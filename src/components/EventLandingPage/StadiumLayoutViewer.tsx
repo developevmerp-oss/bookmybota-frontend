@@ -496,21 +496,31 @@ export default function StadiumLayoutViewer({
         const cy = by + bh / 2;
         const numTiers = Math.max(1, block.tiers?.length || 1);
 
+        const isHorizontalSplit = (block as any).tier_split_direction === "horizontal";
         let tierTop = 0;
         let tierH = bh;
+        let tierLeft = 0;
+        let tierW = bw;
+
         if (resolvedTierId && numTiers > 1) {
           const tIdx = block.tiers.findIndex((t) => t.tier_id === resolvedTierId);
           if (tIdx >= 0) {
-            const baseTierH = bh / numTiers;
-            tierTop = tIdx * baseTierH;
-            tierH = baseTierH;
+            if (isHorizontalSplit) {
+              const baseTierW = bw / numTiers;
+              tierLeft = tIdx * baseTierW;
+              tierW = baseTierW;
+            } else {
+              const baseTierH = bh / numTiers;
+              tierTop = tIdx * baseTierH;
+              tierH = baseTierH;
+            }
           }
         }
 
         const localY0 = tierTop - bh / 2;
         const localY1 = tierTop + tierH - bh / 2;
-        const localX0 = -bw / 2;
-        const localX1 = bw / 2;
+        const localX0 = tierLeft - bw / 2;
+        const localX1 = tierLeft + tierW - bw / 2;
 
         const corners = [
           { x: cx + localX0 * cosRot - localY0 * sinRot, y: cy + localX0 * sinRot + localY0 * cosRot },
@@ -1029,9 +1039,23 @@ export default function StadiumLayoutViewer({
     });
 
     let overallMinDist = Infinity;
+    // Also check inter-row distance so rows never overlap vertically
+    const rowLabels = Array.from(rowMap.keys());
+    for (let ri = 0; ri < rowLabels.length - 1; ri++) {
+      const seatsA = rowMap.get(rowLabels[ri]) || [];
+      const seatsB = rowMap.get(rowLabels[ri + 1]) || [];
+      if (seatsA.length > 0 && seatsB.length > 0) {
+        const dRow = Math.hypot(seatsB[0].posX - seatsA[0].posX, seatsB[0].posY - seatsA[0].posY);
+        if (dRow > 2 && dRow < overallMinDist) {
+          overallMinDist = dRow;
+        }
+      }
+    }
+
     rowMap.forEach((seats, rLabel) => {
       if (seats.length < 2) {
-        map.set(rLabel, 6.5);
+        const r = overallMinDist !== Infinity ? Math.max(2.2, Math.min(8.5, overallMinDist * 0.40)) : 6.0;
+        map.set(rLabel, r);
         return;
       }
       let minDist = Infinity;
@@ -1042,12 +1066,13 @@ export default function StadiumLayoutViewer({
       if (minDist !== Infinity && minDist < overallMinDist) {
         overallMinDist = minDist;
       }
-      // Guarantee comfortable 20% air margin between adjacent seats in this specific row
-      const r = Math.max(3.8, Math.min(9.5, minDist * 0.40));
+      // Guarantee comfortable air margin between adjacent seats (strictly prevents overlap)
+      const effectiveDist = Math.min(minDist, overallMinDist);
+      const r = Math.max(2.2, Math.min(8.5, effectiveDist * 0.40));
       map.set(rLabel, r);
     });
 
-    const defaultRadius = overallMinDist !== Infinity ? Math.max(4.0, Math.min(8.5, overallMinDist * 0.38)) : 6.0;
+    const defaultRadius = overallMinDist !== Infinity ? Math.max(2.2, Math.min(8.0, overallMinDist * 0.40)) : 6.0;
     return { rowSeatRadii: map, dynamicSeatRadius: defaultRadius };
   }, [selectedBlock, renderedSeats]);
 
@@ -1898,57 +1923,111 @@ export default function StadiumLayoutViewer({
                     perfectDrawEnabled={false}
                   />
 
-                  <Line
-                    points={[25, pitchH / 2, pitchW - 25, pitchH / 2]}
-                    stroke="#ffffff"
-                    strokeWidth={2}
-                    opacity={0.7}
-                    listening={false}
-                  />
-
-                  <Circle
-                    x={pitchW / 2}
-                    y={pitchH / 2}
-                    radius={pitchH * 0.16}
-                    stroke="#ffffff"
-                    strokeWidth={2}
-                    opacity={0.7}
-                    listening={false}
-                    perfectDrawEnabled={false}
-                  />
-                  <Circle
-                    x={pitchW / 2}
-                    y={pitchH / 2}
-                    radius={5}
-                    fill="#ffffff"
-                    opacity={0.9}
-                    listening={false}
-                    perfectDrawEnabled={false}
-                  />
-
-                  <Rect
-                    x={pitchW * 0.3}
-                    y={25}
-                    width={pitchW * 0.4}
-                    height={pitchH * 0.18}
-                    stroke="#ffffff"
-                    strokeWidth={2}
-                    opacity={0.7}
-                    listening={false}
-                    perfectDrawEnabled={false}
-                  />
-
-                  <Rect
-                    x={pitchW * 0.3}
-                    y={pitchH - 25 - pitchH * 0.18}
-                    width={pitchW * 0.4}
-                    height={pitchH * 0.18}
-                    stroke="#ffffff"
-                    strokeWidth={2}
-                    opacity={0.7}
-                    listening={false}
-                    perfectDrawEnabled={false}
-                  />
+                  {pitchW >= pitchH ? (
+                    <>
+                      <Line
+                        points={[pitchW / 2, 25, pitchW / 2, pitchH - 25]}
+                        stroke="#ffffff"
+                        strokeWidth={2}
+                        opacity={0.7}
+                        listening={false}
+                        perfectDrawEnabled={false}
+                      />
+                      <Circle
+                        x={pitchW / 2}
+                        y={pitchH / 2}
+                        radius={Math.min(pitchW, pitchH) * 0.16}
+                        stroke="#ffffff"
+                        strokeWidth={2}
+                        opacity={0.7}
+                        listening={false}
+                        perfectDrawEnabled={false}
+                      />
+                      <Circle
+                        x={pitchW / 2}
+                        y={pitchH / 2}
+                        radius={5}
+                        fill="#ffffff"
+                        opacity={0.9}
+                        listening={false}
+                        perfectDrawEnabled={false}
+                      />
+                      <Rect
+                        x={25}
+                        y={(pitchH - pitchH * 0.52) / 2}
+                        width={pitchW * 0.16}
+                        height={pitchH * 0.52}
+                        stroke="#ffffff"
+                        strokeWidth={2}
+                        opacity={0.7}
+                        listening={false}
+                        perfectDrawEnabled={false}
+                      />
+                      <Rect
+                        x={pitchW - 25 - pitchW * 0.16}
+                        y={(pitchH - pitchH * 0.52) / 2}
+                        width={pitchW * 0.16}
+                        height={pitchH * 0.52}
+                        stroke="#ffffff"
+                        strokeWidth={2}
+                        opacity={0.7}
+                        listening={false}
+                        perfectDrawEnabled={false}
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <Line
+                        points={[25, pitchH / 2, pitchW - 25, pitchH / 2]}
+                        stroke="#ffffff"
+                        strokeWidth={2}
+                        opacity={0.7}
+                        listening={false}
+                        perfectDrawEnabled={false}
+                      />
+                      <Circle
+                        x={pitchW / 2}
+                        y={pitchH / 2}
+                        radius={pitchH * 0.16}
+                        stroke="#ffffff"
+                        strokeWidth={2}
+                        opacity={0.7}
+                        listening={false}
+                        perfectDrawEnabled={false}
+                      />
+                      <Circle
+                        x={pitchW / 2}
+                        y={pitchH / 2}
+                        radius={5}
+                        fill="#ffffff"
+                        opacity={0.9}
+                        listening={false}
+                        perfectDrawEnabled={false}
+                      />
+                      <Rect
+                        x={pitchW * 0.3}
+                        y={25}
+                        width={pitchW * 0.4}
+                        height={pitchH * 0.18}
+                        stroke="#ffffff"
+                        strokeWidth={2}
+                        opacity={0.7}
+                        listening={false}
+                        perfectDrawEnabled={false}
+                      />
+                      <Rect
+                        x={pitchW * 0.3}
+                        y={pitchH - 25 - pitchH * 0.18}
+                        width={pitchW * 0.4}
+                        height={pitchH * 0.18}
+                        stroke="#ffffff"
+                        strokeWidth={2}
+                        opacity={0.7}
+                        listening={false}
+                        perfectDrawEnabled={false}
+                      />
+                    </>
+                  )}
                 </>
               )}
 
@@ -2399,9 +2478,11 @@ export default function StadiumLayoutViewer({
 
                       {block.tiers.map((tier, tIdx) => {
                         const numTiers = block.tiers.length;
-                        const baseTierH = block.height / numTiers;
-                        const tierY = tIdx * baseTierH;
-                        const tierH = baseTierH;
+                        const isHorizontal = (block as any).tier_split_direction === "horizontal";
+                        const tierW = isHorizontal ? block.width / numTiers : block.width;
+                        const tierH = isHorizontal ? block.height : block.height / numTiers;
+                        const tierX = isHorizontal ? tIdx * tierW : 0;
+                        const tierY = isHorizontal ? 0 : tIdx * tierH;
                         const tierColor = tier.color || (tIdx === 0 ? "#f59e0b" : "#10b981");
                         const isTierSoldOut = tier.available === 0 && tier.total > 0;
                         const isFirst = tIdx === 0;
@@ -2425,9 +2506,9 @@ export default function StadiumLayoutViewer({
                             }}
                           >
                             <Rect
-                              x={0}
+                              x={tierX}
                               y={tierY}
-                              width={block.width}
+                              width={tierW}
                               height={tierH}
                               fill={
                                 isSelected

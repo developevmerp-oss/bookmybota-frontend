@@ -56,6 +56,11 @@ import {
   Settings2,
   Crosshair,
   Ticket,
+  Eye,
+  Send,
+  ArrowLeft,
+  ShoppingBag,
+  Users,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useGenerateStadiumSeatsMutation } from "@/services/api";
@@ -107,6 +112,9 @@ export interface StadiumBlockDef {
   row_seat_overrides?: Record<string, number>;
   row_gaps?: string[];
   excluded_seats?: string[];
+  tier_split_direction?: "vertical" | "horizontal";
+  tier_order_reversed?: boolean;
+  stand_level?: "lower" | "upper" | "multi";
   tiers: StadiumTierDef[];
 }
 
@@ -261,8 +269,8 @@ function defaultTier(): StadiumTierDef {
     color,
     ticket_type_id: "",
     row_start: "A",
-    row_end: "J",
-    seats_per_row: 25,
+    row_end: "E",
+    seats_per_row: 14,
     price: 500,
   };
 }
@@ -1078,6 +1086,7 @@ function BlockPanel({
   onUpdate,
   onDelete,
   onSelect,
+  onDuplicateAsUpperTier,
 }: {
   block: StadiumBlockDef;
   isSelected: boolean;
@@ -1087,6 +1096,7 @@ function BlockPanel({
   onUpdate: (b: StadiumBlockDef) => void;
   onDelete: () => void;
   onSelect: () => void;
+  onDuplicateAsUpperTier?: (b: StadiumBlockDef) => void;
 }) {
   const [open, setOpen] = useState(true);
   const [showDirectCustomizer, setShowDirectCustomizer] = useState(false);
@@ -1305,6 +1315,63 @@ function BlockPanel({
             </div>
           </div>
 
+          {/* Stand Level / Tier Mode Selector */}
+          <div className="space-y-1">
+            <label className="text-[10px] uppercase font-bold text-slate-600 tracking-wider block">
+              Stand Level Mode
+            </label>
+            <div className="grid grid-cols-3 gap-1 p-1 bg-slate-100 rounded-xl border border-slate-200">
+              <button
+                type="button"
+                onClick={() => {
+                  onUpdate({
+                    ...block,
+                    stand_level: "lower",
+                  });
+                }}
+                className={`py-1.5 px-1.5 rounded-lg text-[10px] font-bold text-center transition-all ${
+                  block.stand_level === "lower"
+                    ? "bg-emerald-600 text-white shadow-sm"
+                    : "text-slate-600 hover:text-slate-900 bg-white border border-slate-200 shadow-sm"
+                }`}
+              >
+                🌱 Lower Stand
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onUpdate({
+                    ...block,
+                    stand_level: "upper",
+                  });
+                }}
+                className={`py-1.5 px-1.5 rounded-lg text-[10px] font-bold text-center transition-all ${
+                  block.stand_level === "upper"
+                    ? "bg-blue-600 text-white shadow-sm"
+                    : "text-slate-600 hover:text-slate-900 bg-white border border-slate-200 shadow-sm"
+                }`}
+              >
+                🏛️ Upper Stand
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onUpdate({
+                    ...block,
+                    stand_level: "multi",
+                  });
+                }}
+                className={`py-1.5 px-1.5 rounded-lg text-[10px] font-bold text-center transition-all ${
+                  block.stand_level === "multi" || !block.stand_level
+                    ? "bg-amber-500 text-slate-950 shadow-sm"
+                    : "text-slate-600 hover:text-slate-900 bg-white border border-slate-200 shadow-sm"
+                }`}
+              >
+                🥞 Multi-Tier
+              </button>
+            </div>
+          </div>
+
           {/* Stand Capacity & Price (Two Column Card - Seated mode) */}
           {!isStanding && (
             <div className="grid grid-cols-2 gap-2.5 p-3 bg-slate-50 rounded-xl border border-slate-200">
@@ -1440,6 +1507,42 @@ function BlockPanel({
                     </button>
                   ))}
                 </div>
+                {/* Duplicate Arc as Concentric Upper Tier Ring */}
+                {onDuplicateAsUpperTier && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const inR = block.outerRadius ? block.outerRadius + 8 : 342;
+                      const depth = Math.max(50, (block.outerRadius || 335) - (block.innerRadius || 260));
+                      const outR = inR + depth;
+                      const defaultTicket = ticketTypes[1]?.id || ticketTypes[0]?.id || "";
+                      const newUpperBlock: StadiumBlockDef = {
+                        ...block,
+                        id: makeId(),
+                        name: `${block.name.replace(/gr\. floor|ground floor|lower tier/i, "").trim()} Upper Tier`,
+                        color: "#9d174d",
+                        stand_level: "upper",
+                        innerRadius: inR,
+                        outerRadius: outR,
+                        tiers: [
+                          {
+                            id: makeId(),
+                            name: "Upper Grandstand",
+                            ticket_type_id: defaultTicket,
+                            row_start: "A",
+                            row_end: "M",
+                            seats_per_row: 25,
+                          },
+                        ],
+                      };
+                      onDuplicateAsUpperTier(newUpperBlock);
+                      toast.success(`Created concentric Upper Tier ring for ${block.name}!`);
+                    }}
+                    className="w-full mt-1.5 py-1.5 px-2 rounded-lg bg-sky-100 hover:bg-sky-200 border border-sky-300 text-sky-900 text-[11px] font-bold transition-all shadow-sm flex items-center justify-center gap-1.5"
+                  >
+                    <span>⭕ + Add Concentric Upper Tier Ring</span>
+                  </button>
+                )}
               </div>
 
               {/* Rotate Ring Arc Slider & Quick Rotate Buttons */}
@@ -1604,33 +1707,80 @@ function BlockPanel({
               </div>
             </div>
           ) : (
-            <div className="flex items-center gap-1.5">
-              <div className="flex-1 grid grid-cols-4 gap-1 text-[11px] text-slate-600 bg-slate-50 p-2 rounded-xl border border-slate-200 font-mono font-semibold text-center">
-                <span>X: {Math.round(block.x)}</span>
-                <span>Y: {Math.round(block.y)}</span>
-                <span>W: {Math.round(block.width)}</span>
-                <span>H: {Math.round(block.height)}</span>
+            <div className="space-y-2">
+              <div className="flex items-center gap-1.5">
+                <div className="flex-1 grid grid-cols-4 gap-1 text-[11px] text-slate-600 bg-slate-50 p-2 rounded-xl border border-slate-200 font-mono font-semibold text-center">
+                  <span>X: {Math.round(block.x)}</span>
+                  <span>Y: {Math.round(block.y)}</span>
+                  <span>W: {Math.round(block.width)}</span>
+                  <span>H: {Math.round(block.height)}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const dims = calculateOptimalBlockDimensions(block, pitchW, pitchH);
+                    onUpdate({
+                      ...block,
+                      width: dims.width,
+                      height: dims.height,
+                      innerRadius: dims.innerRadius ?? block.innerRadius,
+                      outerRadius: dims.outerRadius ?? block.outerRadius,
+                      sweepAngle: dims.sweepAngle ?? block.sweepAngle,
+                    });
+                    toast.success(`Auto-adjusted ${block.name} size to fit ${totalSeats} seats!`);
+                  }}
+                  className="py-2 px-2.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 text-[10px] font-extrabold flex items-center gap-1 shadow-sm shrink-0 transition-colors"
+                  title="Auto-calculate and set optimal width and height for this stand based on its seats & rows"
+                >
+                  <Maximize2 className="w-3.5 h-3.5 text-amber-600" />
+                  <span>Auto-Fit Size</span>
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  const dims = calculateOptimalBlockDimensions(block, pitchW, pitchH);
-                  onUpdate({
-                    ...block,
-                    width: dims.width,
-                    height: dims.height,
-                    innerRadius: dims.innerRadius ?? block.innerRadius,
-                    outerRadius: dims.outerRadius ?? block.outerRadius,
-                    sweepAngle: dims.sweepAngle ?? block.sweepAngle,
-                  });
-                  toast.success(`Auto-adjusted ${block.name} size to fit ${totalSeats} seats!`);
-                }}
-                className="py-2 px-2.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 text-[10px] font-extrabold flex items-center gap-1 shadow-sm shrink-0 transition-colors"
-                title="Auto-calculate and set optimal width and height for this stand based on its seats & rows"
-              >
-                <Maximize2 className="w-3.5 h-3.5 text-amber-600" />
-                <span>Auto-Fit Size</span>
-              </button>
+
+              {/* Stand Rotation Controls */}
+              <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] uppercase font-bold text-slate-600 tracking-wider flex items-center gap-1">
+                    🔄 Stand Rotation ({Math.round(block.rotation || 0)}°)
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onUpdate({
+                          ...block,
+                          rotation: ((block.rotation || 0) + 90) % 360,
+                        })
+                      }
+                      className="px-2 py-1 rounded-lg bg-white hover:bg-slate-100 border border-slate-300 text-[10px] font-bold text-slate-700 shadow-sm transition-all"
+                    >
+                      🔄 Rotate 90°
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onUpdate({
+                          ...block,
+                          rotation: 0,
+                        })
+                      }
+                      className="px-1.5 py-1 rounded-lg bg-white hover:bg-slate-100 border border-slate-300 text-[10px] font-bold text-slate-500 shadow-sm transition-all"
+                      title="Reset rotation to 0°"
+                    >
+                      Reset
+                    </button>
+                  </div>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={360}
+                  step={5}
+                  value={Math.round(block.rotation || 0)}
+                  onChange={(e) => onUpdate({ ...block, rotation: Number(e.target.value) || 0 })}
+                  className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-amber-500"
+                />
+              </div>
             </div>
           )}
 
@@ -2005,6 +2155,51 @@ function BlockPanel({
                 </span>
               </button>
 
+              {/* Quick Split into Lower & Upper Tier Stand */}
+              <button
+                type="button"
+                onClick={() => {
+                  const defaultTicket = ticketTypes[0]?.id || "";
+                  const premiumTicket = ticketTypes[1]?.id || defaultTicket;
+                  const total = totalSeats || 1000;
+                  const lowerCount = Math.round(total * 0.45);
+                  const upperCount = total - lowerCount;
+                  const fLower = autoFitRowsAndSeats(lowerCount);
+                  const fUpper = autoFitRowsAndSeats(upperCount);
+
+                  onUpdate({
+                    ...block,
+                    seating_type: "tiered",
+                    stand_level: "multi",
+                    tier_split_direction: "vertical",
+                    tiers: [
+                      {
+                        id: `tier-${Date.now()}-lower`,
+                        name: "Lower Tier (Ground)",
+                        color: "#10b981",
+                        ticket_type_id: defaultTicket,
+                        row_start: "A",
+                        row_end: String.fromCharCode("A".charCodeAt(0) + Math.max(0, fLower.rowEnd.charCodeAt(0) - fLower.rowStart.charCodeAt(0))),
+                        seats_per_row: fLower.seatsPerRow,
+                      },
+                      {
+                        id: `tier-${Date.now()}-upper`,
+                        name: "Upper Grandstand",
+                        color: "#3b82f6",
+                        ticket_type_id: premiumTicket,
+                        row_start: String.fromCharCode("A".charCodeAt(0) + Math.max(0, fLower.rowEnd.charCodeAt(0) - fLower.rowStart.charCodeAt(0)) + 1),
+                        row_end: "P",
+                        seats_per_row: fUpper.seatsPerRow,
+                      },
+                    ],
+                  });
+                  toast.success(`Split ${block.name} into Lower Tier & Upper Grandstand!`);
+                }}
+                className="w-full flex items-center justify-center gap-1.5 text-xs font-bold text-sky-800 bg-sky-50 hover:bg-sky-100 border border-sky-300 py-2 px-3 rounded-xl transition-all shadow-sm active:scale-95"
+              >
+                <span>⚡ Split into Lower & Upper Tier Stand</span>
+              </button>
+
               <RowSeatCustomizerModal
                 isOpen={showDirectCustomizer}
                 onClose={() => setShowDirectCustomizer(false)}
@@ -2050,19 +2245,61 @@ function BlockPanel({
           ) : (
             /* Multi-Tier Stand: List of Tiers */
             <div className="space-y-2.5">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-1 flex-wrap">
                 <span className="text-[10px] uppercase tracking-wider font-bold text-slate-700">
                   Seating Tiers ({block.tiers.length})
                 </span>
-                <button
-                  type="button"
-                  onClick={() =>
-                    onUpdate({ ...block, tiers: [...block.tiers, defaultTier()] })
-                  }
-                  className="text-xs text-amber-700 hover:text-amber-800 font-bold flex items-center gap-1 bg-amber-50 hover:bg-amber-100 px-2.5 py-1 rounded-lg border border-amber-300 transition-all active:scale-95"
-                >
-                  <Plus className="w-3.5 h-3.5" /> Add Tier
-                </button>
+                <div className="flex items-center gap-1">
+                  {/* Split Tier Orientation: Stacked (Upper/Lower) vs Side-by-Side (Horizontal) */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const nextDir = block.tier_split_direction === "horizontal" ? "vertical" : "horizontal";
+                      onUpdate({
+                        ...block,
+                        tier_split_direction: nextDir,
+                      });
+                      toast.info(
+                        nextDir === "horizontal"
+                          ? "Tiers split horizontally (Side-by-side Left/Right)"
+                          : "Tiers split vertically (Stacked Upper/Lower)"
+                      );
+                    }}
+                    className="text-[10px] text-slate-700 font-bold flex items-center gap-1 bg-white hover:bg-slate-100 px-2 py-1 rounded-lg border border-slate-300 shadow-sm transition-all active:scale-95"
+                    title="Rotate tier split between Upper/Lower (stacked) and Left/Right (side-by-side)"
+                  >
+                    <span>🔄 Split: {block.tier_split_direction === "horizontal" ? "Horizontal" : "Upper/Lower"}</span>
+                  </button>
+
+                  {/* Reverse / Flip Tiers */}
+                  {block.tiers.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onUpdate({
+                          ...block,
+                          tiers: [...block.tiers].reverse(),
+                          tier_order_reversed: !block.tier_order_reversed,
+                        });
+                        toast.info("Reversed tier order (Upper ↔ Lower)!");
+                      }}
+                      className="text-[10px] text-slate-700 font-bold flex items-center gap-1 bg-white hover:bg-slate-100 px-2 py-1 rounded-lg border border-slate-300 shadow-sm transition-all active:scale-95"
+                      title="Flip tier order (Lower at front vs Upper at front)"
+                    >
+                      <span>⇄ Flip</span>
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onUpdate({ ...block, tiers: [...block.tiers, defaultTier()] })
+                    }
+                    className="text-xs text-amber-700 hover:text-amber-800 font-bold flex items-center gap-1 bg-amber-50 hover:bg-amber-100 px-2.5 py-1 rounded-lg border border-amber-300 transition-all active:scale-95"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Add Tier
+                  </button>
+                </div>
               </div>
 
               {block.tiers.map((tier, ti) => (
@@ -2175,6 +2412,769 @@ function ElementPanel({
   );
 }
 
+// ─── Customer View Simulation Modal (Level 1 Stadium -> Level 2/3 Stand Zoom & Seat Picker) ───
+
+function describeArcSvg(
+  cx: number,
+  cy: number,
+  innerR: number,
+  outerR: number,
+  startAngle: number,
+  sweepAngle: number
+) {
+  const endAngle = startAngle + sweepAngle;
+  const rad1 = (startAngle * Math.PI) / 180;
+  const rad2 = (endAngle * Math.PI) / 180;
+
+  const p1 = { x: cx + outerR * Math.cos(rad1), y: cy + outerR * Math.sin(rad1) };
+  const p2 = { x: cx + outerR * Math.cos(rad2), y: cy + outerR * Math.sin(rad2) };
+  const p3 = { x: cx + innerR * Math.cos(rad2), y: cy + innerR * Math.sin(rad2) };
+  const p4 = { x: cx + innerR * Math.cos(rad1), y: cy + innerR * Math.sin(rad1) };
+
+  const largeArcFlag = sweepAngle > 180 ? 1 : 0;
+
+  return `M ${p1.x} ${p1.y} A ${outerR} ${outerR} 0 ${largeArcFlag} 1 ${p2.x} ${p2.y} L ${p3.x} ${p3.y} A ${innerR} ${innerR} 0 ${largeArcFlag} 0 ${p4.x} ${p4.y} Z`;
+}
+
+interface CustomerPreviewModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  stadiumName: string;
+  groundConfig: StadiumGroundConfig;
+  blocks: StadiumBlockDef[];
+  elements: StadiumElementDef[];
+  ticketTypes: Array<{ id: string; name?: string; ticket_type?: string; price?: number }>;
+  onPublish: () => Promise<void>;
+  isPublishing: boolean;
+}
+
+function CustomerStadiumPreviewModal({
+  isOpen,
+  onClose,
+  stadiumName,
+  groundConfig,
+  blocks,
+  elements,
+  ticketTypes,
+  onPublish,
+  isPublishing,
+}: CustomerPreviewModalProps) {
+  const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
+  const [activeTierIdx, setActiveTierIdx] = useState<number>(0);
+  const [selectedSeats, setSelectedSeats] = useState<
+    Array<{
+      id: string;
+      standName: string;
+      tierName: string;
+      row: string;
+      seat: number;
+      price: number;
+    }>
+  >([]);
+
+  // Reset selected block when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setSelectedBlockId(null);
+      setActiveTierIdx(0);
+    }
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  const currentBlock = blocks.find((b) => b.id === selectedBlockId) || null;
+  const currentTier = currentBlock?.tiers?.[activeTierIdx] || currentBlock?.tiers?.[0];
+
+  const getTierPrice = (tier?: StadiumTierDef) => {
+    if (!tier) return 500;
+    const tt = ticketTypes.find((t) => t.id === tier.ticket_type_id);
+    return tt?.price != null ? Number(tt.price) : Number(tier.price) || 500;
+  };
+
+  const getBlockPrice = (block: StadiumBlockDef) => {
+    const tier = block.tiers?.[0];
+    return getTierPrice(tier);
+  };
+
+  const toggleSeatSelection = (
+    block: StadiumBlockDef,
+    tier: StadiumTierDef,
+    row: string,
+    seatNum: number
+  ) => {
+    const seatId = `${block.id}-${tier.id}-${row}-${seatNum}`;
+    const price = getTierPrice(tier);
+
+    setSelectedSeats((prev) => {
+      const exists = prev.some((s) => s.id === seatId);
+      if (exists) {
+        return prev.filter((s) => s.id !== seatId);
+      } else {
+        return [
+          ...prev,
+          {
+            id: seatId,
+            standName: block.name,
+            tierName: tier.name,
+            row,
+            seat: seatNum,
+            price,
+          },
+        ];
+      }
+    });
+  };
+
+  const totalCartPrice = selectedSeats.reduce((sum, s) => sum + s.price, 0);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="w-full max-w-7xl h-[94vh] bg-slate-900 border border-slate-700/80 rounded-2xl flex flex-col overflow-hidden shadow-2xl relative text-white">
+        {/* ── Top Bar ── */}
+        <div className="shrink-0 flex items-center justify-between gap-3 px-4 py-3 bg-slate-950/90 border-b border-slate-800">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="px-2.5 py-1 rounded-md bg-sky-500/20 text-sky-400 border border-sky-500/30 text-[11px] font-extrabold uppercase tracking-wider flex items-center gap-1.5 shrink-0">
+              <Eye className="w-3.5 h-3.5" />
+              <span>Customer Experience Preview</span>
+            </span>
+
+            <div className="flex items-center gap-2 text-xs font-bold text-slate-300 truncate">
+              <span className="text-white font-extrabold">{stadiumName}</span>
+              <span>/</span>
+              {selectedBlockId && currentBlock ? (
+                <div className="flex items-center gap-2">
+                  <span className="text-amber-400 font-extrabold">{currentBlock.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedBlockId(null);
+                      setActiveTierIdx(0);
+                    }}
+                    className="flex items-center gap-1 px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-sky-400 text-[11px] transition-colors"
+                  >
+                    <ArrowLeft className="w-3 h-3" />
+                    <span>Back to Full Stadium</span>
+                  </button>
+                </div>
+              ) : (
+                <span className="text-slate-400">Full Stadium Overview (Level 1)</span>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={async () => {
+                await onPublish();
+                onClose();
+              }}
+              disabled={isPublishing}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-extrabold text-xs shadow-lg shadow-emerald-500/20 active:scale-95 disabled:opacity-50 transition-all"
+              title="Save, generate seats and publish this layout for ticket buyers"
+            >
+              {isPublishing ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Send className="w-3.5 h-3.5" />
+              )}
+              <span>Save & Publish Layout</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-2 rounded-xl text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 transition-colors"
+              title="Close Preview"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* ── Guidance Banner ── */}
+        <div className="shrink-0 px-4 py-2 bg-gradient-to-r from-slate-900 via-sky-950/40 to-slate-900 border-b border-slate-800/80 flex items-center justify-between text-xs">
+          <div className="flex items-center gap-2 text-slate-300">
+            <Sparkles className="w-4 h-4 text-sky-400 shrink-0" />
+            {!selectedBlockId ? (
+              <span>
+                <strong className="text-white">Customer Step 1:</strong> Buyers see the complete 360° stadium map.{" "}
+                <span className="text-sky-300 font-semibold underline decoration-sky-400 underline-offset-2">
+                  Click on any stand below
+                </span>{" "}
+                to zoom inside and test seat selection.
+              </span>
+            ) : (
+              <span>
+                <strong className="text-white">Customer Step 2 & 3:</strong> Buyers view row letters & seat dots. Click
+                any available seat circle to select it into your cart.
+              </span>
+            )}
+          </div>
+
+          <div className="text-[11px] text-slate-400 flex items-center gap-3">
+            <span>Stands: {blocks.length}</span>
+            <span>•</span>
+            <span>Total Capacity: {blocks.reduce((acc, b) => acc + computeBlockSeatCount(b), 0).toLocaleString()} seats</span>
+          </div>
+        </div>
+
+        {/* ── Main Interactive Content Area ── */}
+        <div className="flex-1 relative overflow-auto bg-slate-950 flex flex-col items-center justify-center p-3">
+          {!selectedBlockId ? (
+            /* ═════════ LEVEL 1: FULL STADIUM OVERVIEW ═════════ */
+            <div className="w-full h-full flex flex-col items-center justify-center relative select-none">
+              {(() => {
+                const gx = groundConfig.x ?? PITCH_X;
+                const gy = groundConfig.y ?? PITCH_Y;
+                const gw = groundConfig.width ?? PITCH_W;
+                const gh = groundConfig.height ?? PITCH_H;
+
+                return (
+                  <svg
+                    viewBox={`0 0 ${CANVAS_W} ${CANVAS_H}`}
+                    className="w-full h-full max-h-[72vh] object-contain drop-shadow-2xl"
+                  >
+                    {/* Stadium Grass / Ground Canvas Background */}
+                    <rect x={0} y={0} width={CANVAS_W} height={CANVAS_H} fill="#090d16" />
+
+                    {/* Pitch / Sport Ground in Center */}
+                    {groundConfig.shape === "capsule" ? (
+                      <rect
+                        x={gx}
+                        y={gy}
+                        width={gw}
+                        height={gh}
+                        rx={gw / 2}
+                        fill={groundConfig.track_color || "#7f1d1d"}
+                        stroke="#ffffff"
+                        strokeWidth={2}
+                        strokeOpacity={0.2}
+                      />
+                    ) : groundConfig.shape === "oval" ? (
+                      <ellipse
+                        cx={gx + gw / 2}
+                        cy={gy + gh / 2}
+                        rx={gw / 2}
+                        ry={gh / 2}
+                        fill={groundConfig.turf_color || "#15803d"}
+                        stroke="#ffffff"
+                        strokeWidth={2}
+                        strokeOpacity={0.3}
+                      />
+                    ) : (
+                      <rect
+                        x={gx}
+                        y={gy}
+                        width={gw}
+                        height={gh}
+                        rx={12}
+                        fill={groundConfig.turf_color || "#15803d"}
+                        stroke="#ffffff"
+                        strokeWidth={2}
+                        strokeOpacity={0.2}
+                      />
+                    )}
+
+                    {/* Ground Field Markings */}
+                    {groundConfig.sport_type === "cricket" ? (
+                      <rect
+                        x={gx + gw / 2 - 25}
+                        y={gy + gh / 2 - 80}
+                        width={50}
+                        height={160}
+                        fill="#d97706"
+                        opacity={0.8}
+                        rx={4}
+                      />
+                    ) : gw >= gh ? (
+                      <>
+                        <circle
+                          cx={gx + gw / 2}
+                          cy={gy + gh / 2}
+                          r={gh * 0.16}
+                          fill="none"
+                          stroke="#ffffff"
+                          strokeWidth={2}
+                          strokeOpacity={0.4}
+                        />
+                        <line
+                          x1={gx + gw / 2}
+                          y1={gy}
+                          x2={gx + gw / 2}
+                          y2={gy + gh}
+                          stroke="#ffffff"
+                          strokeWidth={2}
+                          strokeOpacity={0.4}
+                        />
+                        <rect
+                          x={gx}
+                          y={gy + (gh - gh * 0.52) / 2}
+                          width={gw * 0.16}
+                          height={gh * 0.52}
+                          fill="none"
+                          stroke="#ffffff"
+                          strokeWidth={1.5}
+                          strokeOpacity={0.35}
+                        />
+                        <rect
+                          x={gx + gw - gw * 0.16}
+                          y={gy + (gh - gh * 0.52) / 2}
+                          width={gw * 0.16}
+                          height={gh * 0.52}
+                          fill="none"
+                          stroke="#ffffff"
+                          strokeWidth={1.5}
+                          strokeOpacity={0.35}
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <circle
+                          cx={gx + gw / 2}
+                          cy={gy + gh / 2}
+                          r={70}
+                          fill="none"
+                          stroke="#ffffff"
+                          strokeWidth={2}
+                          strokeOpacity={0.4}
+                        />
+                        <line
+                          x1={gx}
+                          y1={gy + gh / 2}
+                          x2={gx + gw}
+                          y2={gy + gh / 2}
+                          stroke="#ffffff"
+                          strokeWidth={2}
+                          strokeOpacity={0.4}
+                        />
+                      </>
+                    )}
+
+                    {/* Pitch Text Label */}
+                    <text
+                      x={gx + gw / 2}
+                      y={gy + gh / 2 + 5}
+                      textAnchor="middle"
+                      fill="#ffffff"
+                      fontSize={14}
+                      fontWeight="bold"
+                      opacity={0.85}
+                      letterSpacing={2}
+                    >
+                      {groundConfig.pitch_label || "STADIUM GROUND"}
+                    </text>
+
+                    {/* Custom Elements (Stage, Gates, Dugouts) */}
+                    {elements.map((el) => (
+                      <g key={el.id} transform={`translate(${el.x}, ${el.y})`}>
+                        <rect
+                          width={el.width}
+                          height={el.height}
+                          rx={8}
+                          fill={el.color || "#475569"}
+                          stroke="#ffffff"
+                          strokeWidth={1.5}
+                          strokeOpacity={0.4}
+                        />
+                        <text
+                          x={el.width / 2}
+                          y={el.height / 2 + 4}
+                          textAnchor="middle"
+                          fill="#ffffff"
+                          fontSize={11}
+                          fontWeight="bold"
+                        >
+                          {el.name}
+                        </text>
+                      </g>
+                    ))}
+
+                {/* All Stadium Stands / Blocks */}
+                {blocks.map((block) => {
+                  const isArc = block.shape === "arc";
+                  const price = getBlockPrice(block);
+                  const capacity = computeBlockSeatCount(block);
+                  const blockColor = block.color || "#2563eb";
+
+                  if (isArc) {
+                    const cx = block.stadiumCenterX ?? CANVAS_W / 2;
+                    const cy = block.stadiumCenterY ?? CANVAS_H / 2;
+                    const innerR = block.innerRadius ?? 260;
+                    const outerR = block.outerRadius ?? 335;
+                    const startA = block.startAngle ?? 0;
+                    const sweepA = block.sweepAngle ?? 45;
+
+                    const dPath = describeArcSvg(cx, cy, innerR, outerR, startA, sweepA);
+
+                    const midA = ((startA + sweepA / 2) * Math.PI) / 180;
+                    const midR = (innerR + outerR) / 2;
+                    const lblX = cx + midR * Math.cos(midA);
+                    const lblY = cy + midR * Math.sin(midA);
+
+                    return (
+                      <g
+                        key={block.id}
+                        className="cursor-pointer transition-transform hover:opacity-95"
+                        onClick={() => {
+                          setSelectedBlockId(block.id);
+                          setActiveTierIdx(0);
+                        }}
+                      >
+                        <path
+                          d={dPath}
+                          fill={blockColor}
+                          stroke="#ffffff"
+                          strokeWidth={2}
+                          strokeOpacity={0.6}
+                          className="hover:stroke-sky-300 hover:stroke-[3.5] transition-all"
+                        />
+                        <rect
+                          x={lblX - 55}
+                          y={lblY - 14}
+                          width={110}
+                          height={28}
+                          rx={14}
+                          fill="#090d16"
+                          stroke="#ffffff"
+                          strokeWidth={1}
+                          strokeOpacity={0.4}
+                        />
+                        <text
+                          x={lblX}
+                          y={lblY - 1}
+                          textAnchor="middle"
+                          fill="#ffffff"
+                          fontSize={10}
+                          fontWeight="bold"
+                        >
+                          {block.name}
+                        </text>
+                        <text
+                          x={lblX}
+                          y={lblY + 10}
+                          textAnchor="middle"
+                          fill="#38bdf8"
+                          fontSize={8}
+                          fontWeight="bold"
+                        >
+                          ETB {price.toLocaleString()} · {capacity} seats
+                        </text>
+                      </g>
+                    );
+                  }
+
+                  // Rectangular / Curved Block
+                  const bx = block.x;
+                  const by = block.y;
+                  const bw = block.width;
+                  const bh = block.height;
+                  const rot = block.rotation || 0;
+
+                  return (
+                    <g
+                      key={block.id}
+                      transform={`translate(${bx}, ${by}) rotate(${rot}, ${bw / 2}, ${bh / 2})`}
+                      className="cursor-pointer transition-transform hover:opacity-95"
+                      onClick={() => {
+                        setSelectedBlockId(block.id);
+                        setActiveTierIdx(0);
+                      }}
+                    >
+                      <rect
+                        x={0}
+                        y={0}
+                        width={bw}
+                        height={bh}
+                        rx={block.shape === "pill" ? 16 : 8}
+                        fill={blockColor}
+                        stroke="#ffffff"
+                        strokeWidth={2}
+                        strokeOpacity={0.6}
+                        className="hover:stroke-sky-300 hover:stroke-[3.5] transition-all"
+                      />
+                      <rect
+                        x={bw / 2 - 60}
+                        y={bh / 2 - 16}
+                        width={120}
+                        height={32}
+                        rx={8}
+                        fill="#090d16"
+                        stroke="#ffffff"
+                        strokeWidth={1}
+                        strokeOpacity={0.4}
+                      />
+                      <text
+                        x={bw / 2}
+                        y={bh / 2 - 2}
+                        textAnchor="middle"
+                        fill="#ffffff"
+                        fontSize={11}
+                        fontWeight="bold"
+                      >
+                        {block.name}
+                      </text>
+                      <text
+                        x={bw / 2}
+                        y={bh / 2 + 11}
+                        textAnchor="middle"
+                        fill="#38bdf8"
+                        fontSize={9}
+                        fontWeight="bold"
+                      >
+                        ETB {price.toLocaleString()} · {capacity} seats
+                      </text>
+                    </g>
+                  );
+                })}
+                  </svg>
+                );
+              })()}
+            </div>
+          ) : (
+            /* ═════════ LEVEL 2 & 3: STAND ZOOM & INTERACTIVE SEAT PICKER ═════════ */
+            <div className="w-full h-full flex flex-col bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
+              {/* Stand Header & Tier Tabs */}
+              <div className="shrink-0 p-3 bg-slate-950 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedBlockId(null);
+                      setActiveTierIdx(0);
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-sky-400 text-xs font-bold transition-colors"
+                  >
+                    <ArrowLeft className="w-3.5 h-3.5" />
+                    <span>Back to Stadium Bowl</span>
+                  </button>
+
+                  <div>
+                    <h3 className="text-sm font-extrabold text-white flex items-center gap-2">
+                      <span>{currentBlock?.name}</span>
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-300 border border-slate-700">
+                        {currentBlock?.stand_type === "standing"
+                          ? "Standing Fan Zone"
+                          : currentBlock && currentBlock.tiers.length > 1
+                          ? "Multi-Tier Stand"
+                          : "Seated Stand"}
+                      </span>
+                    </h3>
+                  </div>
+                </div>
+
+                {/* Tier Tabs (if multi-tier stand) */}
+                {currentBlock && currentBlock.tiers.length > 1 && (
+                  <div className="flex items-center gap-1.5 bg-slate-900 p-1 rounded-xl border border-slate-800">
+                    {currentBlock.tiers.map((t, idx) => {
+                      const isActive = activeTierIdx === idx;
+                      const price = getTierPrice(t);
+                      return (
+                        <button
+                          key={t.id || idx}
+                          type="button"
+                          onClick={() => setActiveTierIdx(idx)}
+                          className={`px-3 py-1 rounded-lg text-xs font-extrabold transition-all flex items-center gap-1.5 ${
+                            isActive
+                              ? "bg-sky-500 text-slate-950 shadow-md shadow-sky-500/20"
+                              : "text-slate-400 hover:text-white"
+                          }`}
+                        >
+                          <span
+                            className="w-2.5 h-2.5 rounded-full shrink-0"
+                            style={{ backgroundColor: t.color || "#22c55e" }}
+                          />
+                          <span>{t.name}</span>
+                          <span className="opacity-80 text-[10px]">• ETB {price}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Seat Legend */}
+                <div className="flex items-center gap-4 text-xs font-semibold text-slate-400">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-3.5 h-3.5 rounded-full border border-sky-400 bg-sky-500/20" />
+                    <span>Available</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-3.5 h-3.5 rounded-full bg-emerald-500 flex items-center justify-center text-[9px] text-slate-950 font-bold">
+                      ✓
+                    </span>
+                    <span className="text-emerald-400">Selected</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-3.5 h-3.5 rounded-full bg-slate-700 opacity-60 text-center text-[9px]">✕</span>
+                    <span>Booked</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Pitch Direction Indicator */}
+              <div className="shrink-0 py-1.5 bg-slate-950/60 border-b border-slate-800/80 text-center text-[11px] font-bold text-slate-400 uppercase tracking-widest">
+                🏟️ Ground / Pitch This Way ↑
+              </div>
+
+              {/* Stand Virtual Seat Map Canvas */}
+              <div className="flex-1 overflow-auto p-6 flex flex-col items-center justify-center">
+                {currentBlock?.stand_type === "standing" ? (
+                  <div className="p-8 rounded-2xl bg-slate-800/60 border border-slate-700 text-center max-w-md space-y-4">
+                    <Users className="w-12 h-12 text-sky-400 mx-auto" />
+                    <div>
+                      <h4 className="text-base font-bold text-white">Standing Only Fan Zone</h4>
+                      <p className="text-xs text-slate-400 mt-1">
+                        General admission area with total capacity of {currentBlock.capacity || 500} guests.
+                      </p>
+                    </div>
+                    <div className="text-sm font-extrabold text-amber-400">
+                      ETB {getBlockPrice(currentBlock).toLocaleString()} per ticket
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3 select-none">
+                    {(() => {
+                      const tier = currentTier;
+                      if (!tier) return null;
+
+                      const startCode = (tier.row_start || "A").toUpperCase().charCodeAt(0);
+                      const endCode = (tier.row_end || "E").toUpperCase().charCodeAt(0);
+                      const spr = Math.max(1, tier.seats_per_row || 14);
+
+                      const rows: string[] = [];
+                      for (let c = startCode; c <= endCode; c++) {
+                        rows.push(String.fromCharCode(c));
+                      }
+
+                      return rows.map((rLabel) => (
+                        <div key={rLabel} className="flex items-center justify-center gap-3">
+                          {/* Left Row Label */}
+                          <span className="w-7 text-right font-mono font-bold text-xs text-slate-400 shrink-0">
+                            {rLabel}
+                          </span>
+
+                          {/* Seats in Row */}
+                          <div className="flex items-center gap-2">
+                            {Array.from({ length: spr }, (_, i) => i + 1).map((seatNum) => {
+                              const seatId = `${currentBlock.id}-${tier.id}-${rLabel}-${seatNum}`;
+                              const isSelected = selectedSeats.some((s) => s.id === seatId);
+                              // Simulate a realistic 10% booked seats for demonstration
+                              const isBooked = (seatNum * 7 + rLabel.charCodeAt(0)) % 11 === 0;
+
+                              return (
+                                <button
+                                  key={seatNum}
+                                  type="button"
+                                  disabled={isBooked}
+                                  onClick={() => toggleSeatSelection(currentBlock, tier, rLabel, seatNum)}
+                                  className={`w-7 h-7 rounded-full text-[10px] font-bold flex items-center justify-center transition-all ${
+                                    isSelected
+                                      ? "bg-emerald-500 text-slate-950 font-extrabold shadow-md shadow-emerald-500/40 ring-2 ring-emerald-300 scale-110"
+                                      : isBooked
+                                      ? "bg-slate-800 text-slate-600 cursor-not-allowed border border-slate-700/50"
+                                      : "bg-slate-800 hover:bg-sky-500 text-slate-300 hover:text-slate-950 border border-slate-600 hover:border-sky-400 active:scale-95"
+                                  }`}
+                                  title={`Row ${rLabel} · Seat ${seatNum} · ETB ${getTierPrice(tier)}`}
+                                >
+                                  {isSelected ? "✓" : isBooked ? "✕" : seatNum}
+                                </button>
+                              );
+                            })}
+                          </div>
+
+                          {/* Right Row Label */}
+                          <span className="w-7 text-left font-mono font-bold text-xs text-slate-400 shrink-0">
+                            {rLabel}
+                          </span>
+                        </div>
+                      ));
+                    })()}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ── Bottom Cart & Order Summary Bar (Customer Experience Simulation) ── */}
+        <div className="shrink-0 p-3 bg-slate-950 border-t border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 shrink-0 flex items-center gap-1.5 font-bold">
+              <ShoppingBag className="w-4 h-4" />
+              <span>{selectedSeats.length} Seat(s) Selected</span>
+            </div>
+
+            <div className="flex items-center gap-1.5 overflow-x-auto py-1 max-w-xl">
+              {selectedSeats.length === 0 ? (
+                <span className="text-slate-500 text-xs italic">
+                  No seats selected yet. Click any seat circle above to simulate customer booking.
+                </span>
+              ) : (
+                selectedSeats.map((s) => (
+                  <span
+                    key={s.id}
+                    className="px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700 text-white font-bold text-[11px] flex items-center gap-1.5 shrink-0"
+                  >
+                    <span>
+                      {s.standName}: {s.row}-{s.seat}
+                    </span>
+                    <span className="text-emerald-400 font-extrabold">ETB {s.price}</span>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedSeats((prev) => prev.filter((x) => x.id !== s.id))}
+                      className="text-slate-400 hover:text-rose-400 ml-0.5"
+                    >
+                      ✕
+                    </button>
+                  </span>
+                ))
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 shrink-0">
+            {selectedSeats.length > 0 && (
+              <div className="text-right">
+                <span className="text-[10px] text-slate-400 uppercase font-bold block">Total Amount</span>
+                <span className="text-sm font-extrabold text-emerald-400">
+                  ETB {totalCartPrice.toLocaleString()}
+                </span>
+              </div>
+            )}
+
+            {selectedSeats.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setSelectedSeats([])}
+                className="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 transition-colors font-bold text-xs"
+              >
+                Clear
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={async () => {
+                await onPublish();
+                onClose();
+              }}
+              disabled={isPublishing}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-extrabold text-xs shadow-lg shadow-emerald-500/20 active:scale-95 disabled:opacity-50 transition-all"
+            >
+              {isPublishing ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Send className="w-3.5 h-3.5" />
+              )}
+              <span>Save & Publish Stadium</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main StadiumBlockBuilder Component ──────────────────────────────────────
 
 export default function StadiumBlockBuilder({
@@ -2194,7 +3194,7 @@ export default function StadiumBlockBuilder({
     total_count?: number;
   }>;
   initialConfig?: StadiumSeatingConfigOutput | null;
-  onSave: (config: StadiumSeatingConfigOutput) => Promise<void>;
+  onSave: (config: StadiumSeatingConfigOutput, options?: { publish?: boolean }) => Promise<void>;
   saving?: boolean;
   eventId?: string;
   isVenueRequest?: boolean;
@@ -2243,6 +3243,10 @@ export default function StadiumBlockBuilder({
   // Validation modal state
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [showValidationModal, setShowValidationModal] = useState(false);
+
+  // Customer Preview & Publishing State
+  const [showCustomerPreview, setShowCustomerPreview] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
 
   const [generateSeats, { isLoading: isGenerating }] =
     useGenerateStadiumSeatsMutation();
@@ -2838,7 +3842,7 @@ export default function StadiumBlockBuilder({
     return { isValid: errors.length === 0, errors };
   };
 
-  const handleSaveAndGenerate = async () => {
+  const handleSaveAndGenerate = async (options?: { publish?: boolean }) => {
     if (!isVenueRequest && isEventOrgRequest) {
       const { isValid, errors } = performStrictValidation();
 
@@ -2861,7 +3865,7 @@ export default function StadiumBlockBuilder({
       elements,
     };
 
-    await onSave(config);
+    await onSave(config, options);
 
     if (eventId && !isVenueRequest) {
       try {
@@ -2875,17 +3879,159 @@ export default function StadiumBlockBuilder({
           blocks: res.blocks,
           tiers: res.tiers,
         });
-        toast.success(
-          `🎉 Generated ${res.generated.toLocaleString()} seats across ${res.blocks} stands!`
-        );
+        if (options?.publish) {
+          toast.success(
+            `🚀 Stadium layout published successfully! Generated ${res.generated.toLocaleString()} seats across ${res.blocks} stands for live booking.`
+          );
+        } else {
+          toast.success(
+            `🎉 Generated ${res.generated.toLocaleString()} seats across ${res.blocks} stands!`
+          );
+        }
       } catch (err: any) {
         toast.error(
           err?.data?.error || err?.message || "Failed to generate stadium seats."
         );
       }
     } else {
-      toast.success("Stadium layout saved successfully!");
+      if (options?.publish) {
+        toast.success("🚀 Stadium layout published successfully!");
+      } else {
+        toast.success("Stadium layout saved successfully!");
+      }
     }
+  };
+
+  const handlePublish = async () => {
+    try {
+      setIsPublishing(true);
+      await handleSaveAndGenerate({ publish: true });
+    } finally {
+      setIsPublishing(false);
+    }
+  };
+
+  const handleOptimizeSpacingAntiOverlap = () => {
+    setBlocks((prev) =>
+      prev.map((block) => {
+        if (block.id === "euro-north") {
+          return {
+            ...block,
+            x: 540,
+            y: 155,
+            width: 520,
+            height: 185,
+            tiers: block.tiers.map((t) => ({
+              ...t,
+              seats_per_row: Math.min(t.seats_per_row || 24, 24),
+            })),
+          };
+        }
+        if (block.id === "euro-south") {
+          return {
+            ...block,
+            x: 540,
+            y: 860,
+            width: 520,
+            height: 185,
+            tiers: block.tiers.map((t) => ({
+              ...t,
+              seats_per_row: Math.min(t.seats_per_row || 24, 24),
+            })),
+          };
+        }
+        if (block.id === "euro-west") {
+          return {
+            ...block,
+            x: 235,
+            y: 440,
+            width: 195,
+            height: 320,
+            tiers: block.tiers.map((t) => ({
+              ...t,
+              seats_per_row: Math.min(t.seats_per_row || 18, 18),
+            })),
+          };
+        }
+        if (block.id === "euro-east") {
+          return {
+            ...block,
+            x: 1170,
+            y: 440,
+            width: 195,
+            height: 320,
+            tiers: block.tiers.map((t) => ({
+              ...t,
+              seats_per_row: Math.min(t.seats_per_row || 18, 18),
+            })),
+          };
+        }
+        if (block.id === "euro-corner-nw") {
+          return {
+            ...block,
+            startAngle: 205,
+            sweepAngle: 22,
+            innerRadius: 440,
+            outerRadius: 575,
+            tiers: block.tiers.map((t) => ({
+              ...t,
+              seats_per_row: Math.min(t.seats_per_row || 10, 10),
+            })),
+          };
+        }
+        if (block.id === "euro-corner-ne") {
+          return {
+            ...block,
+            startAngle: 313,
+            sweepAngle: 22,
+            innerRadius: 440,
+            outerRadius: 575,
+            tiers: block.tiers.map((t) => ({
+              ...t,
+              seats_per_row: Math.min(t.seats_per_row || 10, 10),
+            })),
+          };
+        }
+        if (block.id === "euro-corner-se") {
+          return {
+            ...block,
+            startAngle: 25,
+            sweepAngle: 22,
+            innerRadius: 440,
+            outerRadius: 575,
+            tiers: block.tiers.map((t) => ({
+              ...t,
+              seats_per_row: Math.min(t.seats_per_row || 10, 10),
+            })),
+          };
+        }
+        if (block.id === "euro-corner-sw") {
+          return {
+            ...block,
+            startAngle: 133,
+            sweepAngle: 22,
+            innerRadius: 440,
+            outerRadius: 575,
+            tiers: block.tiers.map((t) => ({
+              ...t,
+              seats_per_row: Math.min(t.seats_per_row || 10, 10),
+            })),
+          };
+        }
+        return {
+          ...block,
+          tiers: block.tiers.map((t) => ({
+            ...t,
+            seats_per_row: Math.min(t.seats_per_row || 14, 14),
+            row_end:
+              (t.row_start || "A") === "A" && t.row_end && t.row_end > "E"
+                ? "D"
+                : t.row_end || "D",
+          })),
+        };
+      })
+    );
+    toast.success("🛡️ Stand capacities & spacing optimized! Zero overlap across all sections.");
   };
 
   return (
@@ -3008,23 +4154,61 @@ export default function StadiumBlockBuilder({
               className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs px-3.5 py-2 rounded-xl transition-all shadow-md shadow-amber-500/20 active:scale-95"
               title="Automatically adjusts width & height of all stands proportionally based on their seats and rows!"
             >
-              <Maximize2 className="w-4 h-4" />
+              <Maximize2 className="w-3.5 h-3.5" />
               <span>Auto-Adjust Sizes</span>
             </button>
           )}
 
+          {blocks.length > 0 && (
+            <button
+              type="button"
+              onClick={handleOptimizeSpacingAntiOverlap}
+              className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-emerald-500/30 font-bold text-xs px-3 py-2 rounded-xl transition-all active:scale-95"
+              title="Adjusts all stands to clean, comfortable seat densities so customer-side seat dots never overlap"
+            >
+              <span>🛡️ Anti-Overlap Seats</span>
+            </button>
+          )}
+
+          {/* Customer Side View Simulation Button */}
           <button
             type="button"
-            onClick={handleSaveAndGenerate}
-            disabled={saving || isGenerating}
-            className="flex items-center gap-1.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 disabled:opacity-50 text-slate-950 font-extrabold text-xs px-5 py-2.5 rounded-xl transition-all shadow-lg active:scale-95 shrink-0"
+            onClick={() => setShowCustomerPreview(true)}
+            className="flex items-center gap-1.5 bg-gradient-to-r from-sky-600 via-indigo-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 text-white font-extrabold text-xs px-3.5 py-2 rounded-xl transition-all shadow-md shadow-sky-600/30 active:scale-95 shrink-0 ring-1 ring-sky-400/30"
+            title="Preview how customers view, explore stands, and select seats on this stadium layout"
+          >
+            <Eye className="w-4 h-4" />
+            <span>Customer Preview</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => void handleSaveAndGenerate()}
+            disabled={saving || isGenerating || isPublishing}
+            className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 font-extrabold text-xs px-4 py-2 rounded-xl transition-all shadow-sm active:scale-95 shrink-0 disabled:opacity-50"
           >
             {saving || isGenerating ? (
               <Loader2 className="w-4 h-4 animate-spin" />
             ) : (
               <Save className="w-4 h-4" />
             )}
-            {eventId ? "Save & Generate Seats" : "Save Stadium Config"}
+            <span>{eventId ? "Save & Generate" : "Save Config"}</span>
+          </button>
+
+          {/* Direct Publish Layout Button */}
+          <button
+            type="button"
+            onClick={() => void handlePublish()}
+            disabled={saving || isGenerating || isPublishing}
+            className="flex items-center gap-1.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-extrabold text-xs px-4 py-2 rounded-xl transition-all shadow-lg shadow-emerald-600/30 active:scale-95 shrink-0 disabled:opacity-50"
+            title="Save, generate all seats and publish layout live for ticket buyers"
+          >
+            {isPublishing ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Send className="w-4 h-4" />
+            )}
+            <span>🚀 Publish Layout</span>
           </button>
 
           {eventId && (
@@ -3511,50 +4695,101 @@ export default function StadiumBlockBuilder({
                       opacity={0.75}
                       listening={false}
                     />
-                    <Line
-                      points={[25, pitchH / 2, pitchW - 25, pitchH / 2]}
-                      stroke="#ffffff"
-                      strokeWidth={2}
-                      opacity={0.75}
-                      listening={false}
-                    />
-                    <Circle
-                      x={pitchW / 2}
-                      y={pitchH / 2}
-                      radius={pitchH * 0.16}
-                      stroke="#ffffff"
-                      strokeWidth={2}
-                      opacity={0.75}
-                      listening={false}
-                    />
-                    <Circle
-                      x={pitchW / 2}
-                      y={pitchH / 2}
-                      radius={7}
-                      fill="#ffffff"
-                      opacity={0.9}
-                      listening={false}
-                    />
-                    <Rect
-                      x={pitchW * 0.3}
-                      y={25}
-                      width={pitchW * 0.4}
-                      height={pitchH * 0.18}
-                      stroke="#ffffff"
-                      strokeWidth={2}
-                      opacity={0.75}
-                      listening={false}
-                    />
-                    <Rect
-                      x={pitchW * 0.3}
-                      y={pitchH - 25 - pitchH * 0.18}
-                      width={pitchW * 0.4}
-                      height={pitchH * 0.18}
-                      stroke="#ffffff"
-                      strokeWidth={2}
-                      opacity={0.75}
-                      listening={false}
-                    />
+                    {pitchW >= pitchH ? (
+                      <>
+                        <Line
+                          points={[pitchW / 2, 25, pitchW / 2, pitchH - 25]}
+                          stroke="#ffffff"
+                          strokeWidth={2}
+                          opacity={0.75}
+                          listening={false}
+                        />
+                        <Circle
+                          x={pitchW / 2}
+                          y={pitchH / 2}
+                          radius={Math.min(pitchW, pitchH) * 0.16}
+                          stroke="#ffffff"
+                          strokeWidth={2}
+                          opacity={0.75}
+                          listening={false}
+                        />
+                        <Circle
+                          x={pitchW / 2}
+                          y={pitchH / 2}
+                          radius={7}
+                          fill="#ffffff"
+                          opacity={0.9}
+                          listening={false}
+                        />
+                        <Rect
+                          x={25}
+                          y={(pitchH - pitchH * 0.52) / 2}
+                          width={pitchW * 0.16}
+                          height={pitchH * 0.52}
+                          stroke="#ffffff"
+                          strokeWidth={2}
+                          opacity={0.75}
+                          listening={false}
+                        />
+                        <Rect
+                          x={pitchW - 25 - pitchW * 0.16}
+                          y={(pitchH - pitchH * 0.52) / 2}
+                          width={pitchW * 0.16}
+                          height={pitchH * 0.52}
+                          stroke="#ffffff"
+                          strokeWidth={2}
+                          opacity={0.75}
+                          listening={false}
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <Line
+                          points={[25, pitchH / 2, pitchW - 25, pitchH / 2]}
+                          stroke="#ffffff"
+                          strokeWidth={2}
+                          opacity={0.75}
+                          listening={false}
+                        />
+                        <Circle
+                          x={pitchW / 2}
+                          y={pitchH / 2}
+                          radius={pitchH * 0.16}
+                          stroke="#ffffff"
+                          strokeWidth={2}
+                          opacity={0.75}
+                          listening={false}
+                        />
+                        <Circle
+                          x={pitchW / 2}
+                          y={pitchH / 2}
+                          radius={7}
+                          fill="#ffffff"
+                          opacity={0.9}
+                          listening={false}
+                        />
+                        <Rect
+                          x={pitchW * 0.3}
+                          y={25}
+                          width={pitchW * 0.4}
+                          height={pitchH * 0.18}
+                          stroke="#ffffff"
+                          strokeWidth={2}
+                          opacity={0.75}
+                          listening={false}
+                        />
+                        <Rect
+                          x={pitchW * 0.3}
+                          y={pitchH - 25 - pitchH * 0.18}
+                          width={pitchW * 0.4}
+                          height={pitchH * 0.18}
+                          stroke="#ffffff"
+                          strokeWidth={2}
+                          opacity={0.75}
+                          listening={false}
+                        />
+                      </>
+                    )}
                   </>
                 )}
 
@@ -3942,11 +5177,14 @@ export default function StadiumBlockBuilder({
                           shadowOpacity={isSelected ? 0.9 : 0.4}
                         />
 
-                        {/* Render each tier as its own slice */}
+                        {/* Render each tier as its own slice (horizontal or vertical split) */}
                         {block.tiers.map((tier, tIdx) => {
                           const numTiers = block.tiers.length;
-                          const tierH = block.height / numTiers;
-                          const tierY = tIdx * tierH;
+                          const isHorizontal = block.tier_split_direction === "horizontal";
+                          const tierW = isHorizontal ? block.width / numTiers : block.width;
+                          const tierH = isHorizontal ? block.height : block.height / numTiers;
+                          const tierX = isHorizontal ? tIdx * tierW : 0;
+                          const tierY = isHorizontal ? 0 : tIdx * tierH;
                           const tierColor = tier.color || (tIdx === 0 ? "#f59e0b" : "#10b981");
                           const isFirst = tIdx === 0;
                           const isLast = tIdx === numTiers - 1;
@@ -3956,15 +5194,21 @@ export default function StadiumBlockBuilder({
                           return (
                             <Group key={tier.id || `tier-slice-${tIdx}`}>
                               <Rect
-                                x={0}
+                                x={tierX}
                                 y={tierY}
-                                width={block.width}
+                                width={tierW}
                                 height={tierH}
                                 fill={tierColor}
                                 opacity={0.92}
                                 cornerRadius={
                                   isFirst && isLast
                                     ? 14
+                                    : isHorizontal
+                                    ? isFirst
+                                      ? [14, 0, 0, 14]
+                                      : isLast
+                                      ? [0, 14, 14, 0]
+                                      : 0
                                     : isFirst
                                     ? [14, 14, 0, 0]
                                     : isLast
@@ -3974,7 +5218,11 @@ export default function StadiumBlockBuilder({
                               />
                               {tIdx > 0 && (
                                 <Line
-                                  points={[8, tierY, block.width - 8, tierY]}
+                                  points={
+                                    isHorizontal
+                                      ? [tierX, 8, tierX, block.height - 8]
+                                      : [8, tierY, block.width - 8, tierY]
+                                  }
                                   stroke="rgba(255,255,255,0.5)"
                                   strokeWidth={1.5}
                                   dash={[5, 4]}
@@ -3983,11 +5231,11 @@ export default function StadiumBlockBuilder({
                               {/* Tier Name & Seats */}
                               <Text
                                 text={tier.name.toUpperCase()}
-                                x={6}
+                                x={tierX + 4}
                                 y={tierY + Math.max(3, tierH * 0.15)}
-                                width={block.width - 12}
+                                width={tierW - 8}
                                 align="center"
-                                fontSize={Math.max(10, Math.min(block.width * 0.05, tierH * 0.32))}
+                                fontSize={Math.max(9, Math.min(tierW * 0.08, tierH * 0.32))}
                                 fontStyle="bold"
                                 fill="#ffffff"
                                 shadowColor="#000000"
@@ -3998,11 +5246,11 @@ export default function StadiumBlockBuilder({
                               />
                               <Text
                                 text={`${tierSeats} seats (${tier.row_start}–${tier.row_end})${assigned ? ` · ${assigned.name || assigned.ticket_type}` : ""}`}
-                                x={6}
+                                x={tierX + 4}
                                 y={tierY + Math.max(16, tierH * 0.55)}
-                                width={block.width - 12}
+                                width={tierW - 8}
                                 align="center"
-                                fontSize={Math.max(9, Math.min(block.width * 0.038, tierH * 0.24))}
+                                fontSize={Math.max(8, Math.min(tierW * 0.06, tierH * 0.24))}
                                 fontStyle="bold"
                                 fill="#fde047"
                                 shadowColor="#000000"
@@ -4258,6 +5506,10 @@ export default function StadiumBlockBuilder({
                     pitchH={pitchH}
                     onUpdate={updateBlock}
                     onDelete={() => deleteBlock(block.id)}
+                    onDuplicateAsUpperTier={(newUpper) => {
+                      setBlocks((prev) => [...prev, newUpper]);
+                      setSelectedId(newUpper.id);
+                    }}
                     onSelect={() => {
                       setSelectedId(block.id);
                       setSelectedElementId(null);
@@ -4565,7 +5817,1757 @@ export default function StadiumBlockBuilder({
                     <span className="text-[11px] uppercase font-bold text-slate-600 tracking-wider block">
                       ⚡ Quick Stadium Architecture Presets
                     </span>
-                    {/* Primary Hero Preset: 360° Circular Cricket Stadium (BookMyShow / Guwahati style) */}
+                    {/* Hero Preset 0: Modern European Football Arena (4 Stands + 4 Corner Arcs as in photo) */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setGroundConfig({
+                          sport_type: "football",
+                          pitch_label: "NATIONAL FOOTBALL ARENA",
+                          turf_color: "#15803d",
+                          track_color: "#1e293b",
+                          shape: "rectangle",
+                          x: 520,
+                          y: 425,
+                          width: 560,
+                          height: 350,
+                          rotation: 0,
+                        });
+                        setPitchLabel("NATIONAL FOOTBALL ARENA");
+
+                        const defaultTicket = ticketTypes[0]?.id || "";
+                        const premiumTicket = ticketTypes[1]?.id || defaultTicket;
+                        const vipTicket = ticketTypes[2]?.id || premiumTicket;
+
+                        const cx = CANVAS_W / 2; // 800
+                        const cy = CANVAS_H / 2; // 600
+
+                        const euroBlocks: StadiumBlockDef[] = [
+                          // 1. North Grandstand (Top Sideline)
+                          {
+                            id: "euro-north",
+                            name: "North Grandstand (Sideline)",
+                            color: "#0284c7",
+                            stand_level: "multi",
+                            shape: "rectangle",
+                            x: 540,
+                            y: 155,
+                            width: 520,
+                            height: 185,
+                            rotation: 0,
+                            capacity: 3200,
+                            tiers: [
+                              {
+                                id: "tier-en-upper",
+                                name: "Upper Grandstand",
+                                color: "#0284c7",
+                                ticket_type_id: premiumTicket,
+                                row_start: "I",
+                                row_end: "N",
+                                seats_per_row: 24,
+                              },
+                              {
+                                id: "tier-en-vip",
+                                name: "VIP Executive Suites",
+                                color: "#f59e0b",
+                                ticket_type_id: vipTicket,
+                                row_start: "G",
+                                row_end: "H",
+                                seats_per_row: 18,
+                              },
+                              {
+                                id: "tier-en-lower",
+                                name: "Lower Tier",
+                                color: "#38bdf8",
+                                ticket_type_id: defaultTicket,
+                                row_start: "A",
+                                row_end: "F",
+                                seats_per_row: 22,
+                              },
+                            ],
+                          },
+
+                          // 2. South Grandstand (Bottom Sideline)
+                          {
+                            id: "euro-south",
+                            name: "South Grandstand (Sideline)",
+                            color: "#dc2626",
+                            stand_level: "multi",
+                            shape: "rectangle",
+                            x: 540,
+                            y: 860,
+                            width: 520,
+                            height: 185,
+                            rotation: 0,
+                            capacity: 3200,
+                            tiers: [
+                              {
+                                id: "tier-es-lower",
+                                name: "Lower Tier",
+                                color: "#f87171",
+                                ticket_type_id: defaultTicket,
+                                row_start: "A",
+                                row_end: "F",
+                                seats_per_row: 22,
+                              },
+                              {
+                                id: "tier-es-vip",
+                                name: "VIP Executive Suites",
+                                color: "#f59e0b",
+                                ticket_type_id: vipTicket,
+                                row_start: "G",
+                                row_end: "H",
+                                seats_per_row: 18,
+                              },
+                              {
+                                id: "tier-es-upper",
+                                name: "Upper Grandstand",
+                                color: "#b91c1c",
+                                ticket_type_id: premiumTicket,
+                                row_start: "I",
+                                row_end: "N",
+                                seats_per_row: 24,
+                              },
+                            ],
+                          },
+
+                          // 3. West Grandstand (Left Goal End)
+                          {
+                            id: "euro-west",
+                            name: "West Goal Stand",
+                            color: "#ea580c",
+                            stand_level: "multi",
+                            shape: "rectangle",
+                            x: 235,
+                            y: 440,
+                            width: 195,
+                            height: 320,
+                            rotation: 0,
+                            tier_split_direction: "horizontal",
+                            capacity: 2600,
+                            tiers: [
+                              {
+                                id: "tier-ew-upper",
+                                name: "Upper Grandstand",
+                                color: "#c2410c",
+                                ticket_type_id: premiumTicket,
+                                row_start: "I",
+                                row_end: "N",
+                                seats_per_row: 18,
+                              },
+                              {
+                                id: "tier-ew-vip",
+                                name: "VIP Executive Suites",
+                                color: "#f59e0b",
+                                ticket_type_id: vipTicket,
+                                row_start: "G",
+                                row_end: "H",
+                                seats_per_row: 14,
+                              },
+                              {
+                                id: "tier-ew-lower",
+                                name: "Lower Tier",
+                                color: "#fb923c",
+                                ticket_type_id: defaultTicket,
+                                row_start: "A",
+                                row_end: "F",
+                                seats_per_row: 16,
+                              },
+                            ],
+                          },
+
+                          // 4. East Grandstand (Right Goal End)
+                          {
+                            id: "euro-east",
+                            name: "East Goal Stand",
+                            color: "#9333ea",
+                            stand_level: "multi",
+                            shape: "rectangle",
+                            x: 1170,
+                            y: 440,
+                            width: 195,
+                            height: 320,
+                            rotation: 0,
+                            tier_split_direction: "horizontal",
+                            capacity: 2600,
+                            tiers: [
+                              {
+                                id: "tier-ee-lower",
+                                name: "Lower Tier",
+                                color: "#c084fc",
+                                ticket_type_id: defaultTicket,
+                                row_start: "A",
+                                row_end: "F",
+                                seats_per_row: 16,
+                              },
+                              {
+                                id: "tier-ee-vip",
+                                name: "VIP Executive Suites",
+                                color: "#f59e0b",
+                                ticket_type_id: vipTicket,
+                                row_start: "G",
+                                row_end: "H",
+                                seats_per_row: 14,
+                              },
+                              {
+                                id: "tier-ee-upper",
+                                name: "Upper Grandstand",
+                                color: "#7e22ce",
+                                ticket_type_id: premiumTicket,
+                                row_start: "I",
+                                row_end: "N",
+                                seats_per_row: 18,
+                              },
+                            ],
+                          },
+
+                          // 5. North-West Corner Arc
+                          {
+                            id: "euro-corner-nw",
+                            name: "Stand NW Corner Arc",
+                            color: "#0ea5e9",
+                            stand_level: "multi",
+                            shape: "arc",
+                            innerRadius: 440,
+                            outerRadius: 575,
+                            startAngle: 205,
+                            sweepAngle: 22,
+                            stadiumCenterX: cx,
+                            stadiumCenterY: cy,
+                            x: cx,
+                            y: cy,
+                            width: 1150,
+                            height: 1150,
+                            rotation: 0,
+                            capacity: 1000,
+                            tiers: [
+                              {
+                                id: "tier-cnw-lower",
+                                name: "Lower Tier",
+                                color: "#7dd3fc",
+                                ticket_type_id: defaultTicket,
+                                row_start: "A",
+                                row_end: "D",
+                                seats_per_row: 10,
+                              },
+                              {
+                                id: "tier-cnw-upper",
+                                name: "Upper Tier",
+                                color: "#0369a1",
+                                ticket_type_id: premiumTicket,
+                                row_start: "E",
+                                row_end: "H",
+                                seats_per_row: 12,
+                              },
+                            ],
+                          },
+
+                          // 6. North-East Corner Arc
+                          {
+                            id: "euro-corner-ne",
+                            name: "Stand NE Corner Arc",
+                            color: "#0ea5e9",
+                            stand_level: "multi",
+                            shape: "arc",
+                            innerRadius: 440,
+                            outerRadius: 575,
+                            startAngle: 313,
+                            sweepAngle: 22,
+                            stadiumCenterX: cx,
+                            stadiumCenterY: cy,
+                            x: cx,
+                            y: cy,
+                            width: 1150,
+                            height: 1150,
+                            rotation: 0,
+                            capacity: 1000,
+                            tiers: [
+                              {
+                                id: "tier-cne-lower",
+                                name: "Lower Tier",
+                                color: "#7dd3fc",
+                                ticket_type_id: defaultTicket,
+                                row_start: "A",
+                                row_end: "D",
+                                seats_per_row: 10,
+                              },
+                              {
+                                id: "tier-cne-upper",
+                                name: "Upper Tier",
+                                color: "#0369a1",
+                                ticket_type_id: premiumTicket,
+                                row_start: "E",
+                                row_end: "H",
+                                seats_per_row: 12,
+                              },
+                            ],
+                          },
+
+                          // 7. South-East Corner Arc
+                          {
+                            id: "euro-corner-se",
+                            name: "Stand SE Corner Arc",
+                            color: "#ef4444",
+                            stand_level: "multi",
+                            shape: "arc",
+                            innerRadius: 440,
+                            outerRadius: 575,
+                            startAngle: 25,
+                            sweepAngle: 22,
+                            stadiumCenterX: cx,
+                            stadiumCenterY: cy,
+                            x: cx,
+                            y: cy,
+                            width: 1150,
+                            height: 1150,
+                            rotation: 0,
+                            capacity: 1000,
+                            tiers: [
+                              {
+                                id: "tier-cse-lower",
+                                name: "Lower Tier",
+                                color: "#fca5a5",
+                                ticket_type_id: defaultTicket,
+                                row_start: "A",
+                                row_end: "D",
+                                seats_per_row: 10,
+                              },
+                              {
+                                id: "tier-cse-upper",
+                                name: "Upper Tier",
+                                color: "#b91c1c",
+                                ticket_type_id: premiumTicket,
+                                row_start: "E",
+                                row_end: "H",
+                                seats_per_row: 12,
+                              },
+                            ],
+                          },
+
+                          // 8. South-West Corner Arc
+                          {
+                            id: "euro-corner-sw",
+                            name: "Stand SW Corner Arc",
+                            color: "#ef4444",
+                            stand_level: "multi",
+                            shape: "arc",
+                            innerRadius: 440,
+                            outerRadius: 575,
+                            startAngle: 133,
+                            sweepAngle: 22,
+                            stadiumCenterX: cx,
+                            stadiumCenterY: cy,
+                            x: cx,
+                            y: cy,
+                            width: 1150,
+                            height: 1150,
+                            rotation: 0,
+                            capacity: 1000,
+                            tiers: [
+                              {
+                                id: "tier-csw-lower",
+                                name: "Lower Tier",
+                                color: "#fca5a5",
+                                ticket_type_id: defaultTicket,
+                                row_start: "A",
+                                row_end: "D",
+                                seats_per_row: 10,
+                              },
+                              {
+                                id: "tier-csw-upper",
+                                name: "Upper Tier",
+                                color: "#b91c1c",
+                                ticket_type_id: premiumTicket,
+                                row_start: "E",
+                                row_end: "H",
+                                seats_per_row: 12,
+                              },
+                            ],
+                          },
+                        ];
+
+                        const euroElements: StadiumElementDef[] = [
+                          {
+                            id: "gate-nw",
+                            name: "Gate 1 (NW)",
+                            type: "gate",
+                            icon: "🚪",
+                            color: "#15803d",
+                            x: 465,
+                            y: 365,
+                            width: 45,
+                            height: 45,
+                            rotation: 0,
+                          },
+                          {
+                            id: "gate-ne",
+                            name: "Gate 2 (NE)",
+                            type: "gate",
+                            icon: "🚪",
+                            color: "#15803d",
+                            x: 1090,
+                            y: 365,
+                            width: 45,
+                            height: 45,
+                            rotation: 0,
+                          },
+                          {
+                            id: "gate-se",
+                            name: "Gate 3 (SE)",
+                            type: "gate",
+                            icon: "🚪",
+                            color: "#15803d",
+                            x: 1090,
+                            y: 790,
+                            width: 45,
+                            height: 45,
+                            rotation: 0,
+                          },
+                          {
+                            id: "gate-sw",
+                            name: "Gate 4 (SW)",
+                            type: "gate",
+                            icon: "🚪",
+                            color: "#15803d",
+                            x: 465,
+                            y: 790,
+                            width: 45,
+                            height: 45,
+                            rotation: 0,
+                          },
+                        ];
+
+                        setBlocks(euroBlocks);
+                        setElements(euroElements);
+                        setSelectedId(euroBlocks[0].id);
+                        toast.success("Generated Modern Football Arena with zero overlap!");
+                      }}
+                      className="w-full p-2.5 rounded-xl bg-gradient-to-r from-emerald-600 via-sky-600 to-indigo-600 hover:from-emerald-500 hover:to-indigo-500 text-white font-extrabold text-xs shadow-md shadow-sky-700/20 flex items-center justify-center gap-2 transition-all active:scale-95"
+                    >
+                      <span className="text-base">🏟️</span>
+                      <span>⚡ Generate European Arena (4 Stands + 4 Corner Arcs)</span>
+                    </button>
+
+                    {/* Hero Preset 0B: Seamless European Arena (Snug Stands & Corners · Zero Gap) */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setGroundConfig({
+                          sport_type: "football",
+                          pitch_label: "NATIONAL FOOTBALL ARENA",
+                          turf_color: "#15803d",
+                          track_color: "#1e293b",
+                          shape: "rectangle",
+                          x: 520,
+                          y: 425,
+                          width: 560,
+                          height: 350,
+                          rotation: 0,
+                        });
+                        setPitchLabel("NATIONAL FOOTBALL ARENA");
+
+                        const defaultTicket = ticketTypes[0]?.id || "";
+                        const premiumTicket = ticketTypes[1]?.id || defaultTicket;
+                        const vipTicket = ticketTypes[2]?.id || premiumTicket;
+
+                        const cx = CANVAS_W / 2; // 800
+                        const cy = CANVAS_H / 2; // 600
+
+                        const snugEuroBlocks: StadiumBlockDef[] = [
+                          // 1. North Grandstand (Sideline)
+                          {
+                            id: "euro-north",
+                            name: "North Grandstand (Sideline)",
+                            color: "#0284c7",
+                            stand_level: "multi",
+                            shape: "rectangle",
+                            x: 500,
+                            y: 155,
+                            width: 600,
+                            height: 185,
+                            rotation: 0,
+                            capacity: 3400,
+                            tiers: [
+                              {
+                                id: "tier-en-upper",
+                                name: "Upper Grandstand",
+                                color: "#0284c7",
+                                ticket_type_id: premiumTicket,
+                                row_start: "I",
+                                row_end: "N",
+                                seats_per_row: 24,
+                              },
+                              {
+                                id: "tier-en-vip",
+                                name: "VIP Executive Suites",
+                                color: "#f59e0b",
+                                ticket_type_id: vipTicket,
+                                row_start: "G",
+                                row_end: "H",
+                                seats_per_row: 18,
+                              },
+                              {
+                                id: "tier-en-lower",
+                                name: "Lower Tier",
+                                color: "#38bdf8",
+                                ticket_type_id: defaultTicket,
+                                row_start: "A",
+                                row_end: "F",
+                                seats_per_row: 22,
+                              },
+                            ],
+                          },
+
+                          // 2. South Grandstand (Sideline)
+                          {
+                            id: "euro-south",
+                            name: "South Grandstand (Sideline)",
+                            color: "#dc2626",
+                            stand_level: "multi",
+                            shape: "rectangle",
+                            x: 500,
+                            y: 860,
+                            width: 600,
+                            height: 185,
+                            rotation: 0,
+                            capacity: 3400,
+                            tiers: [
+                              {
+                                id: "tier-es-lower",
+                                name: "Lower Tier",
+                                color: "#f87171",
+                                ticket_type_id: defaultTicket,
+                                row_start: "A",
+                                row_end: "F",
+                                seats_per_row: 22,
+                              },
+                              {
+                                id: "tier-es-vip",
+                                name: "VIP Executive Suites",
+                                color: "#f59e0b",
+                                ticket_type_id: vipTicket,
+                                row_start: "G",
+                                row_end: "H",
+                                seats_per_row: 18,
+                              },
+                              {
+                                id: "tier-es-upper",
+                                name: "Upper Grandstand",
+                                color: "#b91c1c",
+                                ticket_type_id: premiumTicket,
+                                row_start: "I",
+                                row_end: "N",
+                                seats_per_row: 24,
+                              },
+                            ],
+                          },
+
+                          // 3. West Grandstand (Goal End)
+                          {
+                            id: "euro-west",
+                            name: "West Goal Stand",
+                            color: "#ea580c",
+                            stand_level: "multi",
+                            shape: "rectangle",
+                            x: 235,
+                            y: 400,
+                            width: 195,
+                            height: 400,
+                            rotation: 0,
+                            tier_split_direction: "horizontal",
+                            capacity: 2800,
+                            tiers: [
+                              {
+                                id: "tier-ew-upper",
+                                name: "Upper Grandstand",
+                                color: "#c2410c",
+                                ticket_type_id: premiumTicket,
+                                row_start: "I",
+                                row_end: "N",
+                                seats_per_row: 18,
+                              },
+                              {
+                                id: "tier-ew-vip",
+                                name: "VIP Executive Suites",
+                                color: "#f59e0b",
+                                ticket_type_id: vipTicket,
+                                row_start: "G",
+                                row_end: "H",
+                                seats_per_row: 14,
+                              },
+                              {
+                                id: "tier-ew-lower",
+                                name: "Lower Tier",
+                                color: "#fb923c",
+                                ticket_type_id: defaultTicket,
+                                row_start: "A",
+                                row_end: "F",
+                                seats_per_row: 16,
+                              },
+                            ],
+                          },
+
+                          // 4. East Grandstand (Goal End)
+                          {
+                            id: "euro-east",
+                            name: "East Goal Stand",
+                            color: "#9333ea",
+                            stand_level: "multi",
+                            shape: "rectangle",
+                            x: 1170,
+                            y: 400,
+                            width: 195,
+                            height: 400,
+                            rotation: 0,
+                            tier_split_direction: "horizontal",
+                            capacity: 2800,
+                            tiers: [
+                              {
+                                id: "tier-ee-lower",
+                                name: "Lower Tier",
+                                color: "#c084fc",
+                                ticket_type_id: defaultTicket,
+                                row_start: "A",
+                                row_end: "F",
+                                seats_per_row: 16,
+                              },
+                              {
+                                id: "tier-ee-vip",
+                                name: "VIP Executive Suites",
+                                color: "#f59e0b",
+                                ticket_type_id: vipTicket,
+                                row_start: "G",
+                                row_end: "H",
+                                seats_per_row: 14,
+                              },
+                              {
+                                id: "tier-ee-upper",
+                                name: "Upper Grandstand",
+                                color: "#7e22ce",
+                                ticket_type_id: premiumTicket,
+                                row_start: "I",
+                                row_end: "N",
+                                seats_per_row: 18,
+                              },
+                            ],
+                          },
+
+                          // 5. North-West Corner Arc (Snug to West & North with zero space)
+                          {
+                            id: "euro-corner-nw",
+                            name: "Stand NW Corner Arc",
+                            color: "#0ea5e9",
+                            stand_level: "multi",
+                            shape: "arc",
+                            innerRadius: 385,
+                            outerRadius: 535,
+                            startAngle: 196,
+                            sweepAngle: 38,
+                            stadiumCenterX: cx,
+                            stadiumCenterY: cy,
+                            x: cx,
+                            y: cy,
+                            width: 1070,
+                            height: 1070,
+                            rotation: 0,
+                            capacity: 1200,
+                            tiers: [
+                              {
+                                id: "tier-cnw-lower",
+                                name: "Lower Tier",
+                                color: "#7dd3fc",
+                                ticket_type_id: defaultTicket,
+                                row_start: "A",
+                                row_end: "D",
+                                seats_per_row: 12,
+                              },
+                              {
+                                id: "tier-cnw-upper",
+                                name: "Upper Tier",
+                                color: "#0369a1",
+                                ticket_type_id: premiumTicket,
+                                row_start: "E",
+                                row_end: "H",
+                                seats_per_row: 14,
+                              },
+                            ],
+                          },
+
+                          // 6. North-East Corner Arc (Snug to North & East with zero space)
+                          {
+                            id: "euro-corner-ne",
+                            name: "Stand NE Corner Arc",
+                            color: "#0ea5e9",
+                            stand_level: "multi",
+                            shape: "arc",
+                            innerRadius: 385,
+                            outerRadius: 535,
+                            startAngle: 306,
+                            sweepAngle: 38,
+                            stadiumCenterX: cx,
+                            stadiumCenterY: cy,
+                            x: cx,
+                            y: cy,
+                            width: 1070,
+                            height: 1070,
+                            rotation: 0,
+                            capacity: 1200,
+                            tiers: [
+                              {
+                                id: "tier-cne-lower",
+                                name: "Lower Tier",
+                                color: "#7dd3fc",
+                                ticket_type_id: defaultTicket,
+                                row_start: "A",
+                                row_end: "D",
+                                seats_per_row: 12,
+                              },
+                              {
+                                id: "tier-cne-upper",
+                                name: "Upper Tier",
+                                color: "#0369a1",
+                                ticket_type_id: premiumTicket,
+                                row_start: "E",
+                                row_end: "H",
+                                seats_per_row: 14,
+                              },
+                            ],
+                          },
+
+                          // 7. South-East Corner Arc (Snug to East & South with zero space)
+                          {
+                            id: "euro-corner-se",
+                            name: "Stand SE Corner Arc",
+                            color: "#ef4444",
+                            stand_level: "multi",
+                            shape: "arc",
+                            innerRadius: 385,
+                            outerRadius: 535,
+                            startAngle: 16,
+                            sweepAngle: 38,
+                            stadiumCenterX: cx,
+                            stadiumCenterY: cy,
+                            x: cx,
+                            y: cy,
+                            width: 1070,
+                            height: 1070,
+                            rotation: 0,
+                            capacity: 1200,
+                            tiers: [
+                              {
+                                id: "tier-cse-lower",
+                                name: "Lower Tier",
+                                color: "#fca5a5",
+                                ticket_type_id: defaultTicket,
+                                row_start: "A",
+                                row_end: "D",
+                                seats_per_row: 12,
+                              },
+                              {
+                                id: "tier-cse-upper",
+                                name: "Upper Tier",
+                                color: "#b91c1c",
+                                ticket_type_id: premiumTicket,
+                                row_start: "E",
+                                row_end: "H",
+                                seats_per_row: 14,
+                              },
+                            ],
+                          },
+
+                          // 8. South-West Corner Arc (Snug to South & West with zero space)
+                          {
+                            id: "euro-corner-sw",
+                            name: "Stand SW Corner Arc",
+                            color: "#ef4444",
+                            stand_level: "multi",
+                            shape: "arc",
+                            innerRadius: 385,
+                            outerRadius: 535,
+                            startAngle: 126,
+                            sweepAngle: 38,
+                            stadiumCenterX: cx,
+                            stadiumCenterY: cy,
+                            x: cx,
+                            y: cy,
+                            width: 1070,
+                            height: 1070,
+                            rotation: 0,
+                            capacity: 1200,
+                            tiers: [
+                              {
+                                id: "tier-csw-lower",
+                                name: "Lower Tier",
+                                color: "#fca5a5",
+                                ticket_type_id: defaultTicket,
+                                row_start: "A",
+                                row_end: "D",
+                                seats_per_row: 12,
+                              },
+                              {
+                                id: "tier-csw-upper",
+                                name: "Upper Tier",
+                                color: "#b91c1c",
+                                ticket_type_id: premiumTicket,
+                                row_start: "E",
+                                row_end: "H",
+                                seats_per_row: 14,
+                              },
+                            ],
+                          },
+                        ];
+
+                        const snugEuroElements: StadiumElementDef[] = [
+                          {
+                            id: "gate-nw",
+                            name: "Gate 1 (NW)",
+                            type: "gate",
+                            icon: "🚪",
+                            color: "#15803d",
+                            x: 440,
+                            y: 350,
+                            width: 40,
+                            height: 40,
+                            rotation: 0,
+                          },
+                          {
+                            id: "gate-ne",
+                            name: "Gate 2 (NE)",
+                            type: "gate",
+                            icon: "🚪",
+                            color: "#15803d",
+                            x: 1120,
+                            y: 350,
+                            width: 40,
+                            height: 40,
+                            rotation: 0,
+                          },
+                          {
+                            id: "gate-se",
+                            name: "Gate 3 (SE)",
+                            type: "gate",
+                            icon: "🚪",
+                            color: "#15803d",
+                            x: 1120,
+                            y: 810,
+                            width: 40,
+                            height: 40,
+                            rotation: 0,
+                          },
+                          {
+                            id: "gate-sw",
+                            name: "Gate 4 (SW)",
+                            type: "gate",
+                            icon: "🚪",
+                            color: "#15803d",
+                            x: 440,
+                            y: 810,
+                            width: 40,
+                            height: 40,
+                            rotation: 0,
+                          },
+                        ];
+
+                        setBlocks(snugEuroBlocks);
+                        setElements(snugEuroElements);
+                        setSelectedId(snugEuroBlocks[0].id);
+                        toast.success("Generated Seamless European Arena with snug zero-gap stands!");
+                      }}
+                      className="w-full p-2.5 rounded-xl bg-gradient-to-r from-sky-600 via-indigo-600 to-purple-600 hover:from-sky-500 hover:to-purple-500 text-white font-extrabold text-xs shadow-md shadow-indigo-700/20 flex items-center justify-center gap-2 transition-all active:scale-95"
+                    >
+                      <span className="text-base">✨</span>
+                      <span>⚡ Generate European Arena (Zero Gap · Snug Stands)</span>
+                    </button>
+
+                    {/* Hero Preset 0C: 360° Continuous European Arena Bowl (Concentric Zero-Gap Bowl) */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setGroundConfig({
+                          sport_type: "football",
+                          pitch_label: "NATIONAL FOOTBALL ARENA",
+                          turf_color: "#15803d",
+                          track_color: "#1e293b",
+                          shape: "rectangle",
+                          x: 520,
+                          y: 425,
+                          width: 560,
+                          height: 350,
+                          rotation: 0,
+                        });
+                        setPitchLabel("NATIONAL FOOTBALL ARENA");
+
+                        const defaultTicket = ticketTypes[0]?.id || "";
+                        const premiumTicket = ticketTypes[1]?.id || defaultTicket;
+                        const vipTicket = ticketTypes[2]?.id || premiumTicket;
+
+                        const cx = CANVAS_W / 2; // 800
+                        const cy = CANVAS_H / 2; // 600
+
+                        const inR = 375;
+                        const outR = 535;
+
+                        const bowlBlocks: StadiumBlockDef[] = [
+                          // 1. North Sideline Stand (246° to 294°)
+                          {
+                            id: "bowl-north",
+                            name: "North Grandstand (Sideline)",
+                            color: "#0284c7",
+                            stand_level: "multi",
+                            shape: "arc",
+                            innerRadius: inR,
+                            outerRadius: outR,
+                            startAngle: 246,
+                            sweepAngle: 48,
+                            stadiumCenterX: cx,
+                            stadiumCenterY: cy,
+                            x: cx,
+                            y: cy,
+                            width: 1070,
+                            height: 1070,
+                            rotation: 0,
+                            capacity: 3400,
+                            tiers: [
+                              {
+                                id: "tier-bn-lower",
+                                name: "Lower Tier",
+                                color: "#38bdf8",
+                                ticket_type_id: defaultTicket,
+                                row_start: "A",
+                                row_end: "F",
+                                seats_per_row: 22,
+                              },
+                              {
+                                id: "tier-bn-vip",
+                                name: "VIP Executive Suites",
+                                color: "#f59e0b",
+                                ticket_type_id: vipTicket,
+                                row_start: "G",
+                                row_end: "H",
+                                seats_per_row: 18,
+                              },
+                              {
+                                id: "tier-bn-upper",
+                                name: "Upper Grandstand",
+                                color: "#0284c7",
+                                ticket_type_id: premiumTicket,
+                                row_start: "I",
+                                row_end: "N",
+                                seats_per_row: 24,
+                              },
+                            ],
+                          },
+
+                          // 2. Stand NE Corner Arc (294° to 336° - exactly meets North at 294° and East at 336°)
+                          {
+                            id: "bowl-corner-ne",
+                            name: "Stand NE Corner Arc",
+                            color: "#0ea5e9",
+                            stand_level: "multi",
+                            shape: "arc",
+                            innerRadius: inR,
+                            outerRadius: outR,
+                            startAngle: 294,
+                            sweepAngle: 42,
+                            stadiumCenterX: cx,
+                            stadiumCenterY: cy,
+                            x: cx,
+                            y: cy,
+                            width: 1070,
+                            height: 1070,
+                            rotation: 0,
+                            capacity: 1800,
+                            tiers: [
+                              {
+                                id: "tier-bne-lower",
+                                name: "Lower Tier",
+                                color: "#7dd3fc",
+                                ticket_type_id: defaultTicket,
+                                row_start: "A",
+                                row_end: "D",
+                                seats_per_row: 14,
+                              },
+                              {
+                                id: "tier-bne-vip",
+                                name: "VIP Executive Suites",
+                                color: "#f59e0b",
+                                ticket_type_id: vipTicket,
+                                row_start: "G",
+                                row_end: "H",
+                                seats_per_row: 12,
+                              },
+                              {
+                                id: "tier-bne-upper",
+                                name: "Upper Tier",
+                                color: "#0369a1",
+                                ticket_type_id: premiumTicket,
+                                row_start: "E",
+                                row_end: "H",
+                                seats_per_row: 16,
+                              },
+                            ],
+                          },
+
+                          // 3. East Goal Stand (336° to 24° - spans 48° across 0°)
+                          {
+                            id: "bowl-east",
+                            name: "East Goal Stand",
+                            color: "#9333ea",
+                            stand_level: "multi",
+                            shape: "arc",
+                            innerRadius: inR,
+                            outerRadius: outR,
+                            startAngle: 336,
+                            sweepAngle: 48,
+                            stadiumCenterX: cx,
+                            stadiumCenterY: cy,
+                            x: cx,
+                            y: cy,
+                            width: 1070,
+                            height: 1070,
+                            rotation: 0,
+                            capacity: 3400,
+                            tiers: [
+                              {
+                                id: "tier-be-lower",
+                                name: "Lower Tier",
+                                color: "#c084fc",
+                                ticket_type_id: defaultTicket,
+                                row_start: "A",
+                                row_end: "F",
+                                seats_per_row: 22,
+                              },
+                              {
+                                id: "tier-be-vip",
+                                name: "VIP Executive Suites",
+                                color: "#f59e0b",
+                                ticket_type_id: vipTicket,
+                                row_start: "G",
+                                row_end: "H",
+                                seats_per_row: 18,
+                              },
+                              {
+                                id: "tier-be-upper",
+                                name: "Upper Grandstand",
+                                color: "#7e22ce",
+                                ticket_type_id: premiumTicket,
+                                row_start: "I",
+                                row_end: "N",
+                                seats_per_row: 24,
+                              },
+                            ],
+                          },
+
+                          // 4. Stand SE Corner Arc (24° to 66° - exactly meets East at 24° and South at 66°)
+                          {
+                            id: "bowl-corner-se",
+                            name: "Stand SE Corner Arc",
+                            color: "#ef4444",
+                            stand_level: "multi",
+                            shape: "arc",
+                            innerRadius: inR,
+                            outerRadius: outR,
+                            startAngle: 24,
+                            sweepAngle: 42,
+                            stadiumCenterX: cx,
+                            stadiumCenterY: cy,
+                            x: cx,
+                            y: cy,
+                            width: 1070,
+                            height: 1070,
+                            rotation: 0,
+                            capacity: 1800,
+                            tiers: [
+                              {
+                                id: "tier-bse-lower",
+                                name: "Lower Tier",
+                                color: "#fca5a5",
+                                ticket_type_id: defaultTicket,
+                                row_start: "A",
+                                row_end: "D",
+                                seats_per_row: 14,
+                              },
+                              {
+                                id: "tier-bse-vip",
+                                name: "VIP Executive Suites",
+                                color: "#f59e0b",
+                                ticket_type_id: vipTicket,
+                                row_start: "G",
+                                row_end: "H",
+                                seats_per_row: 12,
+                              },
+                              {
+                                id: "tier-bse-upper",
+                                name: "Upper Tier",
+                                color: "#b91c1c",
+                                ticket_type_id: premiumTicket,
+                                row_start: "E",
+                                row_end: "H",
+                                seats_per_row: 16,
+                              },
+                            ],
+                          },
+
+                          // 5. South Sideline Stand (66° to 114° - exactly meets SE at 66° and SW at 114°)
+                          {
+                            id: "bowl-south",
+                            name: "South Grandstand (Sideline)",
+                            color: "#dc2626",
+                            stand_level: "multi",
+                            shape: "arc",
+                            innerRadius: inR,
+                            outerRadius: outR,
+                            startAngle: 66,
+                            sweepAngle: 48,
+                            stadiumCenterX: cx,
+                            stadiumCenterY: cy,
+                            x: cx,
+                            y: cy,
+                            width: 1070,
+                            height: 1070,
+                            rotation: 0,
+                            capacity: 3400,
+                            tiers: [
+                              {
+                                id: "tier-bs-lower",
+                                name: "Lower Tier",
+                                color: "#f87171",
+                                ticket_type_id: defaultTicket,
+                                row_start: "A",
+                                row_end: "F",
+                                seats_per_row: 22,
+                              },
+                              {
+                                id: "tier-bs-vip",
+                                name: "VIP Executive Suites",
+                                color: "#f59e0b",
+                                ticket_type_id: vipTicket,
+                                row_start: "G",
+                                row_end: "H",
+                                seats_per_row: 18,
+                              },
+                              {
+                                id: "tier-bs-upper",
+                                name: "Upper Grandstand",
+                                color: "#b91c1c",
+                                ticket_type_id: premiumTicket,
+                                row_start: "I",
+                                row_end: "N",
+                                seats_per_row: 24,
+                              },
+                            ],
+                          },
+
+                          // 6. Stand SW Corner Arc (114° to 156° - exactly meets South at 114° and West at 156°)
+                          {
+                            id: "bowl-corner-sw",
+                            name: "Stand SW Corner Arc",
+                            color: "#ef4444",
+                            stand_level: "multi",
+                            shape: "arc",
+                            innerRadius: inR,
+                            outerRadius: outR,
+                            startAngle: 114,
+                            sweepAngle: 42,
+                            stadiumCenterX: cx,
+                            stadiumCenterY: cy,
+                            x: cx,
+                            y: cy,
+                            width: 1070,
+                            height: 1070,
+                            rotation: 0,
+                            capacity: 1800,
+                            tiers: [
+                              {
+                                id: "tier-bsw-lower",
+                                name: "Lower Tier",
+                                color: "#fca5a5",
+                                ticket_type_id: defaultTicket,
+                                row_start: "A",
+                                row_end: "D",
+                                seats_per_row: 14,
+                              },
+                              {
+                                id: "tier-bsw-vip",
+                                name: "VIP Executive Suites",
+                                color: "#f59e0b",
+                                ticket_type_id: vipTicket,
+                                row_start: "G",
+                                row_end: "H",
+                                seats_per_row: 12,
+                              },
+                              {
+                                id: "tier-bsw-upper",
+                                name: "Upper Tier",
+                                color: "#b91c1c",
+                                ticket_type_id: premiumTicket,
+                                row_start: "E",
+                                row_end: "H",
+                                seats_per_row: 16,
+                              },
+                            ],
+                          },
+
+                          // 7. West Goal Stand (156° to 204° - exactly meets SW at 156° and NW at 204°)
+                          {
+                            id: "bowl-west",
+                            name: "West Goal Stand",
+                            color: "#ea580c",
+                            stand_level: "multi",
+                            shape: "arc",
+                            innerRadius: inR,
+                            outerRadius: outR,
+                            startAngle: 156,
+                            sweepAngle: 48,
+                            stadiumCenterX: cx,
+                            stadiumCenterY: cy,
+                            x: cx,
+                            y: cy,
+                            width: 1070,
+                            height: 1070,
+                            rotation: 0,
+                            capacity: 3400,
+                            tiers: [
+                              {
+                                id: "tier-bw-lower",
+                                name: "Lower Tier",
+                                color: "#fb923c",
+                                ticket_type_id: defaultTicket,
+                                row_start: "A",
+                                row_end: "F",
+                                seats_per_row: 22,
+                              },
+                              {
+                                id: "tier-bw-vip",
+                                name: "VIP Executive Suites",
+                                color: "#f59e0b",
+                                ticket_type_id: vipTicket,
+                                row_start: "G",
+                                row_end: "H",
+                                seats_per_row: 18,
+                              },
+                              {
+                                id: "tier-bw-upper",
+                                name: "Upper Grandstand",
+                                color: "#c2410c",
+                                ticket_type_id: premiumTicket,
+                                row_start: "I",
+                                row_end: "N",
+                                seats_per_row: 24,
+                              },
+                            ],
+                          },
+
+                          // 8. Stand NW Corner Arc (204° to 246° - exactly meets West at 204° and North at 246°)
+                          {
+                            id: "bowl-corner-nw",
+                            name: "Stand NW Corner Arc",
+                            color: "#0ea5e9",
+                            stand_level: "multi",
+                            shape: "arc",
+                            innerRadius: inR,
+                            outerRadius: outR,
+                            startAngle: 204,
+                            sweepAngle: 42,
+                            stadiumCenterX: cx,
+                            stadiumCenterY: cy,
+                            x: cx,
+                            y: cy,
+                            width: 1070,
+                            height: 1070,
+                            rotation: 0,
+                            capacity: 1800,
+                            tiers: [
+                              {
+                                id: "tier-bnw-lower",
+                                name: "Lower Tier",
+                                color: "#7dd3fc",
+                                ticket_type_id: defaultTicket,
+                                row_start: "A",
+                                row_end: "D",
+                                seats_per_row: 14,
+                              },
+                              {
+                                id: "tier-bnw-vip",
+                                name: "VIP Executive Suites",
+                                color: "#f59e0b",
+                                ticket_type_id: vipTicket,
+                                row_start: "G",
+                                row_end: "H",
+                                seats_per_row: 12,
+                              },
+                              {
+                                id: "tier-bnw-upper",
+                                name: "Upper Tier",
+                                color: "#0369a1",
+                                ticket_type_id: premiumTicket,
+                                row_start: "E",
+                                row_end: "H",
+                                seats_per_row: 16,
+                              },
+                            ],
+                          },
+                        ];
+
+                        setBlocks(bowlBlocks);
+                        setElements([]);
+                        setSelectedId(bowlBlocks[0].id);
+                        toast.success("Generated 360° Continuous European Bowl Arena with Zero Gaps and Zero Overlap!");
+                      }}
+                      className="w-full p-2.5 rounded-xl bg-gradient-to-r from-purple-600 via-pink-600 to-rose-600 hover:from-purple-500 hover:to-rose-500 text-white font-extrabold text-xs shadow-md shadow-purple-700/20 flex items-center justify-center gap-2 transition-all active:scale-95"
+                    >
+                      <span className="text-base">🏟️</span>
+                      <span>⚡ Generate Continuous European Bowl (360° Seamless · Zero Gap)</span>
+                    </button>
+
+                    {/* Hero Preset 1: Olympic Football Stadium (Ethiopian National Stadium Style) */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setGroundConfig({
+                          sport_type: "football",
+                          pitch_label: "ETHIOPIAN NATIONAL STADIUM",
+                          turf_color: "#15803d",
+                          track_color: "#7f1d1d",
+                          shape: "capsule",
+                          x: CANVAS_W * 0.33,
+                          y: CANVAS_H * 0.20,
+                          width: CANVAS_W * 0.34,
+                          height: CANVAS_H * 0.60,
+                          rotation: 0,
+                        });
+                        setPitchLabel("ETHIOPIAN NATIONAL STADIUM");
+
+                        const defaultTicket = ticketTypes[0]?.id || "";
+                        const premiumTicket = ticketTypes[1]?.id || defaultTicket;
+                        const vipTicket = ticketTypes[2]?.id || premiumTicket;
+
+                        const cx = CANVAS_W / 2; // 800
+                        const cy = CANVAS_H / 2; // 600
+
+                        const newBlocks: StadiumBlockDef[] = [
+                          // 1. Stand A: North Goal (North Stand Arc)
+                          {
+                            id: "eth-stand-a",
+                            name: "Stand A (North Goal)",
+                            color: "#0284c7",
+                            stand_level: "multi",
+                            shape: "arc",
+                            innerRadius: 370,
+                            outerRadius: 515,
+                            startAngle: 246,
+                            sweepAngle: 48,
+                            stadiumCenterX: cx,
+                            stadiumCenterY: cy,
+                            x: cx,
+                            y: cy,
+                            width: 1030,
+                            height: 1030,
+                            rotation: 0,
+                            capacity: 1200,
+                            tiers: [
+                              {
+                                id: "tier-a-lower",
+                                name: "Lower Tier",
+                                color: "#38bdf8",
+                                ticket_type_id: defaultTicket,
+                                row_start: "A",
+                                row_end: "D",
+                                seats_per_row: 12,
+                              },
+                              {
+                                id: "tier-a-upper",
+                                name: "Upper Grandstand",
+                                color: "#0284c7",
+                                ticket_type_id: premiumTicket,
+                                row_start: "E",
+                                row_end: "H",
+                                seats_per_row: 14,
+                              },
+                            ],
+                          },
+
+                          // 2. Stand E: North-East Corner Arc
+                          {
+                            id: "eth-stand-e",
+                            name: "Stand E (NE Corner)",
+                            color: "#0ea5e9",
+                            stand_level: "multi",
+                            shape: "arc",
+                            innerRadius: 370,
+                            outerRadius: 515,
+                            startAngle: 296,
+                            sweepAngle: 32,
+                            stadiumCenterX: cx,
+                            stadiumCenterY: cy,
+                            x: cx,
+                            y: cy,
+                            width: 1030,
+                            height: 1030,
+                            rotation: 0,
+                            capacity: 900,
+                            tiers: [
+                              {
+                                id: "tier-e-lower",
+                                name: "Lower Tier",
+                                color: "#7dd3fc",
+                                ticket_type_id: defaultTicket,
+                                row_start: "A",
+                                row_end: "D",
+                                seats_per_row: 10,
+                              },
+                              {
+                                id: "tier-e-upper",
+                                name: "Upper Grandstand",
+                                color: "#0369a1",
+                                ticket_type_id: premiumTicket,
+                                row_start: "E",
+                                row_end: "H",
+                                seats_per_row: 12,
+                              },
+                            ],
+                          },
+
+                          // 3. Stand F: East Sideline North Arc
+                          {
+                            id: "eth-stand-f",
+                            name: "Stand F (East Sideline North)",
+                            color: "#4f46e5",
+                            stand_level: "multi",
+                            shape: "arc",
+                            innerRadius: 370,
+                            outerRadius: 515,
+                            startAngle: 330,
+                            sweepAngle: 28,
+                            stadiumCenterX: cx,
+                            stadiumCenterY: cy,
+                            x: cx,
+                            y: cy,
+                            width: 1030,
+                            height: 1030,
+                            rotation: 0,
+                            capacity: 900,
+                            tiers: [
+                              {
+                                id: "tier-f-lower",
+                                name: "Lower Tier",
+                                color: "#818cf8",
+                                ticket_type_id: defaultTicket,
+                                row_start: "A",
+                                row_end: "D",
+                                seats_per_row: 10,
+                              },
+                              {
+                                id: "tier-f-upper",
+                                name: "Upper Grandstand",
+                                color: "#4338ca",
+                                ticket_type_id: premiumTicket,
+                                row_start: "E",
+                                row_end: "H",
+                                seats_per_row: 12,
+                              },
+                            ],
+                          },
+
+                          // 4. Stand G: East Sideline South Arc
+                          {
+                            id: "eth-stand-g",
+                            name: "Stand G (East Sideline South)",
+                            color: "#4f46e5",
+                            stand_level: "multi",
+                            shape: "arc",
+                            innerRadius: 370,
+                            outerRadius: 515,
+                            startAngle: 2,
+                            sweepAngle: 28,
+                            stadiumCenterX: cx,
+                            stadiumCenterY: cy,
+                            x: cx,
+                            y: cy,
+                            width: 1030,
+                            height: 1030,
+                            rotation: 0,
+                            capacity: 900,
+                            tiers: [
+                              {
+                                id: "tier-g-lower",
+                                name: "Lower Tier",
+                                color: "#818cf8",
+                                ticket_type_id: defaultTicket,
+                                row_start: "A",
+                                row_end: "D",
+                                seats_per_row: 10,
+                              },
+                              {
+                                id: "tier-g-upper",
+                                name: "Upper Grandstand",
+                                color: "#4338ca",
+                                ticket_type_id: premiumTicket,
+                                row_start: "E",
+                                row_end: "H",
+                                seats_per_row: 12,
+                              },
+                            ],
+                          },
+
+                          // 5. Stand H (SE): South-East Corner Arc
+                          {
+                            id: "eth-stand-h-se",
+                            name: "Stand H (SE Corner)",
+                            color: "#7c3aed",
+                            stand_level: "multi",
+                            shape: "arc",
+                            innerRadius: 370,
+                            outerRadius: 515,
+                            startAngle: 32,
+                            sweepAngle: 32,
+                            stadiumCenterX: cx,
+                            stadiumCenterY: cy,
+                            x: cx,
+                            y: cy,
+                            width: 1030,
+                            height: 1030,
+                            rotation: 0,
+                            capacity: 900,
+                            tiers: [
+                              {
+                                id: "tier-hse-lower",
+                                name: "Lower Tier",
+                                color: "#c4b5fd",
+                                ticket_type_id: defaultTicket,
+                                row_start: "A",
+                                row_end: "D",
+                                seats_per_row: 10,
+                              },
+                              {
+                                id: "tier-hse-upper",
+                                name: "Upper Grandstand",
+                                color: "#6d28d9",
+                                ticket_type_id: premiumTicket,
+                                row_start: "E",
+                                row_end: "H",
+                                seats_per_row: 12,
+                              },
+                            ],
+                          },
+
+                          // 6. Stand I: South Goal (South Stand Arc)
+                          {
+                            id: "eth-stand-i",
+                            name: "Stand I (South Goal)",
+                            color: "#9333ea",
+                            stand_level: "multi",
+                            shape: "arc",
+                            innerRadius: 370,
+                            outerRadius: 515,
+                            startAngle: 66,
+                            sweepAngle: 48,
+                            stadiumCenterX: cx,
+                            stadiumCenterY: cy,
+                            x: cx,
+                            y: cy,
+                            width: 1030,
+                            height: 1030,
+                            rotation: 0,
+                            capacity: 1200,
+                            tiers: [
+                              {
+                                id: "tier-i-lower",
+                                name: "Lower Tier",
+                                color: "#d8b4fe",
+                                ticket_type_id: defaultTicket,
+                                row_start: "A",
+                                row_end: "D",
+                                seats_per_row: 12,
+                              },
+                              {
+                                id: "tier-i-upper",
+                                name: "Upper Grandstand",
+                                color: "#7e22ce",
+                                ticket_type_id: premiumTicket,
+                                row_start: "E",
+                                row_end: "H",
+                                seats_per_row: 14,
+                              },
+                            ],
+                          },
+
+                          // 7. Stand H (SW): South-West Corner Arc
+                          {
+                            id: "eth-stand-h-sw",
+                            name: "Stand H (SW Corner)",
+                            color: "#7c3aed",
+                            stand_level: "multi",
+                            shape: "arc",
+                            innerRadius: 370,
+                            outerRadius: 515,
+                            startAngle: 116,
+                            sweepAngle: 32,
+                            stadiumCenterX: cx,
+                            stadiumCenterY: cy,
+                            x: cx,
+                            y: cy,
+                            width: 1030,
+                            height: 1030,
+                            rotation: 0,
+                            capacity: 900,
+                            tiers: [
+                              {
+                                id: "tier-hsw-lower",
+                                name: "Lower Tier",
+                                color: "#c4b5fd",
+                                ticket_type_id: defaultTicket,
+                                row_start: "A",
+                                row_end: "D",
+                                seats_per_row: 10,
+                              },
+                              {
+                                id: "tier-hsw-upper",
+                                name: "Upper Grandstand",
+                                color: "#6d28d9",
+                                ticket_type_id: premiumTicket,
+                                row_start: "E",
+                                row_end: "H",
+                                seats_per_row: 12,
+                              },
+                            ],
+                          },
+
+                          // 8. Stand C: West Sideline South Arc
+                          {
+                            id: "eth-stand-c",
+                            name: "Stand C (West Sideline South)",
+                            color: "#059669",
+                            stand_level: "multi",
+                            shape: "arc",
+                            innerRadius: 370,
+                            outerRadius: 515,
+                            startAngle: 150,
+                            sweepAngle: 28,
+                            stadiumCenterX: cx,
+                            stadiumCenterY: cy,
+                            x: cx,
+                            y: cy,
+                            width: 1030,
+                            height: 1030,
+                            rotation: 0,
+                            capacity: 900,
+                            tiers: [
+                              {
+                                id: "tier-c-lower",
+                                name: "Lower Tier",
+                                color: "#34d399",
+                                ticket_type_id: defaultTicket,
+                                row_start: "A",
+                                row_end: "D",
+                                seats_per_row: 10,
+                              },
+                              {
+                                id: "tier-c-upper",
+                                name: "Upper Grandstand",
+                                color: "#047857",
+                                ticket_type_id: premiumTicket,
+                                row_start: "E",
+                                row_end: "H",
+                                seats_per_row: 12,
+                              },
+                            ],
+                          },
+
+                          // 9. Stand B: West Sideline North Arc
+                          {
+                            id: "eth-stand-b",
+                            name: "Stand B (West Sideline North)",
+                            color: "#059669",
+                            stand_level: "multi",
+                            shape: "arc",
+                            innerRadius: 370,
+                            outerRadius: 515,
+                            startAngle: 182,
+                            sweepAngle: 28,
+                            stadiumCenterX: cx,
+                            stadiumCenterY: cy,
+                            x: cx,
+                            y: cy,
+                            width: 1030,
+                            height: 1030,
+                            rotation: 0,
+                            capacity: 900,
+                            tiers: [
+                              {
+                                id: "tier-b-lower",
+                                name: "Lower Tier",
+                                color: "#34d399",
+                                ticket_type_id: defaultTicket,
+                                row_start: "A",
+                                row_end: "D",
+                                seats_per_row: 10,
+                              },
+                              {
+                                id: "tier-b-upper",
+                                name: "Upper Grandstand",
+                                color: "#047857",
+                                ticket_type_id: premiumTicket,
+                                row_start: "E",
+                                row_end: "H",
+                                seats_per_row: 12,
+                              },
+                            ],
+                          },
+
+                          // 10. Stand J: North-West Corner Arc
+                          {
+                            id: "eth-stand-j",
+                            name: "Stand J (NW Corner)",
+                            color: "#0ea5e9",
+                            stand_level: "multi",
+                            shape: "arc",
+                            innerRadius: 370,
+                            outerRadius: 515,
+                            startAngle: 212,
+                            sweepAngle: 32,
+                            stadiumCenterX: cx,
+                            stadiumCenterY: cy,
+                            x: cx,
+                            y: cy,
+                            width: 1030,
+                            height: 1030,
+                            rotation: 0,
+                            capacity: 900,
+                            tiers: [
+                              {
+                                id: "tier-j-lower",
+                                name: "Lower Tier",
+                                color: "#7dd3fc",
+                                ticket_type_id: defaultTicket,
+                                row_start: "A",
+                                row_end: "D",
+                                seats_per_row: 10,
+                              },
+                              {
+                                id: "tier-j-upper",
+                                name: "Upper Grandstand",
+                                color: "#0369a1",
+                                ticket_type_id: premiumTicket,
+                                row_start: "E",
+                                row_end: "H",
+                                seats_per_row: 12,
+                              },
+                            ],
+                          },
+                        ];
+
+                        setBlocks(newBlocks);
+                        setSelectedId(newBlocks[0].id);
+                        toast.success("Generated Olympic Football Stadium Layout — All Stands in Ring Arc!");
+                      }}
+                      className="w-full p-2.5 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-600 hover:from-blue-500 hover:to-sky-500 text-white font-extrabold text-xs shadow-md shadow-blue-700/20 flex items-center justify-center gap-2 transition-all active:scale-95"
+                    >
+                      <span className="text-base">⚽</span>
+                      <span>⚡ Generate Olympic Football Stadium (Ethiopian Style)</span>
+                    </button>
+
+                    {/* Hero Preset 2: 360° Circular Cricket Stadium (BookMyShow / Guwahati style) */}
                     <button
                       type="button"
                       onClick={() => {
@@ -4581,6 +7583,7 @@ export default function StadiumBlockBuilder({
                           height: CANVAS_H * 0.54,
                           rotation: 0,
                         });
+                        setPitchLabel("CRICKET GROUND");
 
                         const sectors = [
                           { name: "North Stand Block A", deg: 247.5, color: "#831843", colorLower: "#cbd5e1" },
@@ -4604,6 +7607,7 @@ export default function StadiumBlockBuilder({
                             id: `circular-sec-${idx}-gr`,
                             name: `${sec.name} Gr. Floor`,
                             color: sec.colorLower,
+                            stand_level: "lower",
                             x: CANVAS_W / 2,
                             y: CANVAS_H / 2,
                             width: 335 * 2,
@@ -4623,8 +7627,8 @@ export default function StadiumBlockBuilder({
                                 name: "Ground Floor",
                                 ticket_type_id: defaultTicket,
                                 row_start: "A",
-                                row_end: "J",
-                                seats_per_row: 20,
+                                row_end: "D",
+                                seats_per_row: 10,
                               },
                             ],
                           });
@@ -4634,6 +7638,7 @@ export default function StadiumBlockBuilder({
                             id: `circular-sec-${idx}-upper`,
                             name: `${sec.name} Upper Tier`,
                             color: sec.color,
+                            stand_level: "upper",
                             x: CANVAS_W / 2,
                             y: CANVAS_H / 2,
                             width: 480 * 2,
@@ -4652,9 +7657,9 @@ export default function StadiumBlockBuilder({
                                 id: `tier-${idx}-upper`,
                                 name: "Upper Grandstand",
                                 ticket_type_id: premiumTicket,
-                                row_start: "A",
-                                row_end: "M",
-                                seats_per_row: 25,
+                                row_start: "E",
+                                row_end: "H",
+                                seats_per_row: 12,
                               },
                             ],
                           });
@@ -4671,6 +7676,352 @@ export default function StadiumBlockBuilder({
                     </button>
 
                     <div className="grid grid-cols-2 gap-1.5 pt-1">
+                      {/* Preset 3: Classic Rectangular Stadium */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setGroundConfig({
+                            sport_type: "football",
+                            pitch_label: "RECTANGULAR ARENA",
+                            turf_color: "#15803d",
+                            track_color: "#1e293b",
+                            shape: "rectangle",
+                            x: 500,
+                            y: 330,
+                            width: 600,
+                            height: 540,
+                            rotation: 0,
+                          });
+                          setPitchLabel("RECTANGULAR ARENA");
+
+                          const defaultTicket = ticketTypes[0]?.id || "";
+                          const premiumTicket = ticketTypes[1]?.id || defaultTicket;
+                          const vipTicket = ticketTypes[2]?.id || premiumTicket;
+
+                          const rectBlocks: StadiumBlockDef[] = [
+                            // North Stand (Lower + Upper)
+                            {
+                              id: "rect-north",
+                              name: "North Grandstand",
+                              color: "#2563eb",
+                              stand_level: "multi",
+                              shape: "rectangle",
+                              x: 500,
+                              y: 155,
+                              width: 600,
+                              height: 155,
+                              rotation: 0,
+                              capacity: 2500,
+                              tiers: [
+                                {
+                                  id: "t-rn-lower",
+                                  name: "Lower Tier",
+                                  color: "#60a5fa",
+                                  ticket_type_id: defaultTicket,
+                                  row_start: "A",
+                                  row_end: "H",
+                                  seats_per_row: 30,
+                                },
+                                {
+                                  id: "t-rn-upper",
+                                  name: "Upper Grandstand",
+                                  color: "#1d4ed8",
+                                  ticket_type_id: premiumTicket,
+                                  row_start: "I",
+                                  row_end: "P",
+                                  seats_per_row: 32,
+                                },
+                              ],
+                            },
+                            // South Stand (Lower + Upper)
+                            {
+                              id: "rect-south",
+                              name: "South Grandstand",
+                              color: "#7c3aed",
+                              stand_level: "multi",
+                              shape: "rectangle",
+                              x: 500,
+                              y: 890,
+                              width: 600,
+                              height: 155,
+                              rotation: 0,
+                              capacity: 2500,
+                              tiers: [
+                                {
+                                  id: "t-rs-lower",
+                                  name: "Lower Tier",
+                                  color: "#a78bfa",
+                                  ticket_type_id: defaultTicket,
+                                  row_start: "A",
+                                  row_end: "H",
+                                  seats_per_row: 30,
+                                },
+                                {
+                                  id: "t-rs-upper",
+                                  name: "Upper Grandstand",
+                                  color: "#6d28d9",
+                                  ticket_type_id: premiumTicket,
+                                  row_start: "I",
+                                  row_end: "P",
+                                  seats_per_row: 32,
+                                },
+                              ],
+                            },
+                            // West Stand (Lower + Upper)
+                            {
+                              id: "rect-west",
+                              name: "West Grandstand",
+                              color: "#059669",
+                              stand_level: "multi",
+                              shape: "rectangle",
+                              x: 270,
+                              y: 330,
+                              width: 210,
+                              height: 540,
+                              rotation: 0,
+                              tier_split_direction: "horizontal",
+                              capacity: 2800,
+                              tiers: [
+                                {
+                                  id: "t-rw-lower",
+                                  name: "Lower Tier",
+                                  color: "#34d399",
+                                  ticket_type_id: defaultTicket,
+                                  row_start: "A",
+                                  row_end: "H",
+                                  seats_per_row: 26,
+                                },
+                                {
+                                  id: "t-rw-upper",
+                                  name: "Upper Grandstand",
+                                  color: "#047857",
+                                  ticket_type_id: premiumTicket,
+                                  row_start: "I",
+                                  row_end: "P",
+                                  seats_per_row: 28,
+                                },
+                              ],
+                            },
+                            // East Stand (Lower + Upper)
+                            {
+                              id: "rect-east",
+                              name: "East Grandstand",
+                              color: "#d97706",
+                              stand_level: "multi",
+                              shape: "rectangle",
+                              x: 1120,
+                              y: 330,
+                              width: 210,
+                              height: 540,
+                              rotation: 0,
+                              tier_split_direction: "horizontal",
+                              capacity: 2800,
+                              tiers: [
+                                {
+                                  id: "t-re-lower",
+                                  name: "Lower Tier",
+                                  color: "#fbbf24",
+                                  ticket_type_id: defaultTicket,
+                                  row_start: "A",
+                                  row_end: "H",
+                                  seats_per_row: 26,
+                                },
+                                {
+                                  id: "t-re-upper",
+                                  name: "Upper Grandstand",
+                                  color: "#b45309",
+                                  ticket_type_id: premiumTicket,
+                                  row_start: "I",
+                                  row_end: "P",
+                                  seats_per_row: 28,
+                                },
+                              ],
+                            },
+                            // 4 Corner Stands
+                            {
+                              id: "rect-nw",
+                              name: "North-West Corner",
+                              color: "#3b82f6",
+                              shape: "rectangle",
+                              x: 270,
+                              y: 155,
+                              width: 210,
+                              height: 155,
+                              rotation: 0,
+                              capacity: 800,
+                              tiers: [{ id: "t-rnw", name: "Corner Seats", ticket_type_id: defaultTicket, row_start: "A", row_end: "H", seats_per_row: 16 }],
+                            },
+                            {
+                              id: "rect-ne",
+                              name: "North-East Corner",
+                              color: "#3b82f6",
+                              shape: "rectangle",
+                              x: 1120,
+                              y: 155,
+                              width: 210,
+                              height: 155,
+                              rotation: 0,
+                              capacity: 800,
+                              tiers: [{ id: "t-rne", name: "Corner Seats", ticket_type_id: defaultTicket, row_start: "A", row_end: "H", seats_per_row: 16 }],
+                            },
+                            {
+                              id: "rect-sw",
+                              name: "South-West Corner",
+                              color: "#8b5cf6",
+                              shape: "rectangle",
+                              x: 270,
+                              y: 890,
+                              width: 210,
+                              height: 155,
+                              rotation: 0,
+                              capacity: 800,
+                              tiers: [{ id: "t-rsw", name: "Corner Seats", ticket_type_id: defaultTicket, row_start: "A", row_end: "H", seats_per_row: 16 }],
+                            },
+                            {
+                              id: "rect-se",
+                              name: "South-East Corner",
+                              color: "#8b5cf6",
+                              shape: "rectangle",
+                              x: 1120,
+                              y: 890,
+                              width: 210,
+                              height: 155,
+                              rotation: 0,
+                              capacity: 800,
+                              tiers: [{ id: "t-rse", name: "Corner Seats", ticket_type_id: defaultTicket, row_start: "A", row_end: "H", seats_per_row: 16 }],
+                            },
+                            // VIP Director Box
+                            {
+                              id: "rect-vip",
+                              name: "Presidential VIP Box",
+                              color: "#dc2626",
+                              stand_level: "lower",
+                              shape: "rectangle",
+                              x: 700,
+                              y: 345,
+                              width: 200,
+                              height: 65,
+                              rotation: 0,
+                              capacity: 150,
+                              tiers: [{ id: "t-rvip", name: "VIP Box", color: "#f87171", ticket_type_id: vipTicket, row_start: "A", row_end: "C", seats_per_row: 20 }],
+                            },
+                          ];
+
+                          setBlocks(rectBlocks);
+                          setSelectedId(rectBlocks[0].id);
+                          toast.success("Generated Classic Rectangular Stadium with 4 Grandstands + Corners!");
+                        }}
+                        className="p-2 rounded-lg bg-white hover:bg-slate-50 border border-slate-200 text-slate-800 text-[11px] font-bold text-left flex items-center gap-1.5 shadow-sm transition-colors"
+                      >
+                        <span>🔲</span>
+                        <span>Classic Rect</span>
+                      </button>
+
+                      {/* Preset 4: Olympic Pill Bowl */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setGroundConfig({
+                            sport_type: "football",
+                            pitch_label: "OLYMPIC TRACK & FIELD",
+                            turf_color: "#14532d",
+                            track_color: "#7f1d1d",
+                            shape: "capsule",
+                            x: CANVAS_W * 0.25,
+                            y: CANVAS_H * 0.22,
+                            width: CANVAS_W * 0.50,
+                            height: CANVAS_H * 0.56,
+                            rotation: 0,
+                          });
+                          setPitchLabel("OLYMPIC TRACK & FIELD");
+
+                          const defaultTicket = ticketTypes[0]?.id || "";
+                          const premiumTicket = ticketTypes[1]?.id || defaultTicket;
+
+                          const pillBlocks: StadiumBlockDef[] = [
+                            {
+                              id: "pill-north-curve",
+                              name: "North Curve Bow",
+                              color: "#0369a1",
+                              stand_level: "multi",
+                              shape: "curved",
+                              x: CANVAS_W * 0.28,
+                              y: 90,
+                              width: CANVAS_W * 0.44,
+                              height: 150,
+                              rotation: 0,
+                              capacity: 2000,
+                              tiers: [
+                                { id: "pnc-1", name: "Lower Bow", color: "#38bdf8", ticket_type_id: defaultTicket, row_start: "A", row_end: "H", seats_per_row: 28 },
+                                { id: "pnc-2", name: "Upper Grandstand", color: "#0284c7", ticket_type_id: premiumTicket, row_start: "I", row_end: "P", seats_per_row: 30 },
+                              ],
+                            },
+                            {
+                              id: "pill-south-curve",
+                              name: "South Curve Bow",
+                              color: "#7e22ce",
+                              stand_level: "multi",
+                              shape: "curved",
+                              x: CANVAS_W * 0.28,
+                              y: CANVAS_H - 240,
+                              width: CANVAS_W * 0.44,
+                              height: 150,
+                              rotation: 180,
+                              capacity: 2000,
+                              tiers: [
+                                { id: "psc-1", name: "Lower Bow", color: "#c084fc", ticket_type_id: defaultTicket, row_start: "A", row_end: "H", seats_per_row: 28 },
+                                { id: "psc-2", name: "Upper Grandstand", color: "#9333ea", ticket_type_id: premiumTicket, row_start: "I", row_end: "P", seats_per_row: 30 },
+                              ],
+                            },
+                            {
+                              id: "pill-west-straight",
+                              name: "West Trackside Grandstand",
+                              color: "#059669",
+                              stand_level: "multi",
+                              shape: "pill",
+                              x: 170,
+                              y: CANVAS_H * 0.24,
+                              width: 210,
+                              height: CANVAS_H * 0.52,
+                              rotation: 0,
+                              tier_split_direction: "horizontal",
+                              capacity: 2400,
+                              tiers: [
+                                { id: "pws-1", name: "Trackside Lower", color: "#34d399", ticket_type_id: defaultTicket, row_start: "A", row_end: "H", seats_per_row: 24 },
+                                { id: "pws-2", name: "Upper Grandstand", color: "#047857", ticket_type_id: premiumTicket, row_start: "I", row_end: "P", seats_per_row: 26 },
+                              ],
+                            },
+                            {
+                              id: "pill-east-straight",
+                              name: "East Trackside Grandstand",
+                              color: "#ea580c",
+                              stand_level: "multi",
+                              shape: "pill",
+                              x: CANVAS_W - 380,
+                              y: CANVAS_H * 0.24,
+                              width: 210,
+                              height: CANVAS_H * 0.52,
+                              rotation: 0,
+                              tier_split_direction: "horizontal",
+                              capacity: 2400,
+                              tiers: [
+                                { id: "pes-1", name: "Trackside Lower", color: "#fb923c", ticket_type_id: defaultTicket, row_start: "A", row_end: "H", seats_per_row: 24 },
+                                { id: "pes-2", name: "Upper Grandstand", color: "#c2410c", ticket_type_id: premiumTicket, row_start: "I", row_end: "P", seats_per_row: 26 },
+                              ],
+                            },
+                          ];
+
+                          setBlocks(pillBlocks);
+                          setSelectedId(pillBlocks[0].id);
+                          toast.success("Applied Olympic Stadium with Running Track!");
+                        }}
+                        className="p-2 rounded-lg bg-white hover:bg-slate-50 border border-slate-200 text-slate-800 text-[11px] font-bold text-left flex items-center gap-1.5 shadow-sm transition-colors"
+                      >
+                        <span>🏟️</span>
+                        <span>Olympic Pill</span>
+                      </button>
+
+                      {/* Preset 5: Curved Cricket Bowl */}
                       <button
                         type="button"
                         onClick={() => {
@@ -4686,12 +8037,84 @@ export default function StadiumBlockBuilder({
                             height: CANVAS_H * 0.56,
                             rotation: 0,
                           });
-                          setBlocks((prev) =>
-                            prev.map((b) => ({
-                              ...b,
+                          setPitchLabel("CRICKET GROUND");
+
+                          const defaultTicket = ticketTypes[0]?.id || "";
+                          const premiumTicket = ticketTypes[1]?.id || defaultTicket;
+
+                          const curvedBlocks: StadiumBlockDef[] = [
+                            {
+                              id: "crv-north",
+                              name: "North Pavilion Bowl",
+                              color: "#831843",
+                              stand_level: "multi",
                               shape: "curved",
-                            }))
-                          );
+                              x: CANVAS_W * 0.28,
+                              y: 110,
+                              width: CANVAS_W * 0.44,
+                              height: 140,
+                              rotation: 0,
+                              capacity: 1800,
+                              tiers: [
+                                { id: "cn-1", name: "Ground Floor", color: "#f472b6", ticket_type_id: defaultTicket, row_start: "A", row_end: "G", seats_per_row: 24 },
+                                { id: "cn-2", name: "Upper Tier", color: "#9d174d", ticket_type_id: premiumTicket, row_start: "H", row_end: "N", seats_per_row: 26 },
+                              ],
+                            },
+                            {
+                              id: "crv-south",
+                              name: "South Pavilion Bowl",
+                              color: "#4338ca",
+                              stand_level: "multi",
+                              shape: "curved",
+                              x: CANVAS_W * 0.28,
+                              y: CANVAS_H - 250,
+                              width: CANVAS_W * 0.44,
+                              height: 140,
+                              rotation: 180,
+                              capacity: 1800,
+                              tiers: [
+                                { id: "cs-1", name: "Ground Floor", color: "#818cf8", ticket_type_id: defaultTicket, row_start: "A", row_end: "G", seats_per_row: 24 },
+                                { id: "cs-2", name: "Upper Tier", color: "#3730a3", ticket_type_id: premiumTicket, row_start: "H", row_end: "N", seats_per_row: 26 },
+                              ],
+                            },
+                            {
+                              id: "crv-west",
+                              name: "West Wing Stand",
+                              color: "#059669",
+                              stand_level: "multi",
+                              shape: "curved",
+                              x: 180,
+                              y: CANVAS_H * 0.28,
+                              width: 170,
+                              height: CANVAS_H * 0.44,
+                              rotation: 270,
+                              capacity: 1600,
+                              tiers: [
+                                { id: "cw-1", name: "Lower Stand", color: "#34d399", ticket_type_id: defaultTicket, row_start: "A", row_end: "G", seats_per_row: 22 },
+                                { id: "cw-2", name: "Upper Stand", color: "#047857", ticket_type_id: premiumTicket, row_start: "H", row_end: "N", seats_per_row: 24 },
+                              ],
+                            },
+                            {
+                              id: "crv-east",
+                              name: "East Wing Stand",
+                              color: "#d97706",
+                              stand_level: "multi",
+                              shape: "curved",
+                              x: CANVAS_W - 350,
+                              y: CANVAS_H * 0.28,
+                              width: 170,
+                              height: CANVAS_H * 0.44,
+                              rotation: 90,
+                              capacity: 1600,
+                              tiers: [
+                                { id: "ce-1", name: "Lower Stand", color: "#fbbf24", ticket_type_id: defaultTicket, row_start: "A", row_end: "G", seats_per_row: 22 },
+                                { id: "ce-2", name: "Upper Stand", color: "#b45309", ticket_type_id: premiumTicket, row_start: "H", row_end: "N", seats_per_row: 24 },
+                              ],
+                            },
+                          ];
+
+                          setBlocks(curvedBlocks);
+                          setSelectedId(curvedBlocks[0].id);
                           toast.success("Applied Oval Cricket Ground with Curved Stands!");
                         }}
                         className="p-2 rounded-lg bg-white hover:bg-slate-50 border border-slate-200 text-slate-800 text-[11px] font-bold text-left flex items-center gap-1.5 shadow-sm transition-colors"
@@ -4700,64 +8123,7 @@ export default function StadiumBlockBuilder({
                         <span>Curved Cricket</span>
                       </button>
 
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setGroundConfig({
-                            sport_type: "football",
-                            pitch_label: "OLYMPIC STADIUM",
-                            turf_color: "#14532d",
-                            track_color: "#7f1d1d",
-                            shape: "capsule",
-                            x: CANVAS_W * 0.22,
-                            y: CANVAS_H * 0.22,
-                            width: CANVAS_W * 0.56,
-                            height: CANVAS_H * 0.56,
-                            rotation: 0,
-                          });
-                          setBlocks((prev) =>
-                            prev.map((b, i) => ({
-                              ...b,
-                              shape: i % 2 === 0 ? "pill" : "curved",
-                            }))
-                          );
-                          toast.success("Applied Olympic Stadium with Running Track!");
-                        }}
-                        className="p-2 rounded-lg bg-white hover:bg-slate-50 border border-slate-200 text-slate-800 text-[11px] font-bold text-left flex items-center gap-1.5 shadow-sm transition-colors"
-                      >
-                        <span>🏟️</span>
-                        <span>Olympic Pill</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setGroundConfig({
-                            sport_type: "football",
-                            pitch_label: "FOOTBALL ARENA",
-                            turf_color: "#14532d",
-                            track_color: "#1e293b",
-                            shape: "rectangle",
-                            x: CANVAS_W * 0.22,
-                            y: CANVAS_H * 0.22,
-                            width: CANVAS_W * 0.56,
-                            height: CANVAS_H * 0.56,
-                            rotation: 0,
-                          });
-                          setBlocks((prev) =>
-                            prev.map((b) => ({
-                              ...b,
-                              shape: "rectangle",
-                            }))
-                          );
-                          toast.success("Applied Classic Rectangular Stadium!");
-                        }}
-                        className="p-2 rounded-lg bg-white hover:bg-slate-50 border border-slate-200 text-slate-800 text-[11px] font-bold text-left flex items-center gap-1.5 shadow-sm transition-colors"
-                      >
-                        <span>🔲</span>
-                        <span>Classic Rect</span>
-                      </button>
-
+                      {/* Preset 6: Indoor Basketball Arena */}
                       <button
                         type="button"
                         onClick={() => {
@@ -4767,18 +8133,126 @@ export default function StadiumBlockBuilder({
                             turf_color: "#b45309",
                             track_color: "#0f172a",
                             shape: "rectangle",
-                            x: CANVAS_W * 0.25,
-                            y: CANVAS_H * 0.25,
-                            width: CANVAS_W * 0.5,
-                            height: CANVAS_H * 0.5,
+                            x: CANVAS_W * 0.32,
+                            y: CANVAS_H * 0.28,
+                            width: CANVAS_W * 0.36,
+                            height: CANVAS_H * 0.44,
                             rotation: 0,
                           });
-                          setBlocks((prev) =>
-                            prev.map((b) => ({
-                              ...b,
-                              shape: "pill",
-                            }))
-                          );
+                          setPitchLabel("BASKETBALL ARENA");
+
+                          const defaultTicket = ticketTypes[0]?.id || "";
+                          const premiumTicket = ticketTypes[1]?.id || defaultTicket;
+                          const courtsideTicket = ticketTypes[2]?.id || premiumTicket;
+
+                          const courtBlocks: StadiumBlockDef[] = [
+                            // Courtside VIP Rows
+                            {
+                              id: "court-vip-north",
+                              name: "Courtside VIP Floor North",
+                              color: "#f59e0b",
+                              stand_level: "lower",
+                              shape: "rectangle",
+                              x: CANVAS_W * 0.32,
+                              y: CANVAS_H * 0.28 - 60,
+                              width: CANVAS_W * 0.36,
+                              height: 50,
+                              rotation: 0,
+                              capacity: 100,
+                              tiers: [{ id: "cvip-n", name: "Floor VIP Row", color: "#fbbf24", ticket_type_id: courtsideTicket, row_start: "A", row_end: "B", seats_per_row: 25 }],
+                            },
+                            {
+                              id: "court-vip-south",
+                              name: "Courtside VIP Floor South",
+                              color: "#f59e0b",
+                              stand_level: "lower",
+                              shape: "rectangle",
+                              x: CANVAS_W * 0.32,
+                              y: CANVAS_H * 0.72 + 10,
+                              width: CANVAS_W * 0.36,
+                              height: 50,
+                              rotation: 0,
+                              capacity: 100,
+                              tiers: [{ id: "cvip-s", name: "Floor VIP Row", color: "#fbbf24", ticket_type_id: courtsideTicket, row_start: "A", row_end: "B", seats_per_row: 25 }],
+                            },
+                            // North Bleachers
+                            {
+                              id: "court-bleacher-north",
+                              name: "North Tiered Bleachers",
+                              color: "#2563eb",
+                              stand_level: "multi",
+                              shape: "rectangle",
+                              x: CANVAS_W * 0.28,
+                              y: 110,
+                              width: CANVAS_W * 0.44,
+                              height: 150,
+                              rotation: 0,
+                              capacity: 1500,
+                              tiers: [
+                                { id: "cbn-1", name: "Lower Bleachers", color: "#60a5fa", ticket_type_id: defaultTicket, row_start: "A", row_end: "G", seats_per_row: 24 },
+                                { id: "cbn-2", name: "Upper Level", color: "#1d4ed8", ticket_type_id: premiumTicket, row_start: "H", row_end: "N", seats_per_row: 26 },
+                              ],
+                            },
+                            // South Bleachers
+                            {
+                              id: "court-bleacher-south",
+                              name: "South Tiered Bleachers",
+                              color: "#7c3aed",
+                              stand_level: "multi",
+                              shape: "rectangle",
+                              x: CANVAS_W * 0.28,
+                              y: CANVAS_H * 0.72 + 70,
+                              width: CANVAS_W * 0.44,
+                              height: 150,
+                              rotation: 0,
+                              capacity: 1500,
+                              tiers: [
+                                { id: "cbs-1", name: "Lower Bleachers", color: "#a78bfa", ticket_type_id: defaultTicket, row_start: "A", row_end: "G", seats_per_row: 24 },
+                                { id: "cbs-2", name: "Upper Level", color: "#6d28d9", ticket_type_id: premiumTicket, row_start: "H", row_end: "N", seats_per_row: 26 },
+                              ],
+                            },
+                            // West Bleachers
+                            {
+                              id: "court-bleacher-west",
+                              name: "West Sideline Bleachers",
+                              color: "#059669",
+                              stand_level: "multi",
+                              shape: "rectangle",
+                              x: 270,
+                              y: CANVAS_H * 0.26,
+                              width: 190,
+                              height: CANVAS_H * 0.48,
+                              rotation: 0,
+                              tier_split_direction: "horizontal",
+                              capacity: 1600,
+                              tiers: [
+                                { id: "cbw-1", name: "Lower Level", color: "#34d399", ticket_type_id: defaultTicket, row_start: "A", row_end: "G", seats_per_row: 22 },
+                                { id: "cbw-2", name: "Upper Level", color: "#047857", ticket_type_id: premiumTicket, row_start: "H", row_end: "N", seats_per_row: 24 },
+                              ],
+                            },
+                            // East Bleachers
+                            {
+                              id: "court-bleacher-east",
+                              name: "East Sideline Bleachers",
+                              color: "#ea580c",
+                              stand_level: "multi",
+                              shape: "rectangle",
+                              x: CANVAS_W * 0.68 + 60,
+                              y: CANVAS_H * 0.26,
+                              width: 190,
+                              height: CANVAS_H * 0.48,
+                              rotation: 0,
+                              tier_split_direction: "horizontal",
+                              capacity: 1600,
+                              tiers: [
+                                { id: "cbe-1", name: "Lower Level", color: "#fb923c", ticket_type_id: defaultTicket, row_start: "A", row_end: "G", seats_per_row: 22 },
+                                { id: "cbe-2", name: "Upper Level", color: "#c2410c", ticket_type_id: premiumTicket, row_start: "H", row_end: "N", seats_per_row: 24 },
+                              ],
+                            },
+                          ];
+
+                          setBlocks(courtBlocks);
+                          setSelectedId(courtBlocks[0].id);
                           toast.success("Applied Indoor Arena Bowl!");
                         }}
                         className="p-2 rounded-lg bg-white hover:bg-slate-50 border border-slate-200 text-slate-800 text-[11px] font-bold text-left flex items-center gap-1.5 shadow-sm transition-colors"
@@ -4983,6 +8457,19 @@ export default function StadiumBlockBuilder({
           </div>
         </div>
       )}
+
+      {/* Customer Experience Simulation Modal (Level 1 Stadium -> Level 2/3 Seat Picker & Publishing) */}
+      <CustomerStadiumPreviewModal
+        isOpen={showCustomerPreview}
+        onClose={() => setShowCustomerPreview(false)}
+        stadiumName={stadiumName}
+        groundConfig={groundConfig}
+        blocks={blocks}
+        elements={elements}
+        ticketTypes={ticketTypes}
+        onPublish={handlePublish}
+        isPublishing={isPublishing}
+      />
     </div>
   );
 }

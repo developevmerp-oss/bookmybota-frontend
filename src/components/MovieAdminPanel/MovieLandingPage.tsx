@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { CalendarDays, Film, QrCode, Ticket } from "lucide-react";
 import PartnerListYourShowLanding from "@/components/Shared/PartnerListYourShowLanding";
 import { homePathForRole, readSessionForRole } from "@/lib/authStorage";
-import { PARTNER_VENUE_TYPE_CARDS } from "@/data/partnerVenueTypeCards";
 import { PARTNER_CATEGORY_TYPES } from "@/data/partnerCategoryTypes";
 import images from "@/Images";
 
@@ -81,10 +80,6 @@ export default function MovieLandingPage() {
       heroDescription="List your cinema on BookMyBota, manage showtimes, sell tickets and reach more audiences with a seamless booking experience."
       heroImage={HERO_IMAGE}
       heroImageAlt="Cinema partner on Book My Bota"
-      imageCards={PARTNER_VENUE_TYPE_CARDS}
-      imageCardsTitle="Venue Types"
-      imageCardsVariant="cards"
-      imageCardsTitleStyle="heading"
       categoryTypesTitle={`${PARTNER_CATEGORY_TYPES.movie.title} Types`}
       categoryTypes={PARTNER_CATEGORY_TYPES.movie.types}
       categoryTypesVariant="cards"

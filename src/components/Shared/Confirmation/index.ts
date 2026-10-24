@@ -13,3 +13,5 @@ export { CONFIRMATION_UI_VERSION } from "./confirmationUiVersion";
 export { default as ConfirmationPageUI1 } from "./ConfirmationPageUI1";
 export { default as ConfirmationPageUI2 } from "./ConfirmationPageUI2";
 export { default as ConfirmationPageUI1Shell } from "./ConfirmationPageUI1Shell";
+export { default as DiningConfirmationReviewAside } from "./DiningConfirmationReviewAside";
+export { default as EventConfirmationReviewAside } from "./EventConfirmationReviewAside";

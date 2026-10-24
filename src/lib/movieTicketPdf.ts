@@ -1,18 +1,16 @@
 import { formatDateCustomer, formatTime12h } from "@/lib/dateFormat";
 import { formatMoney } from "@/lib/currencyFormat";
-
-const BRAND: [number, number, number] = [105, 0, 170];
-const SLATE_900: [number, number, number] = [15, 23, 42];
-const SLATE_600: [number, number, number] = [71, 85, 105];
-const SLATE_400: [number, number, number] = [148, 163, 184];
-const SLATE_50: [number, number, number] = [248, 250, 252];
-const BORDER: [number, number, number] = [226, 232, 240];
-const WHITE: [number, number, number] = [255, 255, 255];
-const GREEN: [number, number, number] = [46, 125, 50];
+import {
+  buildTicketCardPdf,
+  downloadPdfBlob,
+  type TicketCardPdfAmountRow,
+} from "./confirmationTicketPdf";
 
 export type MovieTicketPdfBooking = {
   id: string;
   movie_title?: string;
+  movie_poster?: string;
+  cinema_image?: string;
   cinema_name?: string;
   cinema_address?: string;
   screen_name?: string;
@@ -26,8 +24,12 @@ export type MovieTicketPdfBooking = {
   guest_phone?: string;
   guest_email?: string;
   ticket_qty?: number;
+  ticket_amount?: number | string;
   grand_total?: number | string;
   beverage_total?: number | string;
+  convenience_fee_total?: number | string;
+  discount_amount?: number | string;
+  promo_code?: string;
   seats?: Array<{
     seat_identifier?: string;
     tier_name?: string | null;
@@ -46,197 +48,76 @@ function formatLongDate(value?: string) {
   if (!value) return "—";
   const normalized = String(value).includes("T") ? value : String(value).replace(" ", "T");
   const label = formatDateCustomer(normalized);
-  return label === "—" ? String(value) : label;
-}
-
-async function fetchAsDataUrl(url: string): Promise<string | null> {
-  try {
-    const res = await fetch(url);
-    if (!res.ok) return null;
-    const blob = await res.blob();
-    return await new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(typeof reader.result === "string" ? reader.result : null);
-      reader.onerror = () => resolve(null);
-      reader.readAsDataURL(blob);
-    });
-  } catch {
-    return null;
-  }
+  const time = formatTime12h(normalized);
+  return `${label} · ${time}`;
 }
 
 export async function buildMovieTicketPdf(booking: MovieTicketPdfBooking): Promise<Blob> {
-  const { jsPDF } = await import("jspdf");
-  const doc = new jsPDF({ unit: "mm", format: "a4" });
-  const pageW = doc.internal.pageSize.getWidth();
-  const margin = 18;
-  const cardW = pageW - margin * 2;
-  let y = 20;
-
-  const qrRaw = booking.qr_code_token || booking.booking_code || booking.id;
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&margin=10&data=${encodeURIComponent(qrRaw)}`;
-  const qrDataUrl = await fetchAsDataUrl(qrUrl);
-
-  const venue = [booking.cinema_name, booking.screen_name, booking.cinema_address]
-    .filter(Boolean)
-    .join(" · ");
-  const meta = [booking.showtime_format, booking.showtime_language, booking.movie_certificate]
-    .filter(Boolean)
-    .join(" · ");
   const seatsLabel =
     (booking.seats || [])
       .map((s) => s.seat_identifier)
       .filter(Boolean)
       .join(", ") || "—";
 
-  doc.setFillColor(...SLATE_50);
-  doc.rect(0, 0, pageW, doc.internal.pageSize.getHeight(), "F");
+  const venueLine = [booking.cinema_name, booking.cinema_address]
+    .filter(Boolean)
+    .join(", ");
 
-  doc.setFillColor(...WHITE);
-  doc.setDrawColor(...BORDER);
-  doc.roundedRect(margin, y, cardW, 240, 4, 4, "FD");
+  const formatMeta = [booking.showtime_format, booking.showtime_language]
+    .filter(Boolean)
+    .join(", ");
 
-  doc.setFillColor(...BRAND);
-  doc.roundedRect(margin, y, cardW, 18, 4, 4, "F");
-  doc.rect(margin, y + 10, cardW, 8, "F");
-  doc.setTextColor(...WHITE);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(11);
-  doc.text("BookMyBota  ·  Official M-Ticket", margin + 8, y + 11);
+  const qrRaw = booking.qr_code_token || booking.booking_code || booking.id;
+  const bookingCode = booking.booking_code || booking.id.slice(0, 8).toUpperCase();
+  const ticketCount = booking.ticket_qty || booking.seats?.length || 1;
 
-  y += 28;
-  doc.setTextColor(...SLATE_900);
-  doc.setFontSize(16);
-  doc.text(booking.movie_title || "Movie", margin + 8, y, { maxWidth: cardW - 16 });
+  const amountRows: TicketCardPdfAmountRow[] = [
+    {
+      label: "Net Ticket(s) Price",
+      value: formatMoney(Number(booking.ticket_amount || booking.grand_total) || 0),
+    },
+  ];
 
-  y += 8;
-  if (meta) {
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    doc.setTextColor(...SLATE_600);
-    doc.text(meta, margin + 8, y);
-    y += 6;
+  if (Number(booking.beverage_total) > 0) {
+    amountRows.push({
+      label: "Snacks & beverages",
+      value: formatMoney(Number(booking.beverage_total) || 0),
+    });
   }
 
-  doc.setFontSize(9);
-  doc.setTextColor(...SLATE_600);
-  doc.text(venue || "Cinema TBA", margin + 8, y, { maxWidth: cardW - 16 });
-  y += 6;
-  doc.text(
-    `${formatLongDate(booking.showtime_starts_at)}  ·  ${formatTime12h(booking.showtime_starts_at)}`,
-    margin + 8,
-    y
-  );
-
-  y += 12;
-  doc.setDrawColor(...BORDER);
-  doc.line(margin + 8, y, margin + cardW - 8, y);
-  y += 10;
-
-  const leftX = margin + 8;
-  const rightX = margin + cardW / 2;
-  const drawField = (label: string, value: string, x: number, yy: number) => {
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(7);
-    doc.setTextColor(...SLATE_400);
-    doc.text(label.toUpperCase(), x, yy);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(10);
-    doc.setTextColor(...SLATE_900);
-    doc.text(value || "—", x, yy + 5, { maxWidth: cardW / 2 - 16 });
-  };
-
-  drawField("Guest", booking.guest_name || "Guest", leftX, y);
-  drawField("Booking code", booking.booking_code || "—", rightX, y);
-  y += 16;
-  drawField("Seats", seatsLabel, leftX, y);
-  drawField("Tickets", String(booking.ticket_qty || booking.seats?.length || 0), rightX, y);
-  y += 16;
-  drawField("Amount paid", formatMoney(Number(booking.grand_total) || 0), leftX, y);
-
-  // ── Snacks & Beverages section ──────────────────────────────────────────
-  const beverages = booking.beverages?.filter((b) => b.quantity > 0) ?? [];
-  if (beverages.length > 0) {
-    y += 14;
-    doc.setDrawColor(...BORDER);
-    doc.line(margin + 8, y, margin + cardW - 8, y);
-    y += 7;
-
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(7);
-    doc.setTextColor(...SLATE_400);
-    doc.text("SNACKS & BEVERAGES", leftX, y);
-    y += 5;
-
-    for (const bev of beverages) {
-      const label = `${bev.name}${bev.quantity > 1 ? ` ×${bev.quantity}` : ""}`;
-      const price = formatMoney(Number(bev.subtotal ?? (Number(bev.unit_price || 0) * bev.quantity)));
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(9);
-      doc.setTextColor(...SLATE_900);
-      doc.text(label, leftX, y, { maxWidth: cardW - 60 });
-      doc.setFont("helvetica", "bold");
-      doc.text(price, margin + cardW - 8, y, { align: "right" });
-      y += 6;
-    }
-
-    if (booking.beverage_total) {
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(7);
-      doc.setTextColor(...SLATE_400);
-      doc.text("Snacks subtotal", leftX, y);
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(9);
-      doc.setTextColor(...SLATE_900);
-      doc.text(formatMoney(Number(booking.beverage_total)), margin + cardW - 8, y, { align: "right" });
-      y += 8;
-    }
+  if (Number(booking.convenience_fee_total) > 0) {
+    amountRows.push({
+      label: "Convenience fee",
+      value: formatMoney(Number(booking.convenience_fee_total) || 0),
+    });
   }
 
-  y += 6;
-  if (qrDataUrl) {
-    const qrSize = 48;
-    const qrX = margin + (cardW - qrSize) / 2;
-    doc.setFillColor(...WHITE);
-    doc.setDrawColor(...BORDER);
-    doc.roundedRect(qrX - 4, y - 4, qrSize + 8, qrSize + 8, 3, 3, "FD");
-    doc.addImage(qrDataUrl, "PNG", qrX, y, qrSize, qrSize);
-    y += qrSize + 12;
+  if (Number(booking.discount_amount) > 0) {
+    amountRows.push({
+      label: `Discount${booking.promo_code ? ` (${booking.promo_code})` : ""}`,
+      value: `− ${formatMoney(Number(booking.discount_amount) || 0)}`,
+      strong: true,
+    });
   }
 
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(8);
-  doc.setTextColor(...SLATE_600);
-  doc.text("Show this QR at the cinema gate for one-time entry.", pageW / 2, y, {
-    align: "center",
+  return buildTicketCardPdf({
+    filenameTitle: "Movie",
+    title: booking.movie_title || "Movie",
+    posterUrl: booking.movie_poster || booking.cinema_image || null,
+    tag: "M-Ticket",
+    whenLine: formatLongDate(booking.showtime_starts_at),
+    venueLine: venueLine || formatMeta,
+    offerLabel: booking.promo_code ? `Offer: ${booking.promo_code}` : undefined,
+    ticketCountLabel: `${ticketCount} Ticket${ticketCount === 1 ? "" : "(s)"}`,
+    primaryLabel: booking.screen_name || "SCREEN",
+    secondaryLabel: seatsLabel,
+    bookingCode,
+    qrValue: qrRaw,
+    showQr: true,
+    cancellationNote: "Cancellation unavailable : cut-off time of 20 minutes before showtime has passed",
+    totalFormatted: formatMoney(Number(booking.grand_total) || 0),
+    amountRows,
   });
-  y += 6;
-  doc.setTextColor(...GREEN);
-  doc.setFont("helvetica", "bold");
-  doc.text("CONFIRMED", pageW / 2, y, { align: "center" });
-
-  y += 14;
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(7);
-  doc.setTextColor(...SLATE_400);
-  doc.text(
-    "Non-transferable · Present valid ID if requested · bookmybota.com",
-    pageW / 2,
-    y,
-    { align: "center", maxWidth: cardW - 20 }
-  );
-
-  return doc.output("blob");
 }
 
-export function downloadPdfBlob(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  link.rel = "noopener";
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 1500);
-}
+export { downloadPdfBlob };

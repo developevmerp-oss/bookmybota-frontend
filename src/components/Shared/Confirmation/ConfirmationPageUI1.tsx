@@ -5,21 +5,14 @@ import {
   useMemo,
   useRef,
   useState,
-  type CSSProperties,
   type ReactNode,
 } from "react";
 import Link from "next/link";
 import { Controller, useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import {
-  ArrowLeft,
-  Download,
-  Film,
-  Link2,
-  Loader2,
-  Phone,
-  Share2,
   AlertCircle,
+  Loader2,
   Star,
   X,
 } from "lucide-react";
@@ -42,20 +35,11 @@ import {
   movieReviewFormSchema,
   type MovieReviewFormValues,
 } from "@/lib/movieReviewFormSchema";
-import images from "@/Images";
+import ConfirmationPageUI1Shell from "./ConfirmationPageUI1Shell";
 
 interface ConfirmationPageUI1Props {
   bookingId: string;
 }
-
-const PAGE_BG = "#F2F2F2";
-const PAGE_MAX = "mx-auto w-full max-w-[72rem] px-4 sm:px-6 lg:px-10";
-const CUT_SIZE = 24; // px diameter — half hangs off the ticket edge
-
-const HIDE_SCROLLBAR =
-  "[scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden";
-
-const logoSrc = typeof images.logo === "string" ? images.logo : images.logo.src;
 
 function formatRatingOutOf5(value: number) {
   return `${Number(value || 0).toFixed(1)}/5`;
@@ -97,7 +81,6 @@ function openCustomerLogin() {
   }
 }
 
-/** Same half-star click input used on movie detail reviews. */
 function StarRatingInput({
   value,
   onChange,
@@ -149,7 +132,7 @@ function StarRatingInput({
   );
 }
 
-function StarRatingDisplay({ value, size = 22 }: { value: number; size?: number }) {
+function StarRatingDisplay({ value, size = 28 }: { value: number; size?: number }) {
   return (
     <div className="flex items-center gap-1 pointer-events-none" aria-hidden>
       {[1, 2, 3, 4, 5].map((star) => (
@@ -177,103 +160,18 @@ function StarRatingDisplay({ value, size = 22 }: { value: number; size?: number 
   );
 }
 
-/**
- * True scalloped ticket edge via CSS mask (transparent holes — not painted circles).
- * Base fill + destination-out circles so the dimmed overlay shows through naturally.
- */
-function ticketNotchMask(corners: {
-  topLeft?: boolean;
-  topRight?: boolean;
-  bottomLeft?: boolean;
-  bottomRight?: boolean;
-}): CSSProperties {
-  const r = CUT_SIZE / 2;
-  const holes: string[] = [];
-  if (corners.topLeft) {
-    holes.push(`radial-gradient(circle ${r}px at 0 0, #000 ${r}px, transparent ${r}px)`);
-  }
-  if (corners.topRight) {
-    holes.push(`radial-gradient(circle ${r}px at 100% 0, #000 ${r}px, transparent ${r}px)`);
-  }
-  if (corners.bottomLeft) {
-    holes.push(`radial-gradient(circle ${r}px at 0 100%, #000 ${r}px, transparent ${r}px)`);
-  }
-  if (corners.bottomRight) {
-    holes.push(`radial-gradient(circle ${r}px at 100% 100%, #000 ${r}px, transparent ${r}px)`);
-  }
-  if (!holes.length) return {};
-  const image = [`linear-gradient(#000, #000)`, ...holes].join(", ");
-  return {
-    WebkitMaskImage: image,
-    maskImage: image,
-    WebkitMaskComposite: holes.map(() => "destination-out").join(", "),
-    maskComposite: holes.map(() => "exclude").join(", "),
-    WebkitMaskRepeat: "no-repeat",
-    maskRepeat: "no-repeat",
-    WebkitMaskSize: "100% 100%",
-    maskSize: "100% 100%",
-  };
-}
-
-/** Page ticket: soft notches matching gray page bg (no dotted line). */
-function TicketCut({ fill = PAGE_BG }: { fill?: string }) {
-  return (
-    <div className="relative z-30 h-0 pointer-events-none select-none" aria-hidden>
-      <span
-        className="absolute top-0 left-0 rounded-full"
-        style={{
-          width: CUT_SIZE,
-          height: CUT_SIZE,
-          backgroundColor: fill,
-          transform: "translate(-50%, -50%)",
-        }}
-      />
-      <span
-        className="absolute top-0 right-0 rounded-full"
-        style={{
-          width: CUT_SIZE,
-          height: CUT_SIZE,
-          backgroundColor: fill,
-          transform: "translate(50%, -50%)",
-        }}
-      />
-    </div>
-  );
-}
-
-/** Hairline inside a masked band — inset past notch radius so it never crosses the cut. */
-function TicketBandEdgeLine({ edge }: { edge: "top" | "bottom" }) {
-  const inset = CUT_SIZE + 2;
-  return (
-    <div className="pointer-events-none" aria-hidden>
-      <div
-        className={`border-[#E8E8E8] ${edge === "top" ? "border-t" : "border-b"}`}
-        style={{ marginLeft: inset, marginRight: inset }}
-      />
-    </div>
-  );
-}
-
-function ModalShell({
+function ReviewModalShell({
   open,
   title,
   onClose,
   children,
   footer,
-  maxWidthClass = "max-w-[26rem]",
-  overlayClass = "bg-black/50",
-  hideHeader = false,
-  panelClass = "",
 }: {
   open: boolean;
   title?: string;
   onClose: () => void;
   children: ReactNode;
   footer?: ReactNode;
-  maxWidthClass?: string;
-  overlayClass?: string;
-  hideHeader?: boolean;
-  panelClass?: string;
 }) {
   useEffect(() => {
     if (!open) return;
@@ -287,28 +185,15 @@ function ModalShell({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 print:hidden">
-      {/* Translucent scrim so page + ticket cuts show through (not solid black). */}
+    <div className="fixed inset-0 z-[90] flex items-center justify-center p-4 print:hidden">
       <button
         type="button"
-        className={`absolute inset-0 cursor-pointer ${overlayClass}`}
-        style={
-          hideHeader
-            ? { backgroundColor: "rgba(0, 0, 0, 0.45)" }
-            : undefined
-        }
+        className="absolute inset-0 cursor-pointer bg-black/50"
         aria-label="Close"
         onClick={onClose}
       />
-      <div
-        className={`relative w-full ${maxWidthClass} max-h-[min(92vh,52rem)] flex flex-col animate-[confirmHeaderIn_0.28s_ease-out] ${
-          hideHeader
-            ? /* side padding + no x-clip so punch halves sit in the gutter */
-              `overflow-y-auto ${HIDE_SCROLLBAR} ${panelClass}`
-            : "rounded-2xl bg-white shadow-2xl overflow-hidden"
-        }`}
-      >
-        {!hideHeader && title ? (
+      <div className="relative w-full max-w-[26rem] max-h-[min(92vh,52rem)] flex flex-col rounded-2xl bg-white shadow-2xl overflow-hidden">
+        {title ? (
           <div className="relative shrink-0 flex items-center justify-center border-b border-[#EDEDED] px-5 py-3.5">
             <h2 className="text-[1rem] font-semibold text-[#222]">{title}</h2>
             <button
@@ -321,25 +206,13 @@ function ModalShell({
             </button>
           </div>
         ) : null}
-        <div className={hideHeader ? "" : `min-h-0 flex-1 overflow-y-auto ${HIDE_SCROLLBAR}`}>
-          {children}
-        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
         {footer ? <div className="shrink-0 border-t border-[#EDEDED] px-6 py-4">{footer}</div> : null}
       </div>
-      <style>{`
-        @keyframes confirmHeaderIn {
-          from { opacity: 0; transform: translateY(10px) scale(0.98); }
-          to { opacity: 1; transform: translateY(0) scale(1); }
-        }
-      `}</style>
     </div>
   );
 }
 
-/**
- * Confirmation UI v1 — BMS-style ticket (+ optional rating aside for movies).
- * Used via CONFIRMATION_UI_VERSION / comment-switch in module confirmation pages.
- */
 export default function ConfirmationPageUI1({
   bookingId,
 }: ConfirmationPageUI1Props) {
@@ -365,9 +238,7 @@ export default function ConfirmationPageUI1({
   }, [reviewsData?.items, authUser?.name]);
 
   const [createReview, { isLoading: submittingReview }] = useCreateMovieReviewMutation();
-  const [detailsOpen, setDetailsOpen] = useState(false);
   const [ratingOpen, setRatingOpen] = useState(false);
-  const [shareOpen, setShareOpen] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const prevLoggedInNameRef = useRef("");
 
@@ -440,19 +311,33 @@ export default function ConfirmationPageUI1({
     booking?.booking_code || booking?.id.slice(0, 8).toUpperCase() || "";
 
   const alreadyReviewed = Boolean(reviewMeta?.already_reviewed || myReview);
-  const canReview = Boolean(reviewMeta?.can_review) && isLoggedIn && !alreadyReviewed;
-  const previewRating = myReview ? Number(myReview.rating) || 0 : 0;
-
-  const handleCopyTicketLink = async () => {
-    const url = typeof window !== "undefined" ? window.location.href : "";
+  const previewRating = myReview ? Number(myReview.rating) || 0 : 0;  // Determine if the show has completed according to panel/backend logic
+  const isShowEnded = useMemo(() => {
+    if (reviewMeta?.show_ended) return true;
+    const startsAt = booking?.showtime_starts_at;
+    if (!startsAt) return false;
     try {
-      await navigator.clipboard.writeText(url);
-      toast.success("Ticket link copied to clipboard!");
-      setShareOpen(false);
+      const raw = String(startsAt).replace(" ", "T");
+      const startTime = new Date(raw.includes("T") ? raw : `${raw}T00:00:00`).getTime();
+      if (Number.isNaN(startTime)) return false;
+      const endsAt = booking?.showtime_ends_at;
+      if (endsAt) {
+        const rawEnd = String(endsAt).replace(" ", "T");
+        const endTime = new Date(rawEnd.includes("T") ? rawEnd : `${rawEnd}T00:00:00`).getTime();
+        if (!Number.isNaN(endTime)) return Date.now() >= endTime;
+      }
+      // Fallback 2 hours duration
+      return Date.now() >= startTime + 2 * 60 * 60 * 1000;
     } catch {
-      toast.error("Could not copy the link. Please try again.");
+      return false;
     }
-  };
+  }, [
+    reviewMeta?.show_ended,
+    booking?.showtime_starts_at,
+    booking?.showtime_ends_at,
+  ]);
+
+  const canShowReview = isShowEnded && !alreadyReviewed;
 
   const handleDownloadPdf = async () => {
     if (!booking) return;
@@ -480,14 +365,6 @@ export default function ConfirmationPageUI1({
     }
     if (reviewMeta && !reviewMeta.has_booking) {
       toast.info("Book tickets for this movie on BookMyBota to leave a review.");
-      return;
-    }
-    if (reviewMeta && !reviewMeta.show_ended) {
-      toast.info("You can review this movie after your show ends.");
-      return;
-    }
-    if (!canReview && reviewMeta) {
-      toast.info("Review is not available for this booking yet.");
       return;
     }
     reset({ user_name: loggedInName || "", rating: 5, text: "" });
@@ -520,8 +397,37 @@ export default function ConfirmationPageUI1({
     }
   });
 
+  const amountRows = useMemo(() => {
+    if (!booking) return [];
+    const rows = [
+      {
+        label: "Net Ticket(s) Price",
+        value: formatMoney(Number(booking.ticket_amount) || 0),
+      },
+    ];
+    if (Number(booking.beverage_total) > 0) {
+      rows.push({
+        label: "Snacks & beverages",
+        value: formatMoney(Number(booking.beverage_total) || 0),
+      });
+    }
+    if (Number(booking.convenience_fee_total) > 0) {
+      rows.push({
+        label: "Convenience fee",
+        value: formatMoney(Number(booking.convenience_fee_total) || 0),
+      });
+    }
+    if (Number(booking.discount_amount) > 0) {
+      rows.push({
+        label: `Discount${booking.promo_code ? ` (${booking.promo_code})` : ""}`,
+        value: `− ${formatMoney(Number(booking.discount_amount) || 0)}`,
+      });
+    }
+    return rows;
+  }, [booking]);
+
   if (isLoading) {
-    return <ConfirmationPageUI1Shimmer showAside />;
+    return <ConfirmationPageUI1Shimmer showAside={false} />;
   }
 
   if (isError || !booking) {
@@ -542,282 +448,70 @@ export default function ConfirmationPageUI1({
     );
   }
 
-  const movieHeader = (
-    <div className="relative flex gap-3.5 px-4 pt-5 pb-4 pr-10 sm:px-5">
-      <div className="relative shrink-0 w-[4.75rem] overflow-hidden rounded-md bg-[#F3F3F3]">
-        {poster ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={poster}
-            alt={booking.movie_title || "Movie"}
-            className="block h-full w-full object-cover aspect-[2/3]"
-          />
-        ) : (
-          <div className="flex aspect-[2/3] items-center justify-center text-slate-400">
-            <Film size={24} />
-          </div>
-        )}
+  const movieReviewAside = (
+    <button
+      type="button"
+      onClick={openRatingModal}
+      className="w-full rounded-2xl border border-[#E8E8E8] bg-white p-6 text-left shadow-[0_2px_12px_rgba(0,0,0,0.06)] hover:shadow-[0_4px_16px_rgba(0,0,0,0.1)] transition-shadow cursor-pointer"
+    >
+      <div className="flex justify-center">
+        <StarRatingDisplay value={previewRating || 0} size={28} />
       </div>
-      <div className="min-w-0 flex-1">
-        <h3 className="text-[1.05rem] sm:text-[1.125rem] font-bold text-[#111] leading-snug">
-          {booking.movie_title}
-        </h3>
-        {formatMeta ? (
-          <p className="mt-1.5 text-[0.75rem] md:text-[0.8125rem] text-[#757575]">
-            {formatMeta}
-          </p>
-        ) : null}
-        {whenLine ? (
-          <p className="mt-1 text-[0.75rem] md:text-[0.8125rem] text-[#757575]">
-            {whenLine}
-          </p>
-        ) : null}
-        {cinemaLine ? (
-          <p className="mt-1 text-[0.75rem] md:text-[0.8125rem] text-[#757575] leading-snug">
-            {cinemaLine}
-          </p>
-        ) : null}
-        {hasOffer ? (
-          <p className="mt-2 inline-flex rounded bg-[#111] px-2 py-0.5 text-[0.625rem] font-semibold text-white">
-            {booking.promo_code
-              ? `Offer: ${booking.promo_code}`
-              : `Offer · −${formatMoney(Number(booking.discount_amount) || 0)}`}
-          </p>
-        ) : null}
-      </div>
-      <span
-        className="pointer-events-none absolute right-2.5 top-[52%] text-[0.625rem] font-medium tracking-[0.14em] text-[#B8B8B8]"
-        style={{
-          writingMode: "vertical-rl",
-          transform: "translateY(-50%) rotate(180deg)",
-        }}
-        aria-hidden
-      >
-        M-Ticket
-      </span>
-    </div>
+      <p className="mt-7 text-[1.15rem] font-bold text-[#111] leading-snug">
+        What did you think of the movie?
+      </p>
+      <p className="mt-2 text-[0.875rem] text-[#777] leading-relaxed">
+        {alreadyReviewed
+          ? `Thanks — you rated this ${formatRatingOutOf5(previewRating)}.`
+          : !isLoggedIn
+            ? "Log in to rate and review this movie."
+            : "Rate and review the movie so that it helps others."}
+      </p>
+    </button>
   );
 
   return (
-    <div
-      className="min-h-screen w-full overflow-x-hidden pb-12 print:bg-white"
-      style={{ backgroundColor: PAGE_BG }}
-    >
-      <div className={`${PAGE_MAX} pt-5 sm:pt-8 print:pt-4`}>
-        <div className="mb-5 sm:mb-6 flex items-center gap-2.5 sm:gap-3">
-          <Link
-            href="/customer/dashboard"
-            className="inline-flex h-9 w-9 items-center justify-center text-[#111] hover:opacity-70 cursor-pointer print:hidden"
-            aria-label="Back"
-          >
-            <ArrowLeft size={22} strokeWidth={2} />
-          </Link>
-          <h1 className="text-[1.25rem] sm:text-[1.375rem] font-bold text-[#111]">Your Ticket</h1>
-          <button
-            type="button"
-            onClick={() => setShareOpen(true)}
-            className="inline-flex h-9 w-9 items-center justify-center text-[#333] hover:opacity-70 cursor-pointer print:hidden"
-            aria-label="Share ticket"
-          >
-            <Share2 size={18} />
-          </button>
-        </div>
+    <>
+      <ConfirmationPageUI1Shell
+        showAside={canShowReview}
+        aside={canShowReview ? movieReviewAside : undefined}
+        backHref="/customer/dashboard"
+        pageTitle="Your Ticket"
+        title={booking.movie_title || "Movie"}
+        posterUrl={poster}
+        formatMeta={formatMeta}
+        whenLine={whenLine}
+        venueLine={cinemaLine}
+        offerLabel={
+          hasOffer
+            ? booking.promo_code
+              ? `Offer: ${booking.promo_code}`
+              : `Offer · −${formatMoney(Number(booking.discount_amount) || 0)}`
+            : undefined
+        }
+        ticketCountLabel={`${ticketCount} Ticket${ticketCount === 1 ? "" : "(s)"}`}
+        primaryLabel={booking.screen_name || "Screen"}
+        secondaryLabel={seatsLabel}
+        bookingCode={bookingCode}
+        qrValue={qrValue}
+        totalFormatted={formatMoney(Number(booking.grand_total) || 0)}
+        totalNote={
+          Number(booking.convenience_fee_total || 0) > 0
+            ? `Includes ${formatMoney(Number(booking.convenience_fee_total))} convenience fee & VAT`
+            : undefined
+        }
+        amountRows={amountRows}
+        cancellationNote="Cancellation unavailable : cut-off time of 20 minutes before showtime has passed"
+        supportHref="/customer/help"
+        mTicketLabel="M-Ticket"
+        onDownloadPdf={handleDownloadPdf}
+        downloading={downloading}
+        showQr={true}
+        directDetails={true}
+      />
 
-        <div className="mb-3 flex max-w-[28rem] xl:max-w-[30rem] items-center gap-2.5 rounded-lg border border-[#E5E5E5] bg-[#FAFAFA] px-3 py-2.5 text-[0.75rem] md:text-[0.875rem] text-[#444] print:hidden">
-          <span
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-white border border-[#E8E8E8]"
-            aria-hidden
-          >
-            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="#111" strokeWidth="1.75">
-              <rect x="7" y="2" width="10" height="20" rx="2" />
-              <path d="M10 18h4" />
-            </svg>
-          </span>
-          <p className="leading-snug">
-            Ticket shared on the contact details provided, have it handy on your phone while
-            entering the venue.
-          </p>
-        </div>
-
-        <div className="flex flex-col lg:flex-row lg:items-start gap-5 lg:gap-8">
-          <div className="min-w-0 w-full lg:max-w-[28rem] xl:max-w-[30rem]">
-            <div className="relative overflow-visible rounded-2xl border border-[#E8E8E8] bg-white shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
-              <div className="relative flex gap-3.5 sm:gap-4 px-4 pt-4 pb-5 sm:px-5 sm:pt-5 sm:pb-6 pr-9 sm:pr-11">
-                <div className="relative shrink-0 w-[5rem] sm:w-[5.75rem] overflow-hidden rounded-md bg-[#F3F3F3]">
-                  {poster ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={poster}
-                      alt={booking.movie_title || "Movie"}
-                      className="block h-full w-full object-cover aspect-[2/3]"
-                    />
-                  ) : (
-                    <div className="flex aspect-[2/3] items-center justify-center text-slate-400">
-                      <Film size={28} />
-                    </div>
-                  )}
-                </div>
-
-                <div className="min-w-0 flex-1">
-                  <h2 className="text-[1.05rem] sm:text-[1.25rem] font-bold text-[#111] leading-snug">
-                    {booking.movie_title}
-                  </h2>
-                  {formatMeta ? (
-                    <p className="mt-2 text-[0.8125rem] md:text-[0.875rem] text-[#777]">
-                      {formatMeta}
-                    </p>
-                  ) : null}
-                  {whenLine ? (
-                    <p className="mt-1 text-[0.8125rem] md:text-[0.875rem] text-[#777]">
-                      {whenLine}
-                    </p>
-                  ) : null}
-                  {cinemaLine ? (
-                    <p className="mt-1 text-[0.8125rem] md:text-[0.875rem] text-[#777] leading-snug">
-                      {cinemaLine}
-                    </p>
-                  ) : null}
-                  {hasOffer ? (
-                    <p className="mt-2.5 inline-flex items-center rounded bg-[#111] px-2 py-0.5 text-[0.6875rem] font-semibold text-white">
-                      {booking.promo_code
-                        ? `Offer: ${booking.promo_code}`
-                        : `Offer · −${formatMoney(Number(booking.discount_amount) || 0)}`}
-                    </p>
-                  ) : null}
-                </div>
-
-                <span
-                  className="pointer-events-none absolute right-3 sm:right-4 top-[55%] text-[0.6875rem] md:text-[0.75rem] font-medium tracking-[0.12em] text-[#B0B0B0]"
-                  style={{
-                    writingMode: "vertical-rl",
-                    transform: "translateY(-50%) rotate(180deg)",
-                  }}
-                  aria-hidden
-                >
-                  M-Ticket
-                </span>
-              </div>
-
-              <div
-                className="relative z-20 print:hidden"
-                style={{
-                  paddingLeft: CUT_SIZE,
-                  paddingRight: CUT_SIZE,
-                  marginBottom: -(CUT_SIZE / 2),
-                }}
-              >
-                <button
-                  type="button"
-                  onClick={() => setDetailsOpen(true)}
-                  className="relative z-20 w-full rounded-full bg-[#F0F0F0] hover:bg-[#E4E4E4] px-4 py-[0.65rem] text-center text-[0.8125rem] md:text-[0.875rem] font-medium text-[#333] cursor-pointer transition-colors"
-                >
-                  Tap for support, details &amp; more actions
-                </button>
-              </div>
-              <TicketCut fill={PAGE_BG} />
-
-              <div className="px-4 sm:px-5 pt-6 pb-0">
-                <div className="flex items-start gap-4 sm:gap-5">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=4&data=${encodeURIComponent(
-                      qrValue
-                    )}`}
-                    alt={`QR ${bookingCode}`}
-                    className="h-[7.25rem] w-[7.25rem] sm:h-[8rem] sm:w-[8rem] shrink-0 bg-white"
-                  />
-                  <div className="min-w-0 flex-1 pt-0.5">
-                    <p className="text-[0.75rem] md:text-[0.8125rem] text-[#888]">
-                      {ticketCount} Ticket{ticketCount === 1 ? "" : "(s)"}
-                    </p>
-                    <p className="mt-1 text-[1.2rem] sm:text-[1.35rem] font-bold text-[#111] uppercase leading-tight">
-                      {booking.screen_name || "Screen"}
-                    </p>
-                    <p className="mt-1.5 text-[0.8125rem] md:text-[0.875rem] text-[#555] break-words leading-snug">
-                      {seatsLabel}
-                    </p>
-                    <p className="mt-3 text-[0.8125rem] md:text-[0.875rem] font-bold text-[#111] tracking-wide">
-                      BOOKING ID: {bookingCode}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="mt-5 -mx-4 sm:-mx-5 bg-[#F5F5F5] px-4 sm:px-5 py-2.5 text-center text-[0.6875rem] md:text-[0.8125rem] text-[#777] leading-snug">
-                  Cancellation unavailable : cut-off time of 20 minutes before showtime has passed
-                </div>
-
-                <div className="flex items-center justify-between gap-3 py-4 text-[0.9375rem] text-[#111]">
-                  <div>
-                    <span className="font-medium">Total Amount</span>
-                    {Number(booking.convenience_fee_total || 0) > 0 && (
-                      <p className="text-[11px] text-[#777] font-normal">
-                        Includes {formatMoney(Number(booking.convenience_fee_total))} convenience fee &amp; VAT
-                      </p>
-                    )}
-                  </div>
-                  <span className="font-bold tabular-nums">
-                    {formatMoney(Number(booking.grand_total) || 0)}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="w-full lg:w-[22rem] xl:w-[24rem] shrink-0 print:hidden">
-            <button
-              type="button"
-              onClick={openRatingModal}
-              className="w-full rounded-2xl border border-[#E8E8E8] bg-white p-6 text-left shadow-[0_2px_12px_rgba(0,0,0,0.06)] hover:shadow-[0_4px_16px_rgba(0,0,0,0.1)] transition-shadow cursor-pointer"
-            >
-              <div className="flex justify-center">
-                <StarRatingDisplay value={previewRating || 0} size={28} />
-              </div>
-              <p className="mt-7 text-[1.15rem] font-bold text-[#111] leading-snug">
-                What did you think of the movie?
-              </p>
-              <p className="mt-2 text-[0.875rem] text-[#777] leading-relaxed">
-                {alreadyReviewed
-                  ? `Thanks — you rated this ${formatRatingOutOf5(previewRating)}.`
-                  : !isLoggedIn
-                    ? "Log in to rate and review this movie."
-                    : reviewMeta && !reviewMeta.show_ended
-                      ? "You can review after your show ends."
-                      : "Rate and review the movie so that it helps others."}
-              </p>
-            </button>
-
-            <div className="mt-8 flex justify-center">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={logoSrc}
-                alt="Book My Bota"
-                className="h-12 lg:h-14 w-auto object-contain"
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Share — Copy Link only */}
-      <ModalShell
-        open={shareOpen}
-        title="Share"
-        onClose={() => setShareOpen(false)}
-        maxWidthClass="max-w-[22rem] sm:max-w-[24rem]"
-        overlayClass="bg-black/50"
-      >
-        <button
-          type="button"
-          onClick={() => void handleCopyTicketLink()}
-          className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left text-[0.9375rem] text-[#111] hover:bg-[#FAFAFA] cursor-pointer transition-colors"
-        >
-          <span>Copy Link</span>
-          <Link2 size={20} strokeWidth={1.75} className="shrink-0 text-[#555]" />
-        </button>
-      </ModalShell>
-
-      {/* Rating — same 5-star half-click + form schema as movie reviews */}
-      <ModalShell
+      {/* Rating modal */}
+      <ReviewModalShell
         open={ratingOpen}
         title="How was the movie?"
         onClose={() => setRatingOpen(false)}
@@ -895,152 +589,7 @@ export default function ConfirmationPageUI1({
             They help others decide what to watch next.
           </p>
         </form>
-      </ModalShell>
-
-      {/* Details popup — natural scalloped cuts (mask holes, not black circles) */}
-      <ModalShell
-        open={detailsOpen}
-        onClose={() => setDetailsOpen(false)}
-        hideHeader
-        maxWidthClass="max-w-[28rem] sm:max-w-[30rem]"
-        overlayClass=""
-        panelClass="px-4 sm:px-5"
-      >
-        {/* No filter on masked ticket — keeps notch holes truly transparent over the scrim */}
-        <div className="relative">
-          {/* Top band — bottom edge scalloped */}
-          <div
-            className="relative bg-white rounded-t-2xl shadow-[0_8px_28px_rgba(0,0,0,0.18)]"
-            style={ticketNotchMask({ bottomLeft: true, bottomRight: true })}
-          >
-            {movieHeader}
-            <div
-              className="relative z-20 pb-3"
-              style={{ paddingLeft: CUT_SIZE, paddingRight: CUT_SIZE }}
-            >
-              <button
-                type="button"
-                onClick={() => setDetailsOpen(false)}
-                className="relative z-20 w-full rounded-full bg-[#F0F0F0] hover:bg-[#E8E8E8] px-4 py-[0.6rem] text-center text-[0.8125rem] font-medium text-[#333] cursor-pointer"
-              >
-                Tap to hide details
-              </button>
-            </div>
-            <TicketBandEdgeLine edge="bottom" />
-          </div>
-
-          {/* Middle band — scalloped top + bottom */}
-          <div
-            className="relative bg-white shadow-[0_8px_28px_rgba(0,0,0,0.12)]"
-            style={ticketNotchMask({
-              topLeft: true,
-              topRight: true,
-              bottomLeft: true,
-              bottomRight: true,
-            })}
-          >
-            <div className="px-6 sm:px-7 pt-7 pb-0 text-center">
-              <p className="text-[0.75rem] md:text-[0.8125rem] text-[#888]">
-                {ticketCount} Ticket{ticketCount === 1 ? "" : "(s)"}
-              </p>
-              <p className="mt-1.5 text-[1.4rem] font-bold text-[#111] uppercase tracking-wide">
-                {booking.screen_name || "Screen"}
-              </p>
-              <p className="mt-1.5 text-[0.8125rem] md:text-[0.875rem] text-[#555] break-words leading-snug">
-                {seatsLabel}
-              </p>
-
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=320x320&margin=10&data=${encodeURIComponent(
-                  qrValue
-                )}`}
-                alt={`QR ${bookingCode}`}
-                className="mx-auto mt-5 h-[12rem] w-[12rem] sm:h-[13rem] sm:w-[13rem] bg-white"
-              />
-
-              <p className="mt-4 text-[0.8125rem] font-bold text-[#111] tracking-wide">
-                BOOKING ID: {bookingCode}
-              </p>
-
-              <div className="mt-5 -mx-6 sm:-mx-7 bg-[#F5F5F5] px-4 py-2.5 text-[0.6875rem] md:text-[0.8125rem] text-[#757575] leading-snug">
-                Cancellation unavailable : cut-off time of 20 minutes before showtime has passed
-              </div>
-
-              <Link
-                href="/customer/help"
-                className="mt-5 mb-6 inline-flex flex-col items-center gap-1.5 text-[#333] hover:opacity-80"
-              >
-                <Phone size={22} strokeWidth={1.6} />
-                <span className="text-[0.8125rem] font-medium">Contact support</span>
-              </Link>
-            </div>
-            <TicketBandEdgeLine edge="bottom" />
-          </div>
-
-          {/* Bottom band — top edge scalloped */}
-          <div
-            className="relative bg-white rounded-b-2xl shadow-[0_8px_28px_rgba(0,0,0,0.18)]"
-            style={ticketNotchMask({ topLeft: true, topRight: true })}
-          >
-            <div className="px-6 sm:px-7 pt-5 pb-6 text-left">
-              <div className="space-y-2.5 text-[0.8125rem] text-[#666]">
-                <div className="flex justify-between gap-3 text-[0.9375rem] font-bold text-[#111]">
-                  <span>Total Amount</span>
-                  <span className="tabular-nums">
-                    {formatMoney(Number(booking.grand_total) || 0)}
-                  </span>
-                </div>
-                <div className="flex justify-between gap-3">
-                  <span>Net Ticket(s) Price</span>
-                  <span className="tabular-nums">
-                    {formatMoney(Number(booking.ticket_amount) || 0)}
-                  </span>
-                </div>
-                {Number(booking.beverage_total) > 0 ? (
-                  <div className="flex justify-between gap-3">
-                    <span>Snacks &amp; beverages</span>
-                    <span className="tabular-nums">
-                      {formatMoney(Number(booking.beverage_total) || 0)}
-                    </span>
-                  </div>
-                ) : null}
-                <div className="flex justify-between gap-3">
-                  <span>Convenience fee</span>
-                  <span className="tabular-nums">
-                    {formatMoney(Number(booking.convenience_fee_total) || 0)}
-                  </span>
-                </div>
-                {Number(booking.discount_amount) > 0 ? (
-                  <div className="flex justify-between gap-3 text-[#111]">
-                    <span>
-                      Discount
-                      {booking.promo_code ? ` (${booking.promo_code})` : ""}
-                    </span>
-                    <span className="tabular-nums">
-                      − {formatMoney(Number(booking.discount_amount) || 0)}
-                    </span>
-                  </div>
-                ) : null}
-              </div>
-
-              <button
-                type="button"
-                onClick={() => void handleDownloadPdf()}
-                disabled={downloading}
-                className="mt-5 inline-flex w-full items-center justify-center gap-1.5 h-11 rounded-lg bg-[#111] text-white text-[0.875rem] font-semibold hover:bg-[#333] disabled:opacity-60 cursor-pointer"
-              >
-                {downloading ? (
-                  <Loader2 size={15} className="animate-spin" />
-                ) : (
-                  <Download size={15} />
-                )}
-                Download PDF
-              </button>
-            </div>
-          </div>
-        </div>
-      </ModalShell>
-    </div>
+      </ReviewModalShell>
+    </>
   );
 }

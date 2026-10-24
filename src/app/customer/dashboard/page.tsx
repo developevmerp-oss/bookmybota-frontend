@@ -52,6 +52,7 @@ type UnifiedBooking = {
   canCancel: boolean;
   guests?: number;
   ticketQty?: number;
+  createdAt?: string;
 };
 
 function diningUpcoming(b: Booking) {
@@ -179,6 +180,7 @@ export default function CustomerDashboard() {
       image: b.business_cover_image,
       canCancel: diningUpcoming(b),
       guests: b.guests,
+      createdAt: String((b as any).created_at || b.booking_time || ""),
     }));
     const events: UnifiedBooking[] = eventBookings.map((b) => ({
       kind: "event",
@@ -192,6 +194,7 @@ export default function CustomerDashboard() {
       image: b.poster_horizontal_url || b.poster_vertical_url,
       canCancel: eventUpcoming(b),
       ticketQty: b.ticket_qty,
+      createdAt: String((b as any).created_at || b.starts_at || ""),
     }));
     const movies: UnifiedBooking[] = movieBookings.map((b) => ({
       kind: "movie",
@@ -207,10 +210,13 @@ export default function CustomerDashboard() {
       image: (b as any).movie_poster || DEFAULT_MOVIE_IMAGE,
       canCancel: false,
       ticketQty: b.ticket_qty,
+      createdAt: String((b as any).created_at || (b as any).showtime_starts_at || ""),
     }));
-    return [...dining, ...events, ...movies].sort(
-      (a, b) => new Date(b.when).getTime() - new Date(a.when).getTime()
-    );
+    return [...dining, ...events, ...movies].sort((a, b) => {
+      const timeA = new Date(a.createdAt || a.when).getTime() || 0;
+      const timeB = new Date(b.createdAt || b.when).getTime() || 0;
+      return timeB - timeA;
+    });
   }, [diningBookings, eventBookings, movieBookings]);
 
   const byKind = useMemo(() => {

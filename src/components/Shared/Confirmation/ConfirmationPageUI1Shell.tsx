@@ -48,14 +48,20 @@ export type ConfirmationPageUI1ShellProps = {
   bookingCode: string;
   qrValue: string;
   totalFormatted?: string;
+  /** Shown under Total Amount, e.g. convenience fee included in the total. */
+  totalNote?: string;
   amountRows?: ConfirmationAmountRow[];
   cancellationNote?: string;
   supportHref?: string;
   mTicketLabel?: string;
   onDownloadPdf?: () => void | Promise<void>;
   downloading?: boolean;
-  /** Extra footer under amount in details modal */
+  /** Extra footer under amount in details modal / bottom of card */
   detailsExtra?: ReactNode;
+  /** Whether to render QR code (defaults to true; set to false for dining) */
+  showQr?: boolean;
+  /** When true, renders ticket details & actions directly on the card without popup modal */
+  directDetails?: boolean;
 };
 
 function ticketNotchMask(corners: {
@@ -237,6 +243,7 @@ export default function ConfirmationPageUI1Shell(props: ConfirmationPageUI1Shell
     bookingCode,
     qrValue,
     totalFormatted,
+    totalNote,
     amountRows = [],
     cancellationNote = "Cancellation unavailable : cut-off time of 20 minutes before showtime has passed",
     supportHref = "/customer/help",
@@ -244,6 +251,8 @@ export default function ConfirmationPageUI1Shell(props: ConfirmationPageUI1Shell
     onDownloadPdf,
     downloading = false,
     detailsExtra,
+    showQr = true,
+    directDetails = true,
   } = props;
 
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -309,7 +318,156 @@ export default function ConfirmationPageUI1Shell(props: ConfirmationPageUI1Shell
     </div>
   );
 
-  const ticketCard = (
+  const ticketCard = directDetails ? (
+    <div className="relative overflow-visible rounded-2xl border border-[#E8E8E8] bg-white shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
+      <div className="relative flex gap-3.5 sm:gap-4 px-4 pt-4 pb-5 sm:px-5 sm:pt-5 sm:pb-6 pr-9 sm:pr-11">
+        <div className="relative shrink-0 w-[5rem] sm:w-[5.75rem] overflow-hidden rounded-md bg-[#F3F3F3]">
+          {posterUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={posterUrl}
+              alt={title}
+              className="block h-full w-full object-cover aspect-[2/3]"
+            />
+          ) : (
+            <div className="flex aspect-[2/3] items-center justify-center text-slate-400">
+              <Film size={28} />
+            </div>
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <h2 className="text-[1.05rem] sm:text-[1.25rem] font-bold text-[#111] leading-snug">
+            {title}
+          </h2>
+          {formatMeta ? (
+            <p className="mt-2 text-[0.8125rem] md:text-[0.875rem] text-[#777]">{formatMeta}</p>
+          ) : null}
+          {whenLine ? (
+            <p className="mt-1 text-[0.8125rem] md:text-[0.875rem] text-[#777]">{whenLine}</p>
+          ) : null}
+          {venueLine ? (
+            <p className="mt-1 text-[0.8125rem] md:text-[0.875rem] text-[#777] leading-snug">
+              {venueLine}
+            </p>
+          ) : null}
+          {offerLabel ? (
+            <p className="mt-2.5 inline-flex items-center rounded bg-[#111] px-2 py-0.5 text-[0.6875rem] font-semibold text-white">
+              {offerLabel}
+            </p>
+          ) : null}
+        </div>
+        <span
+          className="pointer-events-none absolute right-3 sm:right-4 top-[55%] text-[0.6875rem] md:text-[0.75rem] font-medium tracking-[0.12em] text-[#B0B0B0]"
+          style={{
+            writingMode: "vertical-rl",
+            transform: "translateY(-50%) rotate(180deg)",
+          }}
+          aria-hidden
+        >
+          {mTicketLabel}
+        </span>
+      </div>
+
+      <TicketCut fill={PAGE_BG} />
+      <div className="border-t border-dashed border-[#E8E8E8] mx-6" aria-hidden />
+
+      <div className="px-5 sm:px-6 pt-6 pb-0 text-center">
+        <p className="text-[0.75rem] md:text-[0.8125rem] text-[#888] font-medium">{ticketCountLabel}</p>
+        <p className="mt-1.5 text-[1.4rem] font-bold text-[#111] uppercase tracking-wide">
+          {primaryLabel}
+        </p>
+        {secondaryLabel ? (
+          <p className="mt-1.5 text-[0.8125rem] md:text-[0.875rem] text-[#555] break-words leading-snug">
+            {secondaryLabel}
+          </p>
+        ) : null}
+
+        {showQr ? (
+          <div className="mt-4 flex justify-center">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={`https://api.qrserver.com/v1/create-qr-code/?size=320x320&margin=10&data=${encodeURIComponent(
+                qrValue
+              )}`}
+              alt={`QR ${bookingCode}`}
+              className="mx-auto h-[11.5rem] w-[11.5rem] sm:h-[13rem] sm:w-[13rem] bg-white"
+            />
+          </div>
+        ) : null}
+
+        <p className="mt-4 text-[0.8125rem] font-bold text-[#111] tracking-wide">
+          BOOKING ID: {bookingCode}
+        </p>
+
+        {cancellationNote ? (
+          <div className="mt-5 -mx-5 sm:-mx-6 bg-[#F5F5F5] px-4 sm:px-5 py-2.5 text-center text-[0.6875rem] md:text-[0.8125rem] text-[#757575] leading-snug">
+            {cancellationNote}
+          </div>
+        ) : null}
+
+        <div className="mt-4 mb-5 flex justify-center">
+          <Link
+            href={supportHref}
+            className="inline-flex flex-col items-center gap-1.5 text-[#333] hover:opacity-80 transition-opacity"
+          >
+            <Phone size={22} strokeWidth={1.6} />
+            <span className="text-[0.8125rem] font-medium">Contact support</span>
+          </Link>
+        </div>
+      </div>
+
+      <TicketCut fill={PAGE_BG} />
+      <div className="border-t border-dashed border-[#E8E8E8] mx-6" aria-hidden />
+
+      <div className="px-5 sm:px-6 pt-5 pb-6 text-left">
+        {totalFormatted || amountRows.length > 0 ? (
+          <div className="space-y-2.5 text-[0.8125rem] text-[#666] mb-5">
+            {totalFormatted ? (
+              <div className="flex justify-between gap-3 text-[0.9375rem] font-bold text-[#111]">
+                <div>
+                  <span>Total Amount</span>
+                  {totalNote ? (
+                    <p className="text-[11px] text-[#777] font-normal">{totalNote}</p>
+                  ) : null}
+                </div>
+                <span className="tabular-nums">{totalFormatted}</span>
+              </div>
+            ) : null}
+
+            {amountRows.map((row, idx) => (
+              <div
+                key={`${row.label}-${idx}`}
+                className={`flex justify-between gap-3 ${
+                  row.strong ? "text-[#111] font-bold text-[0.9375rem]" : ""
+                }`}
+              >
+                <span>{row.label}</span>
+                <span className="tabular-nums">{row.value}</span>
+              </div>
+            ))}
+          </div>
+        ) : null}
+
+        {onDownloadPdf ? (
+          <button
+            type="button"
+            onClick={() => void onDownloadPdf()}
+            disabled={downloading}
+            className="inline-flex w-full items-center justify-center gap-1.5 h-11 rounded-xl bg-[#111] hover:bg-[#222] text-white text-[0.875rem] font-semibold disabled:opacity-60 cursor-pointer transition-colors"
+          >
+            {downloading ? (
+              <Loader2 size={15} className="animate-spin" />
+            ) : (
+              <Download size={15} />
+            )}
+            Download PDF
+          </button>
+        ) : null}
+
+        {detailsExtra}
+      </div>
+    </div>
+  ) : (
     <div className="relative overflow-visible rounded-2xl border border-[#E8E8E8] bg-white shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
       <div className="relative flex gap-3.5 sm:gap-4 px-4 pt-4 pb-5 sm:px-5 sm:pt-5 sm:pb-6 pr-9 sm:pr-11">
         <div className="relative shrink-0 w-[5rem] sm:w-[5.75rem] overflow-hidden rounded-md bg-[#F3F3F3]">
@@ -379,14 +537,16 @@ export default function ConfirmationPageUI1Shell(props: ConfirmationPageUI1Shell
 
       <div className="px-4 sm:px-5 pt-6 pb-0">
         <div className="flex items-start gap-4 sm:gap-5">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=4&data=${encodeURIComponent(
-              qrValue
-            )}`}
-            alt={`QR ${bookingCode}`}
-            className="h-[7.25rem] w-[7.25rem] sm:h-[8rem] sm:w-[8rem] shrink-0 bg-white"
-          />
+          {showQr ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=4&data=${encodeURIComponent(
+                qrValue
+              )}`}
+              alt={`QR ${bookingCode}`}
+              className="h-[7.25rem] w-[7.25rem] sm:h-[8rem] sm:w-[8rem] shrink-0 bg-white"
+            />
+          ) : null}
           <div className="min-w-0 flex-1 pt-0.5">
             <p className="text-[0.75rem] md:text-[0.8125rem] text-[#888]">{ticketCountLabel}</p>
             <p className="mt-1 text-[1.2rem] sm:text-[1.35rem] font-bold text-[#111] uppercase leading-tight">
@@ -411,7 +571,12 @@ export default function ConfirmationPageUI1Shell(props: ConfirmationPageUI1Shell
 
         {totalFormatted ? (
           <div className="flex items-center justify-between gap-3 py-4 text-[0.9375rem] text-[#111]">
-            <span className="font-medium">Total Amount</span>
+            <div>
+              <span className="font-medium">Total Amount</span>
+              {totalNote ? (
+                <p className="text-[11px] text-[#777] font-normal">{totalNote}</p>
+              ) : null}
+            </div>
             <span className="font-bold tabular-nums">{totalFormatted}</span>
           </div>
         ) : (
@@ -427,7 +592,13 @@ export default function ConfirmationPageUI1Shell(props: ConfirmationPageUI1Shell
       style={{ backgroundColor: PAGE_BG }}
     >
       <div className={`${PAGE_MAX} pt-5 sm:pt-8 print:pt-4`}>
-        <div className="mb-5 sm:mb-6 flex items-center gap-2.5 sm:gap-3">
+        <div
+          className={`mb-5 sm:mb-6 flex items-center gap-2.5 sm:gap-3 ${
+            showAside && aside
+              ? "mx-auto w-full max-w-[56rem] xl:max-w-[60rem]"
+              : "mx-auto w-full max-w-[28rem] xl:max-w-[30rem]"
+          }`}
+        >
           <Link
             href={backHref}
             className="inline-flex h-9 w-9 items-center justify-center text-[#111] hover:opacity-70 cursor-pointer print:hidden"
@@ -450,7 +621,7 @@ export default function ConfirmationPageUI1Shell(props: ConfirmationPageUI1Shell
           className={
             showAside && aside
               ? "mx-auto flex w-full max-w-[56rem] xl:max-w-[60rem] flex-col items-stretch lg:flex-row lg:items-start lg:justify-center gap-6 sm:gap-8 lg:gap-12 xl:gap-14"
-              : "flex justify-center"
+              : "mx-auto flex w-full max-w-[28rem] xl:max-w-[30rem] justify-center"
           }
         >
           <div
@@ -460,11 +631,6 @@ export default function ConfirmationPageUI1Shell(props: ConfirmationPageUI1Shell
                 : "min-w-0 w-full max-w-[28rem] xl:max-w-[30rem]"
             }
           >
-            {tipBanner ? (
-              <div className="mb-3 flex items-center gap-2.5 rounded-lg border border-[#E5E5E5] bg-[#FAFAFA] px-3 py-2.5 text-[0.75rem] md:text-[0.875rem] text-[#444] print:hidden">
-                <p className="leading-snug">{tipBanner}</p>
-              </div>
-            ) : null}
             {ticketCard}
           </div>
 
@@ -585,13 +751,18 @@ export default function ConfirmationPageUI1Shell(props: ConfirmationPageUI1Shell
                 <div className="space-y-2.5 text-[0.8125rem] text-[#666]">
                   {totalFormatted ? (
                     <div className="flex justify-between gap-3 text-[0.9375rem] font-bold text-[#111]">
-                      <span>Total Amount</span>
+                      <div>
+                        <span>Total Amount</span>
+                        {totalNote ? (
+                          <p className="text-[11px] text-[#777] font-normal">{totalNote}</p>
+                        ) : null}
+                      </div>
                       <span className="tabular-nums">{totalFormatted}</span>
                     </div>
                   ) : null}
-                  {amountRows.map((row) => (
+                  {amountRows.map((row, idx) => (
                     <div
-                      key={row.label}
+                      key={`${row.label}-${idx}`}
                       className={`flex justify-between gap-3 ${
                         row.strong ? "text-[#111] font-medium" : ""
                       }`}

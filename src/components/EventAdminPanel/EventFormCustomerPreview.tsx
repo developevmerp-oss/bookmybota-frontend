@@ -451,7 +451,7 @@ export default function EventFormCustomerPreview({
   );
 
   const promoBannerCard = (
-    <div className="w-[min(100%,520px)] sm:w-[420px] lg:w-[480px] relative aspect-[21/9] rounded-2xl overflow-hidden bg-[#111] shrink-0 shadow-sm">
+    <div className="w-[min(100%,520px)] sm:w-[420px] lg:w-[480px] relative aspect-[3/1] rounded-2xl overflow-hidden bg-[#111] shrink-0 shadow-sm">
       {promoBanner ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={promoBanner} alt={promoTitle} className="w-full h-full object-cover" />
@@ -641,7 +641,7 @@ export default function EventFormCustomerPreview({
                         </p>
                       </div>
                     </div>
-                    <div className="relative rounded-xl overflow-hidden bg-black aspect-[21/9] sm:aspect-[2.8/1] ring-2 ring-[#6900AA]/25">
+                    <div className="relative rounded-xl overflow-hidden bg-black aspect-[3/1] ring-2 ring-[#6900AA]/25">
                       {promoBanner ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img

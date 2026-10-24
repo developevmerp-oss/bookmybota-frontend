@@ -321,14 +321,24 @@ export default function PartnerPromotionsPage({
       toast.error("Promotion start date cannot be after the event date.");
       return;
     }
+    const effectiveTargetType =
+      module === "DINING"
+        ? (values.target_type === "BUSINESS" ? "RESTAURANT" : values.target_type)
+        : allowsItemTarget && values.target_id
+        ? (module === "EVENTS" ? "EVENT" : "MOVIE")
+        : "BUSINESS";
+    const effectiveTargetId =
+      effectiveTargetType === "BUSINESS"
+        ? undefined
+        : values.target_id || (module === "DINING" ? bizId : undefined);
+
     const payload = {
       title: values.title.trim(),
       banner_image_url: values.banner_image_url || undefined,
       slider_accent_text: values.slider_accent_text?.trim() || "",
       start_date: values.start_date,
-      target_type:
-        module === "DINING" && values.target_type === "BUSINESS" ? "RESTAURANT" : values.target_type,
-      target_id: values.target_id || (module === "DINING" ? bizId : undefined),
+      target_type: effectiveTargetType,
+      target_id: effectiveTargetId,
     };
 
     try {

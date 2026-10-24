@@ -184,6 +184,9 @@ export default function DiningConfirmationReviewAside({
     authUser?.role === "customer" && authToken
       ? { user: authUser, token: authToken }
       : readSessionForRole("customer");
+  const loggedInCustomerId = customerSession?.user?.id
+    ? String(customerSession.user.id)
+    : null;
   const loggedInName = String(customerSession?.user?.name || "").trim();
   const isLoggedIn = Boolean(
     customerSession?.token && customerSession?.user?.role === "customer"
@@ -194,13 +197,20 @@ export default function DiningConfirmationReviewAside({
   });
   const eligibility = reviewsData?.eligibility;
   const myReview = useMemo(() => {
-    const name = loggedInName.toLowerCase();
     const items = reviewsData?.items ?? [];
-    if (!name || !items.length) return null;
+    if (!items.length) return null;
+    if (loggedInCustomerId) {
+      const matchById = items.find(
+        (r) => r.customer_id != null && String(r.customer_id) === loggedInCustomerId
+      );
+      if (matchById) return matchById;
+    }
+    const name = loggedInName.toLowerCase();
+    if (!name) return null;
     return (
       items.find((r) => String(r.user_name || "").trim().toLowerCase() === name) || null
     );
-  }, [reviewsData?.items, loggedInName]);
+  }, [reviewsData?.items, loggedInCustomerId, loggedInName]);
 
   const [createReview, { isLoading: submitting }] = useCreateReviewMutation();
 
@@ -240,11 +250,11 @@ export default function DiningConfirmationReviewAside({
   const openRatingModal = () => {
     if (!isLoggedIn) {
       openCustomerLogin();
-      toast.info("Please log in to submit a review.");
+      toast.info("Log in to rate this place after your visit on BookMyBota.");
       return;
     }
     if (alreadyReviewed) {
-      toast.info("You have already reviewed this place.");
+      toast.info("Thanks — you have already reviewed this place.");
       return;
     }
     if (eligibility && !eligibility.has_booking) {
@@ -308,12 +318,14 @@ export default function DiningConfirmationReviewAside({
         </p>
         <p className="mt-2 text-[0.875rem] text-[#777] leading-relaxed">
           {alreadyReviewed
-            ? `Thanks — you rated this ${formatRatingOutOf5(previewRating)}.`
+            ? "Thanks — you have already reviewed this place."
             : !isLoggedIn
-              ? "Log in to rate and review this place."
-              : eligibility && !eligibility.visit_ended
-                ? "You can review after your visit ends."
-                : "Rate and review so that it helps others."}
+              ? "Log in to rate this place after your visit on BookMyBota."
+              : eligibility && !eligibility.has_booking
+                ? "Book a table here on BookMyBota to leave a review."
+                : eligibility && !eligibility.visit_ended
+                  ? "You can review this place after your visit ends."
+                  : "Rate and review so that it helps others."}
         </p>
       </button>
 

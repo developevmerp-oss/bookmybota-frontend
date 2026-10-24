@@ -6247,6 +6247,879 @@ export default function StadiumBlockBuilder({
                       <span className="text-base">🏟️</span>
                       <span>⚡ Generate European Arena (4 Stands + 4 Corner Arcs)</span>
                     </button>
+
+                    {/* Hero Preset 0B: Seamless European Arena (Snug Stands & Corners · Zero Gap) */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setGroundConfig({
+                          sport_type: "football",
+                          pitch_label: "NATIONAL FOOTBALL ARENA",
+                          turf_color: "#15803d",
+                          track_color: "#1e293b",
+                          shape: "rectangle",
+                          x: 520,
+                          y: 425,
+                          width: 560,
+                          height: 350,
+                          rotation: 0,
+                        });
+                        setPitchLabel("NATIONAL FOOTBALL ARENA");
+
+                        const defaultTicket = ticketTypes[0]?.id || "";
+                        const premiumTicket = ticketTypes[1]?.id || defaultTicket;
+                        const vipTicket = ticketTypes[2]?.id || premiumTicket;
+
+                        const cx = CANVAS_W / 2; // 800
+                        const cy = CANVAS_H / 2; // 600
+
+                        const snugEuroBlocks: StadiumBlockDef[] = [
+                          // 1. North Grandstand (Sideline)
+                          {
+                            id: "euro-north",
+                            name: "North Grandstand (Sideline)",
+                            color: "#0284c7",
+                            stand_level: "multi",
+                            shape: "rectangle",
+                            x: 500,
+                            y: 155,
+                            width: 600,
+                            height: 185,
+                            rotation: 0,
+                            capacity: 3400,
+                            tiers: [
+                              {
+                                id: "tier-en-upper",
+                                name: "Upper Grandstand",
+                                color: "#0284c7",
+                                ticket_type_id: premiumTicket,
+                                row_start: "I",
+                                row_end: "N",
+                                seats_per_row: 24,
+                              },
+                              {
+                                id: "tier-en-vip",
+                                name: "VIP Executive Suites",
+                                color: "#f59e0b",
+                                ticket_type_id: vipTicket,
+                                row_start: "G",
+                                row_end: "H",
+                                seats_per_row: 18,
+                              },
+                              {
+                                id: "tier-en-lower",
+                                name: "Lower Tier",
+                                color: "#38bdf8",
+                                ticket_type_id: defaultTicket,
+                                row_start: "A",
+                                row_end: "F",
+                                seats_per_row: 22,
+                              },
+                            ],
+                          },
+
+                          // 2. South Grandstand (Sideline)
+                          {
+                            id: "euro-south",
+                            name: "South Grandstand (Sideline)",
+                            color: "#dc2626",
+                            stand_level: "multi",
+                            shape: "rectangle",
+                            x: 500,
+                            y: 860,
+                            width: 600,
+                            height: 185,
+                            rotation: 0,
+                            capacity: 3400,
+                            tiers: [
+                              {
+                                id: "tier-es-lower",
+                                name: "Lower Tier",
+                                color: "#f87171",
+                                ticket_type_id: defaultTicket,
+                                row_start: "A",
+                                row_end: "F",
+                                seats_per_row: 22,
+                              },
+                              {
+                                id: "tier-es-vip",
+                                name: "VIP Executive Suites",
+                                color: "#f59e0b",
+                                ticket_type_id: vipTicket,
+                                row_start: "G",
+                                row_end: "H",
+                                seats_per_row: 18,
+                              },
+                              {
+                                id: "tier-es-upper",
+                                name: "Upper Grandstand",
+                                color: "#b91c1c",
+                                ticket_type_id: premiumTicket,
+                                row_start: "I",
+                                row_end: "N",
+                                seats_per_row: 24,
+                              },
+                            ],
+                          },
+
+                          // 3. West Grandstand (Goal End)
+                          {
+                            id: "euro-west",
+                            name: "West Goal Stand",
+                            color: "#ea580c",
+                            stand_level: "multi",
+                            shape: "rectangle",
+                            x: 235,
+                            y: 400,
+                            width: 195,
+                            height: 400,
+                            rotation: 0,
+                            tier_split_direction: "horizontal",
+                            capacity: 2800,
+                            tiers: [
+                              {
+                                id: "tier-ew-upper",
+                                name: "Upper Grandstand",
+                                color: "#c2410c",
+                                ticket_type_id: premiumTicket,
+                                row_start: "I",
+                                row_end: "N",
+                                seats_per_row: 18,
+                              },
+                              {
+                                id: "tier-ew-vip",
+                                name: "VIP Executive Suites",
+                                color: "#f59e0b",
+                                ticket_type_id: vipTicket,
+                                row_start: "G",
+                                row_end: "H",
+                                seats_per_row: 14,
+                              },
+                              {
+                                id: "tier-ew-lower",
+                                name: "Lower Tier",
+                                color: "#fb923c",
+                                ticket_type_id: defaultTicket,
+                                row_start: "A",
+                                row_end: "F",
+                                seats_per_row: 16,
+                              },
+                            ],
+                          },
+
+                          // 4. East Grandstand (Goal End)
+                          {
+                            id: "euro-east",
+                            name: "East Goal Stand",
+                            color: "#9333ea",
+                            stand_level: "multi",
+                            shape: "rectangle",
+                            x: 1170,
+                            y: 400,
+                            width: 195,
+                            height: 400,
+                            rotation: 0,
+                            tier_split_direction: "horizontal",
+                            capacity: 2800,
+                            tiers: [
+                              {
+                                id: "tier-ee-lower",
+                                name: "Lower Tier",
+                                color: "#c084fc",
+                                ticket_type_id: defaultTicket,
+                                row_start: "A",
+                                row_end: "F",
+                                seats_per_row: 16,
+                              },
+                              {
+                                id: "tier-ee-vip",
+                                name: "VIP Executive Suites",
+                                color: "#f59e0b",
+                                ticket_type_id: vipTicket,
+                                row_start: "G",
+                                row_end: "H",
+                                seats_per_row: 14,
+                              },
+                              {
+                                id: "tier-ee-upper",
+                                name: "Upper Grandstand",
+                                color: "#7e22ce",
+                                ticket_type_id: premiumTicket,
+                                row_start: "I",
+                                row_end: "N",
+                                seats_per_row: 18,
+                              },
+                            ],
+                          },
+
+                          // 5. North-West Corner Arc (Snug to West & North with zero space)
+                          {
+                            id: "euro-corner-nw",
+                            name: "Stand NW Corner Arc",
+                            color: "#0ea5e9",
+                            stand_level: "multi",
+                            shape: "arc",
+                            innerRadius: 385,
+                            outerRadius: 535,
+                            startAngle: 196,
+                            sweepAngle: 38,
+                            stadiumCenterX: cx,
+                            stadiumCenterY: cy,
+                            x: cx,
+                            y: cy,
+                            width: 1070,
+                            height: 1070,
+                            rotation: 0,
+                            capacity: 1200,
+                            tiers: [
+                              {
+                                id: "tier-cnw-lower",
+                                name: "Lower Tier",
+                                color: "#7dd3fc",
+                                ticket_type_id: defaultTicket,
+                                row_start: "A",
+                                row_end: "D",
+                                seats_per_row: 12,
+                              },
+                              {
+                                id: "tier-cnw-upper",
+                                name: "Upper Tier",
+                                color: "#0369a1",
+                                ticket_type_id: premiumTicket,
+                                row_start: "E",
+                                row_end: "H",
+                                seats_per_row: 14,
+                              },
+                            ],
+                          },
+
+                          // 6. North-East Corner Arc (Snug to North & East with zero space)
+                          {
+                            id: "euro-corner-ne",
+                            name: "Stand NE Corner Arc",
+                            color: "#0ea5e9",
+                            stand_level: "multi",
+                            shape: "arc",
+                            innerRadius: 385,
+                            outerRadius: 535,
+                            startAngle: 306,
+                            sweepAngle: 38,
+                            stadiumCenterX: cx,
+                            stadiumCenterY: cy,
+                            x: cx,
+                            y: cy,
+                            width: 1070,
+                            height: 1070,
+                            rotation: 0,
+                            capacity: 1200,
+                            tiers: [
+                              {
+                                id: "tier-cne-lower",
+                                name: "Lower Tier",
+                                color: "#7dd3fc",
+                                ticket_type_id: defaultTicket,
+                                row_start: "A",
+                                row_end: "D",
+                                seats_per_row: 12,
+                              },
+                              {
+                                id: "tier-cne-upper",
+                                name: "Upper Tier",
+                                color: "#0369a1",
+                                ticket_type_id: premiumTicket,
+                                row_start: "E",
+                                row_end: "H",
+                                seats_per_row: 14,
+                              },
+                            ],
+                          },
+
+                          // 7. South-East Corner Arc (Snug to East & South with zero space)
+                          {
+                            id: "euro-corner-se",
+                            name: "Stand SE Corner Arc",
+                            color: "#ef4444",
+                            stand_level: "multi",
+                            shape: "arc",
+                            innerRadius: 385,
+                            outerRadius: 535,
+                            startAngle: 16,
+                            sweepAngle: 38,
+                            stadiumCenterX: cx,
+                            stadiumCenterY: cy,
+                            x: cx,
+                            y: cy,
+                            width: 1070,
+                            height: 1070,
+                            rotation: 0,
+                            capacity: 1200,
+                            tiers: [
+                              {
+                                id: "tier-cse-lower",
+                                name: "Lower Tier",
+                                color: "#fca5a5",
+                                ticket_type_id: defaultTicket,
+                                row_start: "A",
+                                row_end: "D",
+                                seats_per_row: 12,
+                              },
+                              {
+                                id: "tier-cse-upper",
+                                name: "Upper Tier",
+                                color: "#b91c1c",
+                                ticket_type_id: premiumTicket,
+                                row_start: "E",
+                                row_end: "H",
+                                seats_per_row: 14,
+                              },
+                            ],
+                          },
+
+                          // 8. South-West Corner Arc (Snug to South & West with zero space)
+                          {
+                            id: "euro-corner-sw",
+                            name: "Stand SW Corner Arc",
+                            color: "#ef4444",
+                            stand_level: "multi",
+                            shape: "arc",
+                            innerRadius: 385,
+                            outerRadius: 535,
+                            startAngle: 126,
+                            sweepAngle: 38,
+                            stadiumCenterX: cx,
+                            stadiumCenterY: cy,
+                            x: cx,
+                            y: cy,
+                            width: 1070,
+                            height: 1070,
+                            rotation: 0,
+                            capacity: 1200,
+                            tiers: [
+                              {
+                                id: "tier-csw-lower",
+                                name: "Lower Tier",
+                                color: "#fca5a5",
+                                ticket_type_id: defaultTicket,
+                                row_start: "A",
+                                row_end: "D",
+                                seats_per_row: 12,
+                              },
+                              {
+                                id: "tier-csw-upper",
+                                name: "Upper Tier",
+                                color: "#b91c1c",
+                                ticket_type_id: premiumTicket,
+                                row_start: "E",
+                                row_end: "H",
+                                seats_per_row: 14,
+                              },
+                            ],
+                          },
+                        ];
+
+                        const snugEuroElements: StadiumElementDef[] = [
+                          {
+                            id: "gate-nw",
+                            name: "Gate 1 (NW)",
+                            type: "gate",
+                            icon: "🚪",
+                            color: "#15803d",
+                            x: 440,
+                            y: 350,
+                            width: 40,
+                            height: 40,
+                            rotation: 0,
+                          },
+                          {
+                            id: "gate-ne",
+                            name: "Gate 2 (NE)",
+                            type: "gate",
+                            icon: "🚪",
+                            color: "#15803d",
+                            x: 1120,
+                            y: 350,
+                            width: 40,
+                            height: 40,
+                            rotation: 0,
+                          },
+                          {
+                            id: "gate-se",
+                            name: "Gate 3 (SE)",
+                            type: "gate",
+                            icon: "🚪",
+                            color: "#15803d",
+                            x: 1120,
+                            y: 810,
+                            width: 40,
+                            height: 40,
+                            rotation: 0,
+                          },
+                          {
+                            id: "gate-sw",
+                            name: "Gate 4 (SW)",
+                            type: "gate",
+                            icon: "🚪",
+                            color: "#15803d",
+                            x: 440,
+                            y: 810,
+                            width: 40,
+                            height: 40,
+                            rotation: 0,
+                          },
+                        ];
+
+                        setBlocks(snugEuroBlocks);
+                        setElements(snugEuroElements);
+                        setSelectedId(snugEuroBlocks[0].id);
+                        toast.success("Generated Seamless European Arena with snug zero-gap stands!");
+                      }}
+                      className="w-full p-2.5 rounded-xl bg-gradient-to-r from-sky-600 via-indigo-600 to-purple-600 hover:from-sky-500 hover:to-purple-500 text-white font-extrabold text-xs shadow-md shadow-indigo-700/20 flex items-center justify-center gap-2 transition-all active:scale-95"
+                    >
+                      <span className="text-base">✨</span>
+                      <span>⚡ Generate European Arena (Zero Gap · Snug Stands)</span>
+                    </button>
+
+                    {/* Hero Preset 0C: 360° Continuous European Arena Bowl (Concentric Zero-Gap Bowl) */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setGroundConfig({
+                          sport_type: "football",
+                          pitch_label: "NATIONAL FOOTBALL ARENA",
+                          turf_color: "#15803d",
+                          track_color: "#1e293b",
+                          shape: "rectangle",
+                          x: 520,
+                          y: 425,
+                          width: 560,
+                          height: 350,
+                          rotation: 0,
+                        });
+                        setPitchLabel("NATIONAL FOOTBALL ARENA");
+
+                        const defaultTicket = ticketTypes[0]?.id || "";
+                        const premiumTicket = ticketTypes[1]?.id || defaultTicket;
+                        const vipTicket = ticketTypes[2]?.id || premiumTicket;
+
+                        const cx = CANVAS_W / 2; // 800
+                        const cy = CANVAS_H / 2; // 600
+
+                        const inR = 375;
+                        const outR = 535;
+
+                        const bowlBlocks: StadiumBlockDef[] = [
+                          // 1. North Sideline Stand (246° to 294°)
+                          {
+                            id: "bowl-north",
+                            name: "North Grandstand (Sideline)",
+                            color: "#0284c7",
+                            stand_level: "multi",
+                            shape: "arc",
+                            innerRadius: inR,
+                            outerRadius: outR,
+                            startAngle: 246,
+                            sweepAngle: 48,
+                            stadiumCenterX: cx,
+                            stadiumCenterY: cy,
+                            x: cx,
+                            y: cy,
+                            width: 1070,
+                            height: 1070,
+                            rotation: 0,
+                            capacity: 3400,
+                            tiers: [
+                              {
+                                id: "tier-bn-lower",
+                                name: "Lower Tier",
+                                color: "#38bdf8",
+                                ticket_type_id: defaultTicket,
+                                row_start: "A",
+                                row_end: "F",
+                                seats_per_row: 22,
+                              },
+                              {
+                                id: "tier-bn-vip",
+                                name: "VIP Executive Suites",
+                                color: "#f59e0b",
+                                ticket_type_id: vipTicket,
+                                row_start: "G",
+                                row_end: "H",
+                                seats_per_row: 18,
+                              },
+                              {
+                                id: "tier-bn-upper",
+                                name: "Upper Grandstand",
+                                color: "#0284c7",
+                                ticket_type_id: premiumTicket,
+                                row_start: "I",
+                                row_end: "N",
+                                seats_per_row: 24,
+                              },
+                            ],
+                          },
+
+                          // 2. Stand NE Corner Arc (294° to 336° - exactly meets North at 294° and East at 336°)
+                          {
+                            id: "bowl-corner-ne",
+                            name: "Stand NE Corner Arc",
+                            color: "#0ea5e9",
+                            stand_level: "multi",
+                            shape: "arc",
+                            innerRadius: inR,
+                            outerRadius: outR,
+                            startAngle: 294,
+                            sweepAngle: 42,
+                            stadiumCenterX: cx,
+                            stadiumCenterY: cy,
+                            x: cx,
+                            y: cy,
+                            width: 1070,
+                            height: 1070,
+                            rotation: 0,
+                            capacity: 1800,
+                            tiers: [
+                              {
+                                id: "tier-bne-lower",
+                                name: "Lower Tier",
+                                color: "#7dd3fc",
+                                ticket_type_id: defaultTicket,
+                                row_start: "A",
+                                row_end: "D",
+                                seats_per_row: 14,
+                              },
+                              {
+                                id: "tier-bne-vip",
+                                name: "VIP Executive Suites",
+                                color: "#f59e0b",
+                                ticket_type_id: vipTicket,
+                                row_start: "G",
+                                row_end: "H",
+                                seats_per_row: 12,
+                              },
+                              {
+                                id: "tier-bne-upper",
+                                name: "Upper Tier",
+                                color: "#0369a1",
+                                ticket_type_id: premiumTicket,
+                                row_start: "E",
+                                row_end: "H",
+                                seats_per_row: 16,
+                              },
+                            ],
+                          },
+
+                          // 3. East Goal Stand (336° to 24° - spans 48° across 0°)
+                          {
+                            id: "bowl-east",
+                            name: "East Goal Stand",
+                            color: "#9333ea",
+                            stand_level: "multi",
+                            shape: "arc",
+                            innerRadius: inR,
+                            outerRadius: outR,
+                            startAngle: 336,
+                            sweepAngle: 48,
+                            stadiumCenterX: cx,
+                            stadiumCenterY: cy,
+                            x: cx,
+                            y: cy,
+                            width: 1070,
+                            height: 1070,
+                            rotation: 0,
+                            capacity: 3400,
+                            tiers: [
+                              {
+                                id: "tier-be-lower",
+                                name: "Lower Tier",
+                                color: "#c084fc",
+                                ticket_type_id: defaultTicket,
+                                row_start: "A",
+                                row_end: "F",
+                                seats_per_row: 22,
+                              },
+                              {
+                                id: "tier-be-vip",
+                                name: "VIP Executive Suites",
+                                color: "#f59e0b",
+                                ticket_type_id: vipTicket,
+                                row_start: "G",
+                                row_end: "H",
+                                seats_per_row: 18,
+                              },
+                              {
+                                id: "tier-be-upper",
+                                name: "Upper Grandstand",
+                                color: "#7e22ce",
+                                ticket_type_id: premiumTicket,
+                                row_start: "I",
+                                row_end: "N",
+                                seats_per_row: 24,
+                              },
+                            ],
+                          },
+
+                          // 4. Stand SE Corner Arc (24° to 66° - exactly meets East at 24° and South at 66°)
+                          {
+                            id: "bowl-corner-se",
+                            name: "Stand SE Corner Arc",
+                            color: "#ef4444",
+                            stand_level: "multi",
+                            shape: "arc",
+                            innerRadius: inR,
+                            outerRadius: outR,
+                            startAngle: 24,
+                            sweepAngle: 42,
+                            stadiumCenterX: cx,
+                            stadiumCenterY: cy,
+                            x: cx,
+                            y: cy,
+                            width: 1070,
+                            height: 1070,
+                            rotation: 0,
+                            capacity: 1800,
+                            tiers: [
+                              {
+                                id: "tier-bse-lower",
+                                name: "Lower Tier",
+                                color: "#fca5a5",
+                                ticket_type_id: defaultTicket,
+                                row_start: "A",
+                                row_end: "D",
+                                seats_per_row: 14,
+                              },
+                              {
+                                id: "tier-bse-vip",
+                                name: "VIP Executive Suites",
+                                color: "#f59e0b",
+                                ticket_type_id: vipTicket,
+                                row_start: "G",
+                                row_end: "H",
+                                seats_per_row: 12,
+                              },
+                              {
+                                id: "tier-bse-upper",
+                                name: "Upper Tier",
+                                color: "#b91c1c",
+                                ticket_type_id: premiumTicket,
+                                row_start: "E",
+                                row_end: "H",
+                                seats_per_row: 16,
+                              },
+                            ],
+                          },
+
+                          // 5. South Sideline Stand (66° to 114° - exactly meets SE at 66° and SW at 114°)
+                          {
+                            id: "bowl-south",
+                            name: "South Grandstand (Sideline)",
+                            color: "#dc2626",
+                            stand_level: "multi",
+                            shape: "arc",
+                            innerRadius: inR,
+                            outerRadius: outR,
+                            startAngle: 66,
+                            sweepAngle: 48,
+                            stadiumCenterX: cx,
+                            stadiumCenterY: cy,
+                            x: cx,
+                            y: cy,
+                            width: 1070,
+                            height: 1070,
+                            rotation: 0,
+                            capacity: 3400,
+                            tiers: [
+                              {
+                                id: "tier-bs-lower",
+                                name: "Lower Tier",
+                                color: "#f87171",
+                                ticket_type_id: defaultTicket,
+                                row_start: "A",
+                                row_end: "F",
+                                seats_per_row: 22,
+                              },
+                              {
+                                id: "tier-bs-vip",
+                                name: "VIP Executive Suites",
+                                color: "#f59e0b",
+                                ticket_type_id: vipTicket,
+                                row_start: "G",
+                                row_end: "H",
+                                seats_per_row: 18,
+                              },
+                              {
+                                id: "tier-bs-upper",
+                                name: "Upper Grandstand",
+                                color: "#b91c1c",
+                                ticket_type_id: premiumTicket,
+                                row_start: "I",
+                                row_end: "N",
+                                seats_per_row: 24,
+                              },
+                            ],
+                          },
+
+                          // 6. Stand SW Corner Arc (114° to 156° - exactly meets South at 114° and West at 156°)
+                          {
+                            id: "bowl-corner-sw",
+                            name: "Stand SW Corner Arc",
+                            color: "#ef4444",
+                            stand_level: "multi",
+                            shape: "arc",
+                            innerRadius: inR,
+                            outerRadius: outR,
+                            startAngle: 114,
+                            sweepAngle: 42,
+                            stadiumCenterX: cx,
+                            stadiumCenterY: cy,
+                            x: cx,
+                            y: cy,
+                            width: 1070,
+                            height: 1070,
+                            rotation: 0,
+                            capacity: 1800,
+                            tiers: [
+                              {
+                                id: "tier-bsw-lower",
+                                name: "Lower Tier",
+                                color: "#fca5a5",
+                                ticket_type_id: defaultTicket,
+                                row_start: "A",
+                                row_end: "D",
+                                seats_per_row: 14,
+                              },
+                              {
+                                id: "tier-bsw-vip",
+                                name: "VIP Executive Suites",
+                                color: "#f59e0b",
+                                ticket_type_id: vipTicket,
+                                row_start: "G",
+                                row_end: "H",
+                                seats_per_row: 12,
+                              },
+                              {
+                                id: "tier-bsw-upper",
+                                name: "Upper Tier",
+                                color: "#b91c1c",
+                                ticket_type_id: premiumTicket,
+                                row_start: "E",
+                                row_end: "H",
+                                seats_per_row: 16,
+                              },
+                            ],
+                          },
+
+                          // 7. West Goal Stand (156° to 204° - exactly meets SW at 156° and NW at 204°)
+                          {
+                            id: "bowl-west",
+                            name: "West Goal Stand",
+                            color: "#ea580c",
+                            stand_level: "multi",
+                            shape: "arc",
+                            innerRadius: inR,
+                            outerRadius: outR,
+                            startAngle: 156,
+                            sweepAngle: 48,
+                            stadiumCenterX: cx,
+                            stadiumCenterY: cy,
+                            x: cx,
+                            y: cy,
+                            width: 1070,
+                            height: 1070,
+                            rotation: 0,
+                            capacity: 3400,
+                            tiers: [
+                              {
+                                id: "tier-bw-lower",
+                                name: "Lower Tier",
+                                color: "#fb923c",
+                                ticket_type_id: defaultTicket,
+                                row_start: "A",
+                                row_end: "F",
+                                seats_per_row: 22,
+                              },
+                              {
+                                id: "tier-bw-vip",
+                                name: "VIP Executive Suites",
+                                color: "#f59e0b",
+                                ticket_type_id: vipTicket,
+                                row_start: "G",
+                                row_end: "H",
+                                seats_per_row: 18,
+                              },
+                              {
+                                id: "tier-bw-upper",
+                                name: "Upper Grandstand",
+                                color: "#c2410c",
+                                ticket_type_id: premiumTicket,
+                                row_start: "I",
+                                row_end: "N",
+                                seats_per_row: 24,
+                              },
+                            ],
+                          },
+
+                          // 8. Stand NW Corner Arc (204° to 246° - exactly meets West at 204° and North at 246°)
+                          {
+                            id: "bowl-corner-nw",
+                            name: "Stand NW Corner Arc",
+                            color: "#0ea5e9",
+                            stand_level: "multi",
+                            shape: "arc",
+                            innerRadius: inR,
+                            outerRadius: outR,
+                            startAngle: 204,
+                            sweepAngle: 42,
+                            stadiumCenterX: cx,
+                            stadiumCenterY: cy,
+                            x: cx,
+                            y: cy,
+                            width: 1070,
+                            height: 1070,
+                            rotation: 0,
+                            capacity: 1800,
+                            tiers: [
+                              {
+                                id: "tier-bnw-lower",
+                                name: "Lower Tier",
+                                color: "#7dd3fc",
+                                ticket_type_id: defaultTicket,
+                                row_start: "A",
+                                row_end: "D",
+                                seats_per_row: 14,
+                              },
+                              {
+                                id: "tier-bnw-vip",
+                                name: "VIP Executive Suites",
+                                color: "#f59e0b",
+                                ticket_type_id: vipTicket,
+                                row_start: "G",
+                                row_end: "H",
+                                seats_per_row: 12,
+                              },
+                              {
+                                id: "tier-bnw-upper",
+                                name: "Upper Tier",
+                                color: "#0369a1",
+                                ticket_type_id: premiumTicket,
+                                row_start: "E",
+                                row_end: "H",
+                                seats_per_row: 16,
+                              },
+                            ],
+                          },
+                        ];
+
+                        setBlocks(bowlBlocks);
+                        setElements([]);
+                        setSelectedId(bowlBlocks[0].id);
+                        toast.success("Generated 360° Continuous European Bowl Arena with Zero Gaps and Zero Overlap!");
+                      }}
+                      className="w-full p-2.5 rounded-xl bg-gradient-to-r from-purple-600 via-pink-600 to-rose-600 hover:from-purple-500 hover:to-rose-500 text-white font-extrabold text-xs shadow-md shadow-purple-700/20 flex items-center justify-center gap-2 transition-all active:scale-95"
+                    >
+                      <span className="text-base">🏟️</span>
+                      <span>⚡ Generate Continuous European Bowl (360° Seamless · Zero Gap)</span>
+                    </button>
+
                     {/* Hero Preset 1: Olympic Football Stadium (Ethiopian National Stadium Style) */}
                     <button
                       type="button"

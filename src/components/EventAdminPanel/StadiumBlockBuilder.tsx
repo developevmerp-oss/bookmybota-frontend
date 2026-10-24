@@ -2687,6 +2687,47 @@ function CustomerStadiumPreviewModal({
                         opacity={0.8}
                         rx={4}
                       />
+                    ) : gw >= gh ? (
+                      <>
+                        <circle
+                          cx={gx + gw / 2}
+                          cy={gy + gh / 2}
+                          r={gh * 0.16}
+                          fill="none"
+                          stroke="#ffffff"
+                          strokeWidth={2}
+                          strokeOpacity={0.4}
+                        />
+                        <line
+                          x1={gx + gw / 2}
+                          y1={gy}
+                          x2={gx + gw / 2}
+                          y2={gy + gh}
+                          stroke="#ffffff"
+                          strokeWidth={2}
+                          strokeOpacity={0.4}
+                        />
+                        <rect
+                          x={gx}
+                          y={gy + (gh - gh * 0.52) / 2}
+                          width={gw * 0.16}
+                          height={gh * 0.52}
+                          fill="none"
+                          stroke="#ffffff"
+                          strokeWidth={1.5}
+                          strokeOpacity={0.35}
+                        />
+                        <rect
+                          x={gx + gw - gw * 0.16}
+                          y={gy + (gh - gh * 0.52) / 2}
+                          width={gw * 0.16}
+                          height={gh * 0.52}
+                          fill="none"
+                          stroke="#ffffff"
+                          strokeWidth={1.5}
+                          strokeOpacity={0.35}
+                        />
+                      </>
                     ) : (
                       <>
                         <circle
@@ -4548,50 +4589,101 @@ export default function StadiumBlockBuilder({
                       opacity={0.75}
                       listening={false}
                     />
-                    <Line
-                      points={[25, pitchH / 2, pitchW - 25, pitchH / 2]}
-                      stroke="#ffffff"
-                      strokeWidth={2}
-                      opacity={0.75}
-                      listening={false}
-                    />
-                    <Circle
-                      x={pitchW / 2}
-                      y={pitchH / 2}
-                      radius={pitchH * 0.16}
-                      stroke="#ffffff"
-                      strokeWidth={2}
-                      opacity={0.75}
-                      listening={false}
-                    />
-                    <Circle
-                      x={pitchW / 2}
-                      y={pitchH / 2}
-                      radius={7}
-                      fill="#ffffff"
-                      opacity={0.9}
-                      listening={false}
-                    />
-                    <Rect
-                      x={pitchW * 0.3}
-                      y={25}
-                      width={pitchW * 0.4}
-                      height={pitchH * 0.18}
-                      stroke="#ffffff"
-                      strokeWidth={2}
-                      opacity={0.75}
-                      listening={false}
-                    />
-                    <Rect
-                      x={pitchW * 0.3}
-                      y={pitchH - 25 - pitchH * 0.18}
-                      width={pitchW * 0.4}
-                      height={pitchH * 0.18}
-                      stroke="#ffffff"
-                      strokeWidth={2}
-                      opacity={0.75}
-                      listening={false}
-                    />
+                    {pitchW >= pitchH ? (
+                      <>
+                        <Line
+                          points={[pitchW / 2, 25, pitchW / 2, pitchH - 25]}
+                          stroke="#ffffff"
+                          strokeWidth={2}
+                          opacity={0.75}
+                          listening={false}
+                        />
+                        <Circle
+                          x={pitchW / 2}
+                          y={pitchH / 2}
+                          radius={Math.min(pitchW, pitchH) * 0.16}
+                          stroke="#ffffff"
+                          strokeWidth={2}
+                          opacity={0.75}
+                          listening={false}
+                        />
+                        <Circle
+                          x={pitchW / 2}
+                          y={pitchH / 2}
+                          radius={7}
+                          fill="#ffffff"
+                          opacity={0.9}
+                          listening={false}
+                        />
+                        <Rect
+                          x={25}
+                          y={(pitchH - pitchH * 0.52) / 2}
+                          width={pitchW * 0.16}
+                          height={pitchH * 0.52}
+                          stroke="#ffffff"
+                          strokeWidth={2}
+                          opacity={0.75}
+                          listening={false}
+                        />
+                        <Rect
+                          x={pitchW - 25 - pitchW * 0.16}
+                          y={(pitchH - pitchH * 0.52) / 2}
+                          width={pitchW * 0.16}
+                          height={pitchH * 0.52}
+                          stroke="#ffffff"
+                          strokeWidth={2}
+                          opacity={0.75}
+                          listening={false}
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <Line
+                          points={[25, pitchH / 2, pitchW - 25, pitchH / 2]}
+                          stroke="#ffffff"
+                          strokeWidth={2}
+                          opacity={0.75}
+                          listening={false}
+                        />
+                        <Circle
+                          x={pitchW / 2}
+                          y={pitchH / 2}
+                          radius={pitchH * 0.16}
+                          stroke="#ffffff"
+                          strokeWidth={2}
+                          opacity={0.75}
+                          listening={false}
+                        />
+                        <Circle
+                          x={pitchW / 2}
+                          y={pitchH / 2}
+                          radius={7}
+                          fill="#ffffff"
+                          opacity={0.9}
+                          listening={false}
+                        />
+                        <Rect
+                          x={pitchW * 0.3}
+                          y={25}
+                          width={pitchW * 0.4}
+                          height={pitchH * 0.18}
+                          stroke="#ffffff"
+                          strokeWidth={2}
+                          opacity={0.75}
+                          listening={false}
+                        />
+                        <Rect
+                          x={pitchW * 0.3}
+                          y={pitchH - 25 - pitchH * 0.18}
+                          width={pitchW * 0.4}
+                          height={pitchH * 0.18}
+                          stroke="#ffffff"
+                          strokeWidth={2}
+                          opacity={0.75}
+                          listening={false}
+                        />
+                      </>
+                    )}
                   </>
                 )}
 
@@ -5619,6 +5711,436 @@ export default function StadiumBlockBuilder({
                     <span className="text-[11px] uppercase font-bold text-slate-600 tracking-wider block">
                       ⚡ Quick Stadium Architecture Presets
                     </span>
+                    {/* Hero Preset 0: Modern European Football Arena (4 Stands + 4 Corner Arcs as in photo) */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setGroundConfig({
+                          sport_type: "football",
+                          pitch_label: "NATIONAL FOOTBALL ARENA",
+                          turf_color: "#15803d",
+                          track_color: "#1e293b",
+                          shape: "rectangle",
+                          x: 470,
+                          y: 390,
+                          width: 660,
+                          height: 420,
+                          rotation: 0,
+                        });
+                        setPitchLabel("NATIONAL FOOTBALL ARENA");
+
+                        const defaultTicket = ticketTypes[0]?.id || "";
+                        const premiumTicket = ticketTypes[1]?.id || defaultTicket;
+                        const vipTicket = ticketTypes[2]?.id || premiumTicket;
+
+                        const cx = CANVAS_W / 2; // 800
+                        const cy = CANVAS_H / 2; // 600
+
+                        const euroBlocks: StadiumBlockDef[] = [
+                          // 1. North Grandstand (Top Sideline)
+                          {
+                            id: "euro-north",
+                            name: "North Grandstand (Sideline)",
+                            color: "#0284c7",
+                            stand_level: "multi",
+                            shape: "rectangle",
+                            x: 470,
+                            y: 135,
+                            width: 660,
+                            height: 205,
+                            rotation: 0,
+                            capacity: 4000,
+                            tiers: [
+                              {
+                                id: "tier-en-upper",
+                                name: "Upper Grandstand",
+                                color: "#0284c7",
+                                ticket_type_id: premiumTicket,
+                                row_start: "I",
+                                row_end: "N",
+                                seats_per_row: 30,
+                              },
+                              {
+                                id: "tier-en-vip",
+                                name: "VIP Executive Suites",
+                                color: "#f59e0b",
+                                ticket_type_id: vipTicket,
+                                row_start: "G",
+                                row_end: "H",
+                                seats_per_row: 22,
+                              },
+                              {
+                                id: "tier-en-lower",
+                                name: "Lower Tier",
+                                color: "#38bdf8",
+                                ticket_type_id: defaultTicket,
+                                row_start: "A",
+                                row_end: "F",
+                                seats_per_row: 28,
+                              },
+                            ],
+                          },
+
+                          // 2. South Grandstand (Bottom Sideline)
+                          {
+                            id: "euro-south",
+                            name: "South Grandstand (Sideline)",
+                            color: "#dc2626",
+                            stand_level: "multi",
+                            shape: "rectangle",
+                            x: 470,
+                            y: 860,
+                            width: 660,
+                            height: 205,
+                            rotation: 0,
+                            capacity: 4000,
+                            tiers: [
+                              {
+                                id: "tier-es-lower",
+                                name: "Lower Tier",
+                                color: "#f87171",
+                                ticket_type_id: defaultTicket,
+                                row_start: "A",
+                                row_end: "F",
+                                seats_per_row: 28,
+                              },
+                              {
+                                id: "tier-es-vip",
+                                name: "VIP Executive Suites",
+                                color: "#f59e0b",
+                                ticket_type_id: vipTicket,
+                                row_start: "G",
+                                row_end: "H",
+                                seats_per_row: 22,
+                              },
+                              {
+                                id: "tier-es-upper",
+                                name: "Upper Grandstand",
+                                color: "#b91c1c",
+                                ticket_type_id: premiumTicket,
+                                row_start: "I",
+                                row_end: "N",
+                                seats_per_row: 30,
+                              },
+                            ],
+                          },
+
+                          // 3. West Grandstand (Left Goal End)
+                          {
+                            id: "euro-west",
+                            name: "West Goal Stand",
+                            color: "#ea580c",
+                            stand_level: "multi",
+                            shape: "rectangle",
+                            x: 205,
+                            y: 380,
+                            width: 215,
+                            height: 440,
+                            rotation: 0,
+                            tier_split_direction: "horizontal",
+                            capacity: 3200,
+                            tiers: [
+                              {
+                                id: "tier-ew-upper",
+                                name: "Upper Grandstand",
+                                color: "#c2410c",
+                                ticket_type_id: premiumTicket,
+                                row_start: "I",
+                                row_end: "N",
+                                seats_per_row: 24,
+                              },
+                              {
+                                id: "tier-ew-vip",
+                                name: "VIP Executive Suites",
+                                color: "#f59e0b",
+                                ticket_type_id: vipTicket,
+                                row_start: "G",
+                                row_end: "H",
+                                seats_per_row: 18,
+                              },
+                              {
+                                id: "tier-ew-lower",
+                                name: "Lower Tier",
+                                color: "#fb923c",
+                                ticket_type_id: defaultTicket,
+                                row_start: "A",
+                                row_end: "F",
+                                seats_per_row: 22,
+                              },
+                            ],
+                          },
+
+                          // 4. East Grandstand (Right Goal End)
+                          {
+                            id: "euro-east",
+                            name: "East Goal Stand",
+                            color: "#9333ea",
+                            stand_level: "multi",
+                            shape: "rectangle",
+                            x: 1180,
+                            y: 380,
+                            width: 215,
+                            height: 440,
+                            rotation: 0,
+                            tier_split_direction: "horizontal",
+                            capacity: 3200,
+                            tiers: [
+                              {
+                                id: "tier-ee-lower",
+                                name: "Lower Tier",
+                                color: "#c084fc",
+                                ticket_type_id: defaultTicket,
+                                row_start: "A",
+                                row_end: "F",
+                                seats_per_row: 22,
+                              },
+                              {
+                                id: "tier-ee-vip",
+                                name: "VIP Executive Suites",
+                                color: "#f59e0b",
+                                ticket_type_id: vipTicket,
+                                row_start: "G",
+                                row_end: "H",
+                                seats_per_row: 18,
+                              },
+                              {
+                                id: "tier-ee-upper",
+                                name: "Upper Grandstand",
+                                color: "#7e22ce",
+                                ticket_type_id: premiumTicket,
+                                row_start: "I",
+                                row_end: "N",
+                                seats_per_row: 24,
+                              },
+                            ],
+                          },
+
+                          // 5. North-West Corner Arc
+                          {
+                            id: "euro-corner-nw",
+                            name: "Stand NW Corner Arc",
+                            color: "#0ea5e9",
+                            stand_level: "multi",
+                            shape: "arc",
+                            innerRadius: 460,
+                            outerRadius: 585,
+                            startAngle: 198,
+                            sweepAngle: 44,
+                            stadiumCenterX: cx,
+                            stadiumCenterY: cy,
+                            x: cx,
+                            y: cy,
+                            width: 1170,
+                            height: 1170,
+                            rotation: 0,
+                            capacity: 1200,
+                            tiers: [
+                              {
+                                id: "tier-cnw-lower",
+                                name: "Lower Tier",
+                                color: "#7dd3fc",
+                                ticket_type_id: defaultTicket,
+                                row_start: "A",
+                                row_end: "D",
+                                seats_per_row: 12,
+                              },
+                              {
+                                id: "tier-cnw-upper",
+                                name: "Upper Tier",
+                                color: "#0369a1",
+                                ticket_type_id: premiumTicket,
+                                row_start: "E",
+                                row_end: "H",
+                                seats_per_row: 14,
+                              },
+                            ],
+                          },
+
+                          // 6. North-East Corner Arc
+                          {
+                            id: "euro-corner-ne",
+                            name: "Stand NE Corner Arc",
+                            color: "#0ea5e9",
+                            stand_level: "multi",
+                            shape: "arc",
+                            innerRadius: 460,
+                            outerRadius: 585,
+                            startAngle: 298,
+                            sweepAngle: 44,
+                            stadiumCenterX: cx,
+                            stadiumCenterY: cy,
+                            x: cx,
+                            y: cy,
+                            width: 1170,
+                            height: 1170,
+                            rotation: 0,
+                            capacity: 1200,
+                            tiers: [
+                              {
+                                id: "tier-cne-lower",
+                                name: "Lower Tier",
+                                color: "#7dd3fc",
+                                ticket_type_id: defaultTicket,
+                                row_start: "A",
+                                row_end: "D",
+                                seats_per_row: 12,
+                              },
+                              {
+                                id: "tier-cne-upper",
+                                name: "Upper Tier",
+                                color: "#0369a1",
+                                ticket_type_id: premiumTicket,
+                                row_start: "E",
+                                row_end: "H",
+                                seats_per_row: 14,
+                              },
+                            ],
+                          },
+
+                          // 7. South-East Corner Arc
+                          {
+                            id: "euro-corner-se",
+                            name: "Stand SE Corner Arc",
+                            color: "#ef4444",
+                            stand_level: "multi",
+                            shape: "arc",
+                            innerRadius: 460,
+                            outerRadius: 585,
+                            startAngle: 18,
+                            sweepAngle: 44,
+                            stadiumCenterX: cx,
+                            stadiumCenterY: cy,
+                            x: cx,
+                            y: cy,
+                            width: 1170,
+                            height: 1170,
+                            rotation: 0,
+                            capacity: 1200,
+                            tiers: [
+                              {
+                                id: "tier-cse-lower",
+                                name: "Lower Tier",
+                                color: "#fca5a5",
+                                ticket_type_id: defaultTicket,
+                                row_start: "A",
+                                row_end: "D",
+                                seats_per_row: 12,
+                              },
+                              {
+                                id: "tier-cse-upper",
+                                name: "Upper Tier",
+                                color: "#b91c1c",
+                                ticket_type_id: premiumTicket,
+                                row_start: "E",
+                                row_end: "H",
+                                seats_per_row: 14,
+                              },
+                            ],
+                          },
+
+                          // 8. South-West Corner Arc
+                          {
+                            id: "euro-corner-sw",
+                            name: "Stand SW Corner Arc",
+                            color: "#ef4444",
+                            stand_level: "multi",
+                            shape: "arc",
+                            innerRadius: 460,
+                            outerRadius: 585,
+                            startAngle: 118,
+                            sweepAngle: 44,
+                            stadiumCenterX: cx,
+                            stadiumCenterY: cy,
+                            x: cx,
+                            y: cy,
+                            width: 1170,
+                            height: 1170,
+                            rotation: 0,
+                            capacity: 1200,
+                            tiers: [
+                              {
+                                id: "tier-csw-lower",
+                                name: "Lower Tier",
+                                color: "#fca5a5",
+                                ticket_type_id: defaultTicket,
+                                row_start: "A",
+                                row_end: "D",
+                                seats_per_row: 12,
+                              },
+                              {
+                                id: "tier-csw-upper",
+                                name: "Upper Tier",
+                                color: "#b91c1c",
+                                ticket_type_id: premiumTicket,
+                                row_start: "E",
+                                row_end: "H",
+                                seats_per_row: 14,
+                              },
+                            ],
+                          },
+                        ];
+
+                        const euroElements: StadiumElementDef[] = [
+                          {
+                            id: "gate-nw",
+                            name: "Gate 1 (NW)",
+                            type: "gate",
+                            icon: "🚪",
+                            color: "#15803d",
+                            x: 410,
+                            y: 320,
+                            width: 50,
+                            height: 50,
+                            rotation: 0,
+                          },
+                          {
+                            id: "gate-ne",
+                            name: "Gate 2 (NE)",
+                            type: "gate",
+                            icon: "🚪",
+                            color: "#15803d",
+                            x: 1140,
+                            y: 320,
+                            width: 50,
+                            height: 50,
+                            rotation: 0,
+                          },
+                          {
+                            id: "gate-se",
+                            name: "Gate 3 (SE)",
+                            type: "gate",
+                            icon: "🚪",
+                            color: "#15803d",
+                            x: 1140,
+                            y: 830,
+                            width: 50,
+                            height: 50,
+                            rotation: 0,
+                          },
+                          {
+                            id: "gate-sw",
+                            name: "Gate 4 (SW)",
+                            type: "gate",
+                            icon: "🚪",
+                            color: "#15803d",
+                            x: 410,
+                            y: 830,
+                            width: 50,
+                            height: 50,
+                            rotation: 0,
+                          },
+                        ];
+
+                        setBlocks(euroBlocks);
+                        setElements(euroElements);
+                        setSelectedId(euroBlocks[0].id);
+                        toast.success("Generated Modern Football Arena (4 Stands + 4 Corner Arcs)!");
+                      }}
+                      className="w-full p-2.5 rounded-xl bg-gradient-to-r from-emerald-600 via-sky-600 to-indigo-600 hover:from-emerald-500 hover:to-indigo-500 text-white font-extrabold text-xs shadow-md shadow-sky-700/20 flex items-center justify-center gap-2 transition-all active:scale-95"
+                    >
+                      <span className="text-base">🏟️</span>
+                      <span>⚡ Generate European Arena (4 Stands + 4 Corner Arcs)</span>
+                    </button>
                     {/* Hero Preset 1: Olympic Football Stadium (Ethiopian National Stadium Style) */}
                     <button
                       type="button"

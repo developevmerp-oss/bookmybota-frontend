@@ -1428,7 +1428,27 @@ export interface PublicRegisteredPartner {
   /** Present when API includes partner flags (onboarded vs event_auto stubs). */
   partner_source?: string | null;
   is_partner_authorized?: boolean | null;
+  /** Lineup role (artist directory rows sourced from event lineups). */
+  role_title?: string | null;
 }
+
+export type PublicPartnerPageQuery = {
+  q?: string;
+  city?: string;
+  page: number;
+  limit: number;
+};
+
+type PublicPartnerPageResponse = {
+  data?: PublicRegisteredPartner[];
+  meta?: PaginationMeta;
+  city_fallback?: boolean;
+};
+
+export type PublicPartnerPage = PaginatedList<PublicRegisteredPartner> & {
+  /** City filter matched nothing, so the server returned all partners instead. */
+  cityFallback: boolean;
+};
 
 export interface ArtistAvailabilitySlot {
   id: string;
@@ -6595,6 +6615,40 @@ export const api = createApi({
       providesTags: ['Businesses'],
     }),
 
+    /** Venue listing page — server-side search + pagination (infinite scroll). */
+    getPublicVenuesPaged: builder.query<PublicPartnerPage, PublicPartnerPageQuery>({
+      query: (params) =>
+        `/events/public/venues${toListQuery({
+          q: params.q,
+          city: params.city,
+          page: params.page,
+          limit: params.limit,
+          city_fallback: params.city ? 1 : undefined,
+        })}`,
+      transformResponse: (res: PublicPartnerPageResponse) => ({
+        ...unwrapPaginated(res),
+        cityFallback: Boolean(res?.city_fallback),
+      }),
+      providesTags: ['Businesses'],
+    }),
+
+    /** Artist listing page — registered + event lineup artists, searched and paged server-side. */
+    getPublicArtistDirectory: builder.query<PublicPartnerPage, PublicPartnerPageQuery>({
+      query: (params) =>
+        `/events/public/artists/directory${toListQuery({
+          q: params.q,
+          city: params.city,
+          page: params.page,
+          limit: params.limit,
+          city_fallback: params.city ? 1 : undefined,
+        })}`,
+      transformResponse: (res: PublicPartnerPageResponse) => ({
+        ...unwrapPaginated(res),
+        cityFallback: Boolean(res?.city_fallback),
+      }),
+      providesTags: ['Businesses', 'PublicEvents'],
+    }),
+
     getPublicArtist: builder.query<PublicArtistProfile, string>({
       query: (id) => `/artists/public/${id}`,
       transformResponse: (res: { data: PublicArtistProfile }) => res.data,
@@ -8736,6 +8790,8 @@ export const {
   useGetPublicRegisteredVenuesQuery,
   useGetPublicRegisteredCinemasQuery,
   useGetPublicRegisteredArtistsQuery,
+  useGetPublicVenuesPagedQuery,
+  useGetPublicArtistDirectoryQuery,
   useGetPublicArtistQuery,
   useCreateArtistInquiryMutation,
   useGetArtistMySlotsQuery,

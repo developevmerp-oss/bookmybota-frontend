@@ -36,6 +36,7 @@ import { sanitizePhoneInput } from "@/lib/validation";
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
 import PhoneInput from "@/components/Shared/PhoneInput";
+import PartnerInquiryModal from "@/components/Shared/PartnerInquiryModal";
 import PreferredTimeSelect from "@/components/Shared/PreferredTimeSelect";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { normalizeArtistMetaClient } from "@/lib/artistMeta";
@@ -224,31 +225,14 @@ export default function PublicArtistProfilePage({ artistId }: { artistId: string
   const [lineupEvents, setLineupEvents] = useState<PartnerEventWithMeta[]>(EMPTY_EVENT_ITEMS);
   const [eventsReady, setEventsReady] = useState(false);
   const [showAllEvents, setShowAllEvents] = useState(false);
-  const [inquiryFormEl, setInquiryFormEl] = useState<HTMLFormElement | null>(null);
-  const [inquiryFormInView, setInquiryFormInView] = useState(false);
+  const [inquiryOpen, setInquiryOpen] = useState(false);
   const bioRef = useRef<HTMLParagraphElement>(null);
 
   useEffect(() => {
     setShowAllEvents(false);
     setEventsReady(false);
-    setInquiryFormInView(false);
+    setInquiryOpen(false);
   }, [artistId]);
-
-  useEffect(() => {
-    if (!inquiryFormEl || showAllEvents) {
-      setInquiryFormInView(false);
-      return;
-    }
-    if (typeof IntersectionObserver === "undefined") return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        setInquiryFormInView(Boolean(entries[0]?.isIntersecting));
-      },
-      { threshold: 0.2, rootMargin: "0px 0px -12% 0px" }
-    );
-    observer.observe(inquiryFormEl);
-    return () => observer.disconnect();
-  }, [inquiryFormEl, showAllEvents]);
 
   const form = useForm<ArtistInquiryFormValues>({
     resolver: yupResolver(artistInquiryFormSchema),
@@ -407,10 +391,25 @@ export default function PublicArtistProfilePage({ artistId }: { artistId: string
         message: "",
       });
       void data;
+      setInquiryOpen(false);
     } catch (err) {
       toast.error(extractApiError(err, "Could not send inquiry"));
     }
   });
+
+  const closeInquiry = () => {
+    setInquiryOpen(false);
+    reset({
+      event_date: "",
+      event_time: "",
+      contact_name: "",
+      contact_email: "",
+      contact_phone: "",
+      event_type: "",
+      event_location: "",
+      message: "",
+    });
+  };
 
   if ((!skipPublicArtist && isLoading) || (catalogLoading && !artist && !eventProfile)) {
     return <ArtistDetailShimmer />;
@@ -542,14 +541,8 @@ export default function PublicArtistProfilePage({ artistId }: { artistId: string
     );
   }
 
-  const showStickyInquiry = canInquire && !inquiryFormInView;
-
   return (
-    <div
-      className={`min-h-screen bg-white ${
-        showStickyInquiry ? "pb-[calc(5.25rem+env(safe-area-inset-bottom))] lg:pb-0" : ""
-      }`}
-    >
+    <div className="min-h-screen bg-white pb-[calc(5.25rem+env(safe-area-inset-bottom))] lg:pb-0">
       <header className="relative w-full overflow-hidden">
         {coverSrc ? (
           <img
@@ -619,11 +612,7 @@ export default function PublicArtistProfilePage({ artistId }: { artistId: string
               {canInquire ? (
                 <button
                   type="button"
-                  onClick={() =>
-                    document
-                      .getElementById("artist-inquiry")
-                      ?.scrollIntoView({ behavior: "smooth", block: "start" })
-                  }
+                  onClick={() => setInquiryOpen(true)}
                   className="mt-5 hidden lg:inline-flex h-11 items-center justify-center rounded-xl bg-[#111111] px-7 text-sm font-bold text-white transition-colors hover:bg-black cursor-pointer"
                 >
                   Send inquiry
@@ -664,9 +653,9 @@ export default function PublicArtistProfilePage({ artistId }: { artistId: string
       </header>
 
         <div className="bg-white bmb-section-container py-8 sm:py-10">
-          <div className="flex flex-col items-stretch gap-8 lg:flex-row lg:items-start lg:gap-10">
+          <div>
             {showLeftColumn ? (
-              <div className="min-w-0 flex-1 space-y-8 sm:space-y-10">
+              <div className="min-w-0 space-y-8 sm:space-y-10">
                 {showStage ? (
                   <ArtistStageSection
                     name={artist.name}
@@ -701,147 +690,140 @@ export default function PublicArtistProfilePage({ artistId }: { artistId: string
                 ) : null}
               </div>
             ) : null}
+          </div>
+        </div>
 
-            {canInquire ? (
-            <aside className="w-full shrink-0 lg:w-[24.5rem]">
-              <form
-                id="artist-inquiry"
-                ref={setInquiryFormEl}
-                onSubmit={onSubmit}
-                className="relative w-full rounded-[1.5rem] border border-[#F0EAF7] bg-white p-5 sm:p-6 space-y-4 shadow-[0_10px_30px_rgba(105,0,170,0.07)] scroll-mt-28 lg:sticky lg:top-24"
-                noValidate
-              >
+      {canInquire ? (
+        <PartnerInquiryModal
+          open={inquiryOpen}
+          onClose={closeInquiry}
+          title="Send inquiry"
+          subtitle="Share your event details and this artist will get back to you."
+        >
+          <form onSubmit={onSubmit} className="space-y-3" noValidate>
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <h2 className="text-lg font-bold text-[#111111]">Send inquiry</h2>
-                <p className="text-sm text-[#8b8794] mt-1">
-                  Share your event details and this artist will get back to you.
+                <InquiryLabel icon={CalendarDays}>Event date</InquiryLabel>
+                <input
+                  type="date"
+                  min={todayYmd()}
+                  className={inquiryInput}
+                  {...register("event_date")}
+                />
+                {errors.event_date && <p className={fieldErrorClass}>{errors.event_date.message}</p>}
+              </div>
+              <div>
+                <InquiryLabel icon={Clock}>Time</InquiryLabel>
+                <Controller
+                  name="event_time"
+                  control={control}
+                  render={({ field }) => (
+                    <PreferredTimeSelect value={field.value || ""} onChange={field.onChange} />
+                  )}
+                />
+                {errors.event_time && <p className={fieldErrorClass}>{errors.event_time.message}</p>}
+              </div>
+            </div>
+
+            <div>
+              <InquiryLabel icon={User}>Your name</InquiryLabel>
+              <input className={inquiryInput} placeholder="Full name" {...register("contact_name")} />
+              {errors.contact_name && (
+                <p className={fieldErrorClass}>{errors.contact_name.message}</p>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <InquiryLabel icon={Mail}>Email</InquiryLabel>
+                <input
+                  type="email"
+                  className={inquiryInput}
+                  placeholder="you@email.com"
+                  {...register("contact_email")}
+                />
+                {errors.contact_email && (
+                  <p className={fieldErrorClass}>{errors.contact_email.message}</p>
+                )}
+              </div>
+              <div>
+                <InquiryLabel icon={Phone}>Phone</InquiryLabel>
+                <Controller
+                  name="contact_phone"
+                  control={control}
+                  render={({ field }) => (
+                    <PhoneInput
+                      value={field.value || ""}
+                      onChange={(v) => field.onChange(v)}
+                      onValidChange={() => undefined}
+                      required
+                      inputClassName={inquiryInput}
+                    />
+                  )}
+                />
+                {errors.contact_phone && (
+                  <p className={fieldErrorClass}>{errors.contact_phone.message}</p>
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <InquiryLabel icon={Briefcase}>Event type</InquiryLabel>
+                <input
+                  className={inquiryInput}
+                  placeholder="Wedding"
+                  {...register("event_type")}
+                />
+              </div>
+              <div>
+                <InquiryLabel icon={MapPin}>Location</InquiryLabel>
+                <input
+                  className={inquiryInput}
+                  placeholder="Venue / city"
+                  {...register("event_location")}
+                />
+              </div>
+            </div>
+
+            <div>
+              <InquiryLabel icon={MessageSquare}>Message</InquiryLabel>
+              <textarea
+                rows={3}
+                className={`${inquiryInput} resize-none`}
+                placeholder="Tell the artist about your event…"
+                {...register("message")}
+              />
+              {errors.message && <p className={fieldErrorClass}>{errors.message.message}</p>}
+            </div>
+
+            <div className="flex items-center justify-between gap-3 pt-1">
+              {!customerId ? (
+                <p className="text-[11px] leading-snug text-[#9CA3AF]">
+                  You can send without logging in.
                 </p>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-4">
-                <div>
-                  <InquiryLabel icon={CalendarDays}>Event date</InquiryLabel>
-                  <input
-                    type="date"
-                    min={todayYmd()}
-                    className={inquiryInput}
-                    {...register("event_date")}
-                  />
-                  {errors.event_date && <p className={fieldErrorClass}>{errors.event_date.message}</p>}
-                </div>
-
-                <div>
-                  <InquiryLabel icon={Clock}>Preferred time (optional)</InquiryLabel>
-                  <Controller
-                    name="event_time"
-                    control={control}
-                    render={({ field }) => (
-                      <PreferredTimeSelect value={field.value || ""} onChange={field.onChange} />
-                    )}
-                  />
-                  {errors.event_time && <p className={fieldErrorClass}>{errors.event_time.message}</p>}
-                </div>
-
-                <div>
-                  <InquiryLabel icon={User}>Your name</InquiryLabel>
-                  <input className={inquiryInput} {...register("contact_name")} />
-                  {errors.contact_name && (
-                    <p className={fieldErrorClass}>{errors.contact_name.message}</p>
-                  )}
-                </div>
-
-                <div>
-                  <InquiryLabel icon={Mail}>Email</InquiryLabel>
-                  <input
-                    type="email"
-                    className={inquiryInput}
-                    placeholder="you@email.com"
-                    {...register("contact_email")}
-                  />
-                  {errors.contact_email && (
-                    <p className={fieldErrorClass}>{errors.contact_email.message}</p>
-                  )}
-                </div>
-
-                <div>
-                  <InquiryLabel icon={Phone}>Phone</InquiryLabel>
-                  <Controller
-                    name="contact_phone"
-                    control={control}
-                    render={({ field }) => (
-                      <PhoneInput
-                        value={field.value || ""}
-                        onChange={(v) => field.onChange(v)}
-                        onValidChange={() => undefined}
-                        required
-                        inputClassName={inquiryInput}
-                      />
-                    )}
-                  />
-                  {errors.contact_phone && (
-                    <p className={fieldErrorClass}>{errors.contact_phone.message}</p>
-                  )}
-                </div>
-
-                <div>
-                  <InquiryLabel icon={Briefcase}>Event type</InquiryLabel>
-                  <input
-                    className={inquiryInput}
-                    placeholder="Wedding, corporate…"
-                    {...register("event_type")}
-                  />
-                </div>
-
-                <div className="sm:col-span-2 lg:col-span-1">
-                  <InquiryLabel icon={MapPin}>Location</InquiryLabel>
-                  <input
-                    className={inquiryInput}
-                    placeholder="Venue / city"
-                    {...register("event_location")}
-                  />
-                </div>
-
-                <div className="sm:col-span-2 lg:col-span-1">
-                  <InquiryLabel icon={MessageSquare}>Message</InquiryLabel>
-                  <textarea
-                    rows={4}
-                    className={`${inquiryInput} resize-none min-h-[96px]`}
-                    placeholder="Tell the artist about your event…"
-                    {...register("message")}
-                  />
-                  {errors.message && <p className={fieldErrorClass}>{errors.message.message}</p>}
-                </div>
-              </div>
-
+              ) : (
+                <span />
+              )}
               <button
                 type="submit"
                 disabled={sending}
-                className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-[#111111] text-white py-3 px-4 text-sm sm:text-[1rem] font-bold transition-colors cursor-pointer hover:bg-black disabled:opacity-50"
+                className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-[#111111] px-5 text-sm font-bold text-white transition-colors cursor-pointer hover:bg-black disabled:opacity-50"
               >
                 {sending ? <Loader2 size={16} className="animate-spin" /> : null}
                 Send inquiry
                 {!sending ? <ArrowRight size={16} /> : null}
               </button>
-              {!customerId ? (
-                <p className="text-[11px] text-[#9CA3AF] text-center">
-                  You can send without logging in. Sign in to prefill your details.
-                </p>
-              ) : null}
-            </form>
-          </aside>
-            ) : null}
-        </div>
-        </div>
+            </div>
+          </form>
+        </PartnerInquiryModal>
+      ) : null}
 
-      {showStickyInquiry ? (
-        <div className="lg:hidden fixed bottom-0 inset-x-0 z-50 border-t border-slate-200 bg-white px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+      {canInquire ? (
+        <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 border-t border-slate-200 bg-white px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           <button
             type="button"
-            onClick={() =>
-              document
-                .getElementById("artist-inquiry")
-                ?.scrollIntoView({ behavior: "smooth", block: "start" })
-            }
+            onClick={() => setInquiryOpen(true)}
             className="w-full rounded-xl bg-[#111111] text-white py-3.5 text-base font-bold cursor-pointer hover:bg-black"
           >
             Send inquiry

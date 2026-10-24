@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, Briefcase, Building2, CalendarDays, Clock, Loader2, Mail, MapPin, MessageSquare, Phone, Send, User, Users } from "lucide-react";
+import { ArrowLeft, ArrowRight, Briefcase, Building2, CalendarDays, Clock, Loader2, Mail, MapPin, MessageSquare, Phone, User, Users } from "lucide-react";
 import { toast } from "sonner";
 import {
   api,
@@ -23,7 +23,9 @@ import { sanitizePhoneInput } from "@/lib/validation";
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
 import ArtistMonthCalendar from "@/components/Shared/ArtistMonthCalendar";
+import PartnerInquiryModal from "@/components/Shared/PartnerInquiryModal";
 import PhoneInput from "@/components/Shared/PhoneInput";
+import PreferredTimeSelect from "@/components/Shared/PreferredTimeSelect";
 import PartnerLiveEventsSection, {
   PartnerAllEventsPanel,
 } from "@/components/Shared/PartnerLiveEventsSection";
@@ -85,31 +87,14 @@ export default function PublicVenueProfilePage({ venueId }: { venueId: string })
   const [venueEvents, setVenueEvents] = useState<PartnerEventWithMeta[]>(EMPTY_EVENT_ITEMS);
   const [eventsReady, setEventsReady] = useState(false);
   const [showAllEvents, setShowAllEvents] = useState(false);
-  const [inquiryFormEl, setInquiryFormEl] = useState<HTMLFormElement | null>(null);
-  const [inquiryFormInView, setInquiryFormInView] = useState(false);
+  const [inquiryOpen, setInquiryOpen] = useState(false);
   const aboutTextRef = useRef<HTMLParagraphElement>(null);
 
   useEffect(() => {
     setShowAllEvents(false);
     setEventsReady(false);
-    setInquiryFormInView(false);
+    setInquiryOpen(false);
   }, [venueId]);
-
-  useEffect(() => {
-    if (!inquiryFormEl || showAllEvents) {
-      setInquiryFormInView(false);
-      return;
-    }
-    if (typeof IntersectionObserver === "undefined") return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        setInquiryFormInView(Boolean(entries[0]?.isIntersecting));
-      },
-      { threshold: 0.2, rootMargin: "0px 0px -12% 0px" }
-    );
-    observer.observe(inquiryFormEl);
-    return () => observer.disconnect();
-  }, [inquiryFormEl, showAllEvents]);
 
   const freeDates = useMemo(
     () => (venue?.slots || []).map((s) => s.slot_date),
@@ -352,10 +337,38 @@ export default function PublicVenueProfilePage({ venueId }: { venueId: string })
         message: "",
       });
       void data;
+      setInquiryOpen(false);
     } catch (err) {
       toast.error(extractApiError(err, "Could not send inquiry"));
     }
   });
+
+  const openInquiry = () => {
+    if (!selectedDate) {
+      toast.error("Select an open day on the calendar first.");
+      document.getElementById("venue-availability")?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+      return;
+    }
+    setInquiryOpen(true);
+  };
+
+  const closeInquiry = () => {
+    setInquiryOpen(false);
+    reset({
+      event_date: "",
+      event_time: "",
+      contact_name: "",
+      contact_email: "",
+      contact_phone: "",
+      event_type: "",
+      guest_count: "",
+      event_location: "",
+      message: "",
+    });
+  };
 
   if (isLoading) {
     return <VenueDetailShimmer />;
@@ -396,14 +409,8 @@ export default function PublicVenueProfilePage({ venueId }: { venueId: string })
     );
   }
 
-  const showStickyInquiry = !inquiryFormInView;
-
   return (
-    <div
-      className={`min-h-screen bg-white overflow-x-hidden ${
-        showStickyInquiry ? "pb-[calc(5.25rem+env(safe-area-inset-bottom))] lg:pb-0" : ""
-      }`}
-    >
+    <div className="min-h-screen bg-white overflow-x-hidden pb-[calc(5.25rem+env(safe-area-inset-bottom))] lg:pb-0">
       <div className="bmb-section-container pt-5 sm:pt-6">
         <Link
           href="/venues"
@@ -452,25 +459,14 @@ export default function PublicVenueProfilePage({ venueId }: { venueId: string })
                   <span className="min-w-0 break-words">{place}</span>
                 </p>
               ) : null}
-              <button
-                type="button"
-                onClick={() =>
-                  document
-                    .getElementById("venue-inquiry")
-                    ?.scrollIntoView({ behavior: "smooth", block: "start" })
-                }
-                className="mt-5 hidden lg:inline-flex h-11 items-center justify-center rounded-xl bg-white px-7 text-sm font-bold text-[#111111] transition-colors hover:bg-black cursor-pointer"
-              >
-                Send inquiry
-              </button>
             </div>
           </div>
         </div>
       </header>
 
       <div className="bg-white bmb-section-container py-6 sm:py-8 md:py-10">
-        <div className="flex flex-col items-stretch gap-8 lg:flex-row lg:items-start lg:gap-5">
-          <div className="min-w-0 flex-1 order-1 space-y-8 sm:space-y-10">
+        <div className="flex flex-col items-start gap-8 lg:flex-row lg:gap-10">
+          <div className="min-w-0 w-full flex-1 space-y-8 sm:space-y-10">
               {aboutText ? (
                 <section id="venue-about" className="scroll-mt-24 sm:scroll-mt-28">
                   <h2 className="text-xl font-bold tracking-tight text-[#111111] sm:text-2xl">
@@ -520,13 +516,15 @@ export default function PublicVenueProfilePage({ venueId }: { venueId: string })
                   dense
                 />
               ) : null}
+          </div>
 
-              <section className="w-full max-w-md sm:max-w-lg lg:max-w-lg">
+          <aside className="w-full shrink-0 lg:sticky lg:top-24 lg:w-[22.5rem] xl:w-[24rem]">
+              <section id="venue-availability" className="w-full scroll-mt-24">
                 <h2 className="text-xl font-bold tracking-tight text-[#111111] sm:text-2xl">
                   Booking Availability
                 </h2>
                 <p className="mt-1 text-sm text-[#6B6B6B]">
-                  Green days are open. Select one to request a booking.
+                  Green days are open. Pick a date, then send your inquiry.
                 </p>
                 <div className="mt-4">
                   <ArtistMonthCalendar
@@ -539,165 +537,175 @@ export default function PublicVenueProfilePage({ venueId }: { venueId: string })
                     }
                   />
                 </div>
+                {errors.event_date && !inquiryOpen ? (
+                  <p className={fieldErrorClass}>{errors.event_date.message}</p>
+                ) : null}
                 {freeDates.length === 0 ? (
                   <p className="mt-3 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
                     This venue has not published free days yet. Check back later.
                   </p>
-                ) : null}
+                ) : (
+                  <button
+                    type="button"
+                    onClick={openInquiry}
+                    disabled={!selectedDate}
+                    className="mt-4 hidden lg:inline-flex h-11 items-center justify-center rounded-xl bg-[#111111] px-6 text-sm font-bold text-white transition-colors hover:bg-black cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Send inquiry
+                  </button>
+                )}
               </section>
-            </div>
-
-          <aside className="w-full shrink-0 order-2 max-w-xl lg:max-w-none lg:w-[min(100%,32rem)]">
-            <form
-              id="venue-inquiry"
-              ref={setInquiryFormEl}
-              onSubmit={onSubmit}
-              className="relative w-full rounded-[1.25rem] sm:rounded-[1.5rem] border border-[#F0EAF7] bg-white p-4 sm:p-5 md:p-6 space-y-4 shadow-[0_10px_30px_rgba(105,0,170,0.07)] scroll-mt-24 sm:scroll-mt-28 lg:sticky lg:top-24"
-              noValidate
-            >
-              <div>
-                <h2 className="text-lg font-bold text-[#111111]">Send booking inquiry</h2>
-                <p className="text-sm text-[#8b8794] mt-1">
-                  The venue receives this request in their panel and by email.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-3 sm:gap-4">
-                <div>
-                  <InquiryLabel icon={CalendarDays}>Selected date</InquiryLabel>
-                  <input
-                    readOnly
-                    className={`${inquiryInput} bg-slate-50`}
-                    value={selectedDate ? formatDateCustomer(selectedDate) : "Pick a free day on the calendar"}
-                  />
-                  {errors.event_date && <p className={fieldErrorClass}>{errors.event_date.message}</p>}
-                </div>
-
-                <div>
-                  <InquiryLabel icon={Clock}>Preferred time (optional)</InquiryLabel>
-                  <input type="time" className={inquiryInput} {...register("event_time")} />
-                  {errors.event_time && <p className={fieldErrorClass}>{errors.event_time.message}</p>}
-                </div>
-
-                <div>
-                  <InquiryLabel icon={User}>Your name</InquiryLabel>
-                  <input className={inquiryInput} {...register("contact_name")} />
-                  {errors.contact_name && (
-                    <p className={fieldErrorClass}>{errors.contact_name.message}</p>
-                  )}
-                </div>
-
-                <div>
-                  <InquiryLabel icon={Mail}>Email</InquiryLabel>
-                  <input
-                    type="email"
-                    className={inquiryInput}
-                    placeholder="you@email.com"
-                    {...register("contact_email")}
-                  />
-                  {errors.contact_email && (
-                    <p className={fieldErrorClass}>{errors.contact_email.message}</p>
-                  )}
-                </div>
-
-                <div>
-                  <InquiryLabel icon={Phone}>Phone</InquiryLabel>
-                  <Controller
-                    name="contact_phone"
-                    control={control}
-                    render={({ field }) => (
-                      <PhoneInput
-                        value={field.value || ""}
-                        onChange={(v) => field.onChange(v)}
-                        onValidChange={() => undefined}
-                        required
-                        inputClassName={inquiryInput}
-                      />
-                    )}
-                  />
-                  {errors.contact_phone && (
-                    <p className={fieldErrorClass}>{errors.contact_phone.message}</p>
-                  )}
-                </div>
-
-                <div>
-                  <InquiryLabel icon={Briefcase}>Event type</InquiryLabel>
-                  <input
-                    className={inquiryInput}
-                    placeholder="Wedding, corporate…"
-                    {...register("event_type")}
-                  />
-                </div>
-
-                <div>
-                  <InquiryLabel icon={Users}>Guest count</InquiryLabel>
-                  <input
-                    type="number"
-                    min={1}
-                    className={inquiryInput}
-                    placeholder="e.g. 150"
-                    {...register("guest_count")}
-                  />
-                  {errors.guest_count && (
-                    <p className={fieldErrorClass}>{errors.guest_count.message}</p>
-                  )}
-                </div>
-
-                <div className="sm:col-span-2 lg:col-span-1">
-                  <InquiryLabel icon={MapPin}>Setup / notes</InquiryLabel>
-                  <input
-                    className={inquiryInput}
-                    placeholder="Hall preference, seating style…"
-                    {...register("event_location")}
-                  />
-                </div>
-
-                <div className="sm:col-span-2 lg:col-span-1">
-                  <InquiryLabel icon={MessageSquare}>Message</InquiryLabel>
-                  <textarea
-                    rows={4}
-                    className={`${inquiryInput} resize-none min-h-[96px]`}
-                    placeholder="Tell the venue about your event…"
-                    {...register("message")}
-                  />
-                  {errors.message && <p className={fieldErrorClass}>{errors.message.message}</p>}
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={sending || freeDates.length === 0}
-                className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-[#111111] text-white py-3 px-4 text-sm sm:text-[1rem] font-bold transition-colors cursor-pointer hover:bg-black disabled:opacity-50"
-              >
-                {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
-                Send inquiry
-                {!sending ? <ArrowRight size={16} /> : null}
-              </button>
-              {!customerId ? (
-                <p className="text-[11px] text-[#9CA3AF] text-center">
-                  You can send without logging in. Signing in prefills your details.
-                </p>
-              ) : null}
-            </form>
           </aside>
         </div>
       </div>
 
-      {showStickyInquiry ? (
-        <div className="lg:hidden fixed bottom-0 inset-x-0 z-50 border-t border-slate-200 bg-white px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-          <button
-            type="button"
-            onClick={() =>
-              document
-                .getElementById("venue-inquiry")
-                ?.scrollIntoView({ behavior: "smooth", block: "start" })
-            }
-            className="w-full rounded-xl bg-[#111111] text-white py-3.5 text-base font-bold cursor-pointer hover:bg-black"
-          >
-            Send inquiry
-          </button>
-        </div>
-      ) : null}
+      <PartnerInquiryModal
+        open={inquiryOpen}
+        onClose={closeInquiry}
+        title="Send booking inquiry"
+        subtitle="The venue receives this request in their panel and by email."
+      >
+        <form onSubmit={onSubmit} className="space-y-3" noValidate>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <InquiryLabel icon={CalendarDays}>Date</InquiryLabel>
+              <input
+                readOnly
+                className={`${inquiryInput} bg-[#F4F5F7]`}
+                value={selectedDate ? formatDateCustomer(selectedDate) : ""}
+              />
+              {errors.event_date && <p className={fieldErrorClass}>{errors.event_date.message}</p>}
+            </div>
+            <div>
+              <InquiryLabel icon={Clock}>Time</InquiryLabel>
+              <Controller
+                name="event_time"
+                control={control}
+                render={({ field }) => (
+                  <PreferredTimeSelect value={field.value || ""} onChange={field.onChange} />
+                )}
+              />
+              {errors.event_time && <p className={fieldErrorClass}>{errors.event_time.message}</p>}
+            </div>
+          </div>
+
+          <div>
+            <InquiryLabel icon={User}>Your name</InquiryLabel>
+            <input className={inquiryInput} placeholder="Full name" {...register("contact_name")} />
+            {errors.contact_name && (
+              <p className={fieldErrorClass}>{errors.contact_name.message}</p>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <InquiryLabel icon={Mail}>Email</InquiryLabel>
+              <input
+                type="email"
+                className={inquiryInput}
+                placeholder="you@email.com"
+                {...register("contact_email")}
+              />
+              {errors.contact_email && (
+                <p className={fieldErrorClass}>{errors.contact_email.message}</p>
+              )}
+            </div>
+            <div>
+              <InquiryLabel icon={Phone}>Phone</InquiryLabel>
+              <Controller
+                name="contact_phone"
+                control={control}
+                render={({ field }) => (
+                  <PhoneInput
+                    value={field.value || ""}
+                    onChange={(v) => field.onChange(v)}
+                    onValidChange={() => undefined}
+                    required
+                    inputClassName={inquiryInput}
+                  />
+                )}
+              />
+              {errors.contact_phone && (
+                <p className={fieldErrorClass}>{errors.contact_phone.message}</p>
+              )}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <InquiryLabel icon={Briefcase}>Event type</InquiryLabel>
+              <input
+                className={inquiryInput}
+                placeholder="Wedding"
+                {...register("event_type")}
+              />
+            </div>
+            <div>
+              <InquiryLabel icon={Users}>Guests</InquiryLabel>
+              <input
+                type="number"
+                min={1}
+                className={inquiryInput}
+                placeholder="150"
+                {...register("guest_count")}
+              />
+              {errors.guest_count && (
+                <p className={fieldErrorClass}>{errors.guest_count.message}</p>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <InquiryLabel icon={MapPin}>Notes</InquiryLabel>
+            <input
+              className={inquiryInput}
+              placeholder="Hall preference, seating style…"
+              {...register("event_location")}
+            />
+          </div>
+
+          <div>
+            <InquiryLabel icon={MessageSquare}>Message</InquiryLabel>
+            <textarea
+              rows={3}
+              className={`${inquiryInput} resize-none`}
+              placeholder="Tell the venue about your event…"
+              {...register("message")}
+            />
+            {errors.message && <p className={fieldErrorClass}>{errors.message.message}</p>}
+          </div>
+
+          <div className="flex items-center justify-between gap-3 pt-1">
+            {!customerId ? (
+              <p className="text-[11px] leading-snug text-[#9CA3AF]">
+                You can send without logging in.
+              </p>
+            ) : (
+              <span />
+            )}
+            <button
+              type="submit"
+              disabled={sending || freeDates.length === 0}
+              className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-[#111111] px-5 text-sm font-bold text-white transition-colors cursor-pointer hover:bg-black disabled:opacity-50"
+            >
+              {sending ? <Loader2 size={16} className="animate-spin" /> : null}
+              Send inquiry
+              {!sending ? <ArrowRight size={16} /> : null}
+            </button>
+          </div>
+        </form>
+      </PartnerInquiryModal>
+
+      <div className="lg:hidden fixed bottom-0 inset-x-0 z-50 border-t border-slate-200 bg-white px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+        <button
+          type="button"
+          onClick={openInquiry}
+          disabled={freeDates.length === 0}
+          className="w-full rounded-xl bg-[#111111] text-white py-3.5 text-base font-bold cursor-pointer hover:bg-black disabled:opacity-40"
+        >
+          Send inquiry
+        </button>
+      </div>
     </div>
   );
 }

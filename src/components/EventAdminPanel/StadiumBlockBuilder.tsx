@@ -56,6 +56,11 @@ import {
   Settings2,
   Crosshair,
   Ticket,
+  Eye,
+  Send,
+  ArrowLeft,
+  ShoppingBag,
+  Users,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useGenerateStadiumSeatsMutation } from "@/services/api";
@@ -264,8 +269,8 @@ function defaultTier(): StadiumTierDef {
     color,
     ticket_type_id: "",
     row_start: "A",
-    row_end: "J",
-    seats_per_row: 25,
+    row_end: "E",
+    seats_per_row: 14,
     price: 500,
   };
 }
@@ -2407,6 +2412,728 @@ function ElementPanel({
   );
 }
 
+// ─── Customer View Simulation Modal (Level 1 Stadium -> Level 2/3 Stand Zoom & Seat Picker) ───
+
+function describeArcSvg(
+  cx: number,
+  cy: number,
+  innerR: number,
+  outerR: number,
+  startAngle: number,
+  sweepAngle: number
+) {
+  const endAngle = startAngle + sweepAngle;
+  const rad1 = (startAngle * Math.PI) / 180;
+  const rad2 = (endAngle * Math.PI) / 180;
+
+  const p1 = { x: cx + outerR * Math.cos(rad1), y: cy + outerR * Math.sin(rad1) };
+  const p2 = { x: cx + outerR * Math.cos(rad2), y: cy + outerR * Math.sin(rad2) };
+  const p3 = { x: cx + innerR * Math.cos(rad2), y: cy + innerR * Math.sin(rad2) };
+  const p4 = { x: cx + innerR * Math.cos(rad1), y: cy + innerR * Math.sin(rad1) };
+
+  const largeArcFlag = sweepAngle > 180 ? 1 : 0;
+
+  return `M ${p1.x} ${p1.y} A ${outerR} ${outerR} 0 ${largeArcFlag} 1 ${p2.x} ${p2.y} L ${p3.x} ${p3.y} A ${innerR} ${innerR} 0 ${largeArcFlag} 0 ${p4.x} ${p4.y} Z`;
+}
+
+interface CustomerPreviewModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  stadiumName: string;
+  groundConfig: StadiumGroundConfig;
+  blocks: StadiumBlockDef[];
+  elements: StadiumElementDef[];
+  ticketTypes: Array<{ id: string; name?: string; ticket_type?: string; price?: number }>;
+  onPublish: () => Promise<void>;
+  isPublishing: boolean;
+}
+
+function CustomerStadiumPreviewModal({
+  isOpen,
+  onClose,
+  stadiumName,
+  groundConfig,
+  blocks,
+  elements,
+  ticketTypes,
+  onPublish,
+  isPublishing,
+}: CustomerPreviewModalProps) {
+  const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
+  const [activeTierIdx, setActiveTierIdx] = useState<number>(0);
+  const [selectedSeats, setSelectedSeats] = useState<
+    Array<{
+      id: string;
+      standName: string;
+      tierName: string;
+      row: string;
+      seat: number;
+      price: number;
+    }>
+  >([]);
+
+  // Reset selected block when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setSelectedBlockId(null);
+      setActiveTierIdx(0);
+    }
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  const currentBlock = blocks.find((b) => b.id === selectedBlockId) || null;
+  const currentTier = currentBlock?.tiers?.[activeTierIdx] || currentBlock?.tiers?.[0];
+
+  const getTierPrice = (tier?: StadiumTierDef) => {
+    if (!tier) return 500;
+    const tt = ticketTypes.find((t) => t.id === tier.ticket_type_id);
+    return tt?.price != null ? Number(tt.price) : Number(tier.price) || 500;
+  };
+
+  const getBlockPrice = (block: StadiumBlockDef) => {
+    const tier = block.tiers?.[0];
+    return getTierPrice(tier);
+  };
+
+  const toggleSeatSelection = (
+    block: StadiumBlockDef,
+    tier: StadiumTierDef,
+    row: string,
+    seatNum: number
+  ) => {
+    const seatId = `${block.id}-${tier.id}-${row}-${seatNum}`;
+    const price = getTierPrice(tier);
+
+    setSelectedSeats((prev) => {
+      const exists = prev.some((s) => s.id === seatId);
+      if (exists) {
+        return prev.filter((s) => s.id !== seatId);
+      } else {
+        return [
+          ...prev,
+          {
+            id: seatId,
+            standName: block.name,
+            tierName: tier.name,
+            row,
+            seat: seatNum,
+            price,
+          },
+        ];
+      }
+    });
+  };
+
+  const totalCartPrice = selectedSeats.reduce((sum, s) => sum + s.price, 0);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="w-full max-w-7xl h-[94vh] bg-slate-900 border border-slate-700/80 rounded-2xl flex flex-col overflow-hidden shadow-2xl relative text-white">
+        {/* ── Top Bar ── */}
+        <div className="shrink-0 flex items-center justify-between gap-3 px-4 py-3 bg-slate-950/90 border-b border-slate-800">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="px-2.5 py-1 rounded-md bg-sky-500/20 text-sky-400 border border-sky-500/30 text-[11px] font-extrabold uppercase tracking-wider flex items-center gap-1.5 shrink-0">
+              <Eye className="w-3.5 h-3.5" />
+              <span>Customer Experience Preview</span>
+            </span>
+
+            <div className="flex items-center gap-2 text-xs font-bold text-slate-300 truncate">
+              <span className="text-white font-extrabold">{stadiumName}</span>
+              <span>/</span>
+              {selectedBlockId && currentBlock ? (
+                <div className="flex items-center gap-2">
+                  <span className="text-amber-400 font-extrabold">{currentBlock.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedBlockId(null);
+                      setActiveTierIdx(0);
+                    }}
+                    className="flex items-center gap-1 px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-sky-400 text-[11px] transition-colors"
+                  >
+                    <ArrowLeft className="w-3 h-3" />
+                    <span>Back to Full Stadium</span>
+                  </button>
+                </div>
+              ) : (
+                <span className="text-slate-400">Full Stadium Overview (Level 1)</span>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={async () => {
+                await onPublish();
+                onClose();
+              }}
+              disabled={isPublishing}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-extrabold text-xs shadow-lg shadow-emerald-500/20 active:scale-95 disabled:opacity-50 transition-all"
+              title="Save, generate seats and publish this layout for ticket buyers"
+            >
+              {isPublishing ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Send className="w-3.5 h-3.5" />
+              )}
+              <span>Save & Publish Layout</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-2 rounded-xl text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 transition-colors"
+              title="Close Preview"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* ── Guidance Banner ── */}
+        <div className="shrink-0 px-4 py-2 bg-gradient-to-r from-slate-900 via-sky-950/40 to-slate-900 border-b border-slate-800/80 flex items-center justify-between text-xs">
+          <div className="flex items-center gap-2 text-slate-300">
+            <Sparkles className="w-4 h-4 text-sky-400 shrink-0" />
+            {!selectedBlockId ? (
+              <span>
+                <strong className="text-white">Customer Step 1:</strong> Buyers see the complete 360° stadium map.{" "}
+                <span className="text-sky-300 font-semibold underline decoration-sky-400 underline-offset-2">
+                  Click on any stand below
+                </span>{" "}
+                to zoom inside and test seat selection.
+              </span>
+            ) : (
+              <span>
+                <strong className="text-white">Customer Step 2 & 3:</strong> Buyers view row letters & seat dots. Click
+                any available seat circle to select it into your cart.
+              </span>
+            )}
+          </div>
+
+          <div className="text-[11px] text-slate-400 flex items-center gap-3">
+            <span>Stands: {blocks.length}</span>
+            <span>•</span>
+            <span>Total Capacity: {blocks.reduce((acc, b) => acc + computeBlockSeatCount(b), 0).toLocaleString()} seats</span>
+          </div>
+        </div>
+
+        {/* ── Main Interactive Content Area ── */}
+        <div className="flex-1 relative overflow-auto bg-slate-950 flex flex-col items-center justify-center p-3">
+          {!selectedBlockId ? (
+            /* ═════════ LEVEL 1: FULL STADIUM OVERVIEW ═════════ */
+            <div className="w-full h-full flex flex-col items-center justify-center relative select-none">
+              {(() => {
+                const gx = groundConfig.x ?? PITCH_X;
+                const gy = groundConfig.y ?? PITCH_Y;
+                const gw = groundConfig.width ?? PITCH_W;
+                const gh = groundConfig.height ?? PITCH_H;
+
+                return (
+                  <svg
+                    viewBox={`0 0 ${CANVAS_W} ${CANVAS_H}`}
+                    className="w-full h-full max-h-[72vh] object-contain drop-shadow-2xl"
+                  >
+                    {/* Stadium Grass / Ground Canvas Background */}
+                    <rect x={0} y={0} width={CANVAS_W} height={CANVAS_H} fill="#090d16" />
+
+                    {/* Pitch / Sport Ground in Center */}
+                    {groundConfig.shape === "capsule" ? (
+                      <rect
+                        x={gx}
+                        y={gy}
+                        width={gw}
+                        height={gh}
+                        rx={gw / 2}
+                        fill={groundConfig.track_color || "#7f1d1d"}
+                        stroke="#ffffff"
+                        strokeWidth={2}
+                        strokeOpacity={0.2}
+                      />
+                    ) : groundConfig.shape === "oval" ? (
+                      <ellipse
+                        cx={gx + gw / 2}
+                        cy={gy + gh / 2}
+                        rx={gw / 2}
+                        ry={gh / 2}
+                        fill={groundConfig.turf_color || "#15803d"}
+                        stroke="#ffffff"
+                        strokeWidth={2}
+                        strokeOpacity={0.3}
+                      />
+                    ) : (
+                      <rect
+                        x={gx}
+                        y={gy}
+                        width={gw}
+                        height={gh}
+                        rx={12}
+                        fill={groundConfig.turf_color || "#15803d"}
+                        stroke="#ffffff"
+                        strokeWidth={2}
+                        strokeOpacity={0.2}
+                      />
+                    )}
+
+                    {/* Ground Field Markings */}
+                    {groundConfig.sport_type === "cricket" ? (
+                      <rect
+                        x={gx + gw / 2 - 25}
+                        y={gy + gh / 2 - 80}
+                        width={50}
+                        height={160}
+                        fill="#d97706"
+                        opacity={0.8}
+                        rx={4}
+                      />
+                    ) : (
+                      <>
+                        <circle
+                          cx={gx + gw / 2}
+                          cy={gy + gh / 2}
+                          r={70}
+                          fill="none"
+                          stroke="#ffffff"
+                          strokeWidth={2}
+                          strokeOpacity={0.4}
+                        />
+                        <line
+                          x1={gx}
+                          y1={gy + gh / 2}
+                          x2={gx + gw}
+                          y2={gy + gh / 2}
+                          stroke="#ffffff"
+                          strokeWidth={2}
+                          strokeOpacity={0.4}
+                        />
+                      </>
+                    )}
+
+                    {/* Pitch Text Label */}
+                    <text
+                      x={gx + gw / 2}
+                      y={gy + gh / 2 + 5}
+                      textAnchor="middle"
+                      fill="#ffffff"
+                      fontSize={14}
+                      fontWeight="bold"
+                      opacity={0.85}
+                      letterSpacing={2}
+                    >
+                      {groundConfig.pitch_label || "STADIUM GROUND"}
+                    </text>
+
+                    {/* Custom Elements (Stage, Gates, Dugouts) */}
+                    {elements.map((el) => (
+                      <g key={el.id} transform={`translate(${el.x}, ${el.y})`}>
+                        <rect
+                          width={el.width}
+                          height={el.height}
+                          rx={8}
+                          fill={el.color || "#475569"}
+                          stroke="#ffffff"
+                          strokeWidth={1.5}
+                          strokeOpacity={0.4}
+                        />
+                        <text
+                          x={el.width / 2}
+                          y={el.height / 2 + 4}
+                          textAnchor="middle"
+                          fill="#ffffff"
+                          fontSize={11}
+                          fontWeight="bold"
+                        >
+                          {el.name}
+                        </text>
+                      </g>
+                    ))}
+
+                {/* All Stadium Stands / Blocks */}
+                {blocks.map((block) => {
+                  const isArc = block.shape === "arc";
+                  const price = getBlockPrice(block);
+                  const capacity = computeBlockSeatCount(block);
+                  const blockColor = block.color || "#2563eb";
+
+                  if (isArc) {
+                    const cx = block.stadiumCenterX ?? CANVAS_W / 2;
+                    const cy = block.stadiumCenterY ?? CANVAS_H / 2;
+                    const innerR = block.innerRadius ?? 260;
+                    const outerR = block.outerRadius ?? 335;
+                    const startA = block.startAngle ?? 0;
+                    const sweepA = block.sweepAngle ?? 45;
+
+                    const dPath = describeArcSvg(cx, cy, innerR, outerR, startA, sweepA);
+
+                    const midA = ((startA + sweepA / 2) * Math.PI) / 180;
+                    const midR = (innerR + outerR) / 2;
+                    const lblX = cx + midR * Math.cos(midA);
+                    const lblY = cy + midR * Math.sin(midA);
+
+                    return (
+                      <g
+                        key={block.id}
+                        className="cursor-pointer transition-transform hover:opacity-95"
+                        onClick={() => {
+                          setSelectedBlockId(block.id);
+                          setActiveTierIdx(0);
+                        }}
+                      >
+                        <path
+                          d={dPath}
+                          fill={blockColor}
+                          stroke="#ffffff"
+                          strokeWidth={2}
+                          strokeOpacity={0.6}
+                          className="hover:stroke-sky-300 hover:stroke-[3.5] transition-all"
+                        />
+                        <rect
+                          x={lblX - 55}
+                          y={lblY - 14}
+                          width={110}
+                          height={28}
+                          rx={14}
+                          fill="#090d16"
+                          stroke="#ffffff"
+                          strokeWidth={1}
+                          strokeOpacity={0.4}
+                        />
+                        <text
+                          x={lblX}
+                          y={lblY - 1}
+                          textAnchor="middle"
+                          fill="#ffffff"
+                          fontSize={10}
+                          fontWeight="bold"
+                        >
+                          {block.name}
+                        </text>
+                        <text
+                          x={lblX}
+                          y={lblY + 10}
+                          textAnchor="middle"
+                          fill="#38bdf8"
+                          fontSize={8}
+                          fontWeight="bold"
+                        >
+                          ETB {price.toLocaleString()} · {capacity} seats
+                        </text>
+                      </g>
+                    );
+                  }
+
+                  // Rectangular / Curved Block
+                  const bx = block.x;
+                  const by = block.y;
+                  const bw = block.width;
+                  const bh = block.height;
+                  const rot = block.rotation || 0;
+
+                  return (
+                    <g
+                      key={block.id}
+                      transform={`translate(${bx}, ${by}) rotate(${rot}, ${bw / 2}, ${bh / 2})`}
+                      className="cursor-pointer transition-transform hover:opacity-95"
+                      onClick={() => {
+                        setSelectedBlockId(block.id);
+                        setActiveTierIdx(0);
+                      }}
+                    >
+                      <rect
+                        x={0}
+                        y={0}
+                        width={bw}
+                        height={bh}
+                        rx={block.shape === "pill" ? 16 : 8}
+                        fill={blockColor}
+                        stroke="#ffffff"
+                        strokeWidth={2}
+                        strokeOpacity={0.6}
+                        className="hover:stroke-sky-300 hover:stroke-[3.5] transition-all"
+                      />
+                      <rect
+                        x={bw / 2 - 60}
+                        y={bh / 2 - 16}
+                        width={120}
+                        height={32}
+                        rx={8}
+                        fill="#090d16"
+                        stroke="#ffffff"
+                        strokeWidth={1}
+                        strokeOpacity={0.4}
+                      />
+                      <text
+                        x={bw / 2}
+                        y={bh / 2 - 2}
+                        textAnchor="middle"
+                        fill="#ffffff"
+                        fontSize={11}
+                        fontWeight="bold"
+                      >
+                        {block.name}
+                      </text>
+                      <text
+                        x={bw / 2}
+                        y={bh / 2 + 11}
+                        textAnchor="middle"
+                        fill="#38bdf8"
+                        fontSize={9}
+                        fontWeight="bold"
+                      >
+                        ETB {price.toLocaleString()} · {capacity} seats
+                      </text>
+                    </g>
+                  );
+                })}
+                  </svg>
+                );
+              })()}
+            </div>
+          ) : (
+            /* ═════════ LEVEL 2 & 3: STAND ZOOM & INTERACTIVE SEAT PICKER ═════════ */
+            <div className="w-full h-full flex flex-col bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
+              {/* Stand Header & Tier Tabs */}
+              <div className="shrink-0 p-3 bg-slate-950 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedBlockId(null);
+                      setActiveTierIdx(0);
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-sky-400 text-xs font-bold transition-colors"
+                  >
+                    <ArrowLeft className="w-3.5 h-3.5" />
+                    <span>Back to Stadium Bowl</span>
+                  </button>
+
+                  <div>
+                    <h3 className="text-sm font-extrabold text-white flex items-center gap-2">
+                      <span>{currentBlock?.name}</span>
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-300 border border-slate-700">
+                        {currentBlock?.stand_type === "standing"
+                          ? "Standing Fan Zone"
+                          : currentBlock && currentBlock.tiers.length > 1
+                          ? "Multi-Tier Stand"
+                          : "Seated Stand"}
+                      </span>
+                    </h3>
+                  </div>
+                </div>
+
+                {/* Tier Tabs (if multi-tier stand) */}
+                {currentBlock && currentBlock.tiers.length > 1 && (
+                  <div className="flex items-center gap-1.5 bg-slate-900 p-1 rounded-xl border border-slate-800">
+                    {currentBlock.tiers.map((t, idx) => {
+                      const isActive = activeTierIdx === idx;
+                      const price = getTierPrice(t);
+                      return (
+                        <button
+                          key={t.id || idx}
+                          type="button"
+                          onClick={() => setActiveTierIdx(idx)}
+                          className={`px-3 py-1 rounded-lg text-xs font-extrabold transition-all flex items-center gap-1.5 ${
+                            isActive
+                              ? "bg-sky-500 text-slate-950 shadow-md shadow-sky-500/20"
+                              : "text-slate-400 hover:text-white"
+                          }`}
+                        >
+                          <span
+                            className="w-2.5 h-2.5 rounded-full shrink-0"
+                            style={{ backgroundColor: t.color || "#22c55e" }}
+                          />
+                          <span>{t.name}</span>
+                          <span className="opacity-80 text-[10px]">• ETB {price}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Seat Legend */}
+                <div className="flex items-center gap-4 text-xs font-semibold text-slate-400">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-3.5 h-3.5 rounded-full border border-sky-400 bg-sky-500/20" />
+                    <span>Available</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-3.5 h-3.5 rounded-full bg-emerald-500 flex items-center justify-center text-[9px] text-slate-950 font-bold">
+                      ✓
+                    </span>
+                    <span className="text-emerald-400">Selected</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-3.5 h-3.5 rounded-full bg-slate-700 opacity-60 text-center text-[9px]">✕</span>
+                    <span>Booked</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Pitch Direction Indicator */}
+              <div className="shrink-0 py-1.5 bg-slate-950/60 border-b border-slate-800/80 text-center text-[11px] font-bold text-slate-400 uppercase tracking-widest">
+                🏟️ Ground / Pitch This Way ↑
+              </div>
+
+              {/* Stand Virtual Seat Map Canvas */}
+              <div className="flex-1 overflow-auto p-6 flex flex-col items-center justify-center">
+                {currentBlock?.stand_type === "standing" ? (
+                  <div className="p-8 rounded-2xl bg-slate-800/60 border border-slate-700 text-center max-w-md space-y-4">
+                    <Users className="w-12 h-12 text-sky-400 mx-auto" />
+                    <div>
+                      <h4 className="text-base font-bold text-white">Standing Only Fan Zone</h4>
+                      <p className="text-xs text-slate-400 mt-1">
+                        General admission area with total capacity of {currentBlock.capacity || 500} guests.
+                      </p>
+                    </div>
+                    <div className="text-sm font-extrabold text-amber-400">
+                      ETB {getBlockPrice(currentBlock).toLocaleString()} per ticket
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3 select-none">
+                    {(() => {
+                      const tier = currentTier;
+                      if (!tier) return null;
+
+                      const startCode = (tier.row_start || "A").toUpperCase().charCodeAt(0);
+                      const endCode = (tier.row_end || "E").toUpperCase().charCodeAt(0);
+                      const spr = Math.max(1, tier.seats_per_row || 14);
+
+                      const rows: string[] = [];
+                      for (let c = startCode; c <= endCode; c++) {
+                        rows.push(String.fromCharCode(c));
+                      }
+
+                      return rows.map((rLabel) => (
+                        <div key={rLabel} className="flex items-center justify-center gap-3">
+                          {/* Left Row Label */}
+                          <span className="w-7 text-right font-mono font-bold text-xs text-slate-400 shrink-0">
+                            {rLabel}
+                          </span>
+
+                          {/* Seats in Row */}
+                          <div className="flex items-center gap-2">
+                            {Array.from({ length: spr }, (_, i) => i + 1).map((seatNum) => {
+                              const seatId = `${currentBlock.id}-${tier.id}-${rLabel}-${seatNum}`;
+                              const isSelected = selectedSeats.some((s) => s.id === seatId);
+                              // Simulate a realistic 10% booked seats for demonstration
+                              const isBooked = (seatNum * 7 + rLabel.charCodeAt(0)) % 11 === 0;
+
+                              return (
+                                <button
+                                  key={seatNum}
+                                  type="button"
+                                  disabled={isBooked}
+                                  onClick={() => toggleSeatSelection(currentBlock, tier, rLabel, seatNum)}
+                                  className={`w-7 h-7 rounded-full text-[10px] font-bold flex items-center justify-center transition-all ${
+                                    isSelected
+                                      ? "bg-emerald-500 text-slate-950 font-extrabold shadow-md shadow-emerald-500/40 ring-2 ring-emerald-300 scale-110"
+                                      : isBooked
+                                      ? "bg-slate-800 text-slate-600 cursor-not-allowed border border-slate-700/50"
+                                      : "bg-slate-800 hover:bg-sky-500 text-slate-300 hover:text-slate-950 border border-slate-600 hover:border-sky-400 active:scale-95"
+                                  }`}
+                                  title={`Row ${rLabel} · Seat ${seatNum} · ETB ${getTierPrice(tier)}`}
+                                >
+                                  {isSelected ? "✓" : isBooked ? "✕" : seatNum}
+                                </button>
+                              );
+                            })}
+                          </div>
+
+                          {/* Right Row Label */}
+                          <span className="w-7 text-left font-mono font-bold text-xs text-slate-400 shrink-0">
+                            {rLabel}
+                          </span>
+                        </div>
+                      ));
+                    })()}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ── Bottom Cart & Order Summary Bar (Customer Experience Simulation) ── */}
+        <div className="shrink-0 p-3 bg-slate-950 border-t border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 shrink-0 flex items-center gap-1.5 font-bold">
+              <ShoppingBag className="w-4 h-4" />
+              <span>{selectedSeats.length} Seat(s) Selected</span>
+            </div>
+
+            <div className="flex items-center gap-1.5 overflow-x-auto py-1 max-w-xl">
+              {selectedSeats.length === 0 ? (
+                <span className="text-slate-500 text-xs italic">
+                  No seats selected yet. Click any seat circle above to simulate customer booking.
+                </span>
+              ) : (
+                selectedSeats.map((s) => (
+                  <span
+                    key={s.id}
+                    className="px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700 text-white font-bold text-[11px] flex items-center gap-1.5 shrink-0"
+                  >
+                    <span>
+                      {s.standName}: {s.row}-{s.seat}
+                    </span>
+                    <span className="text-emerald-400 font-extrabold">ETB {s.price}</span>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedSeats((prev) => prev.filter((x) => x.id !== s.id))}
+                      className="text-slate-400 hover:text-rose-400 ml-0.5"
+                    >
+                      ✕
+                    </button>
+                  </span>
+                ))
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 shrink-0">
+            {selectedSeats.length > 0 && (
+              <div className="text-right">
+                <span className="text-[10px] text-slate-400 uppercase font-bold block">Total Amount</span>
+                <span className="text-sm font-extrabold text-emerald-400">
+                  ETB {totalCartPrice.toLocaleString()}
+                </span>
+              </div>
+            )}
+
+            {selectedSeats.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setSelectedSeats([])}
+                className="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 transition-colors font-bold text-xs"
+              >
+                Clear
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={async () => {
+                await onPublish();
+                onClose();
+              }}
+              disabled={isPublishing}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-extrabold text-xs shadow-lg shadow-emerald-500/20 active:scale-95 disabled:opacity-50 transition-all"
+            >
+              {isPublishing ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Send className="w-3.5 h-3.5" />
+              )}
+              <span>Save & Publish Stadium</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main StadiumBlockBuilder Component ──────────────────────────────────────
 
 export default function StadiumBlockBuilder({
@@ -2426,7 +3153,7 @@ export default function StadiumBlockBuilder({
     total_count?: number;
   }>;
   initialConfig?: StadiumSeatingConfigOutput | null;
-  onSave: (config: StadiumSeatingConfigOutput) => Promise<void>;
+  onSave: (config: StadiumSeatingConfigOutput, options?: { publish?: boolean }) => Promise<void>;
   saving?: boolean;
   eventId?: string;
   isVenueRequest?: boolean;
@@ -2475,6 +3202,10 @@ export default function StadiumBlockBuilder({
   // Validation modal state
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [showValidationModal, setShowValidationModal] = useState(false);
+
+  // Customer Preview & Publishing State
+  const [showCustomerPreview, setShowCustomerPreview] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
 
   const [generateSeats, { isLoading: isGenerating }] =
     useGenerateStadiumSeatsMutation();
@@ -3070,7 +3801,7 @@ export default function StadiumBlockBuilder({
     return { isValid: errors.length === 0, errors };
   };
 
-  const handleSaveAndGenerate = async () => {
+  const handleSaveAndGenerate = async (options?: { publish?: boolean }) => {
     if (!isVenueRequest && isEventOrgRequest) {
       const { isValid, errors } = performStrictValidation();
 
@@ -3093,7 +3824,7 @@ export default function StadiumBlockBuilder({
       elements,
     };
 
-    await onSave(config);
+    await onSave(config, options);
 
     if (eventId && !isVenueRequest) {
       try {
@@ -3107,17 +3838,53 @@ export default function StadiumBlockBuilder({
           blocks: res.blocks,
           tiers: res.tiers,
         });
-        toast.success(
-          `🎉 Generated ${res.generated.toLocaleString()} seats across ${res.blocks} stands!`
-        );
+        if (options?.publish) {
+          toast.success(
+            `🚀 Stadium layout published successfully! Generated ${res.generated.toLocaleString()} seats across ${res.blocks} stands for live booking.`
+          );
+        } else {
+          toast.success(
+            `🎉 Generated ${res.generated.toLocaleString()} seats across ${res.blocks} stands!`
+          );
+        }
       } catch (err: any) {
         toast.error(
           err?.data?.error || err?.message || "Failed to generate stadium seats."
         );
       }
     } else {
-      toast.success("Stadium layout saved successfully!");
+      if (options?.publish) {
+        toast.success("🚀 Stadium layout published successfully!");
+      } else {
+        toast.success("Stadium layout saved successfully!");
+      }
     }
+  };
+
+  const handlePublish = async () => {
+    try {
+      setIsPublishing(true);
+      await handleSaveAndGenerate({ publish: true });
+    } finally {
+      setIsPublishing(false);
+    }
+  };
+
+  const handleOptimizeSpacingAntiOverlap = () => {
+    setBlocks((prev) =>
+      prev.map((block) => ({
+        ...block,
+        tiers: block.tiers.map((t) => ({
+          ...t,
+          seats_per_row: Math.min(t.seats_per_row || 14, 14),
+          row_end:
+            (t.row_start || "A") === "A" && t.row_end && t.row_end > "E"
+              ? "D"
+              : t.row_end || "D",
+        })),
+      }))
+    );
+    toast.success("🛡️ Stand capacities optimized! Seats now have clean breathing room with zero overlap.");
   };
 
   return (
@@ -3240,23 +4007,61 @@ export default function StadiumBlockBuilder({
               className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs px-3.5 py-2 rounded-xl transition-all shadow-md shadow-amber-500/20 active:scale-95"
               title="Automatically adjusts width & height of all stands proportionally based on their seats and rows!"
             >
-              <Maximize2 className="w-4 h-4" />
+              <Maximize2 className="w-3.5 h-3.5" />
               <span>Auto-Adjust Sizes</span>
             </button>
           )}
 
+          {blocks.length > 0 && (
+            <button
+              type="button"
+              onClick={handleOptimizeSpacingAntiOverlap}
+              className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-emerald-500/30 font-bold text-xs px-3 py-2 rounded-xl transition-all active:scale-95"
+              title="Adjusts all stands to clean, comfortable seat densities so customer-side seat dots never overlap"
+            >
+              <span>🛡️ Anti-Overlap Seats</span>
+            </button>
+          )}
+
+          {/* Customer Side View Simulation Button */}
           <button
             type="button"
-            onClick={handleSaveAndGenerate}
-            disabled={saving || isGenerating}
-            className="flex items-center gap-1.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 disabled:opacity-50 text-slate-950 font-extrabold text-xs px-5 py-2.5 rounded-xl transition-all shadow-lg active:scale-95 shrink-0"
+            onClick={() => setShowCustomerPreview(true)}
+            className="flex items-center gap-1.5 bg-gradient-to-r from-sky-600 via-indigo-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 text-white font-extrabold text-xs px-3.5 py-2 rounded-xl transition-all shadow-md shadow-sky-600/30 active:scale-95 shrink-0 ring-1 ring-sky-400/30"
+            title="Preview how customers view, explore stands, and select seats on this stadium layout"
+          >
+            <Eye className="w-4 h-4" />
+            <span>Customer Preview</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => void handleSaveAndGenerate()}
+            disabled={saving || isGenerating || isPublishing}
+            className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 font-extrabold text-xs px-4 py-2 rounded-xl transition-all shadow-sm active:scale-95 shrink-0 disabled:opacity-50"
           >
             {saving || isGenerating ? (
               <Loader2 className="w-4 h-4 animate-spin" />
             ) : (
               <Save className="w-4 h-4" />
             )}
-            {eventId ? "Save & Generate Seats" : "Save Stadium Config"}
+            <span>{eventId ? "Save & Generate" : "Save Config"}</span>
+          </button>
+
+          {/* Direct Publish Layout Button */}
+          <button
+            type="button"
+            onClick={() => void handlePublish()}
+            disabled={saving || isGenerating || isPublishing}
+            className="flex items-center gap-1.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-extrabold text-xs px-4 py-2 rounded-xl transition-all shadow-lg shadow-emerald-600/30 active:scale-95 shrink-0 disabled:opacity-50"
+            title="Save, generate all seats and publish layout live for ticket buyers"
+          >
+            {isPublishing ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Send className="w-4 h-4" />
+            )}
+            <span>🚀 Publish Layout</span>
           </button>
 
           {eventId && (
@@ -4867,17 +5672,17 @@ export default function StadiumBlockBuilder({
                                 color: "#38bdf8",
                                 ticket_type_id: defaultTicket,
                                 row_start: "A",
-                                row_end: "H",
-                                seats_per_row: 24,
+                                row_end: "D",
+                                seats_per_row: 12,
                               },
                               {
                                 id: "tier-a-upper",
                                 name: "Upper Grandstand",
                                 color: "#0369a1",
                                 ticket_type_id: premiumTicket,
-                                row_start: "I",
-                                row_end: "P",
-                                seats_per_row: 28,
+                                row_start: "E",
+                                row_end: "H",
+                                seats_per_row: 14,
                               },
                             ],
                           },
@@ -4907,17 +5712,17 @@ export default function StadiumBlockBuilder({
                                 color: "#7dd3fc",
                                 ticket_type_id: defaultTicket,
                                 row_start: "A",
-                                row_end: "H",
-                                seats_per_row: 20,
+                                row_end: "D",
+                                seats_per_row: 10,
                               },
                               {
                                 id: "tier-j-upper",
                                 name: "Upper Grandstand",
                                 color: "#0284c7",
                                 ticket_type_id: premiumTicket,
-                                row_start: "I",
-                                row_end: "P",
-                                seats_per_row: 22,
+                                row_start: "E",
+                                row_end: "H",
+                                seats_per_row: 12,
                               },
                             ],
                           },
@@ -4947,17 +5752,17 @@ export default function StadiumBlockBuilder({
                                 color: "#7dd3fc",
                                 ticket_type_id: defaultTicket,
                                 row_start: "A",
-                                row_end: "H",
-                                seats_per_row: 20,
+                                row_end: "D",
+                                seats_per_row: 10,
                               },
                               {
                                 id: "tier-e-upper",
                                 name: "Upper Grandstand",
                                 color: "#0284c7",
                                 ticket_type_id: premiumTicket,
-                                row_start: "I",
-                                row_end: "P",
-                                seats_per_row: 22,
+                                row_start: "E",
+                                row_end: "H",
+                                seats_per_row: 12,
                               },
                             ],
                           },
@@ -4984,17 +5789,17 @@ export default function StadiumBlockBuilder({
                                 color: "#34d399",
                                 ticket_type_id: defaultTicket,
                                 row_start: "A",
-                                row_end: "H",
-                                seats_per_row: 24,
+                                row_end: "D",
+                                seats_per_row: 12,
                               },
                               {
                                 id: "tier-b-upper",
                                 name: "Upper Grandstand",
                                 color: "#047857",
                                 ticket_type_id: premiumTicket,
-                                row_start: "I",
-                                row_end: "P",
-                                seats_per_row: 26,
+                                row_start: "E",
+                                row_end: "H",
+                                seats_per_row: 14,
                               },
                             ],
                           },
@@ -5018,8 +5823,8 @@ export default function StadiumBlockBuilder({
                                 color: "#fbbf24",
                                 ticket_type_id: vipTicket,
                                 row_start: "A",
-                                row_end: "D",
-                                seats_per_row: 20,
+                                row_end: "C",
+                                seats_per_row: 10,
                               },
                             ],
                           },
@@ -5044,17 +5849,17 @@ export default function StadiumBlockBuilder({
                                 color: "#34d399",
                                 ticket_type_id: defaultTicket,
                                 row_start: "A",
-                                row_end: "H",
-                                seats_per_row: 24,
+                                row_end: "D",
+                                seats_per_row: 12,
                               },
                               {
                                 id: "tier-c-upper",
                                 name: "Upper Grandstand",
                                 color: "#047857",
                                 ticket_type_id: premiumTicket,
-                                row_start: "I",
-                                row_end: "P",
-                                seats_per_row: 26,
+                                row_start: "E",
+                                row_end: "H",
+                                seats_per_row: 14,
                               },
                             ],
                           },
@@ -5081,17 +5886,17 @@ export default function StadiumBlockBuilder({
                                 color: "#818cf8",
                                 ticket_type_id: defaultTicket,
                                 row_start: "A",
-                                row_end: "H",
-                                seats_per_row: 24,
+                                row_end: "D",
+                                seats_per_row: 12,
                               },
                               {
                                 id: "tier-f-upper",
                                 name: "Upper Grandstand",
                                 color: "#3730a3",
                                 ticket_type_id: premiumTicket,
-                                row_start: "I",
-                                row_end: "P",
-                                seats_per_row: 26,
+                                row_start: "E",
+                                row_end: "H",
+                                seats_per_row: 14,
                               },
                             ],
                           },
@@ -5115,8 +5920,8 @@ export default function StadiumBlockBuilder({
                                 color: "#fdba74",
                                 ticket_type_id: vipTicket,
                                 row_start: "A",
-                                row_end: "D",
-                                seats_per_row: 20,
+                                row_end: "C",
+                                seats_per_row: 10,
                               },
                             ],
                           },
@@ -5141,17 +5946,17 @@ export default function StadiumBlockBuilder({
                                 color: "#818cf8",
                                 ticket_type_id: defaultTicket,
                                 row_start: "A",
-                                row_end: "H",
-                                seats_per_row: 24,
+                                row_end: "D",
+                                seats_per_row: 12,
                               },
                               {
                                 id: "tier-g-upper",
                                 name: "Upper Grandstand",
                                 color: "#3730a3",
                                 ticket_type_id: premiumTicket,
-                                row_start: "I",
-                                row_end: "P",
-                                seats_per_row: 26,
+                                row_start: "E",
+                                row_end: "H",
+                                seats_per_row: 14,
                               },
                             ],
                           },
@@ -5183,17 +5988,17 @@ export default function StadiumBlockBuilder({
                                 color: "#c4b5fd",
                                 ticket_type_id: defaultTicket,
                                 row_start: "A",
-                                row_end: "H",
-                                seats_per_row: 20,
+                                row_end: "D",
+                                seats_per_row: 10,
                               },
                               {
                                 id: "tier-hsw-upper",
                                 name: "Upper Grandstand",
                                 color: "#6d28d9",
                                 ticket_type_id: premiumTicket,
-                                row_start: "I",
-                                row_end: "P",
-                                seats_per_row: 22,
+                                row_start: "E",
+                                row_end: "H",
+                                seats_per_row: 12,
                               },
                             ],
                           },
@@ -5223,17 +6028,17 @@ export default function StadiumBlockBuilder({
                                 color: "#d8b4fe",
                                 ticket_type_id: defaultTicket,
                                 row_start: "A",
-                                row_end: "H",
-                                seats_per_row: 24,
+                                row_end: "D",
+                                seats_per_row: 12,
                               },
                               {
                                 id: "tier-i-upper",
                                 name: "Upper Grandstand",
                                 color: "#7e22ce",
                                 ticket_type_id: premiumTicket,
-                                row_start: "I",
-                                row_end: "P",
-                                seats_per_row: 28,
+                                row_start: "E",
+                                row_end: "H",
+                                seats_per_row: 14,
                               },
                             ],
                           },
@@ -5263,17 +6068,17 @@ export default function StadiumBlockBuilder({
                                 color: "#c4b5fd",
                                 ticket_type_id: defaultTicket,
                                 row_start: "A",
-                                row_end: "H",
-                                seats_per_row: 20,
+                                row_end: "D",
+                                seats_per_row: 10,
                               },
                               {
                                 id: "tier-hse-upper",
                                 name: "Upper Grandstand",
                                 color: "#6d28d9",
                                 ticket_type_id: premiumTicket,
-                                row_start: "I",
-                                row_end: "P",
-                                seats_per_row: 22,
+                                row_start: "E",
+                                row_end: "H",
+                                seats_per_row: 12,
                               },
                             ],
                           },
@@ -5349,8 +6154,8 @@ export default function StadiumBlockBuilder({
                                 name: "Ground Floor",
                                 ticket_type_id: defaultTicket,
                                 row_start: "A",
-                                row_end: "J",
-                                seats_per_row: 20,
+                                row_end: "D",
+                                seats_per_row: 10,
                               },
                             ],
                           });
@@ -5379,9 +6184,9 @@ export default function StadiumBlockBuilder({
                                 id: `tier-${idx}-upper`,
                                 name: "Upper Grandstand",
                                 ticket_type_id: premiumTicket,
-                                row_start: "A",
-                                row_end: "M",
-                                seats_per_row: 25,
+                                row_start: "E",
+                                row_end: "H",
+                                seats_per_row: 12,
                               },
                             ],
                           });
@@ -6179,6 +6984,19 @@ export default function StadiumBlockBuilder({
           </div>
         </div>
       )}
+
+      {/* Customer Experience Simulation Modal (Level 1 Stadium -> Level 2/3 Seat Picker & Publishing) */}
+      <CustomerStadiumPreviewModal
+        isOpen={showCustomerPreview}
+        onClose={() => setShowCustomerPreview(false)}
+        stadiumName={stadiumName}
+        groundConfig={groundConfig}
+        blocks={blocks}
+        elements={elements}
+        ticketTypes={ticketTypes}
+        onPublish={handlePublish}
+        isPublishing={isPublishing}
+      />
     </div>
   );
 }

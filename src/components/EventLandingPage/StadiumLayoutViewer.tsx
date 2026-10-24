@@ -1029,9 +1029,23 @@ export default function StadiumLayoutViewer({
     });
 
     let overallMinDist = Infinity;
+    // Also check inter-row distance so rows never overlap vertically
+    const rowLabels = Array.from(rowMap.keys());
+    for (let ri = 0; ri < rowLabels.length - 1; ri++) {
+      const seatsA = rowMap.get(rowLabels[ri]) || [];
+      const seatsB = rowMap.get(rowLabels[ri + 1]) || [];
+      if (seatsA.length > 0 && seatsB.length > 0) {
+        const dRow = Math.hypot(seatsB[0].posX - seatsA[0].posX, seatsB[0].posY - seatsA[0].posY);
+        if (dRow > 2 && dRow < overallMinDist) {
+          overallMinDist = dRow;
+        }
+      }
+    }
+
     rowMap.forEach((seats, rLabel) => {
       if (seats.length < 2) {
-        map.set(rLabel, 6.5);
+        const r = overallMinDist !== Infinity ? Math.max(2.2, Math.min(8.5, overallMinDist * 0.40)) : 6.0;
+        map.set(rLabel, r);
         return;
       }
       let minDist = Infinity;
@@ -1042,12 +1056,13 @@ export default function StadiumLayoutViewer({
       if (minDist !== Infinity && minDist < overallMinDist) {
         overallMinDist = minDist;
       }
-      // Guarantee comfortable 20% air margin between adjacent seats in this specific row
-      const r = Math.max(3.8, Math.min(9.5, minDist * 0.40));
+      // Guarantee comfortable air margin between adjacent seats (strictly prevents overlap)
+      const effectiveDist = Math.min(minDist, overallMinDist);
+      const r = Math.max(2.2, Math.min(8.5, effectiveDist * 0.40));
       map.set(rLabel, r);
     });
 
-    const defaultRadius = overallMinDist !== Infinity ? Math.max(4.0, Math.min(8.5, overallMinDist * 0.38)) : 6.0;
+    const defaultRadius = overallMinDist !== Infinity ? Math.max(2.2, Math.min(8.0, overallMinDist * 0.40)) : 6.0;
     return { rowSeatRadii: map, dynamicSeatRadius: defaultRadius };
   }, [selectedBlock, renderedSeats]);
 

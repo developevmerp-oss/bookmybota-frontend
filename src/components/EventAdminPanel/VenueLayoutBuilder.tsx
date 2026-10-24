@@ -3462,12 +3462,12 @@ export default function VenueLayoutBuilder({
                     : null
                 }
                 saving={isSaving}
-                onSave={async (stadiumConfig) => {
+                onSave={async (stadiumConfig, options) => {
                   if (venueAdapter) {
                     await venueAdapter.onSave({
                       seating_config: stadiumConfig as any,
                       seats: [],
-                    });
+                    }, { publish: options?.publish ?? true });
                     return;
                   }
                   if (eventId) {

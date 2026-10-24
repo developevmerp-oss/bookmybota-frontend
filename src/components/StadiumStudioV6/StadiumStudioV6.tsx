@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
-import { Stage, Layer, Rect, Circle, Line, Text, Group, Arc, Transformer, Image as KonvaImage } from "react-konva";
+import React, { useState, useRef, useMemo, useCallback } from "react";
+import { Stage, Layer, Rect, Circle, Line, Text, Group, Shape, Image as KonvaImage } from "react-konva";
 import useImage from "use-image";
 import Konva from "konva";
 import { toast } from "sonner";
@@ -21,12 +21,12 @@ import {
   ZoomOut,
   Maximize2,
   FileImage,
-  Tag,
-  CheckCircle2,
   DollarSign,
   Grid,
-  ChevronRight,
-  ShieldCheck,
+  ChevronLeft,
+  Eye,
+  CheckCircle2,
+  Sparkles,
 } from "lucide-react";
 import {
   BMSVenueArchetype,
@@ -46,6 +46,8 @@ import BMSV4MiniMap from "../StadiumStudioV4/BMSV4MiniMap";
 
 export const CANVAS_W = 1600;
 export const CANVAS_H = 1200;
+const CENTER_X = CANVAS_W / 2;
+const CENTER_Y = CANVAS_H / 2;
 
 interface StadiumStudioV6Props {
   eventId?: string;
@@ -72,9 +74,8 @@ export default function StadiumStudioV6({
   onSave,
   onClose,
 }: StadiumStudioV6Props) {
-  // ── 1. ACTIVE MASTER VENUE STATE ──
+  // ── 1. ACTIVE MASTER VENUE SELECTION ──
   const [selectedTemplateKey, setSelectedTemplateKey] = useState<string>("addis_ababa_stadium");
-
   const activeTemplate = MASTER_VENUE_TEMPLATES[selectedTemplateKey] || MASTER_VENUE_TEMPLATES.addis_ababa_stadium;
 
   const [venueName, setVenueName] = useState<string>(
@@ -93,29 +94,29 @@ export default function StadiumStudioV6({
     initialConfig?.amenities || activeTemplate.amenities
   );
 
-  // Blueprint background tracing layer
-  const [blueprintUrl, setBlueprintUrl] = useState<string | null>(
-    initialConfig?.blueprintUrl || null
-  );
-  const [blueprintOpacity, setBlueprintOpacity] = useState<number>(
-    initialConfig?.blueprintOpacity ?? 0.35
-  );
+  // Background blueprint tracing layer
+  const [blueprintUrl, setBlueprintUrl] = useState<string | null>(initialConfig?.blueprintUrl || null);
+  const [blueprintOpacity, setBlueprintOpacity] = useState<number>(initialConfig?.blueprintOpacity ?? 0.35);
   const [blueprintImg] = useImage(blueprintUrl || "", "anonymous");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Active selection
-  const [selectedSectionId, setSelectedSectionId] = useState<string | null>(
-    sections[0]?.id || null
-  );
-  const [selectedAmenityId, setSelectedAmenityId] = useState<string | null>(null);
+  // ── 2. VIEWPORT MODES (MACRO STADIUM VIEW vs DRILLDOWN STAND VIEW) ──
+  // BookMyShow Style: Top level shows architectural Stand Sectors; clicking a stand drills down to seat grid!
+  const [viewMode, setViewMode] = useState<"macro" | "drilldown">("macro");
+  const [drilldownSectionId, setDrilldownSectionId] = useState<string | null>(null);
+  const [hoveredSectionId, setHoveredSectionId] = useState<string | null>(null);
+  const [selectedSectionId, setSelectedSectionId] = useState<string | null>(sections[0]?.id || null);
 
-  // Canvas Viewport & Tooling
+  // Filter by price tier
+  const [activePriceFilter, setActivePriceFilter] = useState<number | null>(null);
+
+  // Canvas Stage & Zoom/Pan state
   const stageRef = useRef<Konva.Stage>(null);
-  const [scale, setScale] = useState<number>(0.9);
-  const [stagePos, setStagePos] = useState<{ x: number; y: number }>({ x: 80, y: 30 });
+  const [scale, setScale] = useState<number>(0.85);
+  const [stagePos, setStagePos] = useState<{ x: number; y: number }>({ x: 60, y: 30 });
   const [toolMode, setToolMode] = useState<"select" | "pan">("select");
 
-  // History Stack
+  // History stack
   const [history, setHistory] = useState<Array<{
     sections: BMSSectionDefV4[];
     amenities: BMSAmenityPOIV4[];
@@ -150,7 +151,7 @@ export default function StadiumStudioV6({
       setSections(JSON.parse(JSON.stringify(target.sections)));
       setAmenities(JSON.parse(JSON.stringify(target.amenities)));
       setGroundConfig(JSON.parse(JSON.stringify(target.groundConfig)));
-      setHistoryIndex((prev) => prev + 1);
+      setHistoryIndex((prev) => prev - 1);
       toast.info("Redo change");
     }
   };
@@ -167,16 +168,45 @@ export default function StadiumStudioV6({
     setSections(tmpl.sections);
     setAmenities(tmpl.amenities);
     setSelectedSectionId(tmpl.sections[0]?.id || null);
-    setSelectedAmenityId(null);
+    setViewMode("macro");
+    setDrilldownSectionId(null);
+    setScale(0.85);
+    setStagePos({ x: 60, y: 30 });
     toast.success(`Loaded Master Blueprint: ${tmpl.name}`);
+  };
+
+  // Drilldown to specific stand
+  const handleDrilldownStand = (secId: string) => {
+    const sec = sections.find((s) => s.id === secId);
+    if (!sec) return;
+    setSelectedSectionId(secId);
+    setDrilldownSectionId(secId);
+    setViewMode("drilldown");
+
+    // Center camera on the stand
+    const targetX = sec.x || CENTER_X;
+    const targetY = sec.y || CENTER_Y;
+    setScale(1.6);
+    setStagePos({
+      x: -targetX * 1.6 + (typeof window !== "undefined" ? window.innerWidth - 650 : 1000) / 2,
+      y: -targetY * 1.6 + (typeof window !== "undefined" ? window.innerHeight - 150 : 800) / 2,
+    });
+    toast.info(`Drilled down to ${sec.name}`);
+  };
+
+  const handleReturnToMacro = () => {
+    setViewMode("macro");
+    setDrilldownSectionId(null);
+    setScale(0.85);
+    setStagePos({ x: 60, y: 30 });
   };
 
   // Zoom controls
   const handleZoomIn = () => setScale((s) => Math.min(3, s + 0.15));
   const handleZoomOut = () => setScale((s) => Math.max(0.3, s - 0.15));
   const handleResetZoom = () => {
-    setScale(0.9);
-    setStagePos({ x: 80, y: 30 });
+    setScale(0.85);
+    setStagePos({ x: 60, y: 30 });
   };
 
   // Compute all physical seats
@@ -184,7 +214,7 @@ export default function StadiumStudioV6({
     return generateAllSeatsV4(sections, ticketTypes);
   }, [sections, ticketTypes]);
 
-  // Group seats by section for Konva rendering
+  // Group seats by section
   const seatsBySection = useMemo(() => {
     const map = new Map<string, GeneratedSeatV4[]>();
     for (const seat of allGeneratedSeats) {
@@ -195,18 +225,27 @@ export default function StadiumStudioV6({
     return map;
   }, [allGeneratedSeats]);
 
-  // Real-time capacity and gross metrics
+  // Capacity and pricing summary
   const capacitySummary = useMemo(() => {
     return computeBMSCapacitySummaryV4(sections, ticketTypes);
   }, [sections, ticketTypes]);
+
+  // Distinct price tiers
+  const priceTiers = useMemo(() => {
+    const prices = new Set<number>();
+    sections.forEach((s) => {
+      if (s.price && s.price > 0) prices.add(s.price);
+    });
+    return Array.from(prices).sort((a, b) => b - a);
+  }, [sections]);
 
   // Selected section object
   const selectedSection = useMemo(() => {
     return sections.find((s) => s.id === selectedSectionId) || null;
   }, [sections, selectedSectionId]);
 
-  // Add new Section
-  const handleAddSection = (type: "curved_stand" | "seated_grid" | "general_admission") => {
+  // Add new stand
+  const handleAddStand = (type: "curved_stand" | "seated_grid" | "general_admission") => {
     pushHistorySnapshot();
     const count = sections.length + 1;
     const newId = `sec_ops_${Date.now()}`;
@@ -215,62 +254,62 @@ export default function StadiumStudioV6({
     if (type === "curved_stand") {
       newSec = {
         id: newId,
-        name: `Curved Stand ${count}`,
+        name: `Stand Sector ${count}`,
         code: `SEC-${count}`,
         sectionType: "curved_stand",
-        color: "#8b5cf6",
-        x: 800,
-        y: 600,
+        color: "#f43f5e",
+        x: CENTER_X,
+        y: CENTER_Y,
         width: 400,
         height: 120,
         rotation: 0,
         shape: "arc",
-        innerRadius: 240,
+        innerRadius: 230,
         outerRadius: 360,
-        startAngle: 0,
-        sweepAngle: 90,
+        startAngle: (count * 45) % 360,
+        sweepAngle: 60,
         rowStart: "A",
-        rowEnd: "J",
-        seatsPerRow: 24,
+        rowEnd: "K",
+        seatsPerRow: 26,
         gateEntrance: `Turnstile Gate ${count}`,
-        price: 300,
+        price: 350,
       };
     } else if (type === "general_admission") {
       newSec = {
         id: newId,
-        name: `General Admission Standing Zone ${count}`,
+        name: `Standing Lawn ${count}`,
         code: `GA-${count}`,
         sectionType: "general_admission",
         color: "#10b981",
-        x: 800,
-        y: 500,
-        width: 450,
-        height: 150,
+        x: CENTER_X,
+        y: 450,
+        width: 460,
+        height: 140,
         rotation: 0,
         shape: "rectangle",
-        standingCapacity: 1000,
+        standingCapacity: 1500,
         gateEntrance: `Concourse Gate ${count}`,
         price: 200,
       };
     } else {
       newSec = {
         id: newId,
-        name: `Seated Grid Stand ${count}`,
+        name: `Seated Grid Tier ${count}`,
         code: `SEC-${count}`,
         sectionType: "seated_grid",
         color: "#3b82f6",
-        x: 800,
-        y: 500,
+        x: CENTER_X,
+        y: 480,
         width: 480,
         height: 160,
         rotation: 0,
         shape: "rectangle",
         rowStart: "A",
-        rowEnd: "H",
-        seatsPerRow: 20,
-        aisleGaps: [10],
+        rowEnd: "J",
+        seatsPerRow: 22,
+        aisleGaps: [11],
         gateEntrance: `Gate ${count}`,
-        price: 350,
+        price: 400,
       };
     }
 
@@ -279,24 +318,7 @@ export default function StadiumStudioV6({
     toast.success(`Added ${newSec.name}`);
   };
 
-  // Add Turnstile Gate POI
-  const handleAddGate = () => {
-    pushHistorySnapshot();
-    const count = amenities.filter((a) => a.type === "gate").length + 1;
-    const newAm: BMSAmenityPOIV4 = {
-      id: `amen_gate_${Date.now()}`,
-      type: "gate",
-      label: `Turnstile Gate ${count}`,
-      x: 800,
-      y: 180,
-    };
-    setAmenities((prev) => [...prev, newAm]);
-    setSelectedAmenityId(newAm.id);
-    setSelectedSectionId(null);
-    toast.success(`Added ${newAm.label}`);
-  };
-
-  // Blueprint background upload
+  // Upload blueprint reference
   const handleUploadBlueprint = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -310,7 +332,7 @@ export default function StadiumStudioV6({
     reader.readAsDataURL(file);
   };
 
-  // Save Master Venue Layout
+  // Save Master Venue
   const handleSaveMasterLayout = async () => {
     if (!onSave) {
       toast.info("Master Layout preview saved locally");
@@ -340,7 +362,7 @@ export default function StadiumStudioV6({
 
       await onSave(outputConfig, allGeneratedSeats);
       toast.success(
-        `Published Master Venue "${venueName}"! (${capacitySummary.totalCapacity.toLocaleString()} total capacity across ${sections.length} stands)`
+        `Published Master Venue "${venueName}"! (${capacitySummary.totalCapacity.toLocaleString()} seats across ${sections.length} stands)`
       );
     } catch (err: any) {
       toast.error(err?.message || "Failed to save Master Venue layout");
@@ -349,17 +371,17 @@ export default function StadiumStudioV6({
 
   return (
     <div className="w-full h-full flex flex-col bg-slate-950 text-white select-none overflow-hidden relative font-sans">
-      {/* ── TOP OPERATIONAL HEADER: BOOKMYSHOW VENUE OPS ── */}
+      {/* ── TOP BANNER: BOOKMYSHOW STADIUM OPS HEADER ── */}
       <div className="bg-gradient-to-r from-red-950 via-slate-900 to-slate-950 border-b border-red-500/30 px-4 py-2 flex flex-wrap items-center justify-between gap-3 text-xs shrink-0 shadow-xl shadow-red-950/20">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-red-600/30 border border-red-500/40 text-red-200 font-black tracking-wide uppercase text-[10px]">
             <Building2 className="w-3.5 h-3.5 text-red-400" />
-            <span>PART 1: MASTER VENUE OPS</span>
+            <span>BOOKMYSHOW STADIUM OPS (V6)</span>
           </div>
 
-          {/* Master Venue Selector Dropdown */}
+          {/* Master Venue Selector */}
           <div className="flex items-center gap-2">
-            <span className="text-slate-400 font-medium text-[11px]">Venue Template:</span>
+            <span className="text-slate-400 font-medium text-[11px]">Stadium Template:</span>
             <select
               value={selectedTemplateKey}
               onChange={(e) => handleLoadMasterTemplate(e.target.value)}
@@ -367,7 +389,7 @@ export default function StadiumStudioV6({
             >
               {Object.entries(MASTER_VENUE_TEMPLATES).map(([key, tmpl]) => (
                 <option key={key} value={key}>
-                  {tmpl.name} ({tmpl.totalCapacity.toLocaleString()} Cap)
+                  {tmpl.name} ({tmpl.totalCapacity.toLocaleString()} Seats)
                 </option>
               ))}
             </select>
@@ -391,10 +413,10 @@ export default function StadiumStudioV6({
           </div>
 
           <div className="flex items-center gap-1.5 bg-slate-900/80 px-2.5 py-1 rounded border border-slate-800">
-            <DoorOpen className="w-3.5 h-3.5 text-purple-400" />
-            <span className="text-slate-400">Gates:</span>
-            <span className="font-bold text-purple-300">
-              {amenities.filter((a) => a.type === "gate").length}
+            <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="text-slate-400">Gross Potential:</span>
+            <span className="font-bold text-emerald-300">
+              {capacitySummary.totalGrossRevenue.toLocaleString()} ETB
             </span>
           </div>
 
@@ -404,50 +426,54 @@ export default function StadiumStudioV6({
             className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-md font-bold text-xs bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white shadow-md shadow-red-900/30 transition-all active:scale-95 disabled:opacity-50"
           >
             <Save className="w-3.5 h-3.5" />
-            <span>{saving ? "Saving Master..." : "Publish Master Blueprint"}</span>
+            <span>{saving ? "Publishing..." : "Publish Master Blueprint"}</span>
           </button>
         </div>
       </div>
 
-      {/* ── TOOLBAR: SEATLAYER-STYLE PARAMETRIC ACTIONS ── */}
-      <div className="bg-slate-900/90 border-b border-slate-800 px-4 py-2 flex items-center justify-between text-xs shrink-0">
+      {/* ── SECONDARY TOOLBAR & BMS PRICE TIER FILTER ── */}
+      <div className="bg-slate-900/90 border-b border-slate-800 px-4 py-2 flex flex-wrap items-center justify-between gap-3 text-xs shrink-0">
         <div className="flex items-center gap-2">
-          {/* Quick Add Stand Buttons */}
-          <button
-            onClick={() => handleAddSection("curved_stand")}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 font-medium text-[11px] transition-colors"
-          >
-            <Plus className="w-3.5 h-3.5 text-purple-400" />
-            <span>+ Add Curved Stand</span>
-          </button>
+          {viewMode === "drilldown" ? (
+            <button
+              onClick={handleReturnToMacro}
+              className="flex items-center gap-1.5 px-3 py-1 rounded-md bg-red-600 hover:bg-red-500 text-white font-bold text-xs transition-colors shadow-sm"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              <span>Back to Full Stadium Map</span>
+            </button>
+          ) : (
+            <>
+              {/* Stand Adders */}
+              <button
+                onClick={() => handleAddStand("curved_stand")}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 font-medium text-[11px] transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5 text-purple-400" />
+                <span>+ Add Curved Stand</span>
+              </button>
 
-          <button
-            onClick={() => handleAddSection("seated_grid")}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 font-medium text-[11px] transition-colors"
-          >
-            <Plus className="w-3.5 h-3.5 text-blue-400" />
-            <span>+ Add Grid Stand</span>
-          </button>
+              <button
+                onClick={() => handleAddStand("seated_grid")}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 font-medium text-[11px] transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5 text-blue-400" />
+                <span>+ Add Grid Stand</span>
+              </button>
 
-          <button
-            onClick={() => handleAddSection("general_admission")}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 font-medium text-[11px] transition-colors"
-          >
-            <Plus className="w-3.5 h-3.5 text-emerald-400" />
-            <span>+ Add GA Standing</span>
-          </button>
-
-          <button
-            onClick={handleAddGate}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 font-medium text-[11px] transition-colors"
-          >
-            <DoorOpen className="w-3.5 h-3.5 text-indigo-400" />
-            <span>+ Add Turnstile Gate</span>
-          </button>
+              <button
+                onClick={() => handleAddStand("general_admission")}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 font-medium text-[11px] transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5 text-emerald-400" />
+                <span>+ Add Standing Zone</span>
+              </button>
+            </>
+          )}
 
           <div className="h-4 w-px bg-slate-800 mx-1" />
 
-          {/* Blueprint Reference Upload */}
+          {/* Blueprint reference */}
           <button
             onClick={() => fileInputRef.current?.click()}
             className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-800/80 hover:bg-slate-700 text-slate-300 font-medium text-[11px] border border-slate-700"
@@ -465,7 +491,7 @@ export default function StadiumStudioV6({
 
           {blueprintUrl && (
             <div className="flex items-center gap-1.5 text-[11px] text-slate-400 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
-              <span>Opacity:</span>
+              <span>Guide Opacity:</span>
               <input
                 type="range"
                 min={0}
@@ -477,6 +503,36 @@ export default function StadiumStudioV6({
               />
             </div>
           )}
+        </div>
+
+        {/* BMS Price Tier Filter Chips */}
+        <div className="flex items-center gap-1.5">
+          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+            Filter Price:
+          </span>
+          <button
+            onClick={() => setActivePriceFilter(null)}
+            className={`px-2 py-0.5 rounded-full text-[10px] font-bold transition-all ${
+              activePriceFilter === null
+                ? "bg-white text-slate-950"
+                : "bg-slate-800 text-slate-400 hover:text-white"
+            }`}
+          >
+            All
+          </button>
+          {priceTiers.map((p) => (
+            <button
+              key={p}
+              onClick={() => setActivePriceFilter(activePriceFilter === p ? null : p)}
+              className={`px-2 py-0.5 rounded-full text-[10px] font-bold transition-all ${
+                activePriceFilter === p
+                  ? "bg-red-500 text-white shadow-sm ring-1 ring-white/50"
+                  : "bg-slate-800/90 text-slate-300 hover:text-white"
+              }`}
+            >
+              {p} ETB
+            </button>
+          ))}
         </div>
 
         {/* Viewport & Navigation Tools */}
@@ -534,24 +590,24 @@ export default function StadiumStudioV6({
         </div>
       </div>
 
-      {/* ── MAIN WORKSPACE: 3-COLUMN BOOKMYSHOW OPS LAYOUT ── */}
+      {/* ── WORKSPACE: 3-COLUMN BOOKMYSHOW STADIUM LAYOUT ── */}
       <div className="flex-1 flex overflow-hidden relative">
-        {/* LEFT COLUMN: MASTER STANDS NAVIGATOR */}
+        {/* LEFT COLUMN: STAND SECTOR NAVIGATOR */}
         <div className="w-72 bg-slate-900/95 border-r border-slate-800 flex flex-col shrink-0 overflow-hidden">
           <div className="p-3 border-b border-slate-800 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Layers className="w-4 h-4 text-red-400" />
               <span className="font-bold text-xs uppercase tracking-wide text-slate-200">
-                Stands &amp; Gates ({sections.length})
+                Stadium Stands ({sections.length})
               </span>
             </div>
             <span className="text-[10px] text-slate-400 font-mono">
-              {capacitySummary.totalCapacity.toLocaleString()} cap
+              {capacitySummary.totalCapacity.toLocaleString()} seats
             </span>
           </div>
 
           <div className="flex-1 overflow-y-auto p-2 space-y-1.5 custom-scrollbar">
-            {sections.map((sec, idx) => {
+            {sections.map((sec) => {
               const isSelected = selectedSectionId === sec.id;
               const rows = expandRowRangeV4(sec.rowStart, sec.rowEnd);
               const seatsCount =
@@ -559,65 +615,68 @@ export default function StadiumStudioV6({
                   ? sec.standingCapacity || 0
                   : rows.length * (sec.seatsPerRow || 20);
 
+              const matchesPrice = activePriceFilter === null || sec.price === activePriceFilter;
+
               return (
                 <div
                   key={sec.id}
                   onClick={() => {
                     setSelectedSectionId(sec.id);
-                    setSelectedAmenityId(null);
                   }}
+                  onDoubleClick={() => handleDrilldownStand(sec.id)}
                   className={`p-2.5 rounded-lg border cursor-pointer transition-all ${
                     isSelected
-                      ? "bg-slate-800 border-red-500 shadow-sm"
-                      : "bg-slate-950/60 border-slate-800/80 hover:bg-slate-850 hover:border-slate-700"
-                  }`}
+                      ? "bg-slate-800 border-red-500 shadow-md ring-1 ring-red-500/40"
+                      : "bg-slate-950/60 border-slate-800 hover:bg-slate-850 hover:border-slate-700"
+                  } ${!matchesPrice ? "opacity-35" : ""}`}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div
-                        className="w-3 h-3 rounded-full shrink-0"
+                        className="w-3 h-3 rounded-full shrink-0 shadow-sm"
                         style={{ backgroundColor: sec.color }}
                       />
-                      <span className="font-bold text-xs text-white truncate max-w-[140px]">
+                      <span className="font-bold text-xs text-white truncate max-w-[130px]">
                         {sec.name}
                       </span>
                     </div>
-                    <span className="text-[10px] font-mono font-bold text-amber-300">
-                      {seatsCount.toLocaleString()} seats
+                    <span className="text-[11px] font-mono font-bold text-emerald-400">
+                      {sec.price ? `${sec.price} ETB` : "Free"}
                     </span>
                   </div>
 
-                  <div className="mt-1 flex items-center justify-between text-[10px] text-slate-400">
-                    <span className="capitalize">
-                      {sec.sectionType === "curved_stand"
-                        ? "Curved Arc"
-                        : sec.sectionType === "general_admission"
-                        ? "GA Standing"
-                        : "Grid Stand"}
+                  <div className="mt-1.5 flex items-center justify-between text-[10px] text-slate-400">
+                    <span className="font-mono text-amber-300">
+                      {seatsCount.toLocaleString()} capacity
                     </span>
-                    <span className="truncate max-w-[110px] text-purple-300">
-                      {sec.gateEntrance || "No gate assigned"}
-                    </span>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDrilldownStand(sec.id);
+                      }}
+                      className="text-purple-300 hover:text-white underline text-[10px]"
+                    >
+                      View Seat Grid →
+                    </button>
                   </div>
                 </div>
               );
             })}
           </div>
 
-          {/* Venue Info Footer */}
+          {/* Bottom Guidance */}
           <div className="p-3 bg-slate-950 border-t border-slate-800 text-[11px] text-slate-400">
-            <div className="flex items-center justify-between mb-1">
-              <span>Template:</span>
-              <span className="text-white font-medium">{activeTemplate.name}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>Category:</span>
-              <span className="text-emerald-400 font-bold uppercase">{archetype}</span>
-            </div>
+            <p className="flex items-center gap-1.5 text-slate-300 font-medium">
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              <span>BookMyShow Macro View</span>
+            </p>
+            <p className="text-[10px] text-slate-500 mt-0.5">
+              Double-click any stand to drill down into its seat matrix grid.
+            </p>
           </div>
         </div>
 
-        {/* CENTER COLUMN: KONVA INTERACTIVE CANVAS */}
+        {/* CENTER COLUMN: THE AUTHENTIC BOOKMYSHOW STADIUM CANVAS */}
         <div className="flex-1 bg-slate-950 relative overflow-hidden">
           <Stage
             ref={stageRef}
@@ -631,37 +690,23 @@ export default function StadiumStudioV6({
             onClick={(e) => {
               if (e.target === e.target.getStage()) {
                 setSelectedSectionId(null);
-                setSelectedAmenityId(null);
               }
             }}
           >
-            {/* Background & Blueprint Layer */}
+            {/* 1. Background & Blueprint Layer */}
             <Layer>
+              {/* Stadium Dark Atmosphere */}
               <Rect
                 x={0}
                 y={0}
                 width={CANVAS_W}
                 height={CANVAS_H}
-                fill="#020617"
+                fill="#070a13"
                 stroke="#1e293b"
                 strokeWidth={2}
               />
 
-              {/* Grid dots */}
-              {Array.from({ length: 40 }).map((_, i) =>
-                Array.from({ length: 30 }).map((_, j) => (
-                  <Circle
-                    key={`dot_${i}_${j}`}
-                    x={i * 40}
-                    y={j * 40}
-                    radius={1}
-                    fill="#334155"
-                    opacity={0.3}
-                  />
-                ))
-              )}
-
-              {/* Uploaded Blueprint Reference */}
+              {/* Blueprint Reference (if uploaded) */}
               {blueprintImg && (
                 <KonvaImage
                   image={blueprintImg}
@@ -675,53 +720,139 @@ export default function StadiumStudioV6({
               )}
             </Layer>
 
-            {/* Center Ground / Pitch Layer */}
+            {/* 2. Realistic Athletic Stadium Pitch & Track Layer */}
             <Layer>
-              <Group
-                x={groundConfig.x}
-                y={groundConfig.y}
-                draggable={toolMode === "select"}
-                onDragEnd={(e) => {
-                  pushHistorySnapshot();
-                  setGroundConfig((prev) => ({
-                    ...prev,
-                    x: e.target.x(),
-                    y: e.target.y(),
-                  }));
+              {/* Reddish/Terracotta Athletics Running Track Oval */}
+              <Shape
+                x={CENTER_X}
+                y={CENTER_Y}
+                sceneFunc={(context, shape) => {
+                  context.beginPath();
+                  // Draw outer running track ellipse
+                  context.ellipse(0, 0, 310, 210, 0, 0, Math.PI * 2);
+                  context.fillStrokeShape(shape);
                 }}
-              >
+                fill="#831843"
+                stroke="#9d174d"
+                strokeWidth={3}
+                opacity={0.85}
+              />
+
+              {/* Running Track Lane Lines */}
+              <Circle x={CENTER_X} y={CENTER_Y} radius={210} stroke="#fbcfe8" strokeWidth={0.6} opacity={0.3} />
+              <Circle x={CENTER_X} y={CENTER_Y} radius={200} stroke="#fbcfe8" strokeWidth={0.6} opacity={0.3} />
+
+              {/* Green Football Turf with grass stripes */}
+              <Group x={CENTER_X - 170} y={CENTER_Y - 110}>
+                {/* Grass base */}
                 <Rect
                   x={0}
                   y={0}
-                  width={groundConfig.width}
-                  height={groundConfig.height}
-                  fill={groundConfig.color || "#15803d"}
-                  cornerRadius={10}
+                  width={340}
+                  height={220}
+                  fill="#15803d"
+                  cornerRadius={6}
                   stroke="#22c55e"
                   strokeWidth={2}
                   shadowColor="#15803d"
-                  shadowBlur={10}
+                  shadowBlur={16}
                   shadowOpacity={0.4}
                 />
+
+                {/* Alternating grass stripe pattern */}
+                {Array.from({ length: 10 }).map((_, i) => (
+                  <Rect
+                    key={`stripe_${i}`}
+                    x={i * 34}
+                    y={0}
+                    width={17}
+                    height={220}
+                    fill="#166534"
+                    opacity={0.35}
+                    listening={false}
+                  />
+                ))}
+
+                {/* White Pitch Markings: Outer boundary */}
+                <Rect
+                  x={15}
+                  y={15}
+                  width={310}
+                  height={190}
+                  stroke="#ffffff"
+                  strokeWidth={1.5}
+                  opacity={0.8}
+                  listening={false}
+                />
+
+                {/* Halfway line */}
+                <Line
+                  points={[170, 15, 170, 205]}
+                  stroke="#ffffff"
+                  strokeWidth={1.5}
+                  opacity={0.8}
+                  listening={false}
+                />
+
+                {/* Center circle */}
+                <Circle
+                  x={170}
+                  y={110}
+                  radius={32}
+                  stroke="#ffffff"
+                  strokeWidth={1.5}
+                  opacity={0.8}
+                  listening={false}
+                />
+                <Circle x={170} y={110} radius={2.5} fill="#ffffff" listening={false} />
+
+                {/* Left Penalty Box */}
+                <Rect x={15} y={55} width={45} height={110} stroke="#ffffff" strokeWidth={1.5} opacity={0.8} listening={false} />
+                <Rect x={15} y={80} width={18} height={60} stroke="#ffffff" strokeWidth={1.5} opacity={0.8} listening={false} />
+
+                {/* Right Penalty Box */}
+                <Rect x={280} y={55} width={45} height={110} stroke="#ffffff" strokeWidth={1.5} opacity={0.8} listening={false} />
+                <Rect x={307} y={80} width={18} height={60} stroke="#ffffff" strokeWidth={1.5} opacity={0.8} listening={false} />
+
+                {/* Turf Label */}
                 <Text
                   x={0}
-                  y={groundConfig.height / 2 - 8}
-                  width={groundConfig.width}
-                  text={groundConfig.label}
-                  align="center"
+                  y={110 - 6}
+                  width={340}
+                  text="CENTER FOOTBALL TURF"
                   fill="#ffffff"
                   fontFamily="sans-serif"
                   fontStyle="bold"
-                  fontSize={13}
-                  opacity={0.9}
+                  fontSize={10}
+                  align="center"
+                  opacity={0.4}
+                  listening={false}
                 />
               </Group>
             </Layer>
 
-            {/* Stands & Generated Physical Seats Layer */}
+            {/* 3. SOLID ARCHITECTURAL STAND SECTORS (THE BOOKMYSHOW EXPERIENCE) */}
             <Layer>
               {sections.map((sec) => {
                 const isSelected = selectedSectionId === sec.id;
+                const isHovered = hoveredSectionId === sec.id;
+                const isDrilldown = drilldownSectionId === sec.id;
+                const matchesPrice = activePriceFilter === null || sec.price === activePriceFilter;
+
+                const innerR = sec.innerRadius || 220;
+                const outerR = sec.outerRadius || 340;
+                const startAngDeg = sec.startAngle || 0;
+                const sweepAngDeg = sec.sweepAngle || 90;
+                const startAngRad = (startAngDeg * Math.PI) / 180;
+                const endAngRad = ((startAngDeg + sweepAngDeg) * Math.PI) / 180;
+
+                // Center position of sector label
+                const midAngRad = ((startAngDeg + sweepAngDeg / 2) * Math.PI) / 180;
+                const midR = (innerR + outerR) / 2;
+                const labelX = CENTER_X + midR * Math.cos(midAngRad);
+                const labelY = CENTER_Y + midR * Math.sin(midAngRad);
+
+                // Physical seats for drilldown view
                 const seats = seatsBySection.get(sec.id) || [];
 
                 return (
@@ -729,84 +860,152 @@ export default function StadiumStudioV6({
                     key={sec.id}
                     onClick={() => {
                       setSelectedSectionId(sec.id);
-                      setSelectedAmenityId(null);
                     }}
+                    onDblClick={() => handleDrilldownStand(sec.id)}
+                    onMouseEnter={() => setHoveredSectionId(sec.id)}
+                    onMouseLeave={() => setHoveredSectionId(null)}
                   >
-                    {/* Render Individual Seats */}
-                    {seats.map((seat: GeneratedSeatV4) => (
-                      <Circle
-                        key={seat.id}
-                        x={seat.coordinate_x}
-                        y={seat.coordinate_y}
-                        radius={isSelected ? 4.2 : 3.5}
-                        fill={isSelected ? "#f43f5e" : sec.color}
-                        stroke="#0f172a"
-                        strokeWidth={0.8}
-                        opacity={0.9}
+                    {/* Architectural Sector Block (Solid Annular Wedge) */}
+                    {sec.sectionType === "curved_stand" ? (
+                      <Shape
+                        x={CENTER_X}
+                        y={CENTER_Y}
+                        sceneFunc={(context, shape) => {
+                          context.beginPath();
+                          context.arc(0, 0, outerR, startAngRad, endAngRad, false);
+                          context.arc(0, 0, innerR, endAngRad, startAngRad, true);
+                          context.closePath();
+                          context.fillStrokeShape(shape);
+                        }}
+                        fill={
+                          isSelected
+                            ? "#e11d48"
+                            : isHovered
+                            ? "#f43f5e"
+                            : sec.color || "#3b82f6"
+                        }
+                        stroke={isSelected ? "#ffffff" : "#0f172a"}
+                        strokeWidth={isSelected ? 3 : 1.5}
+                        opacity={!matchesPrice ? 0.25 : isSelected || isHovered ? 1 : 0.88}
+                        shadowColor={isSelected ? "#e11d48" : "#000000"}
+                        shadowBlur={isSelected ? 16 : 6}
+                        shadowOpacity={0.6}
                       />
-                    ))}
+                    ) : (
+                      /* Rectangular Grid Stand Block */
+                      <Rect
+                        x={sec.x - sec.width / 2}
+                        y={sec.y - sec.height / 2}
+                        width={sec.width}
+                        height={sec.height}
+                        fill={isSelected ? "#e11d48" : sec.color || "#3b82f6"}
+                        stroke={isSelected ? "#ffffff" : "#0f172a"}
+                        strokeWidth={isSelected ? 3 : 1.5}
+                        cornerRadius={8}
+                        opacity={!matchesPrice ? 0.25 : 0.9}
+                      />
+                    )}
 
-                    {/* Stand Label */}
-                    <Text
-                      x={sec.x - 80}
-                      y={
-                        sec.sectionType === "curved_stand"
-                          ? sec.y - (sec.innerRadius || 200) - 18
-                          : sec.y - 20
-                      }
-                      text={sec.name}
-                      fill="#ffffff"
-                      fontFamily="sans-serif"
-                      fontSize={11}
-                      fontStyle="bold"
-                      align="center"
-                      width={160}
-                      listening={false}
-                    />
+                    {/* Macro View: Solid Stand Label & Price Badge */}
+                    {viewMode === "macro" && (
+                      <Group x={labelX} y={labelY}>
+                        {/* Stand Name */}
+                        <Text
+                          x={-80}
+                          y={-14}
+                          width={160}
+                          text={sec.name.toUpperCase()}
+                          fill="#ffffff"
+                          fontFamily="sans-serif"
+                          fontStyle="bold"
+                          fontSize={11}
+                          align="center"
+                          shadowColor="#000000"
+                          shadowBlur={4}
+                          shadowOpacity={0.9}
+                          listening={false}
+                        />
+
+                        {/* Price Badge */}
+                        <Text
+                          x={-80}
+                          y={2}
+                          width={160}
+                          text={sec.price ? `${sec.price} ETB` : "GENERAL"}
+                          fill="#fef08a"
+                          fontFamily="monospace"
+                          fontStyle="bold"
+                          fontSize={10}
+                          align="center"
+                          shadowColor="#000000"
+                          shadowBlur={4}
+                          listening={false}
+                        />
+
+                        {/* Gate entrance */}
+                        {sec.gateEntrance && (
+                          <Text
+                            x={-80}
+                            y={16}
+                            width={160}
+                            text={sec.gateEntrance}
+                            fill="#e2e8f0"
+                            fontFamily="sans-serif"
+                            fontSize={8}
+                            align="center"
+                            opacity={0.8}
+                            listening={false}
+                          />
+                        )}
+                      </Group>
+                    )}
+
+                    {/* Drilldown View: Render Physical Seats Grid if drilled down */}
+                    {viewMode === "drilldown" && isDrilldown && (
+                      <Group>
+                        {seats.map((seat: GeneratedSeatV4) => (
+                          <Circle
+                            key={seat.id}
+                            x={seat.coordinate_x}
+                            y={seat.coordinate_y}
+                            radius={4}
+                            fill="#ffffff"
+                            stroke="#0f172a"
+                            strokeWidth={1}
+                            shadowColor="#ffffff"
+                            shadowBlur={4}
+                            shadowOpacity={0.5}
+                          />
+                        ))}
+                      </Group>
+                    )}
                   </Group>
                 );
               })}
             </Layer>
 
-            {/* Turnstile Gates & Concourse POIs Layer */}
+            {/* 4. Concourse Turnstile Gates Layer */}
             <Layer>
-              {amenities.map((am) => {
-                const isSelected = selectedAmenityId === am.id;
-                return (
-                  <Group
-                    key={am.id}
-                    x={am.x}
-                    y={am.y}
-                    draggable={toolMode === "select"}
-                    onClick={() => {
-                      setSelectedAmenityId(am.id);
-                      setSelectedSectionId(null);
-                    }}
-                    onDragEnd={(e) => {
-                      pushHistorySnapshot();
-                      const nx = e.target.x();
-                      const ny = e.target.y();
-                      setAmenities((prev) =>
-                        prev.map((a) => (a.id === am.id ? { ...a, x: nx, y: ny } : a))
-                      );
-                    }}
-                  >
+              {amenities
+                .filter((a) => a.type === "gate")
+                .map((am) => (
+                  <Group key={am.id} x={am.x} y={am.y}>
                     <Rect
-                      x={-45}
-                      y={-12}
-                      width={90}
-                      height={24}
-                      fill={am.type === "gate" ? "#7c3aed" : "#0284c7"}
-                      cornerRadius={6}
-                      stroke={isSelected ? "#f43f5e" : "#ffffff"}
-                      strokeWidth={isSelected ? 2 : 1}
+                      x={-40}
+                      y={-11}
+                      width={80}
+                      height={22}
+                      fill="#7c3aed"
+                      cornerRadius={5}
+                      stroke="#ffffff"
+                      strokeWidth={1.5}
                       shadowBlur={6}
-                      shadowOpacity={0.4}
+                      shadowOpacity={0.5}
                     />
                     <Text
-                      x={-45}
-                      y={-6}
-                      width={90}
+                      x={-40}
+                      y={-5}
+                      width={80}
                       text={am.label}
                       fill="#ffffff"
                       fontSize={9}
@@ -814,8 +1013,7 @@ export default function StadiumStudioV6({
                       align="center"
                     />
                   </Group>
-                );
-              })}
+                ))}
             </Layer>
           </Stage>
 
@@ -834,13 +1032,13 @@ export default function StadiumStudioV6({
           />
         </div>
 
-        {/* RIGHT COLUMN: PARAMETRIC STAND INSPECTOR */}
+        {/* RIGHT COLUMN: BOOKMYSHOW PARAMETRIC STAND INSPECTOR */}
         <div className="w-80 bg-slate-900 border-l border-slate-800 flex flex-col shrink-0 overflow-y-auto custom-scrollbar">
           <div className="p-3 border-b border-slate-800 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Sliders className="w-4 h-4 text-red-400" />
               <span className="font-bold text-xs uppercase tracking-wide text-slate-200">
-                Stand Parameters
+                Stand Configuration
               </span>
             </div>
             {selectedSection && (
@@ -863,7 +1061,7 @@ export default function StadiumStudioV6({
             <div className="p-4 space-y-4 text-xs">
               {/* Stand Name */}
               <div>
-                <label className="text-slate-400 block mb-1">Stand Name</label>
+                <label className="text-slate-400 block mb-1">Stand / Sector Name</label>
                 <input
                   type="text"
                   value={selectedSection.name}
@@ -877,7 +1075,7 @@ export default function StadiumStudioV6({
                 />
               </div>
 
-              {/* Gate Entrance Route */}
+              {/* Turnstile Gate */}
               <div>
                 <label className="text-slate-400 block mb-1">Turnstile Entrance Gate</label>
                 <input
@@ -894,7 +1092,26 @@ export default function StadiumStudioV6({
                 />
               </div>
 
-              {/* Geometry Type */}
+              {/* Ticket Price (ETB) */}
+              <div>
+                <label className="text-slate-400 block mb-1">Ticket Price (ETB)</label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    value={selectedSection.price || 0}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value) || 0;
+                      setSections((prev) =>
+                        prev.map((s) => (s.id === selectedSection.id ? { ...s, price: val } : s))
+                      );
+                    }}
+                    className="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1.5 text-emerald-400 font-bold focus:outline-none focus:border-emerald-500 pl-7"
+                  />
+                  <span className="absolute left-2.5 top-1.5 text-slate-500 font-bold">ETB</span>
+                </div>
+              </div>
+
+              {/* Geometry Type & Color */}
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="text-slate-400 block mb-1">Type</label>
@@ -915,7 +1132,7 @@ export default function StadiumStudioV6({
                 </div>
 
                 <div>
-                  <label className="text-slate-400 block mb-1">Color</label>
+                  <label className="text-slate-400 block mb-1">Sector Color</label>
                   <div className="flex items-center gap-2">
                     <input
                       type="color"
@@ -937,7 +1154,7 @@ export default function StadiumStudioV6({
               {selectedSection.sectionType === "curved_stand" && (
                 <div className="p-3 bg-slate-950 rounded-lg border border-slate-800 space-y-2.5">
                   <span className="font-bold text-[11px] text-purple-300 block">
-                    Curved Arc Geometry
+                    Curved Sector Dimensions
                   </span>
 
                   <div className="grid grid-cols-2 gap-2">
@@ -945,28 +1162,28 @@ export default function StadiumStudioV6({
                       <span className="text-slate-400 block text-[10px]">Inner Radius</span>
                       <input
                         type="number"
-                        value={selectedSection.innerRadius || 210}
+                        value={selectedSection.innerRadius || 220}
                         onChange={(e) => {
                           const val = parseInt(e.target.value) || 100;
                           setSections((prev) =>
                             prev.map((s) => (s.id === selectedSection.id ? { ...s, innerRadius: val } : s))
                           );
                         }}
-                        className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white"
+                        className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white font-mono"
                       />
                     </div>
                     <div>
                       <span className="text-slate-400 block text-[10px]">Outer Radius</span>
                       <input
                         type="number"
-                        value={selectedSection.outerRadius || 320}
+                        value={selectedSection.outerRadius || 340}
                         onChange={(e) => {
                           const val = parseInt(e.target.value) || 200;
                           setSections((prev) =>
                             prev.map((s) => (s.id === selectedSection.id ? { ...s, outerRadius: val } : s))
                           );
                         }}
-                        className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white"
+                        className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white font-mono"
                       />
                     </div>
                   </div>
@@ -983,7 +1200,7 @@ export default function StadiumStudioV6({
                             prev.map((s) => (s.id === selectedSection.id ? { ...s, startAngle: val } : s))
                           );
                         }}
-                        className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white"
+                        className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white font-mono"
                       />
                     </div>
                     <div>
@@ -997,18 +1214,18 @@ export default function StadiumStudioV6({
                             prev.map((s) => (s.id === selectedSection.id ? { ...s, sweepAngle: val } : s))
                           );
                         }}
-                        className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white"
+                        className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white font-mono"
                       />
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* Rows & Columns Definition */}
+              {/* Rows & Seats Configuration */}
               {selectedSection.sectionType !== "general_admission" ? (
                 <div className="p-3 bg-slate-950 rounded-lg border border-slate-800 space-y-2.5">
                   <span className="font-bold text-[11px] text-blue-300 block">
-                    Rows &amp; Seats Layout
+                    Rows &amp; Physical Seats
                   </span>
 
                   <div className="grid grid-cols-2 gap-2">
@@ -1030,7 +1247,7 @@ export default function StadiumStudioV6({
                       <span className="text-slate-400 block text-[10px]">End Row</span>
                       <input
                         type="text"
-                        value={selectedSection.rowEnd || "J"}
+                        value={selectedSection.rowEnd || "L"}
                         onChange={(e) => {
                           const val = e.target.value.toUpperCase();
                           setSections((prev) =>
@@ -1046,7 +1263,7 @@ export default function StadiumStudioV6({
                     <span className="text-slate-400 block text-[10px]">Seats Per Row</span>
                     <input
                       type="number"
-                      value={selectedSection.seatsPerRow || 24}
+                      value={selectedSection.seatsPerRow || 28}
                       onChange={(e) => {
                         const val = parseInt(e.target.value) || 10;
                         setSections((prev) =>
@@ -1076,31 +1293,21 @@ export default function StadiumStudioV6({
                 </div>
               )}
 
-              {/* Pricing & Category Tier */}
-              <div>
-                <label className="text-slate-400 block mb-1">Base Price (ETB)</label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    value={selectedSection.price || 0}
-                    onChange={(e) => {
-                      const val = parseFloat(e.target.value) || 0;
-                      setSections((prev) =>
-                        prev.map((s) => (s.id === selectedSection.id ? { ...s, price: val } : s))
-                      );
-                    }}
-                    className="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1.5 text-emerald-400 font-bold focus:outline-none focus:border-emerald-500 pl-7"
-                  />
-                  <span className="absolute left-2.5 top-1.5 text-slate-500 font-bold">ETB</span>
-                </div>
-              </div>
+              {/* Drilldown Action */}
+              <button
+                onClick={() => handleDrilldownStand(selectedSection.id)}
+                className="w-full py-2 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md transition-all active:scale-95"
+              >
+                <Eye className="w-3.5 h-3.5" />
+                <span>Drill Down into Seat Matrix</span>
+              </button>
             </div>
           ) : (
             <div className="p-6 text-center text-slate-500 space-y-2">
-              <ShieldCheck className="w-8 h-8 mx-auto text-slate-600" />
+              <Layers className="w-8 h-8 mx-auto text-slate-600" />
               <p className="font-medium text-xs">No Stand Selected</p>
               <p className="text-[11px] text-slate-600">
-                Click any stand on the canvas or select from the left navigator to inspect its parameters.
+                Click any stand sector on the stadium map to inspect and edit its parameters.
               </p>
             </div>
           )}

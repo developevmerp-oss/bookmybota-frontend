@@ -2,7 +2,7 @@
 import { useState, use, useRef, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  MapPin, Phone, CheckCircle, Calendar, Users, Clock,
+  MapPin, Phone, CheckCircle, Calendar, Users, Clock, EqualApproximately,
   Star, Share, Compass, MessageSquare, Image as ImageIcon,
   BookOpen, AlertCircle, Sparkles, Copy, ChevronRight, Loader2,
   ChevronLeft, X, Navigation, User,
@@ -55,7 +55,7 @@ import CustomerAuthModal from '@/components/Shared/CustomerAuthModal';
 import CustomerReviewCard from '@/components/Shared/CustomerReviewCard';
 import { lockBodyScroll } from '@/lib/lockBodyScroll';
 import { useSelectedCity } from '@/lib/useSelectedCity';
-import { paymentSuccessHref } from '@/lib/paymentSuccess';
+import PaymentSuccessView from '@/components/Shared/PaymentSuccessView';
 import { RestaurantDetailShimmer } from '@/components/Shared/Shimmer';
 import { getPhoneValidationError, isValidPhone, sanitizePhoneInput } from '@/lib/validation';
 import GuestTableAnimation from './GuestTableAnimation';
@@ -1545,13 +1545,6 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
       setLastQrToken(result.qr_token || result.booking_id || null);
       toast.success('Booking confirmed!');
       if (result.booking_id) {
-        router.push(
-          paymentSuccessHref({
-            module: 'dining',
-            bookingId: result.booking_id,
-            next: `/customer/bookings/confirmation?id=${result.booking_id}`,
-          })
-        );
         return;
       }
       setDrawerStep(4);
@@ -2853,7 +2846,10 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
 
                         <div className="flex justify-between items-center gap-2 mt-2.5 text-xs text-slate-500 font-medium">
                           <span className="truncate flex-1">{cuisine}</span>
-                          <span className="shrink-0 text-slate-700 font-semibold">{priceForTwo}</span>
+                          <span className="shrink-0 inline-flex items-center gap-1 text-slate-700 font-semibold">
+                            <EqualApproximately size={14} strokeWidth={2} className="text-slate-500" aria-hidden />
+                            {priceForTwo}
+                          </span>
                         </div>
 
                         <div className="text-xs text-slate-400 mt-1 font-medium">
@@ -4603,6 +4599,15 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
           focusSection={bookingPolicyFocus}
           onClose={() => setBookingPolicyOpen(false)}
         />
+
+        {bookingSuccess && lastBookingId ? (
+          <PaymentSuccessView
+            presentation="modal"
+            module="dining"
+            bookingId={lastBookingId}
+            nextHref={`/customer/bookings/confirmation?id=${lastBookingId}`}
+          />
+        ) : null}
 
         <AboutVenueModal
           open={venueInfoModal != null}

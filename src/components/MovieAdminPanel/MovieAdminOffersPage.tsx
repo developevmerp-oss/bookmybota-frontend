@@ -25,7 +25,7 @@ import {
   emptyCinemaOfferFormValues,
   type CinemaOfferFormValues,
 } from "@/lib/cinemaOfferFormSchema";
-import { formatDate } from "@/lib/dateFormat";
+import { formatDate, toDateInput, toTimeInput } from "@/lib/dateFormat";
 
 const fieldErrorClass = "mt-1.5 text-[11px] font-semibold text-rose-500";
 const reqStar = <span className="text-rose-500">*</span>;
@@ -393,10 +393,10 @@ export default function MovieAdminOffersPage() {
       usage_limit: offer.usage_limit != null ? String(offer.usage_limit) : "",
       per_customer_limit:
         offer.per_customer_limit != null ? String(offer.per_customer_limit) : "",
-      start_date: offer.valid_from?.slice(0, 10) || "",
-      start_time: offer.valid_from?.slice(11, 16) || "",
-      end_date: offer.valid_until?.slice(0, 10) || "",
-      end_time: offer.valid_until?.slice(11, 16) || "",
+      start_date: offer.valid_from ? toDateInput(offer.valid_from) : "",
+      start_time: offer.valid_from ? toTimeInput(offer.valid_from) : "",
+      end_date: offer.valid_until ? toDateInput(offer.valid_until) : "",
+      end_time: offer.valid_until ? toTimeInput(offer.valid_until) : "",
       status: offer.status === "ACTIVE" || offer.is_active ? "ACTIVE" : "DRAFT",
       sort_order: String(offer.sort_order ?? 0),
     });

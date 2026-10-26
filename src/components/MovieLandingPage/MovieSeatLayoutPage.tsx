@@ -29,6 +29,7 @@ import {
   Sparkles,
   ChevronRight,
   ChevronLeft,
+  ChevronDown,
   Info,
   Pencil,
   Accessibility,
@@ -37,7 +38,7 @@ import { FaMoon, FaUniversalAccess } from "react-icons/fa";
 import dynamic from "next/dynamic";
 import { toast } from "sonner";
 import { useSelectedCity } from "@/lib/useSelectedCity";
-import { paymentSuccessHref } from "@/lib/paymentSuccess";
+import PaymentSuccessView from "@/components/Shared/PaymentSuccessView";
 import {
   applyBestsellerFlagsToRawSeats,
   finalizeBestsellerMarks,
@@ -71,7 +72,8 @@ import {
 import PhoneInput from "@/components/Shared/PhoneInput";
 import CustomerAuthModal from "@/components/Shared/CustomerAuthModal";
 import { formatMoney } from "@/lib/currencyFormat";
-import { formatDateCustomer } from "@/lib/dateFormat";
+import { formatDateCustomer, formatTime12h, getVenueDateTimeParts, venueDateStr } from "@/lib/dateFormat";
+import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { isGiftCardSpendable } from "@/lib/giftCardOwnership";
 import { resolveHoldExpiresAt } from "@/lib/holdCountdown";
 import { pickContiguousBlock } from "@/lib/bmsSeatAutoSelect";
@@ -101,25 +103,12 @@ function availableSeatClass(isBestseller?: boolean, withHoverScale = false) {
 }
 
 function formatSeatPageTime(startsAt: string): string {
-  try {
-    const raw = String(startsAt || "").trim();
-    const parts = raw.includes("T") ? raw.split("T") : raw.split(" ");
-    const timePart = (parts[1] || parts[0] || "").slice(0, 5);
-    const [hStr, mStr] = timePart.split(":");
-    let h = parseInt(hStr, 10);
-    if (!Number.isFinite(h)) return raw;
-    const m = mStr || "00";
-    const ampm = h >= 12 ? "PM" : "AM";
-    h = h % 12 || 12;
-    return `${h.toString().padStart(2, "0")}:${m} ${ampm}`;
-  } catch {
-    return String(startsAt || "");
-  }
+  const label = formatTime12h(startsAt);
+  return label === "—" ? String(startsAt || "") : label;
 }
 
 function showtimeDateKey(startsAt: string): string {
-  const raw = String(startsAt || "").trim().replace(" ", "T");
-  return raw.slice(0, 10);
+  return getVenueDateTimeParts(startsAt)?.dateKey || "";
 }
 
 function parseShowtimeDate(startsAt: string): Date | null {
@@ -130,13 +119,11 @@ function parseShowtimeDate(startsAt: string): Date | null {
 }
 
 function formatSeatPageDateParts(startsAt: string): { weekday: string; dayMonth: string } {
-  const d = parseShowtimeDate(startsAt);
-  if (!d) return { weekday: "", dayMonth: "" };
-  const weekday = d.toLocaleDateString("en-US", { weekday: "short" });
+  const parts = getVenueDateTimeParts(startsAt);
+  if (!parts) return { weekday: "", dayMonth: "" };
   const full = formatDateCustomer(startsAt);
-  // Prefer full customer date ("7 October 2026"); fall back to weekday + empty.
   const dayMonth = full && full !== "—" ? full : "";
-  return { weekday, dayMonth };
+  return { weekday: parts.weekdayLong.slice(0, 3), dayMonth };
 }
 
 function isShowtimePast(startsAt: string): boolean {
@@ -146,10 +133,9 @@ function isShowtimePast(startsAt: string): boolean {
 }
 
 function isLateNightShow(startsAt: string): boolean {
-  const d = parseShowtimeDate(startsAt);
-  if (!d) return false;
-  const h = d.getHours();
-  return h >= 23 || h < 5;
+  const hour = getVenueDateTimeParts(startsAt)?.hour;
+  if (hour == null) return false;
+  return hour >= 23 || hour < 5;
 }
 
 /**
@@ -284,7 +270,6 @@ function writeHoldSessionToken(token: string) {
 }
 
 const fieldErrorClass = "mt-1.5 text-[11px] font-semibold text-rose-600";
-const reqStar = <span className="text-rose-500">*</span>;
 
 type BookingStep = "seats" | "beverages" | "review";
 
@@ -354,9 +339,11 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
   const [timeOutOpen, setTimeOutOpen] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [billingEditOpen, setBillingEditOpen] = useState(false);
   const [pendingAfterAuth, setPendingAfterAuth] = useState(false);
   const [holding, setHolding] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [bookedSuccessId, setBookedSuccessId] = useState<string | null>(null);
 
   const [selectedSeats, setSelectedSeats] = useState<MovieBookingSeatPayload[]>([]);
   const [promoCode, setPromoCode] = useState("");
@@ -477,6 +464,8 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
     handleSubmit,
     reset,
     getValues,
+    watch,
+    trigger,
     formState: { errors },
   } = useForm<MovieCheckoutFormValues>({
     resolver: yupResolver(movieCheckoutFormSchema) as any,
@@ -747,8 +736,8 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
             return {
               id: seatId,
               row: rowObj.rowLabel,
-              /** Admin seat_label when set; otherwise continuous index */
-              number: seatNum,
+              /** Left-to-right 01–N across the row, including after an aisle. */
+              number: String(displayNum).padStart(2, "0"),
               tierName: sec.secName,
               price,
               isBooked,
@@ -1453,14 +1442,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
       }).unwrap();
 
       toast.success(res.message || "Booking confirmed!");
-      const bookingId = res.data.booking_id;
-      router.push(
-        paymentSuccessHref({
-          module: "movies",
-          bookingId,
-          next: `/movies/booking-confirmation/${bookingId}`,
-        })
-      );
+      setBookedSuccessId(res.data.booking_id);
     } catch (err) {
       const msg = extractApiError(err, "Failed to confirm booking. Please try again.");
       toast.error(msg);
@@ -1516,6 +1498,49 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
       : "";
     return [cinema?.name, datePart, showTimeFormatted].filter(Boolean).join(" | ");
   }, [cinema?.name, showDateFormatted, showTimeFormatted, showtime?.starts_at]);
+
+  const reviewDateLine = useMemo(() => {
+    const dateKey = getVenueDateTimeParts(showtime?.starts_at)?.dateKey || "";
+    const weekday = formatSeatPageDateParts(showtime?.starts_at || "").weekday;
+    if (dateKey && dateKey === venueDateStr()) return showDateFormatted ? `Today, ${showDateFormatted}` : "Today";
+    return [weekday, showDateFormatted].filter(Boolean).join(", ");
+  }, [showtime?.starts_at, showDateFormatted]);
+
+  const reviewTimeLine = useMemo(() => {
+    if (!showtime?.starts_at) return "";
+    const startLabel = formatTime12h(showtime.starts_at);
+    if (!startLabel || startLabel === "—") return showTimeFormatted;
+    // ends_at includes the 20-minute screen gap. Customers should see the film length only.
+    const duration = Number(movie?.duration_minutes);
+    const startParts = getVenueDateTimeParts(showtime.starts_at);
+    if (!startParts || !Number.isFinite(duration) || duration <= 0) return startLabel;
+    const total = startParts.hour * 60 + startParts.minute + duration;
+    const hour = Math.floor(total / 60) % 24;
+    const minute = total % 60;
+    const endLabel = formatTime12h(
+      `2000-01-01 ${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00`
+    );
+    if (!endLabel || endLabel === "—") return startLabel;
+    return `${startLabel} – ${endLabel}`;
+  }, [showtime?.starts_at, movie?.duration_minutes, showTimeFormatted]);
+
+  const reviewPoster = resolveMediaUrl(movie?.poster_url || movie?.banner_url || "");
+  const guestName = watch("guest_name");
+  const guestPhone = watch("guest_phone");
+  const guestEmail = watch("guest_email");
+  const phoneLocked = isCustomerLoggedIn && Boolean(sanitizePhoneInput(authUser?.phone || ""));
+  const ticketPriceLines = useMemo(() => {
+    const groups = new Map<string, { label: string; price: number; count: number }>();
+    for (const seat of selectedSeats) {
+      const tier = (seat.tier_name || "Standard").trim();
+      const price = Number(seat.unit_price) || 0;
+      const key = `${tier}|${price}`;
+      const row = groups.get(key) || { label: tier, price, count: 0 };
+      row.count += 1;
+      groups.set(key, row);
+    }
+    return Array.from(groups.values());
+  }, [selectedSeats]);
 
   const openQtyEditor = () => {
     setQtyModalDismissible(true);
@@ -1947,9 +1972,13 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
             const { weekday, dayMonth } = formatSeatPageDateParts(dateSrc);
             // Compact "14 Oct" style like District time bar
             const compactDayMonth = (() => {
-              const d = parseShowtimeDate(dateSrc);
-              if (!d) return dayMonth;
-              return `${d.getDate()} ${d.toLocaleDateString("en-US", { month: "short" })}`;
+              const parts = getVenueDateTimeParts(dateSrc);
+              if (!parts) return dayMonth;
+              const month = new Date(Date.UTC(parts.y, parts.m - 1, parts.d, 12)).toLocaleDateString(
+                "en-US",
+                { month: "short", timeZone: "UTC" }
+              );
+              return `${parts.d} ${month}`;
             })();
             return (
               <div className="shrink-0 leading-tight w-[4.25rem] sm:w-[4.75rem] overflow-hidden pr-1">
@@ -2662,23 +2691,33 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
 
           {/* Desktop center — movie title + theater / date / time / screen */}
           <div className="pointer-events-none absolute left-1/2 top-1/2 z-[1] hidden w-[min(52%,42rem)] xl:w-[min(50%,46rem)] -translate-x-1/2 -translate-y-1/2 text-center lg:block">
-            <h1 className="truncate text-sm font-bold leading-tight text-slate-900 sm:text-[15px] md:text-base">
-              {headerTitle}
-            </h1>
-            <p className="mt-0.5 truncate text-[11px] text-slate-500 sm:text-xs">
-              {headerMeta}
-              {screen?.name ? ` | ${screen.name}` : ""}
-            </p>
+            {step === "review" ? (
+              <h1 className="truncate text-sm font-bold leading-tight text-slate-900 sm:text-[15px] md:text-base">
+                Review your booking
+              </h1>
+            ) : (
+              <>
+                <h1 className="truncate text-sm font-bold leading-tight text-slate-900 sm:text-[15px] md:text-base">
+                  {headerTitle}
+                </h1>
+                <p className="mt-0.5 truncate text-[11px] text-slate-500 sm:text-xs">
+                  {headerMeta}
+                  {screen?.name ? ` | ${screen.name}` : ""}
+                </p>
+              </>
+            )}
           </div>
 
           {/* Mobile / tablet — back + title + theater (left-aligned, like reference) */}
           <div className="min-w-0 flex-1 lg:hidden">
             <h1 className="truncate text-[15px] sm:text-base font-bold leading-tight text-slate-900">
-              {headerTitle}
+              {step === "review" ? "Review your booking" : headerTitle}
             </h1>
-            <p className="mt-0.5 truncate text-[12px] text-slate-500">
-              {[cinema?.name, screen?.name].filter(Boolean).join(" | ")}
-            </p>
+            {step === "review" ? null : (
+              <p className="mt-0.5 truncate text-[12px] text-slate-500">
+                {[cinema?.name, screen?.name].filter(Boolean).join(" | ")}
+              </p>
+            )}
           </div>
 
           {/* Right end — desktop only (hidden on mobile / tablet) */}
@@ -2741,18 +2780,12 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
 
       {step === "review" && secondsLeft !== null && (
         <div
-          className={`shrink-0 px-4 py-2.5 text-center text-sm font-bold border-b ${secondsLeft <= 60
+          className={`shrink-0 px-4 py-2 text-center text-[13px] font-medium border-b ${secondsLeft <= 60
               ? "bg-rose-50 border-rose-200 text-rose-700"
-              : "bg-amber-50 border-amber-200 text-amber-800"
+              : "bg-[#F3E8FF] border-[#E9D5FF] text-[#6B21A8]"
             }`}
         >
-          <span className="inline-flex items-center gap-2">
-            <Timer className="size-4" />
-            Complete booking in{" "}
-            <span className="font-mono text-base tracking-wider">
-              {formatCountdown(secondsLeft)}
-            </span>
-          </span>
+          Complete your booking in {formatCountdown(secondsLeft)}
         </div>
       )}
 
@@ -2962,74 +2995,91 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
             </div>
           </div>
         ) : (
-          <div className="max-w-5xl mx-auto w-full px-4 sm:px-8 py-6 pb-10">
+          <div className="max-w-6xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 pb-16">
             <form
-              onSubmit={handleSubmit(onConfirmBooking)}
-              className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start"
+              onSubmit={handleSubmit(onConfirmBooking, () => setBillingEditOpen(true))}
+              className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start"
               noValidate
             >
-              <div className="lg:col-span-7 space-y-5">
-                <div className="rounded-2xl border border-slate-200 bg-white p-5 space-y-4 shadow-sm">
-                  <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                    <User className="size-4 text-[#F84464]" /> Guest details
-                  </h2>
-                  <div className="space-y-3">
-                    <div>
-                      <label className="mb-1 block text-[11px] font-semibold text-slate-500">
-                        Full Name {reqStar}
-                      </label>
-                      <input
-                        type="text"
-                        {...register("guest_name")}
-                        placeholder="Full Name"
-                        className="w-full px-3 py-2.5 rounded-xl bg-white border border-slate-200 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#F84464] focus:ring-1 focus:ring-[#F84464]/20"
-                      />
-                      {errors.guest_name && (
-                        <p className={fieldErrorClass}>{errors.guest_name.message}</p>
-                      )}
+              <div className="lg:col-span-7 space-y-4">
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <h2 className="text-lg sm:text-xl font-bold text-slate-900 leading-tight">{movie?.title || "Movie"}</h2>
+                      <p className="mt-1 text-sm text-slate-500">
+                        {[
+                          showtime?.language,
+                          showtime?.format,
+                          movie?.duration_minutes
+                            ? `${Math.floor(Number(movie.duration_minutes) / 60)}h ${Number(movie.duration_minutes) % 60}m`.replace(" 0m", "")
+                            : "",
+                        ].filter(Boolean).join("  •  ")}
+                      </p>
+                      <p className="mt-3 text-sm font-semibold text-slate-800">{cinema?.name}</p>
+                      {cinema?.address ? (
+                        <p className="mt-0.5 text-sm text-slate-500">{cinema.address}</p>
+                      ) : null}
+                      {movie?.certificate ? (
+                        <span className="mt-3 inline-flex rounded-md bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600">
+                          {movie.certificate}
+                        </span>
+                      ) : null}
                     </div>
-                    <div>
-                      <label className="mb-1 block text-[11px] font-semibold text-slate-500">
-                        Phone Number {reqStar}
-                      </label>
-                      <Controller
-                        name="guest_phone"
-                        control={control}
-                        render={({ field }) => (
-                          <PhoneInput
-                            value={field.value || ""}
-                            onChange={field.onChange}
-                            onBlur={field.onBlur}
-                            required
-                            variant="light"
-                            inputClassName="w-full px-3 py-2.5 rounded-xl bg-white border border-slate-200 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#F84464] focus:ring-1 focus:ring-[#F84464]/20"
-                            placeholder="Phone Number (e.g. 912345678)"
-                            error={errors.guest_phone?.message}
-                          />
-                        )}
+                    {reviewPoster ? (
+                      <img
+                        src={reviewPoster}
+                        alt=""
+                        className="h-[4.5rem] w-12 shrink-0 rounded-md object-cover bg-slate-100 sm:h-20 sm:w-14"
                       />
+                    ) : null}
+                  </div>
+
+                  <div className="mt-4 border-t border-slate-100 pt-4">
+                    <p className="text-sm font-semibold text-slate-900">{reviewDateLine}</p>
+                    {reviewTimeLine ? (
+                      <p className="mt-0.5 text-sm text-slate-500">{reviewTimeLine}</p>
+                    ) : null}
+                  </div>
+
+                  <div className="mt-4 flex items-start justify-between gap-4 border-t border-slate-100 pt-4">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-slate-900">
+                        {selectedSeats.length} ticket{selectedSeats.length === 1 ? "" : "s"}
+                      </p>
+                      <p className="mt-0.5 text-sm text-slate-600">
+                        {[
+                          Array.from(new Set(selectedSeats.map((s) => s.tier_name).filter(Boolean))).join(", "),
+                          selectedSeats.map((s) => formatSelectedSeatLabel(s)).join(", "),
+                        ].filter(Boolean).join("  •  ")}
+                      </p>
+                      {screen?.name ? (
+                        <p className="mt-0.5 text-sm text-slate-500">{screen.name}</p>
+                      ) : null}
                     </div>
-                    <div>
-                      <label className="mb-1 block text-[11px] font-semibold text-slate-500">
-                        Email Address {reqStar}
-                      </label>
-                      <input
-                        type="email"
-                        {...register("guest_email")}
-                        placeholder="Email for M-Ticket confirmation"
-                        className="w-full px-3 py-2.5 rounded-xl bg-white border border-slate-200 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#F84464] focus:ring-1 focus:ring-[#F84464]/20"
-                      />
-                      {errors.guest_email && (
-                        <p className={fieldErrorClass}>{errors.guest_email.message}</p>
-                      )}
+                    <p className="shrink-0 text-sm font-bold text-slate-900">{formatMoney(ticketSubtotal)}</p>
+                  </div>
+
+                  {Object.values(selectedBeverages).length > 0 ? (
+                    <div className="mt-3 space-y-1 border-t border-slate-100 pt-3">
+                      {Object.values(selectedBeverages).map((b) => (
+                        <div key={b.id} className="flex items-center justify-between text-sm text-slate-600">
+                          <span>{b.name} × {b.quantity}</span>
+                          <span className="font-semibold text-slate-900">{formatMoney(b.price * b.quantity)}</span>
+                        </div>
+                      ))}
                     </div>
+                  ) : null}
+
+                  <div className="mt-4 flex items-center gap-2 border-t border-slate-100 pt-3 text-xs text-slate-500">
+                    <Info className="size-3.5 shrink-0" />
+                    Cancellation is unavailable. The cut-off is 20 minutes before showtime.
                   </div>
                 </div>
 
-                <div className="rounded-2xl border border-slate-200 bg-white p-5 space-y-3 shadow-sm">
-                  <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-                    <Tag className="size-3.5 text-purple-500" /> Promo / Discount Code
-                  </label>
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm space-y-4">
+                  <h2 className="text-base font-bold text-slate-900">Offers for you</h2>
+                  <div className="space-y-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Promo code</p>
                   {promoApplied ? (
                     <div className="flex items-center justify-between p-2.5 rounded-xl bg-purple-50 border border-purple-200 text-xs">
                       <div className="flex items-center gap-2">
@@ -3069,10 +3119,8 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                   )}
                 </div>
 
-                <div className="rounded-2xl border border-slate-200 bg-white p-5 space-y-3 shadow-sm">
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-                    <Gift className="size-3.5 text-[#F84464]" /> Gift card
-                  </p>
+                  <div className="space-y-2 pt-1">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Gift card</p>
                   {appliedGiftCard ? (
                     <div className="flex items-center justify-between gap-2 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2">
                       <div className="min-w-0">
@@ -3146,109 +3194,125 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                       </div>
                     </div>
                   )}
-                </div>
-
-                <div className="rounded-2xl border border-slate-200 bg-white p-5 space-y-2 shadow-sm">
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                    Payment method
-                  </p>
-                  <div className="flex items-center gap-3 px-3 py-3 rounded-xl bg-rose-50 border border-rose-200">
-                    <Banknote className="size-5 text-[#F84464]" />
-                    <div>
-                      <p className="text-sm font-bold text-slate-900">Cash</p>
-                      <p className="text-[11px] text-slate-500">
-                        Pay at the cinema counter (mock payment)
-                      </p>
-                    </div>
-                    <CheckCircle2 className="size-5 text-emerald-500 ml-auto" />
                   </div>
                 </div>
               </div>
 
               <aside className="lg:col-span-5 space-y-4 lg:sticky lg:top-4">
-                <div className="rounded-2xl border border-slate-200 bg-white p-5 space-y-4 shadow-sm">
-                  <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                    <Ticket className="size-4 text-[#F84464]" /> Booking summary
-                  </h2>
-
-                  <div className="space-y-2">
-                    <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
-                      Selected seats
-                    </span>
-                    <div className="flex flex-wrap gap-2">
-                      {selectedSeats.map((seat) => (
-                        <span
-                          key={seat.seat_identifier}
-                          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-[#F84464]/08 border border-[#F84464]/30 text-xs font-bold text-[#F84464]"
-                        >
-                          <Armchair className="size-3 text-[#F84464]" />
-                          {formatSelectedSeatLabel(seat)}
-                          <span className="text-[#F84464]/80 font-normal">
-                            ({formatMoney(seat.unit_price, { compact: true })})
-                          </span>
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <h2 className="text-base font-bold text-slate-900">Payment summary</h2>
+                  <div className="mt-4 space-y-3 text-sm">
+                    <details className="group">
+                      <summary className="flex cursor-pointer list-none items-center justify-between text-slate-700 [&::-webkit-details-marker]:hidden">
+                        <span className="inline-flex items-center gap-1">
+                          Order amount
+                          <ChevronDown className="size-3.5 text-slate-400 transition-transform group-open:rotate-180" />
                         </span>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="space-y-2 pt-2 border-t border-slate-200 text-xs">
-                    <div className="flex justify-between text-slate-500">
-                      <span>Tickets ({selectedSeats.length})</span>
-                      <span className="text-slate-900 font-semibold">{formatMoney(ticketSubtotal)}</span>
-                    </div>
-                    {beverageSubtotal > 0 && (
-                      <div className="flex justify-between text-slate-500">
-                        <span>Snacks &amp; drinks ({totalBeverageQty})</span>
-                        <span className="text-slate-900 font-semibold">{formatMoney(beverageSubtotal)}</span>
-                      </div>
-                    )}
-                    <div className="flex justify-between text-slate-500">
-                      <div>
-                        <span>Convenience fee{convFeePct > 0 ? ` (${convFeePct}%)` : ""}</span>
-                        {convenienceFeeTax > 0 && (
-                          <p className="text-[10px] text-slate-400">
-                            Base: {formatMoney(convenienceFeeBase)} + {convVatPct}% VAT ({formatMoney(convenienceFeeTax)})
+                        <span className="font-semibold text-slate-900">{formatMoney(ticketSubtotal + beverageSubtotal)}</span>
+                      </summary>
+                      <div className="mt-2 space-y-1.5 text-xs leading-snug text-slate-500">
+                        {ticketPriceLines.map((line) => (
+                          <p key={`${line.label}-${line.price}`}>
+                            {line.count} × {line.label} ticket{line.count === 1 ? "" : "s"} @ {formatMoney(line.price)}
+                            <span className="block">each</span>
                           </p>
-                        )}
+                        ))}
+                        {beverageSubtotal > 0 ? (
+                          <div className="flex justify-between">
+                            <span>Snacks and drinks ({totalBeverageQty})</span>
+                            <span>{formatMoney(beverageSubtotal)}</span>
+                          </div>
+                        ) : null}
                       </div>
-                      <span className="text-slate-900 font-semibold">+{formatMoney(convenienceFee)}</span>
-                    </div>
-                    {discountAmount > 0 && (
-                      <div className="flex justify-between text-emerald-600">
+                    </details>
+                    <details className="group">
+                      <summary className="flex cursor-pointer list-none items-center justify-between text-slate-700 [&::-webkit-details-marker]:hidden">
+                        <span className="inline-flex items-center gap-1">
+                          Convenience fees
+                          <ChevronDown className="size-3.5 text-slate-400 transition-transform group-open:rotate-180" />
+                        </span>
+                        <span className="font-semibold text-slate-900">{formatMoney(convenienceFee)}</span>
+                      </summary>
+                      <div className="mt-2 space-y-1.5 text-xs text-slate-500">
+                        <div className="flex justify-between gap-4">
+                          <span>Base Amount</span>
+                          <span>{formatMoney(convenienceFeeBase)}</span>
+                        </div>
+                        {convenienceFeeTax > 0 ? (
+                          <div className="flex justify-between gap-4">
+                            <span>VAT @ {convVatPct}%</span>
+                            <span>{formatMoney(convenienceFeeTax)}</span>
+                          </div>
+                        ) : null}
+                      </div>
+                    </details>
+                    {discountAmount > 0 ? (
+                      <div className="flex justify-between text-emerald-700">
                         <span>Promo discount</span>
-                        <span className="font-bold">−{formatMoney(discountAmount)}</span>
+                        <span className="font-semibold">−{formatMoney(discountAmount)}</span>
                       </div>
-                    )}
-                    {giftCardAmount > 0 && (
-                      <div className="flex justify-between text-emerald-600">
+                    ) : null}
+                    {giftCardAmount > 0 ? (
+                      <div className="flex justify-between text-emerald-700">
                         <span>Gift card</span>
-                        <span className="font-bold">−{formatMoney(giftCardAmount)}</span>
+                        <span className="font-semibold">−{formatMoney(giftCardAmount)}</span>
                       </div>
-                    )}
-                    <div className="flex justify-between items-center pt-2 border-t border-slate-200 text-sm font-extrabold">
-                      <span className="text-slate-900">
-                        {giftCardAmount > 0 ? "Amount due" : "Total payable"}
-                      </span>
-                      <span className="text-lg font-extrabold text-[#F84464]">
-                        {formatMoney(grandTotal)}
-                      </span>
+                    ) : null}
+                    <div className="flex items-center justify-between border-t border-slate-100 pt-3 text-base font-bold text-slate-900">
+                      <span>{giftCardAmount > 0 ? "Amount due" : "To be paid"}</span>
+                      <span>{formatMoney(grandTotal)}</span>
                     </div>
                   </div>
-
-                  <button
-                    type="submit"
-                    disabled={submitting || timeOutOpen}
-                    className="w-full py-3.5 rounded-xl bg-[linear-gradient(135deg,#A78BFA_0%,#8B5CF6_38%,#6D28D9_72%,#4C1D95_100%)] text-white text-sm font-extrabold shadow-lg shadow-[#6D28D9]/30 disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2 hover:opacity-95"
-                  >
-                    {submitting ? (
-                      <>
-                        <Loader2 className="size-4 animate-spin" /> Confirming…
-                      </>
-                    ) : (
-                      <>Confirm booking · {formatMoney(grandTotal)}</>
-                    )}
-                  </button>
                 </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <div className="flex items-center justify-between gap-3">
+                    <h2 className="text-base font-bold text-slate-900">Your details</h2>
+                    <button
+                      type="button"
+                      onClick={() => setBillingEditOpen(true)}
+                      className="text-sm font-semibold text-slate-900 hover:underline cursor-pointer"
+                    >
+                      Edit
+                    </button>
+                  </div>
+                  <div className="mt-3 flex items-start gap-3">
+                    <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500">
+                      <User className="size-4" />
+                    </span>
+                    <div className="min-w-0 text-sm leading-5">
+                      <p className="font-semibold text-slate-900">{guestName?.trim() || "Add your name"}</p>
+                      <p className="text-slate-500">{guestPhone?.trim() || "Add your phone number"}</p>
+                      <p className="truncate text-slate-500">{guestEmail?.trim() || "Add your email"}</p>
+                    </div>
+                  </div>
+                  {(errors.guest_name || errors.guest_phone || errors.guest_email) ? (
+                    <p className="mt-2 text-[11px] font-semibold text-rose-600">Check your billing details before paying.</p>
+                  ) : null}
+                </div>
+
+                <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm">
+                  <Banknote className="size-4 shrink-0 text-slate-500" />
+                  <div className="min-w-0">
+                    <p className="font-semibold text-slate-900">Cash</p>
+                    <p className="text-xs text-slate-500">Pay at the cinema counter</p>
+                  </div>
+                  <CheckCircle2 className="ml-auto size-4 shrink-0 text-emerald-600" />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={submitting || timeOutOpen}
+                  className="flex w-full items-center justify-between rounded-xl bg-black px-5 py-3.5 text-white disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+                >
+                  <span className="text-left">
+                    <span className="block text-sm font-bold">{formatMoney(grandTotal)}</span>
+                    <span className="block text-[10px] font-semibold tracking-wide text-white/70">TOTAL</span>
+                  </span>
+                  <span className="text-sm font-bold">
+                    {submitting ? "Confirming…" : "Pay now"}
+                  </span>
+                </button>
               </aside>
             </form>
           </div>
@@ -3396,6 +3460,95 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
           }}
           onSelectSeats={applyAccessibleSeatIds}
         />
+      ) : null}
+
+      {bookedSuccessId ? (
+        <PaymentSuccessView
+          presentation="modal"
+          module="movies"
+          bookingId={bookedSuccessId}
+          nextHref={`/movies/booking-confirmation/${bookedSuccessId}`}
+        />
+      ) : null}
+
+      {billingEditOpen ? (
+        <div
+          className="fixed inset-0 z-[80] flex items-center justify-center bg-black/45 px-4"
+          onClick={() => setBillingEditOpen(false)}
+        >
+          <div
+            role="dialog"
+            aria-labelledby="edit-billing-title"
+            className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="mb-4 flex items-center justify-between">
+              <h3 id="edit-billing-title" className="text-base font-bold text-slate-900">
+                Edit billing details
+              </h3>
+              <button
+                type="button"
+                onClick={() => setBillingEditOpen(false)}
+                className="flex size-8 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 cursor-pointer"
+                aria-label="Close"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+            <div className="space-y-3">
+              <input
+                type="text"
+                {...register("guest_name")}
+                placeholder="Full name"
+                className="w-full rounded-xl border border-slate-200 px-3 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-900 focus:outline-none"
+              />
+              {errors.guest_name ? <p className={fieldErrorClass}>{errors.guest_name.message}</p> : null}
+              <div>
+                <Controller
+                  name="guest_phone"
+                  control={control}
+                  render={({ field }) => (
+                    <PhoneInput
+                      value={field.value || ""}
+                      onChange={field.onChange}
+                      onBlur={field.onBlur}
+                      required
+                      disabled={phoneLocked}
+                      variant="light"
+                      inputClassName="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-900 focus:outline-none disabled:bg-slate-50 disabled:text-slate-500"
+                      placeholder="Phone number"
+                      error={errors.guest_phone?.message}
+                    />
+                  )}
+                />
+                {phoneLocked ? (
+                  <p className="mt-1.5 flex items-start gap-1.5 text-[11px] text-slate-500">
+                    <Info className="mt-0.5 size-3.5 shrink-0" />
+                    The phone number associated with your account cannot be modified.
+                  </p>
+                ) : null}
+              </div>
+              <input
+                type="email"
+                {...register("guest_email")}
+                placeholder="Email"
+                className="w-full rounded-xl border border-slate-200 px-3 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-900 focus:outline-none"
+              />
+              {errors.guest_email ? <p className={fieldErrorClass}>{errors.guest_email.message}</p> : null}
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                void trigger(["guest_name", "guest_phone", "guest_email"]).then((ok) => {
+                  if (ok) setBillingEditOpen(false);
+                });
+              }}
+              className="mt-5 w-full rounded-xl bg-black py-3 text-sm font-bold text-white cursor-pointer"
+            >
+              Confirm
+            </button>
+          </div>
+        </div>
       ) : null}
 
       <CustomerAuthModal

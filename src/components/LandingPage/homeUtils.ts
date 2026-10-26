@@ -1,6 +1,6 @@
 import type { Business, PublicEvent } from "@/services/api";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
-import { formatDateCustomer } from "@/lib/dateFormat";
+import { formatDateCustomer, getVenueDateTimeParts } from "@/lib/dateFormat";
 
 export function hasCityFilter(city?: string) {
   return Boolean(city && city !== "All Cities");
@@ -40,23 +40,25 @@ export function formatShowDateBar(iso?: string) {
 /** Reference card date: "Sat, 10 October 2026 onwards" */
 export function formatEventDateLine(iso?: string) {
   if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  const weekday = d.toLocaleString("en-GB", { weekday: "short" });
-  const dateLabel = formatDateCustomer(d);
+  const parts = getVenueDateTimeParts(iso);
+  if (!parts) return "";
+  const dateLabel = formatDateCustomer(iso);
   if (!dateLabel || dateLabel === "—") return "";
-  return `${weekday}, ${dateLabel} onwards`;
+  return `${parts.weekdayLong.slice(0, 3)}, ${dateLabel} onwards`;
 }
 
 /** Parts for the small date badge on poster images. */
 export function eventDateParts(iso?: string) {
-  if (!iso) return null;
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return null;
+  const parts = getVenueDateTimeParts(iso);
+  if (!parts) return null;
+  const month = new Date(Date.UTC(parts.y, parts.m - 1, parts.d, 12)).toLocaleString("en-GB", {
+    month: "short",
+    timeZone: "UTC",
+  });
   return {
-    day: String(d.getDate()).padStart(2, "0"),
-    month: d.toLocaleString("en-GB", { month: "short" }).toUpperCase(),
-    weekday: d.toLocaleString("en-GB", { weekday: "short" }),
+    day: String(parts.d).padStart(2, "0"),
+    month: month.toUpperCase(),
+    weekday: parts.weekdayLong.slice(0, 3),
   };
 }
 

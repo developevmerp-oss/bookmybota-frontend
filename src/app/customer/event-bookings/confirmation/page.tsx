@@ -126,6 +126,24 @@ function ConfirmationContent() {
     [booking]
   );
 
+  const groupedItems = useMemo(() => {
+    if (!booking?.items?.length) return [];
+    const map = new Map<string, { ticket_type: string; qty: number; totalPrice: number }>();
+    for (const item of booking.items) {
+      const type = item.ticket_type || "Ticket";
+      const qty = Number(item.qty || 0);
+      const total = Number(item.unit_price || 0) * qty;
+      const existing = map.get(type);
+      if (existing) {
+        existing.qty += qty;
+        existing.totalPrice += total;
+      } else {
+        map.set(type, { ticket_type: type, qty, totalPrice: total });
+      }
+    }
+    return Array.from(map.values());
+  }, [booking?.items]);
+
   const poster = resolveMediaUrl(
     booking?.poster_vertical_url || booking?.poster_horizontal_url
   );
@@ -221,23 +239,6 @@ function ConfirmationContent() {
     : booking.ticket_qty
       ? `${booking.ticket_qty} ticket${booking.ticket_qty === 1 ? "" : "s"}`
       : "Ticket";
-  const groupedItems = useMemo(() => {
-    if (!booking.items?.length) return [];
-    const map = new Map<string, { ticket_type: string; qty: number; totalPrice: number }>();
-    for (const item of booking.items) {
-      const type = item.ticket_type || "Ticket";
-      const qty = Number(item.qty || 0);
-      const total = Number(item.unit_price || 0) * qty;
-      const existing = map.get(type);
-      if (existing) {
-        existing.qty += qty;
-        existing.totalPrice += total;
-      } else {
-        map.set(type, { ticket_type: type, qty, totalPrice: total });
-      }
-    }
-    return Array.from(map.values());
-  }, [booking.items]);
 
   const amountRows = [
     ...groupedItems.map((item) => ({
@@ -289,6 +290,7 @@ function ConfirmationContent() {
         cancellationNote={ticketModeConfirmationMessage(ticketMode)}
         onDownloadPdf={downloadTickets}
         downloading={downloading}
+        exploreHref="/events"
         supportHref="/customer/help"
         showQr={true}
         directDetails={true}

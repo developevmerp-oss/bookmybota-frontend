@@ -1,3 +1,5 @@
+import { venueDateStr } from "@/lib/dateFormat";
+
 export type DiningOfferStatus =
   | "DRAFT"
   | "ACTIVE"
@@ -72,7 +74,7 @@ export function getEffectiveDiningOfferStatus(
     return base;
   }
 
-  const todayStr = now.toISOString().slice(0, 10);
+  const todayStr = venueDateStr(now);
 
   if (offer.end_at && offer.end_at.slice(0, 10) < todayStr) return "EXPIRED";
   if (offer.start_at && offer.start_at.slice(0, 10) > todayStr) return "SCHEDULED";

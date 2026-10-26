@@ -37,7 +37,7 @@ import SearchInput from "@/components/Shared/SearchInput";
 import Pagination from "@/components/Shared/Pagination";
 import { AdminListShimmer } from "@/components/Shared/Shimmer";
 import { PAGE_SIZE } from "@/lib/pagination";
-import { formatDate, formatDateTime12h } from "@/lib/dateFormat";
+import { formatDate, formatDateTime12h, toDateInput } from "@/lib/dateFormat";
 import { formatMoney, formatOfferDiscount } from "@/lib/currencyFormat";
 
 type TabKey =
@@ -127,8 +127,8 @@ function offerToForm(o: PlatformOffer): AdminPlatformOfferValues {
     customer_eligibility: o.customer_eligibility,
     usage_limit: o.usage_limit != null ? String(o.usage_limit) : "",
     per_user_limit: String(o.per_user_limit ?? 1),
-    start_at: o.start_at ? o.start_at.slice(0, 10) : "",
-    end_at: o.end_at ? o.end_at.slice(0, 10) : "",
+    start_at: o.start_at ? toDateInput(o.start_at) : "",
+    end_at: o.end_at ? toDateInput(o.end_at) : "",
     status: o.status || "DRAFT",
     display_theme: o.display_theme || "magenta",
     sort_order: String(o.sort_order ?? 0),

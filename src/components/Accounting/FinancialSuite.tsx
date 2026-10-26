@@ -37,7 +37,7 @@ import {
   useExecuteGiftCardBreakageRunMutation,
 } from "@/services/api";
 import { formatMoney } from "@/lib/currencyFormat";
-import { formatDate } from "@/lib/dateFormat";
+import { formatDate, formatInstantLocalDateTime, venueDateStr } from "@/lib/dateFormat";
 import { AdminSegmentedTabs, AdminStatCard, AdminStatusBadge } from "@/components/SuperAdmin/AdminFinanceChrome";
 import { toast } from "sonner";
 
@@ -262,12 +262,12 @@ export default function FinancialSuite({
     }
     const tb = tbData.data;
     const company = ethConfig.company_name || "BookMyBota";
-    const dateStamp = new Date().toISOString().slice(0, 10);
+    const dateStamp = venueDateStr();
     const dateRangeStr = `Period: ${dateFrom || "Beginning"} to ${dateTo || "Current"}`;
 
     const rows: (string | number)[][] = [
       [company, "TRIAL BALANCE REPORT", dateRangeStr],
-      ["Generated At", new Date().toLocaleString(), `Currency: ${ethConfig.currency || "ETB"}`],
+      ["Generated At", formatInstantLocalDateTime(new Date()), `Currency: ${ethConfig.currency || "ETB"}`],
       [],
       ["Account Code", "Account Name", "Category", "Debit (ETB)", "Credit (ETB)", "Net Balance (ETB)"],
       ...tb.accounts.map((item: any) => [
@@ -299,12 +299,12 @@ export default function FinancialSuite({
     }
     const pnl = pnlData.data;
     const company = ethConfig.company_name || "BookMyBota";
-    const dateStamp = new Date().toISOString().slice(0, 10);
+    const dateStamp = venueDateStr();
     const dateRangeStr = `Period: ${dateFrom || "Beginning"} to ${dateTo || "Current"}`;
 
     const rows: (string | number)[][] = [
       [company, "PROFIT & LOSS STATEMENT (INCOME STATEMENT)", dateRangeStr],
-      ["Generated At", new Date().toLocaleString(), `Currency: ${ethConfig.currency || "ETB"}`],
+      ["Generated At", formatInstantLocalDateTime(new Date()), `Currency: ${ethConfig.currency || "ETB"}`],
       [],
       ["--- OPERATING REVENUES ---", "", ""],
       ["Account Code", "Account Name", "Amount (ETB)"],
@@ -337,11 +337,11 @@ export default function FinancialSuite({
     }
     const bs = bsData.data;
     const company = ethConfig.company_name || "BookMyBota";
-    const dateStamp = new Date().toISOString().slice(0, 10);
+    const dateStamp = venueDateStr();
 
     const rows: (string | number)[][] = [
       [company, "STATEMENT OF FINANCIAL POSITION (BALANCE SHEET)", `As of: ${dateTo || dateStamp}`],
-      ["Generated At", new Date().toLocaleString(), `Currency: ${ethConfig.currency || "ETB"}`],
+      ["Generated At", formatInstantLocalDateTime(new Date()), `Currency: ${ethConfig.currency || "ETB"}`],
       [],
       ["--- ASSETS ---", "", ""],
       ["Account Code", "Account Name", "Amount (ETB)"],
@@ -393,14 +393,14 @@ export default function FinancialSuite({
     }
     const entries = ledgerData.entries;
     const company = ethConfig.company_name || "BookMyBota";
-    const dateStamp = new Date().toISOString().slice(0, 10);
+    const dateStamp = venueDateStr();
     const dateRangeStr = `Period: ${dateFrom || "Beginning"} to ${dateTo || "Current"}`;
 
     const rows: (string | number)[][] = [
       [company, "GENERAL LEDGER JOURNAL TRANSACTIONS", dateRangeStr],
       [
         "Generated At",
-        new Date().toLocaleString(),
+        formatInstantLocalDateTime(new Date()),
         `Account Filter: ${selectedAccountFilter || "All Accounts"}`,
       ],
       [],
@@ -426,12 +426,12 @@ export default function FinancialSuite({
     }
     const invoices = invoicesData.invoices;
     const company = ethConfig.company_name || "BookMyBota";
-    const dateStamp = new Date().toISOString().slice(0, 10);
+    const dateStamp = venueDateStr();
     const dateRangeStr = `Period: ${dateFrom || "Beginning"} to ${dateTo || "Current"}`;
 
     const rows: (string | number)[][] = [
       [company, "ISSUED TAX INVOICES & STATUTORY WITHHOLDING CERTIFICATES", dateRangeStr],
-      ["Generated At", new Date().toLocaleString(), `Tax Authority: ${ethConfig.tax_authority_name || "ERCA"}`],
+      ["Generated At", formatInstantLocalDateTime(new Date()), `Tax Authority: ${ethConfig.tax_authority_name || "ERCA"}`],
       [],
       [
         "Invoice Number",
@@ -467,7 +467,7 @@ export default function FinancialSuite({
     }
     const coa = coaData.data;
     const company = ethConfig.company_name || "BookMyBota";
-    const dateStamp = new Date().toISOString().slice(0, 10);
+    const dateStamp = venueDateStr();
 
     const rows: (string | number)[][] = [
       [company, "CHART OF ACCOUNTS MASTER DIRECTORY (IFRS / MOR)", `Date: ${dateStamp}`],

@@ -36,6 +36,7 @@ import { formatDateCustomer, formatTime12h } from "@/lib/dateFormat";
 import { parseEventLanguages } from "@/lib/eventValidation";
 import { formatMoney, formatOfferDiscount } from "@/lib/currencyFormat";
 import { artistHref } from "@/lib/businessPublicPath";
+import { useStickyHeaderOffset } from "@/lib/useStickyHeaderOffset";
 import { readSessionForRole } from "@/lib/authStorage";
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
@@ -200,6 +201,8 @@ export default function PublicEventDetailPage({
   const [venuesOpen, setVenuesOpen] = useState(false);
   const pendingInterestAfterAuthRef = useRef(false);
   const relatedRef = useRef<HTMLDivElement>(null);
+  const stickyHeaderOffset = useStickyHeaderOffset(72);
+  const bookingCardTop = stickyHeaderOffset + 12;
 
   useEffect(() => {
     const syncAuth = () => {
@@ -528,10 +531,6 @@ export default function PublicEventDetailPage({
   const venueLabel = [nextShowtime?.venue_name, nextShowtime?.venue_address]
     .filter(Boolean)
     .join(": ");
-  const venueUnauthorized =
-    nextShowtime?.venue_source === "auto_registered" ||
-    nextShowtime?.venue_is_authorized === false ||
-    nextShowtime?.venue_claim_status === "UNCLAIMED";
   const mapsQuery = [nextShowtime?.venue_name, nextShowtime?.venue_address].filter(Boolean).join(", ");
   const mapsUrl = mapsQuery
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapsQuery)}`
@@ -542,9 +541,24 @@ export default function PublicEventDetailPage({
   ) as string[];
 
   const bookLabel = canBook ? "Book Now" : soldOut ? "Sold out" : "Booking unavailable";
-  const hasLayout = Boolean(
-    layout && (Array.isArray(layout) ? layout.length : layout?.seats || layout?.shapes || layout?.layout)
-  );
+  const layoutBody = (layout as { data?: Record<string, unknown> } | null | undefined)?.data ?? layout;
+  const seatingConfig =
+    (layoutBody as { seating_config?: { layout_mode?: string; blocks?: unknown[] } } | null)
+      ?.seating_config ??
+    (event as { seating_config?: { layout_mode?: string; blocks?: unknown[] } } | null)
+      ?.seating_config ??
+    null;
+  const hasSeatMap =
+    Array.isArray((layoutBody as { seats?: unknown[] } | null)?.seats) &&
+    ((layoutBody as { seats?: unknown[] }).seats?.length || 0) > 0;
+  const hasStadiumLayout =
+    seatingConfig?.layout_mode === "stadium" ||
+    (Array.isArray(seatingConfig?.blocks) && seatingConfig.blocks.length > 0);
+  const hasShowtimeLayout = showtimes.some((s) => {
+    const mode = String(s.layout_mode || "").toLowerCase();
+    return mode === "standard" || mode === "custom" || Boolean(s.venue_layout_template_id);
+  });
+  const hasLayout = hasSeatMap || hasStadiumLayout || hasShowtimeLayout;
 
   const bookingCard = (
     <div className="bg-white rounded-xl border border-[#E8E8E8] shadow-[0_2px_12px_rgba(0,0,0,0.06)] overflow-hidden">
@@ -582,11 +596,6 @@ export default function PublicEventDetailPage({
                 </a>
               )}
             </span>
-            {venueUnauthorized && (
-              <span className="block mt-1 text-[0.6875rem] sm:text-xs text-[#9AA0A6] font-normal leading-snug">
-                This venue is listed by the organizer and is not platform-authorized.
-              </span>
-            )}
             {otherVenues.length > 0 && (
               <button
                 type="button"
@@ -599,17 +608,7 @@ export default function PublicEventDetailPage({
             )}
           </MetaRow>
         )}
-        {hasLayout && canBook && (
-          <button
-            type="button"
-            onClick={() => openCheckout()}
-            className="text-[1rem] sm:text-[1.0625rem] font-semibold cursor-pointer mb-2"
-            style={{ color: BRAND }}
-          >
-            View seating plan
-          </button>
-            )}
-          </div>
+      </div>
 
       {fillingFast && (
         <div className="mx-3 sm:mx-4 mb-3 flex items-start sm:items-center gap-2 rounded-md bg-[#FFF6E5] px-3 py-2 text-[0.875rem] sm:text-[0.9375rem] text-[#6B4E16]">
@@ -684,32 +683,6 @@ export default function PublicEventDetailPage({
       </div>
 
       <div className="bmb-section-container pt-4 sm:pt-6 lg:pt-7 pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:pb-10">
-        <nav
-          aria-label="Breadcrumb"
-          className="hidden lg:block mb-3 sm:mb-4 text-[0.8125rem] sm:text-[0.875rem] text-[#8A8A8A] break-words leading-relaxed"
-        >
-          <Link href="/" className="hover:underline">
-            Home
-          </Link>
-          <span> &gt; </span>
-          <Link href="/events" className="hover:underline">
-            Events
-          </Link>
-          {event.category_name && (
-            <>
-              <span> &gt; </span>
-              <Link
-                href={`/events?category=${encodeURIComponent(event.category_name)}`}
-                className="hover:underline"
-              >
-                {event.category_name}
-              </Link>
-            </>
-          )}
-          <span> &gt; </span>
-          <span className="text-[#555]">{event.name}</span>
-        </nav>
-
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] 2xl:grid-cols-[minmax(0,1fr)_360px] gap-x-5 sm:gap-x-6 lg:gap-x-8 2xl:gap-x-10 gap-y-5 sm:gap-y-6 lg:gap-y-0">
           <div className="hidden lg:flex items-center justify-between gap-3 mb-3 sm:mb-4 lg:mb-5 lg:col-start-1">
             <h1 className="min-w-0 flex-1 text-[1.75rem] sm:text-[2rem] lg:text-[2.2rem] 2xl:text-[2.2rem] font-bold text-[#1A1A1A] leading-tight tracking-tight break-words">
@@ -833,7 +806,7 @@ export default function PublicEventDetailPage({
               </section>
             )}
 
-            {ticketTypesDisplay.length > 0 && (
+            {!hasLayout && ticketTypesDisplay.length > 0 && (
               <section className="mt-6 sm:mt-8 lg:mt-9">
                 <h2 className="text-[1.25rem] sm:text-[1.375rem] lg:text-[1.4rem] font-semibold text-[#1A1A1A] mb-2.5 sm:mb-2">
                   Tickets
@@ -981,7 +954,13 @@ export default function PublicEventDetailPage({
 
           </div>
 
-          <aside className="hidden lg:block lg:sticky lg:top-[140px] 2xl:top-[148px] lg:self-start lg:z-30 lg:col-start-2 lg:row-start-2">
+          <aside
+            className="hidden lg:block lg:sticky lg:self-start lg:z-30 lg:col-start-2 lg:row-start-2 lg:overflow-y-auto"
+            style={{
+              top: bookingCardTop,
+              maxHeight: `calc(100dvh - ${bookingCardTop + 16}px)`,
+            }}
+          >
             {cloneElement(bookingCard)}
           </aside>
         </div>

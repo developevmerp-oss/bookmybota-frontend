@@ -39,6 +39,7 @@ import {
 } from "@/services/api";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import {
+  formatTime12h,
   isMovieShowEnded,
   venueCalendarAddDays,
   venueDateLabels,
@@ -103,27 +104,8 @@ const SHOWCASE_BY_ID: Record<
 
 function parseIsoDateAndHours(iso: string) {
   if (!iso) return { displayTime: "" };
-  const str = String(iso).trim();
-  const match = str.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
-  if (match) {
-    const [, , , , hhStr, mmStr] = match;
-    const h = parseInt(hhStr, 10);
-    const minuteStr = mmStr || "00";
-    const ampm = h >= 12 ? "PM" : "AM";
-    const h12 = h % 12 || 12;
-    return {
-      displayTime: `${String(h12).padStart(2, "0")}:${minuteStr} ${ampm}`,
-    };
-  }
-  const dateObj = new Date(iso);
-  if (isNaN(dateObj.getTime())) return { displayTime: "" };
-  const h = dateObj.getHours();
-  const minuteStr = String(dateObj.getMinutes()).padStart(2, "0");
-  const ampm = h >= 12 ? "PM" : "AM";
-  const h12 = h % 12 || 12;
-  return {
-    displayTime: `${String(h12).padStart(2, "0")}:${minuteStr} ${ampm}`,
-  };
+  const displayTime = formatTime12h(iso);
+  return { displayTime: displayTime === "—" ? "" : displayTime };
 }
 
 function formatTime(iso: string) {

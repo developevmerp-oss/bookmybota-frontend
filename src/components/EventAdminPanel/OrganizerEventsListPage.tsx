@@ -7,7 +7,7 @@ import { useGetOrganizerEventsQuery } from "@/services/api";
 import { contractStatusLabel, organizerWorkflowLabel } from "@/lib/contractPlaceholders";
 import Pagination from "@/components/Shared/Pagination";
 import { PAGE_SIZE } from "@/lib/pagination";
-import { formatDate } from "@/lib/dateFormat";
+import { formatDate, getVenueDateTimeParts } from "@/lib/dateFormat";
 
 const STATUS_FILTERS = [
   { label: "All", value: "" },
@@ -36,13 +36,9 @@ function formatEventDate(startsAt?: string | null, endsAt?: string | null): stri
   if (!endsAt) return startLabel;
   const endLabel = formatDate(endsAt);
   if (endLabel === "—") return startLabel;
-  const start = new Date(startsAt);
-  const end = new Date(endsAt);
-  if (
-    !Number.isNaN(start.getTime()) &&
-    !Number.isNaN(end.getTime()) &&
-    start.toDateString() === end.toDateString()
-  ) {
+  const startKey = getVenueDateTimeParts(startsAt)?.dateKey;
+  const endKey = getVenueDateTimeParts(endsAt)?.dateKey;
+  if (startKey && endKey && startKey === endKey) {
     return startLabel;
   }
   return `${startLabel} – ${endLabel}`;

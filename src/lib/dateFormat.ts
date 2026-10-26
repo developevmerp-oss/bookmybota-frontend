@@ -2,8 +2,8 @@
  * Project-wide date/time display helpers.
  *
  * Storage/API: ISO 8601 UTC.
- * Scheduled times (reservation, showtime, event start): Africa/Addis_Ababa (venue).
- * Instant / audit times (created_at, booked on, checked out): browser local timezone.
+ * Every user-facing clock (customer, admin, superadmin) is Africa/Addis_Ababa.
+ * That includes showtimes and audit times (created_at, booked on, checked out).
  *
  * Display shapes:
  * - Customer: "22 April 2014" + "5:00 PM"
@@ -150,23 +150,48 @@ function scheduledParts(value: string | Date): ZonedYmdHm | null {
   return zonedParts(d, APP_VENUE_TZ);
 }
 
-/** Resolve instant parts in the browser's local timezone. */
+/** Resolve an instant in Ethiopia, not the viewer's computer timezone. */
 function localParts(value: string | Date): ZonedYmdHm | null {
   const d = toValidDate(value);
   if (!d) return null;
+  return zonedParts(d, APP_VENUE_TZ);
+}
+
+/** Ethiopia calendar + clock for a stored value (naive strings keep their digits). */
+export function getVenueDateTimeParts(value?: string | Date | null): {
+  y: number;
+  m: number;
+  d: number;
+  dateKey: string;
+  hour: number;
+  minute: number;
+  weekdayLong: string;
+} | null {
+  if (value == null || value === "") return null;
+  const parts = scheduledParts(value);
+  if (!parts) return null;
+  let weekdayLong = parts.weekday;
+  if (!weekdayLong) {
+    const d = new Date(Date.UTC(parts.y, parts.m - 1, parts.d, 12));
+    weekdayLong = d.toLocaleDateString(DISPLAY_LOCALE, {
+      weekday: "long",
+      timeZone: "UTC",
+    });
+  }
   return {
-    y: d.getFullYear(),
-    m: d.getMonth() + 1,
-    d: d.getDate(),
-    hour: d.getHours(),
-    minute: d.getMinutes(),
-    weekday: d.toLocaleDateString(DISPLAY_LOCALE, { weekday: "long" }),
+    y: parts.y,
+    m: parts.m,
+    d: parts.d,
+    dateKey: `${parts.y}-${pad2(parts.m)}-${pad2(parts.d)}`,
+    hour: parts.hour,
+    minute: parts.minute,
+    weekdayLong,
   };
 }
 
 // ── Scheduled / venue-facing (reservation, showtime, event start) ────────────
 
-/** MM-DD-YYYY (compact admin lists — local calendar for instants, wall for date-only) */
+/** MM-DD-YYYY (admin lists — Ethiopia for instants, wall digits for date-only) */
 export function formatDate(value?: string | Date | null): string {
   if (!value) return "—";
   const wall = typeof value === "string" ? parseWallCalendarParts(value) : null;
@@ -235,7 +260,7 @@ export function formatBookingDateParts(value?: string | Date | null): {
   };
 }
 
-/** MM-DD-YYYY, h:mm AM/PM — browser local (admin / partner audit lists) */
+/** MM-DD-YYYY, h:mm AM/PM in Ethiopia (admin / partner lists) */
 export function formatDateTime12h(value?: string | Date | null): string {
   if (!value) return "—";
   const parts = localParts(value);
@@ -403,9 +428,9 @@ export function formatHm12h(hm?: string | null): string {
   return formatHour12(hours, minutes);
 }
 
-// ── Instant / audit (created_at, booked on, checked out) — browser local ─────
+// ── Instant / audit (created_at, booked on, checked out) — Ethiopia ──────────
 
-/** Local calendar date: "22 April 2014" */
+/** Ethiopia calendar date: "22 April 2014" */
 export function formatInstantLocalDate(value?: string | Date | null): string {
   if (!value) return "—";
   const parts = localParts(value);
@@ -413,7 +438,7 @@ export function formatInstantLocalDate(value?: string | Date | null): string {
   return formatPartsCustomer(parts.y, parts.m, parts.d);
 }
 
-/** Local time: "2:41 PM" */
+/** Ethiopia time: "2:41 PM" */
 export function formatInstantLocalTime(value?: string | Date | null): string {
   if (!value) return "—";
   const parts = localParts(value);
@@ -421,7 +446,7 @@ export function formatInstantLocalTime(value?: string | Date | null): string {
   return formatHour12(parts.hour, parts.minute);
 }
 
-/** Local date + time: "22 April 2014, 2:41 PM" */
+/** Ethiopia date + time: "22 April 2014, 2:41 PM" */
 export function formatInstantLocalDateTime(value?: string | Date | null): string {
   if (!value) return "—";
   const date = formatInstantLocalDate(value);
@@ -432,20 +457,24 @@ export function formatInstantLocalDateTime(value?: string | Date | null): string
   return `${date}, ${time}`;
 }
 
-// ── Form helpers (browser local wall clock ↔ ISO) ────────────────────────────
+// ── Form helpers (Ethiopia wall clock ↔ UTC ISO) ─────────────────────────────
 
-/** Convert ISO / Date to `datetime-local` input value (YYYY-MM-DDTHH:mm) */
+/** Convert ISO / Date to `datetime-local` value in Ethiopia (YYYY-MM-DDTHH:mm) */
 export function toDatetimeLocal(iso?: string | null): string {
   if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+  const parts = getVenueDateTimeParts(iso);
+  if (!parts) return "";
+  return `${parts.dateKey}T${pad2(parts.hour)}:${pad2(parts.minute)}`;
 }
 
-/** Convert `datetime-local` value to ISO string for API */
+/** Convert a `datetime-local` value typed as Ethiopia time to a UTC ISO string */
 export function fromDatetimeLocal(val: string): string {
   if (!val) return "";
-  return new Date(val).toISOString();
+  const match = val.trim().match(/^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2})/);
+  if (!match) return "";
+  const d = new Date(`${match[1]}T${match[2]}:00+03:00`);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toISOString();
 }
 
 export function fromDateAndTime(dateYmd: string, timeHm: string): string {
@@ -459,25 +488,21 @@ export function toDateInput(iso?: string | null): string {
   if (!iso) return "";
   const s = String(iso).trim();
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-  const d = new Date(s);
-  if (Number.isNaN(d.getTime())) return "";
-  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+  const parts = getVenueDateTimeParts(s);
+  return parts?.dateKey || "";
 }
 
 /** Alias for settlement / API date-only params */
 export function toDateOnlyParam(value?: string | Date | null): string {
   if (!value) return "";
-  if (value instanceof Date && !Number.isNaN(value.getTime())) {
-    return value.toISOString().slice(0, 10);
-  }
-  return toDateInput(String(value));
+  return toDateInput(value instanceof Date ? value.toISOString() : String(value));
 }
 
 export function toTimeInput(iso?: string | null): string {
   if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+  const parts = getVenueDateTimeParts(iso);
+  if (!parts) return "";
+  return `${pad2(parts.hour)}:${pad2(parts.minute)}`;
 }
 
 /** Normalize any time string to `HH:mm` (drops seconds). Empty if invalid. */
@@ -497,10 +522,10 @@ export function inferDurationType(
   endsAt?: string | null
 ): "ONE_DAY" | "MULTI_DAY" {
   if (!startsAt || !endsAt) return "ONE_DAY";
-  const a = new Date(startsAt);
-  const b = new Date(endsAt);
-  if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) return "ONE_DAY";
-  return a.toDateString() === b.toDateString() ? "ONE_DAY" : "MULTI_DAY";
+  const a = getVenueDateTimeParts(startsAt);
+  const b = getVenueDateTimeParts(endsAt);
+  if (!a || !b) return "ONE_DAY";
+  return a.dateKey === b.dateKey ? "ONE_DAY" : "MULTI_DAY";
 }
 
 export type ShowtimeEndValidation = "ok" | "missing_start" | "before_start" | "same_as_start";

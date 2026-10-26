@@ -232,10 +232,15 @@
     transition: background-color 0.3s, color 0.3s;
   }
 
-  /* Keep customer pages from shifting sideways when sticky navbar content is wide */
-  html.customer-theme,
-  html.customer-theme body {
+  /* Clip sideways shift on the viewport only.
+     overflow-x: clip on body computes overflow-y to auto and becomes a
+     scroll container that does not scroll, which stops position: sticky
+     (event booking card, dining sidebar) from sticking. */
+  html.customer-theme {
     overflow-x: clip;
+    max-width: 100%;
+  }
+  html.customer-theme body {
     max-width: 100%;
   }
 

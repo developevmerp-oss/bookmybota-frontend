@@ -44,7 +44,9 @@ export default function EventLikeButton({ eventId, className }: Props) {
       const next = nextLiked ? [...ids, id] : ids.filter((x) => x !== id);
       writeLikedIds(next);
       setLiked(nextLiked);
-      toast.success(nextLiked ? "Added to likes" : "Removed from likes");
+      toast.success(
+        nextLiked ? "Successfully added to favourites" : "Removed from favourites"
+      );
     },
     [eventId]
   );
@@ -53,7 +55,7 @@ export default function EventLikeButton({ eventId, className }: Props) {
     <button
       type="button"
       onClick={handleClick}
-      aria-label={liked ? "Unlike event" : "Like event"}
+      aria-label={liked ? "Remove from favourites" : "Add to favourites"}
       aria-pressed={liked}
       className={
         className ||

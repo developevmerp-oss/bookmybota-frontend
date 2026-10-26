@@ -87,10 +87,9 @@ function MovieCard({ movie }: { movie: RailMovieCard }) {
               <Clapperboard size={32} strokeWidth={1.4} />
             </div>
           )}
+          {/* No PROMOTED badge on home — that benefit belongs to the Movies listing page. */}
           {movie.comingSoon ? (
             <span className="movies-rail-badge movies-rail-badge--soon">Coming Soon</span>
-          ) : movie.promoted ? (
-            <span className="movies-rail-badge movies-rail-badge--promoted">Promoted</span>
           ) : null}
         </div>
         <div className="px-3 pt-3 pb-3.5 flex flex-col gap-0.5">

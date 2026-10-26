@@ -27,6 +27,7 @@ import { parseEventLanguages } from "@/lib/eventValidation";
 import { extractApiError } from "@/lib/apiErrors";
 import { formatMoney } from "@/lib/currencyFormat";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
+import { placementOption } from "@/lib/marketingPlacement";
 import SafeCoverImage, {
   ARTIST_IMAGE_FALLBACK_CLASS,
   ArtistImageFallback,
@@ -1046,13 +1047,7 @@ export default function AdminEventDetailPage({
                       {p.plan_price != null ? ` · ${formatMoney(p.plan_price)}` : ""}
                     </p>
                     <p className="text-xs portal-muted">
-                      {[
-                        p.listing_boost ? "Listing boost" : "",
-                        p.landing_slider ? "Landing slider" : "",
-                        p.category_rail ? "Category rail" : "",
-                      ]
-                        .filter(Boolean)
-                        .join(" · ") || "No placement flags"}
+                      {placementOption(p).label} — {placementOption(p).pages}
                     </p>
                     {(p.start_date || p.end_date) && (
                       <p className="text-xs text-slate-600">

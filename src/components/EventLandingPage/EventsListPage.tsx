@@ -58,7 +58,6 @@ import {
   preferCityOrAll,
 } from "@/components/LandingPage/homeUtils";
 import CitySectionEmptyNotice from "@/components/LandingPage/CitySectionEmptyNotice";
-import CategoryPromoBanners from "@/components/LandingPage/CategoryPromoBanners";
 import ListingPromoSlider from "@/components/LandingPage/ListingPromoSlider";
 import { RailPagerNav } from "@/components/LandingPage/RailChrome";
 import { scrollRailBy, useHorizontalScrollEdges } from "@/lib/useHorizontalScrollEdges";
@@ -513,12 +512,23 @@ const FILTER_MODAL_TABS: Array<{ id: FilterModalTab; label: string }> = [
   { id: "pricing", label: "Pricing" },
 ];
 
+/** PROMOTED chip over the poster — only for the placement that applies to this page. */
+function PromotedBadge() {
+  return (
+    <span className="absolute left-2.5 top-2.5 z-10 inline-flex items-center rounded-md bg-white/95 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#6900AA] shadow-sm">
+      Promoted
+    </span>
+  );
+}
+
 function DistrictEventCard({
   event,
   cityLabel,
+  promoted = false,
 }: {
   event: PublicEvent;
   cityLabel?: string;
+  promoted?: boolean;
 }) {
   const portrait = eventPortrait(event);
   const place = eventPlaceLine(event, cityLabel);
@@ -538,6 +548,7 @@ function DistrictEventCard({
           fallbackClassName="absolute inset-0 flex h-full w-full items-center justify-center bg-[#F3F4F6] text-slate-300"
           fallback={<EventImageFallback size={32} />}
         />
+        {promoted ? <PromotedBadge /> : null}
       </div>
       <div className="space-y-1 px-3.5 py-3 sm:px-4 sm:py-3.5">
         {dateLine ? (
@@ -557,7 +568,15 @@ function DistrictEventCard({
   );
 }
 
-function RecommendCard({ event, cityLabel }: { event: PublicEvent; cityLabel?: string }) {
+function RecommendCard({
+  event,
+  cityLabel,
+  promoted = false,
+}: {
+  event: PublicEvent;
+  cityLabel?: string;
+  promoted?: boolean;
+}) {
   const portrait = eventPortrait(event);
   const place = eventPlaceLine(event, cityLabel);
   const dateLine = formatEventDateLine(event.next_showtime);
@@ -575,6 +594,7 @@ function RecommendCard({ event, cityLabel }: { event: PublicEvent; cityLabel?: s
           fallbackClassName="absolute inset-0 flex h-full w-full items-center justify-center bg-[#F3F4F6] text-slate-300"
           fallback={<EventImageFallback size={32} />}
         />
+        {promoted ? <PromotedBadge /> : null}
       </div>
       <div className="mt-2 space-y-0.5">
         {place ? (
@@ -1322,6 +1342,13 @@ export default function PublicEventsPage() {
 
   const isCategoryBrowse = Boolean(dedicatedCategoryPage && selectedSlugs.length === 1);
 
+  /** Listing page uses listing-boost plans; a category page uses category plans only. */
+  const isPromotedHere = useCallback(
+    (event: PublicEvent) =>
+      activeCategoryKey ? Boolean(event.is_category_promoted) : Boolean(event.is_promoted),
+    [activeCategoryKey]
+  );
+
   const categoryTypeId = useMemo(() => {
     if (!isCategoryBrowse || selectedSlugs.length !== 1) return undefined;
     const slug = selectedSlugs[0];
@@ -1342,9 +1369,16 @@ export default function PublicEventsPage() {
   );
 
   const filtered = useMemo(() => {
-    if (!isCategoryBrowse || selectedEventGenres.length === 0) return listingEvents;
-    return listingEvents.filter((event) => eventMatchesSelectedGenres(event, selectedEventGenres));
-  }, [listingEvents, isCategoryBrowse, selectedEventGenres]);
+    const base =
+      !isCategoryBrowse || selectedEventGenres.length === 0
+        ? listingEvents
+        : listingEvents.filter((event) => eventMatchesSelectedGenres(event, selectedEventGenres));
+    // API already ranks listing-boosted events first; category pages rank their own promotions first.
+    if (!activeCategoryKey) return base;
+    return [...base].sort(
+      (a, b) => Number(Boolean(b.is_category_promoted)) - Number(Boolean(a.is_category_promoted))
+    );
+  }, [listingEvents, isCategoryBrowse, selectedEventGenres, activeCategoryKey]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const pageSafe = Math.min(page, totalPages);
@@ -1511,7 +1545,6 @@ export default function PublicEventsPage() {
 
   /** Slider always queries EVENTS; sports/concert/etc. are filtered client-side by linked event. */
   const listingPromoCategory: ListingPromoCategory = "EVENTS";
-  const listingPromoRailCategory = activeCategoryKey === "sports" ? "SPORTS" : "EVENTS";
 
   const filterListingPromoCampaign = useCallback(
     (campaign: MarketingCampaign) => {
@@ -1557,13 +1590,13 @@ export default function PublicEventsPage() {
 
     if (!scopedBase.length) return [];
 
-    const promotedOnly = scopedBase.filter((e) => Boolean(e.is_promoted));
+    const promotedOnly = scopedBase.filter(isPromotedHere);
     if (promotedOnly.length) return promotedOnly.slice(0, 8);
 
     if (!hasCity) {
       const offersInScope = filterByCategory(offerHeroEvents);
       if (offersInScope.length) {
-        const promotedOffers = offersInScope.filter((e) => Boolean(e.is_promoted));
+        const promotedOffers = offersInScope.filter(isPromotedHere);
         return (promotedOffers.length ? promotedOffers : offersInScope).slice(0, 8);
       }
       return scopedBase.slice(0, 8);
@@ -1573,6 +1606,7 @@ export default function PublicEventsPage() {
     return [];
   }, [
     activeCategoryKey,
+    isPromotedHere,
     exploreEventPool,
     offerHeroEvents,
     posterFallbackEvents,
@@ -1697,10 +1731,10 @@ export default function PublicEventsPage() {
     if (catalogPending) return [];
     // City → global (listingEvents via preferCityOrAll) → poster fallback when both empty
     const poolSource = listingEvents.length ? listingEvents : posterFallbackEvents;
-    const promoted = poolSource.filter((e) => e.is_promoted);
+    const promoted = poolSource.filter(isPromotedHere);
     const pool = promoted.length ? promoted : poolSource;
     return pool.slice(0, 15);
-  }, [catalogPending, listingEvents, posterFallbackEvents]);
+  }, [catalogPending, listingEvents, posterFallbackEvents, isPromotedHere]);
 
   const recommendSlideCount =
     catalogPending
@@ -2397,6 +2431,7 @@ export default function PublicEventsPage() {
                 key={event.id}
                 event={event}
                 cityLabel={city || undefined}
+                promoted={isPromotedHere(event)}
               />
             ))}
           </div>
@@ -2439,13 +2474,9 @@ export default function PublicEventsPage() {
       <ListingPromoSlider
         category={listingPromoCategory}
         city={city || ""}
+        placement={activeCategoryKey ? "category" : "listing"}
         eventsById={eventsById}
         filterCampaign={activeCategoryKey ? filterListingPromoCampaign : undefined}
-      />
-      <CategoryPromoBanners
-        category={listingPromoRailCategory}
-        city={city || ""}
-        className="bmb-section-container pt-3"
       />
 
       {/* District / native spotlight hero — disabled (Dining parity). Restore: remove `false &&`. */}
@@ -2561,7 +2592,7 @@ export default function PublicEventsPage() {
                     >
                       <div className="flex items-center gap-8 lg:gap-8 2xl:gap-5">
                         <div className="min-w-0 flex-1 text-slate-900">
-                        {event.is_promoted ? (
+                        {isPromotedHere(event) ? (
                             <p className="mb-2 inline-flex items-center rounded-md bg-[#6900AA]/10 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-[#6900AA]">
                               Promoted
                             </p>
@@ -2789,7 +2820,12 @@ export default function PublicEventsPage() {
                     className="flex gap-3 sm:gap-4 overflow-x-auto scrollbar-none snap-x snap-mandatory pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                   >
                     {recommendedEvents.map((event) => (
-                      <RecommendCard key={event.id} event={event} cityLabel={city || undefined} />
+                      <RecommendCard
+                        key={event.id}
+                        event={event}
+                        cityLabel={city || undefined}
+                        promoted={isPromotedHere(event)}
+                      />
                     ))}
                   </div>
                   <RailPagerNav

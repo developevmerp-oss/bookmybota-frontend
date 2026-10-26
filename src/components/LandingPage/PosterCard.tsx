@@ -128,11 +128,17 @@ export function EventPosterCard({
   city,
   className = "",
   fullWidth = false,
+  showPromoted = false,
 }: {
   event: PublicEvent;
   city?: string;
   className?: string;
   fullWidth?: boolean;
+  /**
+   * PROMOTED badge belongs to the Events listing page (listing placement). Home rails leave it
+   * off — the home page placement is the hero slider.
+   */
+  showPromoted?: boolean;
 }) {
   const adaptive = useAdaptiveCard();
   const image = eventPortrait(event);
@@ -168,7 +174,7 @@ export function EventPosterCard({
           fallback={<Calendar size={28} strokeWidth={1.5} />}
           hoverScaleClass="group-hover:scale-[1.04]"
         />
-        {event.is_promoted ? (
+        {showPromoted && event.is_promoted ? (
           <span className="absolute top-2 right-2 z-[2] rounded-md bg-white/90 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#6900AA] shadow-sm">
             Promoted
           </span>

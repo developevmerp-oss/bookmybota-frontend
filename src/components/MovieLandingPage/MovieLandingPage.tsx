@@ -39,7 +39,6 @@ import {
 } from "@/lib/filterUrlSync";
 import { hasCityFilter, preferCityOrAll, shouldShowShowcaseCards } from "@/components/LandingPage/homeUtils";
 import CitySectionEmptyNotice from "@/components/LandingPage/CitySectionEmptyNotice";
-import CategoryPromoBanners from "@/components/LandingPage/CategoryPromoBanners";
 import ListingPromoSlider, {
   useListingPromoCampaigns,
 } from "@/components/LandingPage/ListingPromoSlider";
@@ -1216,11 +1215,6 @@ export default function MovieLandingPage() {
     <div className="min-h-screen bg-white">
       {/* Top promo — same marketing + city logic / banner UI as dining & landing */}
       <ListingPromoSlider category="MOVIES" city={city} moviesById={moviesById} />
-      <CategoryPromoBanners
-        category="MOVIES"
-        city={city || ""}
-        className="bmb-section-container pt-3"
-      />
 
       {/* District / native spotlight hero — disabled (Dining parity). Restore: remove `false &&`. */}
       {false && (

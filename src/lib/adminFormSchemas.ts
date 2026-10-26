@@ -6,6 +6,7 @@ import {
   isValidPassword,
   PASSWORD_RULES,
 } from '@/lib/validation';
+import { placementAllowedForModule, type MarketingPlacement } from '@/lib/marketingPlacement';
 
 /** Shared phone field: digits only, 9–12 characters allowed while typing & on submit */
 export const adminPhoneSchema = yup
@@ -160,9 +161,13 @@ export const adminMarketingPlanSchema = yup.object({
     .string()
     .oneOf(['ALL', 'DINING', 'EVENTS', 'MOVIES'])
     .default('ALL'),
-  listing_boost: yup.boolean().default(true),
-  landing_slider: yup.boolean().default(false),
-  category_rail: yup.boolean().default(false),
+  placement: yup
+    .string()
+    .oneOf(['HOME_SLIDER', 'LISTING', 'CATEGORY', 'ALL_PAGES', 'LISTING_CATEGORY'] as const)
+    .default('LISTING')
+    .test('placement-module', 'Category pages exist for Events only — pick an Events or All categories module.', function (value) {
+      return !value || placementAllowedForModule(value as MarketingPlacement, this.parent?.module);
+    }),
   allows_item_target: yup.boolean().default(false),
   max_targets: yup
     .number()

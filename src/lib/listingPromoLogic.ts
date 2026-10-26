@@ -5,15 +5,23 @@ import type { EventCategoryKey } from "@/lib/eventCategories";
 
 export type ListingPromoCategory = "DINING" | "MOVIES" | "EVENTS" | "SPORTS";
 
-/** Same city gating as landing PromoBannerCarousel / CategoryPromoBanners. */
+/**
+ * Which plan placement feeds the top slider:
+ * listing = module listing page (/dining, /events, /movies) · category = event category page.
+ * The main home hero uses the separate "slider" surface (PromoBannerCarousel).
+ */
+export type ListingPromoPlacement = "listing" | "category";
+
+/** Same city gating as landing PromoBannerCarousel. */
 export function listingPromoQueryArgs(
   category: ListingPromoCategory,
-  city: string
-): { category: ListingPromoCategory; surface: "slider"; city?: string } {
+  city: string,
+  placement: ListingPromoPlacement = "listing"
+): { category: ListingPromoCategory; surface: ListingPromoPlacement; city?: string } {
   const hasCity = hasCityFilter(city);
   return {
     category,
-    surface: "slider",
+    surface: placement,
     ...(hasCity ? { city } : {}),
   };
 }
@@ -25,7 +33,7 @@ export function campaignsWithBanner(campaigns: MarketingCampaign[]): MarketingCa
 
 /**
  * Listing promo priority (landing-aligned):
- * 1. Paid slider campaigns with banners
+ * 1. Paid campaigns for this page placement that have banners
  * 2. Caller-supplied promoted-entity slides
  * 3. Empty → hide slider
  */

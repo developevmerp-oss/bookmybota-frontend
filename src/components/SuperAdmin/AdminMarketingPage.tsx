@@ -56,6 +56,14 @@ import {
   type AdminMarketingRejectValues,
 } from '@/lib/adminFormSchemas';
 import ConfirmDialog from '@/components/Shared/ConfirmDialog';
+import {
+  PLACEMENT_OPTIONS,
+  placementAllowedForModule,
+  placementNeedsBanner,
+  placementOf,
+  placementOption,
+  type PlacementFlagsLike,
+} from '@/lib/marketingPlacement';
 import SearchInput from '@/components/Shared/SearchInput';
 import Pagination from '@/components/Shared/Pagination';
 import { AdminListShimmer } from '@/components/Shared/Shimmer';
@@ -79,9 +87,7 @@ const PLAN_FORM_DEFAULTS: AdminMarketingPlanValues = {
   duration_days: 30,
   price: 0,
   module: 'ALL',
-  listing_boost: true,
-  landing_slider: false,
-  category_rail: false,
+  placement: 'LISTING',
   allows_item_target: true,
   max_targets: 1,
 };
@@ -163,7 +169,7 @@ function CampaignEditFields({
   banner: string;
   accent: string;
   uploading: boolean;
-  plan: { listing_boost?: boolean; landing_slider?: boolean; category_rail?: boolean } | null;
+  plan: PlacementFlagsLike | null;
   onTitle: (value: string) => void;
   onCategory: (value: string) => void;
   onStart: (value: string) => void;
@@ -172,12 +178,8 @@ function CampaignEditFields({
   onAccent: (value: string) => void;
   onUpload: (file: File | null) => void;
 }) {
-  const needsBanner = Boolean(plan?.landing_slider || plan?.category_rail);
-  const placements = [
-    plan?.listing_boost ? 'Listing boost' : null,
-    plan?.landing_slider ? 'Home slider' : null,
-    plan?.category_rail ? 'Category rail' : null,
-  ].filter(Boolean);
+  const needsBanner = placementNeedsBanner(plan);
+  const placements = plan ? [placementOption(plan).short] : [];
   return (
     <>
       {placements.length > 0 ? (
@@ -306,9 +308,7 @@ function planToFormValues(plan: MarketingPlan): AdminMarketingPlanValues {
     duration_days: plan.duration_days,
     price: Number(plan.price),
     module: (plan.module || 'ALL') as AdminMarketingPlanValues['module'],
-    listing_boost: plan.listing_boost !== false,
-    landing_slider: Boolean(plan.landing_slider),
-    category_rail: Boolean(plan.category_rail),
+    placement: placementOf(plan),
     allows_item_target: Boolean(plan.allows_item_target),
     max_targets: plan.max_targets ?? 1,
   };
@@ -497,6 +497,15 @@ export default function AdminMarketingPage() {
     defaultValues: PLAN_FORM_DEFAULTS,
     mode: 'onSubmit',
   });
+  const planModule = planForm.watch('module');
+  const planPlacement = planForm.watch('placement');
+
+  // Dining / movie plans have no category pages — fall back to the listing placement.
+  useEffect(() => {
+    if (planPlacement && !placementAllowedForModule(planPlacement, planModule)) {
+      planForm.setValue('placement', 'LISTING', { shouldDirty: true });
+    }
+  }, [planForm, planModule, planPlacement]);
 
   const { data: campaignsData, isLoading: campaignsLoading, isFetching: campaignsFetching } =
     useGetMarketingCampaignsQuery(activeListArg, { skip: activeTab !== 'active' });
@@ -764,6 +773,7 @@ export default function AdminMarketingPage() {
             id: editingCampaign.plan_id,
             name: editingCampaign.plan_name || 'Plan',
             duration_days: editingCampaign.duration_days || 30,
+            placement: editingCampaign.placement,
             landing_slider: editingCampaign.landing_slider,
             category_rail: editingCampaign.category_rail,
             listing_boost: editingCampaign.listing_boost,
@@ -776,7 +786,7 @@ export default function AdminMarketingPage() {
 
     try {
       if (editingCampaign) {
-        const needsBanner = Boolean(selectedPlan.landing_slider || selectedPlan.category_rail);
+        const needsBanner = placementNeedsBanner(selectedPlan);
         if (needsBanner && !editBanner.trim()) {
           toast.error('This plan shows a banner. Upload a 3:1 banner image.');
           return;
@@ -1052,25 +1062,45 @@ export default function AdminMarketingPage() {
                       className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-rose-500/50"
                     />
                   </div>
-                  <div className="space-y-2 rounded-xl border border-white/10 p-3">
-                    <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Benefits</p>
-                    <label className="flex items-center gap-2 text-sm text-zinc-300">
-                      <input type="checkbox" {...planForm.register('listing_boost')} className="rounded" />
-                      Listing boost + PROMOTED badge
-                    </label>
-                    <label className="flex items-center gap-2 text-sm text-zinc-300">
-                      <input type="checkbox" {...planForm.register('landing_slider')} className="rounded" />
-                      Landing hero slider
-                    </label>
-                    <label className="flex items-center gap-2 text-sm text-zinc-300">
-                      <input type="checkbox" {...planForm.register('category_rail')} className="rounded" />
-                      Category detail rail
-                    </label>
-                    <label className="flex items-center gap-2 text-sm text-zinc-300">
+                  <fieldset className="space-y-2 rounded-xl border border-white/10 p-3">
+                    <legend className="px-1 text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+                      Benefits — where it shows <span className="text-rose-500">*</span>
+                    </legend>
+                    {PLACEMENT_OPTIONS.map((option) => {
+                      const allowed = placementAllowedForModule(option.value, planModule);
+                      return (
+                        <label
+                          key={option.value}
+                          className={`flex items-start gap-2 text-sm ${
+                            allowed ? 'text-zinc-300 cursor-pointer' : 'text-zinc-600 cursor-not-allowed'
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            value={option.value}
+                            disabled={!allowed}
+                            {...planForm.register('placement')}
+                            className="mt-1"
+                          />
+                          <span className="min-w-0">
+                            <span className="block font-medium">{option.label}</span>
+                            <span className="block text-xs text-zinc-500">
+                              {allowed ? option.pages : 'Category pages exist for Events only'}
+                            </span>
+                          </span>
+                        </label>
+                      );
+                    })}
+                    {planForm.formState.errors.placement && (
+                      <p className="text-xs text-rose-400 font-medium">
+                        {planForm.formState.errors.placement.message}
+                      </p>
+                    )}
+                    <label className="flex items-center gap-2 text-sm text-zinc-300 border-t border-white/10 pt-2 mt-1">
                       <input type="checkbox" {...planForm.register('allows_item_target')} className="rounded" />
                       Allow specific movie/event target
                     </label>
-                  </div>
+                  </fieldset>
                   <button
                     type="submit"
                     disabled={isSavingPlan}
@@ -1135,9 +1165,7 @@ export default function AdminMarketingPage() {
                                     details={{
                                       duration_days: plan.duration_days,
                                       price: plan.price != null ? Number(plan.price) : null,
-                                      listing_boost: plan.listing_boost,
-                                      landing_slider: plan.landing_slider,
-                                      category_rail: plan.category_rail,
+                                      placement: placementOf(plan),
                                     }}
                                     tone="dark"
                                     className="mt-0.5"
@@ -1146,17 +1174,12 @@ export default function AdminMarketingPage() {
                               </td>
                               <td className="p-4 text-zinc-300 text-sm">{plan.module || 'ALL'}</td>
                               <td className="p-4">
-                                <div className="flex flex-wrap gap-1">
-                                  {plan.listing_boost !== false && (
-                                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400">Boost</span>
-                                  )}
-                                  {plan.landing_slider && (
-                                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-400">Slider</span>
-                                  )}
-                                  {plan.category_rail && (
-                                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-400">Rail</span>
-                                  )}
-                                </div>
+                                <span
+                                  className="inline-flex text-[10px] px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-400 whitespace-nowrap"
+                                  title={placementOption(plan).pages}
+                                >
+                                  {placementOption(plan).short}
+                                </span>
                               </td>
                               <td className="p-4 font-bold text-emerald-400">{formatMoneyDisplay(plan.price)}</td>
                               <td className="p-4">{planStatusNode(plan)}</td>

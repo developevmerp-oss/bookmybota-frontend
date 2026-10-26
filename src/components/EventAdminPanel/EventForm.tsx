@@ -30,6 +30,7 @@ import {
 import { fuzzyFilter } from "@/lib/fuzzySearch";
 import { formatMoneyDisplay } from "@/lib/currencyFormat";
 import PlanInfoButton from "@/components/Shared/PlanInfoButton";
+import { placementNeedsBanner, placementOption } from "@/lib/marketingPlacement";
 import { resolveMediaUrl, extractUploadUrl } from "@/lib/mediaUrl";
 import SafeCoverImage, {
   ARTIST_IMAGE_FALLBACK_CLASS,
@@ -202,7 +203,7 @@ function eventToValues(event?: OrganizerEvent | null): EventFormValues {
       ? String((promo as any).slider_accent_text)
       : "",
     promo_start_date: promoStartDate,
-    promo_landing_slider: Boolean((promo as any)?.landing_slider),
+    promo_needs_banner: placementNeedsBanner(promo as any),
     languages: parseEventLanguages(event.language),
     about_event: event.about_event || "",
     age_group: event.age_group || "",
@@ -3046,7 +3047,7 @@ export default function EventForm({
         goToStep("media");
         return;
       }
-      if (values.promo_landing_slider && !values.promo_banner_url?.trim()) {
+      if (values.promo_needs_banner && !values.promo_banner_url?.trim()) {
         toast.error("Banner image is required for the selected promotion plan.");
         goToStep("media");
         return;
@@ -3370,7 +3371,7 @@ export default function EventForm({
         const planId = getValues("promo_plan_id")?.trim();
         const title = getValues("promo_title")?.trim();
         const start = getValues("promo_start_date")?.trim();
-        const landing = Boolean(getValues("promo_landing_slider"));
+        const landing = Boolean(getValues("promo_needs_banner"));
         const banner = getValues("promo_banner_url")?.trim();
         if (!planId) {
           toast.error("Select a promotion plan, or turn off Add promotion.");
@@ -4184,7 +4185,7 @@ export default function EventForm({
                     setValue("promo_banner_url", "", { shouldDirty: true });
                     setValue("promo_slider_accent_text", "", { shouldDirty: true });
                     setValue("promo_start_date", "", { shouldDirty: true });
-                    setValue("promo_landing_slider", false, { shouldDirty: true });
+                    setValue("promo_needs_banner", false, { shouldDirty: true });
                   }}
                   className="text-xs font-semibold text-rose-600 hover:underline"
                 >
@@ -4247,6 +4248,7 @@ export default function EventForm({
                                   ? {
                                       duration_days: selectedPromoPlan.duration_days,
                                       price: selectedPromoPlan.price != null ? Number(selectedPromoPlan.price) : null,
+                                      placement: selectedPromoPlan.placement,
                                       listing_boost: selectedPromoPlan.listing_boost,
                                       landing_slider: selectedPromoPlan.landing_slider,
                                       category_rail: selectedPromoPlan.category_rail,
@@ -4263,7 +4265,7 @@ export default function EventForm({
                               const id = e.target.value;
                               setValue("promo_plan_id", id, { shouldDirty: true });
                               const plan = promoPlans.find((p) => String(p.id) === id);
-                              setValue("promo_landing_slider", Boolean(plan?.landing_slider), {
+                              setValue("promo_needs_banner", Boolean(plan && placementNeedsBanner(plan)), {
                                 shouldDirty: true,
                               });
                             }}
@@ -4271,7 +4273,7 @@ export default function EventForm({
                             <option value="">Select plan</option>
                             {promoPlans.map((p) => (
                               <option key={p.id} value={String(p.id)}>
-                                {p.name} — {formatMoneyDisplay(p.price)} / {p.duration_days} days
+                                {p.name} — {placementOption(p).short} — {formatMoneyDisplay(p.price)} / {p.duration_days} days
                               </option>
                             ))}
                           </select>
@@ -4310,7 +4312,7 @@ export default function EventForm({
                           </p>
                         </div>
 
-                        {watch("promo_landing_slider") ? (
+                        {watch("promo_needs_banner") ? (
                           <div className="space-y-2">
                             <label className="text-sm font-semibold text-slate-600">
                               Banner image <span className="text-rose-500">*</span>
@@ -4424,7 +4426,7 @@ export default function EventForm({
                           const planId = getValues("promo_plan_id")?.trim();
                           const title = getValues("promo_title")?.trim();
                           const start = getValues("promo_start_date")?.trim();
-                          const landing = Boolean(getValues("promo_landing_slider"));
+                          const landing = Boolean(getValues("promo_needs_banner"));
                           const banner = getValues("promo_banner_url")?.trim();
                           if (!planId) {
                             toast.error("Select a promotion plan.");

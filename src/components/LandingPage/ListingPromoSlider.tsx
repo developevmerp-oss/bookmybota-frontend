@@ -21,6 +21,7 @@ import { eventLandscape, eventPortrait, hasCityFilter } from "./homeUtils";
 import {
   campaignsWithBanner,
   listingPromoQueryArgs,
+  type ListingPromoPlacement,
   type ListingPromoCategory,
 } from "@/lib/listingPromoLogic";
 import { PromoBannerShimmer } from "@/components/Shared/Shimmer";
@@ -419,6 +420,8 @@ function SlideCard({
 type ListingPromoSliderProps = {
   category: ListingPromoCategory;
   city: string;
+  /** Listing page (listing-boost plans) or category page (category plans). Default listing. */
+  placement?: ListingPromoPlacement;
   /** City-scoped is_promoted entities as landing-style slides when no paid campaigns. */
   fallbackSlides?: ListingPromoSlide[];
   eventsById?: Map<string, PublicEvent>;
@@ -436,6 +439,7 @@ type ListingPromoSliderProps = {
 export default function ListingPromoSlider({
   category,
   city,
+  placement = "listing",
   fallbackSlides = [],
   eventsById,
   moviesById,
@@ -444,7 +448,10 @@ export default function ListingPromoSlider({
   className = "",
 }: ListingPromoSliderProps) {
   const hasCity = hasCityFilter(city);
-  const queryArgs = useMemo(() => listingPromoQueryArgs(category, city), [category, city]);
+  const queryArgs = useMemo(
+    () => listingPromoQueryArgs(category, city, placement),
+    [category, city, placement]
+  );
   const { data: promotions = [], isLoading } = useGetActiveMarketingPromotionsQuery(queryArgs);
 
   const slides = useMemo(() => {
@@ -621,7 +628,7 @@ export default function ListingPromoSlider({
   );
 }
 
-/** Hook: whether paid slider campaigns exist for this category + city (for parent hero gating). */
+/** Hook: whether paid listing-page campaigns exist for this category + city (for parent hero gating). */
 export function useListingPromoCampaigns(category: ListingPromoCategory, city: string) {
   const queryArgs = useMemo(() => listingPromoQueryArgs(category, city), [category, city]);
   const { data: promotions = [], isLoading } = useGetActiveMarketingPromotionsQuery(queryArgs);

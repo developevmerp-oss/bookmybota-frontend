@@ -232,7 +232,8 @@ export const eventDraftSchema = yup.object({
     .max(40, 'Accent text must be at most 40 characters.')
     .default(''),
   promo_start_date: yup.string().trim().default(''),
-  promo_landing_slider: yup.boolean().default(false),
+  /** Synced from the selected plan: home / category slider placements need a banner. */
+  promo_needs_banner: yup.boolean().default(false),
   languages: yup.array().of(yup.string().required()).default([]),
   about_event: yup
     .string()
@@ -450,7 +451,7 @@ export function defaultEventFormValues(): EventFormValues {
     promo_banner_url: '',
     promo_slider_accent_text: '',
     promo_start_date: '',
-    promo_landing_slider: false,
+    promo_needs_banner: false,
     languages: [],
     about_event: '',
     age_group: '',

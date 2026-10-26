@@ -20,7 +20,6 @@ import { DiningPosterCard, ShowcaseDiningPosterCard } from "@/components/Landing
 import { DiningHomeRestaurantShimmer } from "@/components/Shared/Shimmer";
 import { SHOWCASE_BAR_CARDS, SHOWCASE_DINING_CARDS, type ShowcaseDiningCard } from "@/data/showcaseDiningCards";
 import { hasCityFilter, preferCityOrAll, shouldShowShowcaseCards } from "@/components/LandingPage/homeUtils";
-import CategoryPromoBanners from "@/components/LandingPage/CategoryPromoBanners";
 import CitySectionEmptyNotice from "@/components/LandingPage/CitySectionEmptyNotice";
 import ListingPromoSlider, {
   diningToListingSlide,
@@ -1732,12 +1731,6 @@ export default function Home() {
         city={activeCity || ""}
         fallbackSlides={diningPromoFallbackSlides}
         diningById={diningById}
-      />
-
-      <CategoryPromoBanners
-        category="DINING"
-        city={activeCity || ""}
-        className="bmb-section-container pt-3"
       />
 
       {/* ── 1. Hero Search Banner (centered, reference layout) ─────────────── */}

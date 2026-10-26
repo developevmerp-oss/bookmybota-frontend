@@ -37,6 +37,7 @@ import {
 } from '@/lib/pagination';
 
 export type { PaginationMeta, PaginatedList, PagedQuery } from '@/lib/pagination';
+import type { MarketingPlacement } from '@/lib/marketingPlacement';
 
 // API host resolved per request via getApiBaseUrl() in baseQuery.
 
@@ -903,6 +904,7 @@ export interface AdminEvent {
     plan_name?: string | null;
     plan_price?: number | string | null;
     duration_days?: number | null;
+    placement?: MarketingPlacement;
     listing_boost?: boolean;
     landing_slider?: boolean;
     category_rail?: boolean;
@@ -1408,7 +1410,10 @@ export interface PublicEvent {
   status?: string;
   rating?: number | string;
   reviews_count?: number;
+  /** Events listing page boost + PROMOTED badge (listing placement). */
   is_promoted?: boolean;
+  /** Category page (concert / comedy / music / sports) boost + badge (category placement). */
+  is_category_promoted?: boolean;
 }
 
 /** Approved onboarded venue / artist partners for partner landing pages. */
@@ -1716,6 +1721,8 @@ export interface MarketingPlan {
   is_active?: boolean;
   archived_at?: string | null;
   module?: 'ALL' | 'DINING' | 'EVENTS' | 'MOVIES';
+  /** Pages the promotion appears on — see `@/lib/marketingPlacement`. */
+  placement?: MarketingPlacement;
   listing_boost?: boolean;
   landing_slider?: boolean;
   category_rail?: boolean;
@@ -1744,6 +1751,7 @@ export interface MarketingCampaign {
   duration_days?: number;
   price?: number | string;
   plan_module?: string;
+  placement?: MarketingPlacement;
   listing_boost?: boolean;
   landing_slider?: boolean;
   category_rail?: boolean;

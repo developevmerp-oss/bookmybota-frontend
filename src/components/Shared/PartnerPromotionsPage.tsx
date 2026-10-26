@@ -38,6 +38,7 @@ import { AdminListShimmer } from "@/components/Shared/Shimmer";
 import { PAGE_SIZE } from "@/lib/pagination";
 import { promotionTargetLabel } from "@/lib/promotionTargetLabel";
 import PlanInfoButton from "@/components/Shared/PlanInfoButton";
+import { placementOption } from "@/lib/marketingPlacement";
 import {
   emptyPartnerPromotionsFormValues,
   partnerPromotionsFormSchema,
@@ -208,6 +209,7 @@ export default function PartnerPromotionsPage({
         name: editingCampaign.plan_name || "Current plan",
         duration_days: editingCampaign.duration_days || 0,
         price: Number(editingCampaign.amount ?? editingCampaign.price ?? 0),
+        placement: editingCampaign.placement,
         listing_boost: Boolean(editingCampaign.listing_boost),
         landing_slider: Boolean(editingCampaign.landing_slider),
         category_rail: Boolean(editingCampaign.category_rail),
@@ -428,6 +430,7 @@ export default function PartnerPromotionsPage({
                 ? {
                     duration_days: selectedPlan.duration_days,
                     price: selectedPlan.price != null ? Number(selectedPlan.price) : null,
+                    placement: selectedPlan.placement,
                     listing_boost: selectedPlan.listing_boost,
                     landing_slider: selectedPlan.landing_slider,
                     category_rail: selectedPlan.category_rail,
@@ -436,6 +439,7 @@ export default function PartnerPromotionsPage({
                   ? {
                       duration_days: editingCampaign.duration_days,
                       price: Number(editingCampaign.amount ?? editingCampaign.price ?? 0),
+                      placement: editingCampaign.placement,
                       listing_boost: editingCampaign.listing_boost,
                       landing_slider: editingCampaign.landing_slider,
                       category_rail: editingCampaign.category_rail,
@@ -454,12 +458,19 @@ export default function PartnerPromotionsPage({
             <option value="">Select plan</option>
             {plans.map((p) => (
               <option key={p.id} value={p.id}>
-                {p.name} — {formatMoneyDisplay(p.price)} / {p.duration_days} days
+                {p.name} — {placementOption(p).short} — {formatMoneyDisplay(p.price)} / {p.duration_days} days
               </option>
             ))}
           </select>
         )}
         {errors.plan_id && <p className={fieldErrorClass}>{errors.plan_id.message}</p>}
+        {selectedPlan ? (
+          <p className="text-xs text-slate-500">
+            <span className="font-semibold text-slate-700">{placementOption(selectedPlan).label}</span>
+            {" · "}
+            {placementOption(selectedPlan).pages}
+          </p>
+        ) : null}
       </div>
 
       <div className="space-y-1.5">
@@ -816,7 +827,7 @@ export default function PartnerPromotionsPage({
                     />
                   ) : (
                     <div className="w-full aspect-[3/1] bg-slate-100 flex items-center justify-center px-4 text-center text-slate-600 text-sm font-semibold">
-                      {showTargetName || "Listing boost only"}
+                      {showTargetName || placementOption(camp).label}
                     </div>
                   )}
                   <div className="p-4 space-y-2">

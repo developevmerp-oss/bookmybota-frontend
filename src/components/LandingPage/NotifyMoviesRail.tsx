@@ -55,7 +55,8 @@ export default function NotifyMoviesRail() {
               className="adaptive-card-row--four"
             >
               {items.map((movie) => (
-                <MovieNotifyCard key={`notify-movie-${movie.id}`} movie={movie} />
+                // Home rail: no PROMOTED badge (that benefit belongs to the Movies listing page).
+                <MovieNotifyCard key={`notify-movie-${movie.id}`} movie={{ ...movie, promoted: false }} />
               ))}
             </AdaptiveCardRow>
           )}

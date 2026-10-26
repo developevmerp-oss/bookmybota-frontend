@@ -4,10 +4,13 @@ import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Info, X } from "lucide-react";
 import { formatMoneyDisplay } from "@/lib/currencyFormat";
+import { placementOption } from "@/lib/marketingPlacement";
 
 export type PlanInfoDetails = {
   duration_days?: number | null;
   price?: number | null;
+  /** Plan placement (preferred); the legacy flags below are used when it is missing. */
+  placement?: string | null;
   listing_boost?: boolean | null;
   landing_slider?: boolean | null;
   category_rail?: boolean | null;
@@ -27,10 +30,6 @@ type PlanInfoButtonProps = {
   autoOpenKey?: string | null;
 };
 
-function yesNo(v?: boolean | null) {
-  return v ? "Yes" : "No";
-}
-
 /** Round “i” control — opens a Terms-style modal with plan description & features. */
 export default function PlanInfoButton({
   title,
@@ -48,10 +47,19 @@ export default function PlanInfoButton({
     details &&
       (details.duration_days != null ||
         details.price != null ||
+        details.placement != null ||
         details.listing_boost != null ||
         details.landing_slider != null ||
         details.category_rail != null)
   );
+  const hasPlacement = Boolean(
+    details &&
+      (details.placement != null ||
+        details.listing_boost != null ||
+        details.landing_slider != null ||
+        details.category_rail != null)
+  );
+  const placement = hasPlacement ? placementOption(details) : null;
   const hasContent = Boolean(text) || hasDetails;
   const canOpen = Boolean(title?.trim()) && hasContent;
 
@@ -155,22 +163,13 @@ export default function PlanInfoButton({
                         <span className="font-semibold">{formatMoneyDisplay(details.price)}</span>
                       </div>
                     ) : null}
-                    {details?.listing_boost != null ? (
-                      <div className="flex justify-between gap-3 text-sm text-slate-700">
-                        <span>Listing boost</span>
-                        <span className="font-semibold">{yesNo(details.listing_boost)}</span>
-                      </div>
-                    ) : null}
-                    {details?.landing_slider != null ? (
-                      <div className="flex justify-between gap-3 text-sm text-slate-700">
-                        <span>Landing slider</span>
-                        <span className="font-semibold">{yesNo(details.landing_slider)}</span>
-                      </div>
-                    ) : null}
-                    {details?.category_rail != null ? (
-                      <div className="flex justify-between gap-3 text-sm text-slate-700">
-                        <span>Category rail</span>
-                        <span className="font-semibold">{yesNo(details.category_rail)}</span>
+                    {placement ? (
+                      <div className="text-sm text-slate-700 border-t border-slate-200 pt-2.5">
+                        <div className="flex justify-between gap-3">
+                          <span>Benefit</span>
+                          <span className="font-semibold text-right">{placement.label}</span>
+                        </div>
+                        <p className="mt-1 text-xs text-slate-500">{placement.pages}</p>
                       </div>
                     ) : null}
                   </div>

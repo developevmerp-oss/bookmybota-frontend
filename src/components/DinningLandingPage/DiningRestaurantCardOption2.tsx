@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { MapPin, Star, Users, Utensils } from "lucide-react";
+import { EqualApproximately, MapPin, Star, Utensils } from "lucide-react";
 import type { Business } from "@/services/api";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { restaurantHref } from "@/lib/businessPublicPath";
@@ -222,7 +222,7 @@ export default function DiningRestaurantCardOption2({
 
         {/* Cost for 2 */}
         <div className="flex items-center gap-1.5 min-w-0 text-slate-600">
-          <Users size={14} strokeWidth={2} className="shrink-0 text-slate-500" />
+          <EqualApproximately size={14} strokeWidth={2} className="shrink-0 text-slate-500" aria-hidden />
           <p className="truncate text-xs sm:text-sm leading-snug">
             {priceForTwo}
           </p>
@@ -314,7 +314,7 @@ export function ShowcaseDiningRestaurantCard({
         </div>
 
         <div className="flex items-center gap-1.5 min-w-0 text-slate-600">
-          <Users size={14} strokeWidth={2} className="shrink-0 text-slate-500" />
+          <EqualApproximately size={14} strokeWidth={2} className="shrink-0 text-slate-500" aria-hidden />
           <p className="truncate text-xs sm:text-sm leading-snug">
             {priceForTwo}
           </p>

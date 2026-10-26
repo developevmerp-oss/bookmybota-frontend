@@ -23,7 +23,7 @@ import EventMediaSlider from "@/components/EventLandingPage/EventMediaSlider";
 import EventGallerySection from "@/components/EventLandingPage/EventGallerySection";
 import LayoutSeatPreview from "@/components/venue/LayoutSeatPreview";
 import { formatMoney } from "@/lib/currencyFormat";
-import { formatDate, formatTime12h } from "@/lib/dateFormat";
+import { formatDate, formatTime12h, getVenueDateTimeParts } from "@/lib/dateFormat";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { eventDateParts } from "@/components/LandingPage/homeUtils";
 import type { EventFormValues } from "@/lib/eventFormSchema";
@@ -340,9 +340,7 @@ export default function EventFormCustomerPreview({
         : undefined;
   const dateBadge = eventDateParts(showIso);
   const placeLine = [venueName, city].filter(Boolean).join(city && venueName ? ": " : "") || undefined;
-  const weekdayLabel = showIso
-    ? new Date(showIso).toLocaleDateString("en-US", { weekday: "long" })
-    : "";
+  const weekdayLabel = showIso ? getVenueDateTimeParts(showIso)?.weekdayLong || "" : "";
   const homeDateLabel = showIso ? formatDate(showIso) : "";
 
   const homePosterCard = (

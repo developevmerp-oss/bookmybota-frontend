@@ -27,7 +27,7 @@ import { readSessionForRole } from "@/lib/authStorage";
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
 import { formatMoney } from "@/lib/currencyFormat";
-import { formatTime12h } from "@/lib/dateFormat";
+import { formatTime12h, getVenueDateTimeParts } from "@/lib/dateFormat";
 import { buildMovieTicketPdf, downloadPdfBlob } from "@/lib/movieTicketPdf";
 import { ConfirmationPageUI1Shimmer } from "@/components/Shared/Shimmer";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
@@ -47,17 +47,14 @@ function formatRatingOutOf5(value: number) {
 
 function showMetaLine(startsAt?: string): string {
   if (!startsAt) return "";
-  try {
-    const raw = String(startsAt).replace(" ", "T");
-    const d = new Date(raw.includes("T") ? raw : `${raw}T00:00:00`);
-    if (Number.isNaN(d.getTime())) return formatTime12h(startsAt);
-    const weekday = d.toLocaleDateString("en-GB", { weekday: "short" });
-    const day = d.toLocaleDateString("en-GB", { day: "2-digit" });
-    const month = d.toLocaleDateString("en-GB", { month: "short" });
-    return `${weekday}, ${day} ${month} | ${formatTime12h(startsAt)}`;
-  } catch {
-    return formatTime12h(startsAt);
-  }
+  const parts = getVenueDateTimeParts(startsAt);
+  if (!parts) return formatTime12h(startsAt);
+  const month = new Date(Date.UTC(parts.y, parts.m - 1, parts.d, 12)).toLocaleDateString("en-GB", {
+    month: "short",
+    timeZone: "UTC",
+  });
+  const day = String(parts.d).padStart(2, "0");
+  return `${parts.weekdayLong.slice(0, 3)}, ${day} ${month} | ${formatTime12h(startsAt)}`;
 }
 
 function seatListLabel(
@@ -506,6 +503,7 @@ export default function ConfirmationPageUI1({
         mTicketLabel="M-Ticket"
         onDownloadPdf={handleDownloadPdf}
         downloading={downloading}
+        exploreHref="/movies"
         showQr={true}
         directDetails={true}
       />

@@ -11,10 +11,12 @@ import {
   useGetMarketingCampaignsQuery,
   useGetMarketingPaymentSummaryQuery,
   useAssignMarketingCampaignMutation,
+  useUpdateMarketingCampaignMutation,
   usePatchMarketingCampaignStatusMutation,
   useGetBusinessesQuery,
   useGetAdminMoviesQuery,
   useGetPublicEventsQuery,
+  useUploadImageMutation,
   type MarketingCampaign,
   type MarketingPlan,
   type MarketingPaymentSummary,
@@ -29,14 +31,19 @@ import {
   Check,
   X,
   Pause,
+  Play,
   Pencil,
+  ImagePlus,
   Archive,
   Undo2,
   CheckCircle,
   XCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { formatDate } from '@/lib/dateFormat';
+import { formatDate, toDateInput } from '@/lib/dateFormat';
+import { extractUploadUrl } from '@/lib/mediaUrl';
+import { CroppedImageField } from '@/components/Shared/ImageCropPicker';
+import { LANDING_PROMO_BANNER_ASPECT, LANDING_PROMO_BANNER_SIZE_HINT } from '@/lib/landingPromoBanner';
 import { formatMoneyDisplay } from '@/lib/currencyFormat';
 import { extractApiError } from '@/lib/apiErrors';
 import { resolveMediaUrl } from '@/lib/mediaUrl';
@@ -87,17 +94,17 @@ function isPaymentCleared(status?: string | null) {
 function paymentStatusBadge(status?: string | null) {
   const s = (status || 'UNPAID').toUpperCase();
   const colors: Record<string, string> = {
-    PAID: 'bg-emerald-500/20 text-emerald-300',
-    ADMIN_WAIVED: 'bg-violet-500/20 text-violet-300',
-    UNPAID: 'bg-amber-500/20 text-amber-300',
-    PENDING_VERIFICATION: 'bg-amber-500/20 text-amber-300',
-    REFUNDED: 'bg-zinc-500/20 text-zinc-400',
-    FAILED: 'bg-rose-500/20 text-rose-300',
+    PAID: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+    ADMIN_WAIVED: 'bg-violet-50 text-violet-800 border-violet-200',
+    UNPAID: 'bg-amber-50 text-amber-800 border-amber-200',
+    PENDING_VERIFICATION: 'bg-amber-50 text-amber-800 border-amber-300',
+    REFUNDED: 'bg-slate-100 text-slate-600 border-slate-200',
+    FAILED: 'bg-rose-50 text-rose-700 border-rose-200',
   };
   const label =
     s === 'ADMIN_WAIVED' ? 'Free (admin)' : s === 'PENDING_VERIFICATION' ? 'Pending verify' : s;
   return (
-    <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase ${colors[s] || colors.UNPAID}`}>
+    <span className={`inline-flex px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wide border whitespace-nowrap ${colors[s] || colors.UNPAID}`}>
       {label}
     </span>
   );
@@ -106,17 +113,153 @@ function paymentStatusBadge(status?: string | null) {
 function campaignStatusBadge(status?: string) {
   const s = (status || 'PENDING').toUpperCase();
   const colors: Record<string, string> = {
-    PENDING: 'bg-amber-500/20 text-amber-300',
-    ACTIVE: 'bg-emerald-500/20 text-emerald-300',
-    REJECTED: 'bg-rose-500/20 text-rose-300',
-    PAUSED: 'bg-sky-500/20 text-sky-300',
-    EXPIRED: 'bg-zinc-500/20 text-zinc-400',
-    CANCELLED: 'bg-zinc-500/20 text-zinc-400',
+    PENDING: 'bg-amber-50 text-amber-800 border-amber-200',
+    ACTIVE: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+    REJECTED: 'bg-rose-50 text-rose-700 border-rose-200',
+    PAUSED: 'bg-amber-50 text-amber-800 border-amber-300',
+    EXPIRED: 'bg-slate-100 text-slate-600 border-slate-200',
+    CANCELLED: 'bg-slate-100 text-slate-600 border-slate-200',
   };
   return (
-    <span className={`px-2 py-1 rounded-md text-xs font-bold ${colors[s] || colors.PENDING}`}>
+    <span className={`inline-flex px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wide border ${colors[s] || colors.PENDING}`}>
       {s}
     </span>
+  );
+}
+
+const campaignEditBtn =
+  'inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 text-xs font-semibold';
+const campaignPauseBtn =
+  'inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100 text-xs font-semibold disabled:opacity-50';
+const campaignResumeBtn =
+  'inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 text-xs font-semibold disabled:opacity-50';
+
+const PROMO_CATEGORIES = ['ALL', 'DINING', 'EVENTS', 'MOVIES', 'SPORTS'] as const;
+
+const fieldClass =
+  'w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-rose-500/50';
+
+function CampaignEditFields({
+  title,
+  category,
+  startDate,
+  endDate,
+  banner,
+  accent,
+  uploading,
+  plan,
+  onTitle,
+  onCategory,
+  onStart,
+  onEnd,
+  onBanner,
+  onAccent,
+  onUpload,
+}: {
+  title: string;
+  category: string;
+  startDate: string;
+  endDate: string;
+  banner: string;
+  accent: string;
+  uploading: boolean;
+  plan: { listing_boost?: boolean; landing_slider?: boolean; category_rail?: boolean } | null;
+  onTitle: (value: string) => void;
+  onCategory: (value: string) => void;
+  onStart: (value: string) => void;
+  onEnd: (value: string) => void;
+  onBanner: (value: string) => void;
+  onAccent: (value: string) => void;
+  onUpload: (file: File | null) => void;
+}) {
+  const needsBanner = Boolean(plan?.landing_slider || plan?.category_rail);
+  const placements = [
+    plan?.listing_boost ? 'Listing boost' : null,
+    plan?.landing_slider ? 'Home slider' : null,
+    plan?.category_rail ? 'Category rail' : null,
+  ].filter(Boolean);
+  return (
+    <>
+      {placements.length > 0 ? (
+        <div className="flex flex-wrap gap-1.5">
+          {placements.map((label) => (
+            <span
+              key={label}
+              className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-rose-50 text-rose-700 border border-rose-200"
+            >
+              {label}
+            </span>
+          ))}
+        </div>
+      ) : null}
+      <div>
+        <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">
+          Promotion title <span className="text-rose-500">*</span>
+        </label>
+        <input
+          value={title}
+          onChange={(e) => onTitle(e.target.value)}
+          placeholder="What customers see"
+          className={fieldClass}
+        />
+      </div>
+      <div>
+        <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">
+          Category
+        </label>
+        <select value={category} onChange={(e) => onCategory(e.target.value)} className={fieldClass}>
+          {PROMO_CATEGORIES.map((item) => (
+            <option key={item} value={item}>{item}</option>
+          ))}
+        </select>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">Starts</label>
+          <input type="date" value={startDate} onChange={(e) => onStart(e.target.value)} className={fieldClass} />
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">Expires</label>
+          <input type="date" value={endDate} onChange={(e) => onEnd(e.target.value)} className={fieldClass} />
+        </div>
+      </div>
+      <div>
+        <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">
+          Banner {needsBanner ? <span className="text-rose-500">*</span> : <span className="normal-case tracking-normal text-zinc-500">(optional)</span>}
+        </label>
+        <CroppedImageField
+          value={banner}
+          aspect={LANDING_PROMO_BANNER_ASPECT}
+          disabled={uploading}
+          previewClassName="w-full aspect-[3/1] object-cover rounded-xl border border-slate-200 overflow-hidden"
+          emptyClassName="flex flex-col items-center justify-center w-full aspect-[3/1] rounded-xl border border-dashed border-slate-300 bg-slate-50 hover:border-rose-400 text-slate-400"
+          emptyLabel="Upload and crop banner"
+          emptyContent={
+            <>
+              <ImagePlus size={22} className="mb-1" />
+              <span className="text-xs font-semibold text-slate-600">Upload and crop banner</span>
+            </>
+          }
+          onRemove={() => onBanner('')}
+          onCroppedFile={onUpload}
+        />
+        <p className="text-[11px] text-zinc-500 mt-1.5">
+          3:1 banner, recommended {LANDING_PROMO_BANNER_SIZE_HINT}. Required when the plan uses the home slider or category rail.
+        </p>
+      </div>
+      <div>
+        <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">
+          Slider accent <span className="normal-case tracking-normal text-zinc-500">(optional)</span>
+        </label>
+        <input
+          value={accent}
+          maxLength={40}
+          onChange={(e) => onAccent(e.target.value)}
+          placeholder='e.g. "Feel The Beat"'
+          className={fieldClass}
+        />
+      </div>
+    </>
   );
 }
 
@@ -304,8 +447,7 @@ export default function AdminMarketingPage() {
     page,
     limit,
     ...(q.trim() ? { q: q.trim() } : {}),
-    status: 'ACTIVE',
-    business_scope: true,
+    status: 'ACTIVE,PAUSED',
   };
 
   const requestsListArg = {
@@ -431,13 +573,23 @@ export default function AdminMarketingPage() {
   }, [adminMoviesData?.items, publicEvents]);
 
   const [assignCampaign, { isLoading: isAssigning }] = useAssignMarketingCampaignMutation();
+  const [updateCampaign, { isLoading: isUpdatingCampaign }] = useUpdateMarketingCampaignMutation();
   const [patchStatus, { isLoading: patching }] = usePatchMarketingCampaignStatusMutation();
+  const [editingCampaign, setEditingCampaign] = useState<MarketingCampaign | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editCategory, setEditCategory] = useState('ALL');
+  const [editStartDate, setEditStartDate] = useState('');
+  const [editEndDate, setEditEndDate] = useState('');
+  const [editBanner, setEditBanner] = useState('');
+  const [editAccent, setEditAccent] = useState('');
+  const [uploadImage, { isLoading: uploadingBanner }] = useUploadImageMutation();
 
   const campaignForm = useForm<AdminMarketingCampaignValues>({
     resolver: yupResolver(adminMarketingCampaignSchema),
     defaultValues: { businessId: '', plan_id: '' },
     mode: 'onSubmit',
   });
+  const watchedPlanId = campaignForm.watch('plan_id');
 
   const rejectForm = useForm<AdminMarketingRejectValues>({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -563,17 +715,93 @@ export default function AdminMarketingPage() {
     }
   };
 
+  const resetCampaignForm = () => {
+    setEditingCampaign(null);
+    setEditTitle('');
+    setEditCategory('ALL');
+    setEditStartDate('');
+    setEditEndDate('');
+    setEditBanner('');
+    setEditAccent('');
+    campaignForm.reset({ businessId: '', plan_id: '' });
+  };
+
+  const openEditCampaign = (camp: MarketingCampaign) => {
+    const category = String(camp.category || 'ALL').toUpperCase();
+    setEditingCampaign(camp);
+    setEditTitle(camp.title || '');
+    setEditCategory(PROMO_CATEGORIES.includes(category as (typeof PROMO_CATEGORIES)[number]) ? category : 'ALL');
+    setEditStartDate(camp.start_date ? toDateInput(camp.start_date) : '');
+    setEditEndDate(camp.end_date ? toDateInput(camp.end_date) : '');
+    setEditBanner(camp.banner_image_url || '');
+    setEditAccent(camp.slider_accent_text || '');
+    campaignForm.reset({
+      businessId: String(camp.business_id || ''),
+      plan_id: camp.plan_id != null ? String(camp.plan_id) : '',
+    });
+  };
+
+  const onUploadBanner = async (file: File | null) => {
+    if (!file) return;
+    try {
+      const fd = new FormData();
+      fd.append('image', file);
+      const res = await uploadImage(fd).unwrap();
+      const url = extractUploadUrl(res);
+      if (!url) throw new Error('Upload failed');
+      setEditBanner(url);
+      toast.success('Banner uploaded');
+    } catch (err) {
+      toast.error(extractApiError(err, 'Failed to upload banner'));
+    }
+  };
+
   const onAssignCampaign = async (values: AdminMarketingCampaignValues) => {
-    const selectedPlan = planOptions.find((p) => p.id.toString() === values.plan_id);
+    const selectedPlan =
+      planOptions.find((p) => p.id.toString() === values.plan_id) ||
+      (editingCampaign && String(editingCampaign.plan_id) === values.plan_id
+        ? {
+            id: editingCampaign.plan_id,
+            name: editingCampaign.plan_name || 'Plan',
+            duration_days: editingCampaign.duration_days || 30,
+            landing_slider: editingCampaign.landing_slider,
+            category_rail: editingCampaign.category_rail,
+            listing_boost: editingCampaign.listing_boost,
+          }
+        : undefined);
     if (!selectedPlan) {
       toast.error('Selected plan was not found');
       return;
     }
 
-    const endDate = new Date();
-    endDate.setDate(endDate.getDate() + selectedPlan.duration_days);
-
     try {
+      if (editingCampaign) {
+        const needsBanner = Boolean(selectedPlan.landing_slider || selectedPlan.category_rail);
+        if (needsBanner && !editBanner.trim()) {
+          toast.error('This plan shows a banner. Upload a 3:1 banner image.');
+          return;
+        }
+        if (!editTitle.trim()) {
+          toast.error('Enter a promotion title.');
+          return;
+        }
+        await updateCampaign({
+          id: editingCampaign.id,
+          plan_id: parseInt(values.plan_id, 10),
+          title: editTitle.trim(),
+          category: editCategory,
+          ...(editStartDate ? { start_date: editStartDate } : {}),
+          ...(editEndDate ? { end_date: editEndDate } : {}),
+          banner_image_url: editBanner,
+          slider_accent_text: editAccent,
+        }).unwrap();
+        toast.success('Campaign updated');
+        resetCampaignForm();
+        return;
+      }
+
+      const endDate = new Date();
+      endDate.setDate(endDate.getDate() + selectedPlan.duration_days);
       const business = businesses.find((b) => b.id === values.businessId);
       const created = await assignCampaign({
         businessId: values.businessId,
@@ -588,7 +816,7 @@ export default function AdminMarketingPage() {
       );
       campaignForm.reset({ businessId: '', plan_id: '' });
     } catch (err: unknown) {
-      toast.error(extractApiError(err, 'Failed to assign campaign'));
+      toast.error(extractApiError(err, editingCampaign ? 'Failed to update campaign' : 'Failed to assign campaign'));
     }
   };
 
@@ -631,9 +859,18 @@ export default function AdminMarketingPage() {
   const handlePause = async (camp: MarketingCampaign) => {
     try {
       await patchStatus({ id: camp.id, status: 'PAUSED' }).unwrap();
-      toast.success('Campaign paused');
+      toast.success('Campaign paused. It stays in this list until you resume it.');
     } catch (err) {
       toast.error(extractApiError(err, 'Failed to pause campaign'));
+    }
+  };
+
+  const handleResume = async (camp: MarketingCampaign) => {
+    try {
+      await patchStatus({ id: camp.id, status: 'ACTIVE' }).unwrap();
+      toast.success('Campaign resumed');
+    } catch (err) {
+      toast.error(extractApiError(err, 'Failed to resume campaign'));
     }
   };
 
@@ -1321,11 +1558,12 @@ export default function AdminMarketingPage() {
       {activeTab === 'active' && (
         <div className="space-y-4">
           <div className="glass-panel rounded-2xl border border-white/5 p-4 text-sm text-zinc-400">
-            <p className="text-white font-semibold mb-1">Business-wide promotions only</p>
+            <p className="text-white font-semibold mb-1">Everything on the public promotion banner</p>
             <p>
-              Use this tab to boost a <strong className="text-zinc-300">whole business</strong> (restaurant, event organizer, cinema).
-              Partners promote a <strong className="text-zinc-300">single event or movie</strong> from their own portal — you review those under{' '}
-              <strong className="text-zinc-300">Requests</strong>.
+              This list is every running promotion: a whole business, or one event or movie.
+              A row marked <strong className="text-zinc-300">Home banner</strong> is what customers see in the top slider.
+              If it is active here, it can show on the site. Pause it to take it off the banner. It stays in this list so you can edit it or resume it.
+              New partner requests still start under <strong className="text-zinc-300">Requests</strong>.
             </p>
           </div>
 
@@ -1333,10 +1571,13 @@ export default function AdminMarketingPage() {
           <div className="lg:col-span-1">
             <div className="glass-panel p-6 border border-white/5 rounded-2xl">
               <h3 className="text-lg font-bold text-white mb-1 flex items-center gap-2">
-                <Target size={18} className="text-rose-500" /> Assign business campaign
+                <Target size={18} className="text-rose-500" />{' '}
+                {editingCampaign ? 'Edit campaign' : 'Assign business campaign'}
               </h3>
               <p className="text-xs text-zinc-500 mb-4">
-                Free promotion for the entire business listing — not one event or movie.
+                {editingCampaign
+                  ? 'Update the promotion title, category, dates, and banner. Status stays active or paused.'
+                  : 'Free promotion for the entire business listing — not one event or movie.'}
               </p>
               <form onSubmit={campaignForm.handleSubmit(onAssignCampaign)} noValidate className="space-y-4">
                 <div>
@@ -1345,9 +1586,19 @@ export default function AdminMarketingPage() {
                   </label>
                   <select
                     {...campaignForm.register('businessId')}
-                    className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-rose-500/50"
+                    aria-disabled={Boolean(editingCampaign)}
+                    tabIndex={editingCampaign ? -1 : undefined}
+                    className={`w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-rose-500/50 ${
+                      editingCampaign ? 'pointer-events-none opacity-60' : ''
+                    }`}
                   >
                     <option value="">-- Choose Business --</option>
+                    {editingCampaign &&
+                    !businesses.some((b) => String(b.id) === String(editingCampaign.business_id)) ? (
+                      <option value={editingCampaign.business_id}>
+                        {editingCampaign.business_name || 'Current business'}
+                      </option>
+                    ) : null}
                     {businesses.map((b) => (
                       <option key={b.id} value={b.id}>{b.name}</option>
                     ))}
@@ -1362,19 +1613,62 @@ export default function AdminMarketingPage() {
                     className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-rose-500/50"
                   >
                     <option value="">-- Choose Plan --</option>
+                    {editingCampaign &&
+                    !planOptions.some((p) => String(p.id) === String(editingCampaign.plan_id)) ? (
+                      <option value={editingCampaign.plan_id}>
+                        {editingCampaign.plan_name || 'Current plan'}
+                      </option>
+                    ) : null}
                     {planOptions.map((p) => (
                       <option key={p.id} value={p.id}>{p.name} ({p.duration_days} days)</option>
                     ))}
                   </select>
                 </div>
+                {editingCampaign ? (
+                  <CampaignEditFields
+                    title={editTitle}
+                    category={editCategory}
+                    startDate={editStartDate}
+                    endDate={editEndDate}
+                    banner={editBanner}
+                    accent={editAccent}
+                    uploading={uploadingBanner}
+                    plan={
+                      planOptions.find((p) => String(p.id) === String(watchedPlanId)) ||
+                      (String(editingCampaign.plan_id) === String(watchedPlanId) ? editingCampaign : null)
+                    }
+                    onTitle={setEditTitle}
+                    onCategory={setEditCategory}
+                    onStart={setEditStartDate}
+                    onEnd={setEditEndDate}
+                    onBanner={setEditBanner}
+                    onAccent={setEditAccent}
+                    onUpload={(file) => void onUploadBanner(file)}
+                  />
+                ) : null}
                 <button
                   type="submit"
-                  disabled={isAssigning}
+                  disabled={isAssigning || isUpdatingCampaign}
                   className="w-full bg-rose-600 hover:bg-rose-500 text-white font-bold py-2.5 px-4 rounded-xl transition-all flex items-center justify-center gap-2 mt-2"
                 >
-                  {isAssigning ? <Loader2 className="animate-spin" size={18} /> : <Store size={18} />}
-                  Activate Campaign
+                  {isAssigning || isUpdatingCampaign ? (
+                    <Loader2 className="animate-spin" size={18} />
+                  ) : editingCampaign ? (
+                    <Pencil size={18} />
+                  ) : (
+                    <Store size={18} />
+                  )}
+                  {editingCampaign ? 'Save changes' : 'Activate Campaign'}
                 </button>
+                {editingCampaign ? (
+                  <button
+                    type="button"
+                    onClick={resetCampaignForm}
+                    className="w-full border border-white/10 text-zinc-300 font-semibold py-2.5 px-4 rounded-xl"
+                  >
+                    Cancel edit
+                  </button>
+                ) : null}
               </form>
             </div>
           </div>
@@ -1389,45 +1683,73 @@ export default function AdminMarketingPage() {
                     <tr className="bg-white/5 border-b border-white/5">
                       <th className="p-4 text-xs font-bold text-zinc-400 uppercase tracking-wider">Business</th>
                       <th className="p-4 text-xs font-bold text-zinc-400 uppercase tracking-wider">Promotion</th>
-                      <th className="p-4 text-xs font-bold text-zinc-400 uppercase tracking-wider">Expires</th>
+                      <th className="p-4 text-xs font-bold text-zinc-400 uppercase tracking-wider whitespace-nowrap">Expires</th>
                       <th className="p-4 text-xs font-bold text-zinc-400 uppercase tracking-wider">Status</th>
-                      <th className="p-4 text-xs font-bold text-zinc-400 uppercase tracking-wider text-right">Actions</th>
+                      <th className="p-4 text-xs font-bold text-zinc-400 uppercase tracking-wider text-right whitespace-nowrap">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5">
                     {campaigns.length === 0 ? (
-                      <tr><td colSpan={5} className="p-8 text-center text-zinc-500">No active campaigns.</td></tr>
+                      <tr><td colSpan={5} className="p-8 text-center text-zinc-500">No active or paused campaigns.</td></tr>
                     ) : (
                       campaigns.map((camp: MarketingCampaign) => (
                         <tr key={camp.id} className="hover:bg-white/[0.02] transition-colors">
-                          <td className="p-4">
-                            <div className="font-bold text-white">{camp.business_name}</div>
-                            <div className="text-xs text-zinc-500">{camp.plan_name}</div>
+                          <td className="p-4 align-top min-w-[12rem]">
+                            <div className="font-bold text-white leading-snug">{camp.business_name}</div>
+                            <div className="text-xs text-zinc-500 mt-0.5">{camp.category || 'Business'}</div>
                           </td>
-                        <td className="p-4 text-zinc-300">
-                          {camp.title || camp.plan_name}
-                          <div className="text-xs text-zinc-500">{camp.category}</div>
-                          <div className="text-[10px] text-sky-400/90 mt-0.5">{promotionScopeLabel(camp, targetLookups)}</div>
-                          <div className="text-xs text-emerald-400/80 mt-0.5">
-                            {formatMoneyDisplay(camp.amount ?? camp.price)}
-                          </div>
-                        </td>
-                        <td className="p-4 text-zinc-400">
-                          {formatDate(camp.end_date)}
-                          {camp.status === 'EXPIRED' ? (
-                            <span className="block text-[10px] text-zinc-500 mt-0.5">Auto-expired</span>
-                          ) : null}
-                        </td>
-                          <td className="p-4">{campaignStatusBadge(camp.status)}</td>
-                          <td className="p-4 text-right">
-                            <button
-                              type="button"
-                              disabled={patching}
-                              onClick={() => void handlePause(camp)}
-                              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-white/10 text-zinc-300 hover:text-white text-xs"
-                            >
-                              <Pause size={12} /> Pause
-                            </button>
+                          <td className="p-4 align-top text-zinc-300 min-w-[14rem]">
+                            <div className="font-semibold text-white leading-snug">{camp.title && camp.title !== camp.plan_name ? camp.title : camp.plan_name || '—'}</div>
+                            {camp.title && camp.title !== camp.plan_name ? (
+                              <div className="text-xs text-zinc-500 mt-0.5 leading-snug">{camp.plan_name}</div>
+                            ) : null}
+                            <div className="text-[11px] font-semibold text-sky-700 mt-0.5">{promotionScopeLabel(camp, targetLookups)}</div>
+                            {(camp.status || '').toUpperCase() === 'ACTIVE' && camp.landing_slider && camp.banner_image_url ? (
+                              <div className="mt-1">
+                                <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-rose-50 text-rose-700 border border-rose-200">
+                                  Home banner
+                                </span>
+                              </div>
+                            ) : null}
+                            <div className="text-xs font-semibold text-emerald-700 mt-0.5">
+                              {formatMoneyDisplay(camp.amount ?? camp.price)}
+                            </div>
+                          </td>
+                          <td className="p-4 align-top text-zinc-400 whitespace-nowrap">
+                            {formatDate(camp.end_date)}
+                          </td>
+                          <td className="p-4 align-top">
+                            <div className="flex items-start">{campaignStatusBadge(camp.status)}</div>
+                          </td>
+                          <td className="p-4 align-top text-right">
+                            <div className="inline-flex items-start justify-end gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => openEditCampaign(camp)}
+                                className={campaignEditBtn}
+                              >
+                                <Pencil size={12} /> Edit
+                              </button>
+                              {(camp.status || '').toUpperCase() === 'PAUSED' ? (
+                                <button
+                                  type="button"
+                                  disabled={patching}
+                                  onClick={() => void handleResume(camp)}
+                                  className={campaignResumeBtn}
+                                >
+                                  <Play size={12} /> Resume
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  disabled={patching}
+                                  onClick={() => void handlePause(camp)}
+                                  className={campaignPauseBtn}
+                                >
+                                  <Pause size={12} /> Pause
+                                </button>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       ))

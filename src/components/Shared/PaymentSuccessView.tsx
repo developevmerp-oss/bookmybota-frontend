@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Sparkles } from "lucide-react";
 import { paymentSuccessCopy, type BookingPaymentModule } from "@/lib/paymentSuccess";
@@ -12,6 +13,8 @@ type Props = {
   title?: string;
   subtitle?: string;
   nextLabel?: string;
+  /** page = full route. modal = overlay on the review screen. */
+  presentation?: "page" | "modal";
 };
 
 /**
@@ -24,6 +27,7 @@ export default function PaymentSuccessView({
   title,
   subtitle,
   nextLabel,
+  presentation = "page",
 }: Props) {
   const router = useRouter();
   const copy = paymentSuccessCopy(module);
@@ -52,8 +56,13 @@ export default function PaymentSuccessView({
   const isDone = phase === "done";
   const showMark = isPlaying || isDone;
 
-  return (
-    <div className="min-h-[100dvh] w-full flex items-center justify-center px-4 py-10 sm:py-14 relative overflow-hidden bg-[#F7F5FB]">
+  const shellClass =
+    presentation === "modal"
+      ? "fixed inset-0 z-[200] flex items-center justify-center px-4 py-8 bg-black/45"
+      : "min-h-[100dvh] w-full flex items-center justify-center px-4 py-10 sm:py-14 relative overflow-hidden bg-[#F7F5FB]";
+
+  const view = (
+    <div className={shellClass} role={presentation === "modal" ? "dialog" : undefined} aria-modal={presentation === "modal" ? true : undefined}>
       <style>{`
         @keyframes gpayRingDraw {
           from { stroke-dashoffset: 289; }
@@ -104,6 +113,7 @@ export default function PaymentSuccessView({
         }
       `}</style>
 
+      {presentation === "page" ? (
       <div
         className="pointer-events-none absolute inset-0"
         aria-hidden
@@ -112,6 +122,7 @@ export default function PaymentSuccessView({
             "radial-gradient(ellipse 70% 50% at 50% 28%, rgba(105,0,170,0.13), transparent 68%), radial-gradient(ellipse 40% 30% at 80% 90%, rgba(52,168,83,0.08), transparent 55%)",
         }}
       />
+      ) : null}
 
       <div
         className={`relative z-[1] w-full max-w-[26rem] transition-all duration-500 ease-out ${
@@ -248,4 +259,9 @@ export default function PaymentSuccessView({
       </div>
     </div>
   );
+
+  if (presentation === "modal" && typeof document !== "undefined") {
+    return createPortal(view, document.body);
+  }
+  return view;
 }

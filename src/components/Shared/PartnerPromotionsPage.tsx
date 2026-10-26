@@ -30,7 +30,7 @@ import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
 import { extractApiError } from "@/lib/apiErrors";
 import { extractUploadUrl, resolveMediaUrl } from "@/lib/mediaUrl";
-import { formatDate } from "@/lib/dateFormat";
+import { formatDate, toDateInput } from "@/lib/dateFormat";
 import { formatMoneyDisplay } from "@/lib/currencyFormat";
 import Pagination from "@/components/Shared/Pagination";
 import { CroppedImageField } from "@/components/Shared/ImageCropPicker";
@@ -185,7 +185,8 @@ export default function PartnerPromotionsPage({
     const raw = ev?.event_starts_at || "";
     if (!raw) return "";
     const s = String(raw).trim();
-    if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+    const venueDay = toDateInput(s);
+    if (venueDay) return venueDay;
     const d = new Date(s);
     if (Number.isNaN(d.getTime())) return "";
     const pad = (n: number) => String(n).padStart(2, "0");

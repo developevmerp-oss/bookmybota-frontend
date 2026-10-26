@@ -5136,6 +5136,28 @@ export const api = createApi({
       invalidatesTags: ['MarketingCampaigns', 'PublicMarketingPromotions', 'Businesses', 'PublicEvents', 'Movies'],
     }),
 
+    updateMarketingCampaign: builder.mutation<
+      MarketingCampaign,
+      {
+        id: number;
+        plan_id: number;
+        end_date?: string;
+        start_date?: string;
+        title?: string;
+        category?: string;
+        banner_image_url?: string;
+        slider_accent_text?: string;
+      }
+    >({
+      query: ({ id, ...body }) => ({
+        url: `/admin/marketing-campaigns/${id}`,
+        method: 'PATCH',
+        body,
+      }),
+      transformResponse: (res: { data: MarketingCampaign }) => res.data,
+      invalidatesTags: ['MarketingCampaigns', 'PublicMarketingPromotions', 'Businesses', 'PublicEvents', 'Movies'],
+    }),
+
     assignMarketingCampaign: builder.mutation<
       MarketingCampaign,
       {
@@ -8690,6 +8712,7 @@ export const {
   useGetMarketingCampaignsQuery,
   useGetMarketingPaymentSummaryQuery,
   usePatchMarketingCampaignStatusMutation,
+  useUpdateMarketingCampaignMutation,
   useAssignMarketingCampaignMutation,
   useGetPublicMarketingPlansQuery,
   useGetActiveMarketingPromotionsQuery,

@@ -13,7 +13,7 @@ import {
 } from "@/services/api";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { restaurantHref } from "@/lib/businessPublicPath";
-import { formatDateCustomer } from "@/lib/dateFormat";
+import { formatDateCustomer, getVenueDateTimeParts } from "@/lib/dateFormat";
 import { promotionClickHref } from "@/lib/promotionCta";
 import { useHomeCatalog } from "./useHomeCatalog";
 import {
@@ -75,19 +75,18 @@ function splitTitleYear(name: string, iso?: string) {
   const match = name.match(/^(.*?)[\s,:-]*((?:19|20)\d{2})\s*$/);
   if (match) return { title: match[1].trim() || name, year: match[2] };
   if (iso) {
-    const y = new Date(iso).getFullYear();
-    if (!Number.isNaN(y)) return { title: name, year: String(y) };
+    const y = getVenueDateTimeParts(iso)?.y;
+    if (y) return { title: name, year: String(y) };
   }
   return { title: name, year: undefined };
 }
 
 function formatSlideDate(iso?: string) {
-  if (!iso) return null;
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return null;
+  const parts = getVenueDateTimeParts(iso);
+  if (!parts) return null;
   return {
-    dateLabel: formatDateCustomer(d),
-    weekdayLabel: d.toLocaleDateString("en-US", { weekday: "long" }),
+    dateLabel: formatDateCustomer(iso),
+    weekdayLabel: parts.weekdayLong,
   };
 }
 
@@ -325,29 +324,18 @@ export default function PromoBannerCarousel({ city }: PromoBannerCarouselProps) 
     fallbackEvents,
     cityEvents,
     dining,
-    isLoadingEvents,
-    isLoadingFallback,
   } = useHomeCatalog(city);
   const hasCity = hasCityFilter(city);
-  const { data: cityMoviesData, isLoading: loadingCityMovies, isFetching: fetchingCityMovies } =
-    useGetPublicMoviesQuery({
-      limit: 50,
-      ...(hasCity ? { city } : {}),
-    });
-  const { data: allMoviesData, isLoading: loadingAllMovies, isFetching: fetchingAllMovies } =
-    useGetPublicMoviesQuery({ limit: 50 }, { skip: !hasCity });
+  const { data: cityMoviesData } = useGetPublicMoviesQuery({
+    limit: 50,
+    ...(hasCity ? { city } : {}),
+  });
+  const { data: allMoviesData } = useGetPublicMoviesQuery({ limit: 50 }, { skip: !hasCity });
   const movieItems = preferCityOrAll(
     cityMoviesData?.items ?? [],
     allMoviesData?.items ?? [],
     hasCity
   );
-  const loadingMovies =
-    loadingCityMovies ||
-    fetchingCityMovies ||
-    (hasCity &&
-      (cityMoviesData?.items?.length ?? 0) === 0 &&
-      !fetchingCityMovies &&
-      (loadingAllMovies || fetchingAllMovies));
   const { data: promotions = [], isLoading: loadingPromos, isFetching: fetchingPromos } =
     useGetActiveMarketingPromotionsQuery({
       surface: "slider",
@@ -397,31 +385,17 @@ export default function PromoBannerCarousel({ city }: PromoBannerCarouselProps) 
       });
     };
 
-    // Priority 1: location-scoped landing-slider promotions (API filters by city)
-    if (promotions.length > 0) {
-      const fromPromos = dedupeByImage(
-        promotions
-          .slice(0, 10)
-          .map((p) => promoToSlide(p, linkCtx))
-          .filter((s) => Boolean(s.image?.trim()) && Boolean(s.title?.trim()))
-      );
-      if (fromPromos.length > 0) return fromPromos;
-    }
-
-    // Priority 2: location-scoped events only — hide section if none for this city
+    // Only paid landing-slider campaigns. Events are not used as filler slides.
+    if (promotions.length === 0) return [];
     return dedupeByImage(
-      locationBannerEvents
-        .slice(0, 8)
-        .map((event) => eventToSlide(event, city))
+      promotions
+        .slice(0, 10)
+        .map((p) => promoToSlide(p, linkCtx))
         .filter((s) => Boolean(s.image?.trim()) && Boolean(s.title?.trim()))
     );
-  }, [promotions, locationBannerEvents, city, eventsById, moviesById, diningById]);
+  }, [promotions, city, eventsById, moviesById, diningById]);
 
-  const loading =
-    loadingPromos ||
-    fetchingPromos ||
-    (promotions.length === 0 &&
-      (isLoadingEvents || loadingMovies || (hasCity && slides.length === 0 && isLoadingFallback)));
+  const loading = loadingPromos || fetchingPromos;
 
   const { renderSlides, originalCount, startIndex, useWrapTrack } = useMemo(
     () => preparePromoLoopSlides(slides),

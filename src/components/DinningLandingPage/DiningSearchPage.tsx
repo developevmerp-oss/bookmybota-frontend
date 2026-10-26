@@ -2,11 +2,11 @@
 import { useState, useEffect, Suspense, useMemo } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
+  EqualApproximately,
   MapPin,
   Loader2,
   X,
   UtensilsCrossed,
-  Users,
   Tag,
   ArrowRight,
 } from "lucide-react";
@@ -166,7 +166,7 @@ function RestaurantCard({ restaurant }: { restaurant: Business }) {
             />
           </div>
           <p className="flex items-center gap-1.5 min-w-0">
-            <Users size={14} className="shrink-0 text-[#6900AA]" />
+            <EqualApproximately size={14} strokeWidth={2} className="shrink-0 text-[#6900AA]" aria-hidden />
             <span className="truncate font-medium">{priceForTwo}</span>
           </p>
         </div>

@@ -47,8 +47,12 @@ import {
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import {
   formatDateCustomer,
+  formatTime12h,
+  getVenueDateTimeParts,
   isMovieShowEnded,
   isVenueWallTimeReached,
+  venueCalendarAddDays,
+  venueDateLabels,
   venueDateStr,
 } from "@/lib/dateFormat";
 
@@ -169,32 +173,13 @@ function preferredTimeOptionsForDate(selectedDate: string, now = new Date()): Fi
 }
 
 function parseIsoDateAndHours(iso: string) {
-  if (!iso) return { dateStr: "", hour: 0, displayTime: "" };
-  const str = String(iso).trim();
-  const match = str.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
-  if (match) {
-    const [, yr, mon, dy, hhStr, mmStr] = match;
-    const h = parseInt(hhStr, 10);
-    const minuteStr = mmStr || "00";
-    const ampm = h >= 12 ? "PM" : "AM";
-    const h12 = h % 12 || 12;
-    return {
-      dateStr: `${yr}-${mon}-${dy}`,
-      hour: h,
-      displayTime: `${String(h12).padStart(2, "0")}:${minuteStr} ${ampm}`,
-    };
-  }
-  const dateObj = new Date(iso);
-  if (isNaN(dateObj.getTime())) return { dateStr: "", hour: 0, displayTime: "" };
-  const h = dateObj.getHours();
-  const minuteStr = String(dateObj.getMinutes()).padStart(2, "0");
-  const ampm = h >= 12 ? "PM" : "AM";
-  const h12 = h % 12 || 12;
-  const pad = (n: number) => String(n).padStart(2, "0");
+  const parts = getVenueDateTimeParts(iso);
+  if (!parts) return { dateStr: "", hour: 0, displayTime: "" };
+  const displayTime = formatTime12h(iso);
   return {
-    dateStr: `${dateObj.getFullYear()}-${pad(dateObj.getMonth() + 1)}-${pad(dateObj.getDate())}`,
-    hour: h,
-    displayTime: `${String(h12).padStart(2, "0")}:${minuteStr} ${ampm}`,
+    dateStr: parts.dateKey,
+    hour: parts.hour,
+    displayTime: displayTime === "—" ? "" : displayTime,
   };
 }
 
@@ -213,17 +198,16 @@ function generateDateOptions(count = 7) {
     monthName: string;
     weekdayShort: string;
   }> = [];
-  const today = new Date();
-  const pad = (n: number) => String(n).padStart(2, "0");
-
+  let cursor = venueDateStr();
   for (let i = 0; i < count; i++) {
-    const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() + i);
+    const labels = venueDateLabels(cursor);
     options.push({
-      dateStr: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
-      dayNumber: pad(d.getDate()),
-      monthName: d.toLocaleDateString("en-US", { month: "short" }).toUpperCase(),
-      weekdayShort: d.toLocaleDateString("en-US", { weekday: "short" }).toUpperCase(),
+      dateStr: cursor,
+      dayNumber: labels.dayNumber,
+      monthName: labels.monthName.toUpperCase(),
+      weekdayShort: labels.weekdayShort.toUpperCase(),
     });
+    cursor = venueCalendarAddDays(cursor, 1);
   }
   return options;
 }

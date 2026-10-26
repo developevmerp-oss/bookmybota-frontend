@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Controller, useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
@@ -12,15 +11,12 @@ import {
   ChevronDown,
   ChevronRight,
   ChevronUp,
-  Clock,
   Crown,
   Gift,
-  Languages,
   LayoutGrid,
   Loader2,
   Map as MapIcon,
   Maximize2,
-  Mic2,
   Minus,
   Plus,
   Shield,
@@ -30,13 +26,16 @@ import {
   Timer,
   Truck,
   User,
+  Banknote,
+  CheckCircle2,
   Users,
   X,
   Building2,
 } from "lucide-react";
 import { toast } from "sonner";
+import images from "@/Images";
 import { useSelectedCity } from "@/lib/useSelectedCity";
-import { paymentSuccessHref } from "@/lib/paymentSuccess";
+import PaymentSuccessView from "@/components/Shared/PaymentSuccessView";
 import {
   useCreateEventBookingMutation,
   useCreateEventSeatHoldMutation,
@@ -54,7 +53,8 @@ import {
 } from "@/services/api";
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
-import { formatDateCustomer, formatDateTimeCustomer, formatTime12h } from "@/lib/dateFormat";
+import { formatDateCustomer, formatTime12h, getVenueDateTimeParts, venueDateStr } from "@/lib/dateFormat";
+import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { extractApiError } from "@/lib/apiErrors";
 import { formatMoney } from "@/lib/currencyFormat";
 import { parseEventLanguages } from "@/lib/eventValidation";
@@ -80,8 +80,6 @@ import {
 } from "@/lib/eventTicketMode";
 import dynamic from "next/dynamic";
 import CustomerAuthModal from "@/components/Shared/CustomerAuthModal";
-import images from "@/Images";
-
 const fieldErrorClass = "mt-1.5 text-[0.8125rem] font-medium text-rose-500";
 const reqStar = <span className="text-rose-500">*</span>;
 const HOLD_SESSION_KEY = "bmb_event_hold_session";
@@ -137,26 +135,31 @@ type Props = {
 };
 
 function dateKey(iso: string) {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  return getVenueDateTimeParts(iso)?.dateKey || "";
 }
 
 function dateChip(iso: string) {
-  const d = new Date(iso);
+  const parts = getVenueDateTimeParts(iso);
   return {
-    day: d.toLocaleDateString("en-US", { weekday: "short" }),
+    day: parts?.weekdayLong.slice(0, 3) || "",
     date: formatDateCustomer(iso),
   };
 }
 
-function formatDuration(minutes?: number | null) {
-  if (!minutes) return "";
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  if (h && m) return `${h}h ${m}m`;
-  if (h) return `${h}h`;
-  return `${m}m`;
+function venueMapsUrl(opts: {
+  latitude?: number | string | null;
+  longitude?: number | string | null;
+  address?: string | null;
+  name?: string | null;
+}) {
+  const lat = Number(opts.latitude);
+  const lng = Number(opts.longitude);
+  const hasCoords = Number.isFinite(lat) && Number.isFinite(lng) && (lat !== 0 || lng !== 0);
+  const query = hasCoords
+    ? `${lat},${lng}`
+    : [opts.name, opts.address].filter(Boolean).join(", ");
+  if (!query.trim()) return "";
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
 }
 
 function ticketAvail(available: number, total: number) {
@@ -203,7 +206,6 @@ export default function EventCheckout({
 }: Props) {
   const isOrganizer = mode === "organizer";
   const isPage = variant === "page";
-  const router = useRouter();
   const dispatch = useAppDispatch();
   const selectedCity = useSelectedCity();
   const authUser = useAppSelector((state) => state.auth.user);
@@ -217,6 +219,7 @@ export default function EventCheckout({
   const [selectedGiftCardId, setSelectedGiftCardId] = useState("");
   const [appliedGiftCard, setAppliedGiftCard] = useState<GiftCardRedeemPreview | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [bookedSuccessId, setBookedSuccessId] = useState<string | null>(null);
   const [holding, setHolding] = useState(false);
   const [selectedSeats, setSelectedSeats] = useState<any[]>([]);
   const [desiredSeatQty, setDesiredSeatQty] = useState<number | null>(null);
@@ -224,6 +227,7 @@ export default function EventCheckout({
   const [seatViewMode, setSeatViewMode] = useState<"canvas" | "grid">("canvas");
   const [isMapFullscreen, setIsMapFullscreen] = useState(false);
   const [expandedCity, setExpandedCity] = useState<string>("");
+  const [venueDetailsId, setVenueDetailsId] = useState("");
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [ticketModeDetailsOpen, setTicketModeDetailsOpen] = useState<TicketDeliveryMode | null>(null);
   const [contactModalOpen, setContactModalOpen] = useState(false);
@@ -496,7 +500,14 @@ export default function EventCheckout({
 
   const cityVenueGroups = useMemo(() => {
     type Show = (typeof showtimes)[number];
-    type VenueBucket = { venueKey: string; venueName: string; address?: string; showtimes: Show[] };
+    type VenueBucket = {
+      venueKey: string;
+      venueName: string;
+      address?: string;
+      latitude?: number | string | null;
+      longitude?: number | string | null;
+      showtimes: Show[];
+    };
     const cityMap = new Map<string, Map<string, VenueBucket>>();
 
     for (const s of showtimes) {
@@ -507,7 +518,18 @@ export default function EventCheckout({
       if (!cityMap.has(city)) cityMap.set(city, new Map());
       const venues = cityMap.get(city)!;
       if (!venues.has(venueKey)) {
-        venues.set(venueKey, { venueKey, venueName, address: address || undefined, showtimes: [] });
+        venues.set(venueKey, {
+          venueKey,
+          venueName,
+          address: address || undefined,
+          latitude: s.latitude,
+          longitude: s.longitude,
+          showtimes: [],
+        });
+      } else {
+        const bucket = venues.get(venueKey)!;
+        if (bucket.latitude == null && s.latitude != null) bucket.latitude = s.latitude;
+        if (bucket.longitude == null && s.longitude != null) bucket.longitude = s.longitude;
       }
       venues.get(venueKey)!.showtimes.push(s);
     }
@@ -859,15 +881,10 @@ export default function EventCheckout({
         onClose();
       } else {
         toast.success(result.message || `Tickets booked! Confirmation sent to ${contact.email.trim()}.`);
-        onClose();
         if (result.booking_id) {
-          router.push(
-            paymentSuccessHref({
-              module: "events",
-              bookingId: result.booking_id,
-              next: `/customer/event-bookings/confirmation?id=${result.booking_id}`,
-            })
-          );
+          setBookedSuccessId(result.booking_id);
+        } else {
+          onClose();
         }
       }
     } catch (err) {
@@ -1125,16 +1142,13 @@ export default function EventCheckout({
   const isSingleCitySingleVenue =
     cityVenueGroups.length === 1 && (cityVenueGroups[0]?.venues.length ?? 0) === 1;
   const showStepHeader =
-    step !== 1 || !isSingleCitySingleVenue;
+    step !== 4 && (step !== 1 || !isSingleCitySingleVenue);
 
   const accentBtn = "bg-[#111111] hover:bg-black";
   const accentIcon = "text-[#6900AA]";
   const accentFocus = "focus:border-[#6900AA]";
   const seatCountActiveGradient =
     "linear-gradient(180deg, #A78BFA 0%, #8B5CF6 38%, #6D28D9 72%, #4C1D95 100%)";
-  const durationLabel = formatDuration(event.duration_minutes);
-  const poster = event.poster_horizontal_url || event.poster_vertical_url;
-  const languageLabel = parseEventLanguages(event.language).join(", ") || event.language || "";
   const stepTitle =
     step === 1
       ? "Select Venue"
@@ -1142,7 +1156,7 @@ export default function EventCheckout({
         ? "Select Tickets"
         : step === 3
           ? "Ticket Mode"
-          : "Review & Confirm";
+          : "Review your booking";
   const stepSubtitle =
     step === 1
       ? "Choose a city and venue for your event."
@@ -1412,7 +1426,7 @@ export default function EventCheckout({
 
   const pageStepper = (
     <div className="border-t border-slate-100 bg-white w-full">
-      <div className="max-w-[42rem] mx-auto px-3 sm:px-4 py-2 sm:py-2.5">
+      <div className="max-w-[36rem] mx-auto px-4 sm:px-5 py-2 sm:py-2.5">
         <ol className="flex items-center justify-center gap-0.5 sm:gap-1.5 flex-nowrap">
           {CHECKOUT_STEPS.map((s, i) => {
             const done = step > s.n;
@@ -1565,13 +1579,6 @@ export default function EventCheckout({
     return ticketAvail(available, total);
   };
 
-  const infoItems = [
-    durationLabel ? { icon: Clock, value: durationLabel, label: "Duration" } : null,
-    languageLabel ? { icon: Languages, value: languageLabel, label: "Language" } : null,
-    event.age_group ? { icon: User, value: event.age_group, label: "Age Limit" } : null,
-    event.category_name ? { icon: Mic2, value: event.category_name, label: "Category" } : null,
-  ].filter(Boolean) as { icon: typeof Clock; value: string; label: string }[];
-
   const panel = (
       <div
         className={
@@ -1582,8 +1589,7 @@ export default function EventCheckout({
       >
         {isPage && (
           <div className="z-30 bg-white border-b border-slate-200 shrink-0">
-            <div className="relative h-[4.75rem] sm:h-[5.25rem] flex items-center px-3 sm:px-5">
-              {/* Logo — desktop/laptop only */}
+            <div className="relative flex items-center min-h-[3.25rem] sm:min-h-[3.5rem] lg:min-h-[4.75rem]">
               <Link
                 href="/"
                 className="absolute left-3 sm:left-5 hidden lg:flex shrink-0 items-center z-[1]"
@@ -1591,45 +1597,30 @@ export default function EventCheckout({
                 <img
                   src={typeof images.logo === "string" ? images.logo : images.logo.src}
                   alt="Book My Bota"
-                  className="h-[3.75rem] sm:h-[4.5rem] w-auto max-w-[16rem] sm:max-w-[20rem] object-contain object-left"
+                  className="h-[3.75rem] w-auto max-w-[16rem] object-contain object-left"
                 />
               </Link>
-
-              {/* Mobile + tablet: back left, event name centered */}
-              <div className="relative w-full flex items-center justify-center lg:hidden">
-                <button
-                  type="button"
-                  onClick={() => (step === 4 ? requestLeaveConfirmStep("exit") : onClose())}
-                  aria-label="Back to event"
-                  className="absolute left-0 h-9 w-9 rounded-full text-slate-700 flex items-center justify-center hover:bg-slate-100 cursor-pointer shrink-0 z-[1]"
-                >
-                  <ArrowLeft size={18} />
-                </button>
-                <p className="min-w-0 max-w-[calc(100%-5.5rem)] text-[1rem] md:text-[1.1875rem] font-semibold text-slate-900 truncate text-center px-1">
-                  {event.name}
-                </p>
-              </div>
-
-              {/* Desktop: back + title under logo-aware layout */}
-              <div className="hidden lg:flex w-full max-w-[36rem] mx-auto px-12 sm:px-16 items-center gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => (step === 4 ? requestLeaveConfirmStep("exit") : onClose())}
-                  aria-label="Back to event"
-                  className="h-9 w-9 rounded-full text-slate-700 flex items-center justify-center hover:bg-slate-100 cursor-pointer shrink-0"
-                >
-                  <ArrowLeft size={18} />
-                </button>
-                <p className="min-w-0 flex-1 text-[1rem] md:text-[1.1875rem] font-semibold text-slate-900 truncate text-left">
-                  {event.name}
-                </p>
+              <div className={`mx-auto flex w-full items-center px-4 sm:px-5 ${step === 4 ? "max-w-6xl" : "max-w-[36rem]"}`}>
+                <div className="relative flex w-full items-center py-2.5">
+                  <button
+                    type="button"
+                    onClick={() => (step === 4 ? requestLeaveConfirmStep("exit") : onClose())}
+                    aria-label="Back to event"
+                    className="absolute left-0 z-[1] h-9 w-9 rounded-full text-[#111] flex items-center justify-center hover:bg-slate-100 cursor-pointer shrink-0"
+                  >
+                    <ArrowLeft size={22} strokeWidth={2} />
+                  </button>
+                  <h1 className="min-w-0 w-full px-10 text-center text-[1.05rem] sm:text-[1.2rem] font-bold leading-snug text-[#111] break-words">
+                    {step === 4 ? "Review your booking" : event.name}
+                  </h1>
+                </div>
               </div>
             </div>
             {pageStepper}
           </div>
         )}
 
-        {isPage && step >= 2 && showtimeSummaryBar}
+        {isPage && step >= 2 && step < 4 && showtimeSummaryBar}
 
         {!isPage && (
           <div className="px-5 pt-4 pb-4 border-b border-slate-100 shrink-0 bg-white">
@@ -1705,7 +1696,7 @@ export default function EventCheckout({
           onScroll={handleCheckoutScroll}
           className={
             isPage
-              ? `flex-1 min-h-0 overflow-y-auto overscroll-y-contain checkout-scrollbar${checkoutScrollActive ? " checkout-scrollbar-active" : ""} w-full max-w-[36rem] mx-auto px-4 sm:px-5 py-4 sm:py-5 pb-8`
+              ? `flex-1 min-h-0 overflow-y-auto overscroll-y-contain checkout-scrollbar${checkoutScrollActive ? " checkout-scrollbar-active" : ""} w-full ${step === 4 ? "max-w-6xl" : "max-w-[36rem]"} mx-auto px-4 sm:px-5 py-4 sm:py-5 pb-8`
               : `flex-1 min-h-0 overflow-y-auto checkout-scrollbar${checkoutScrollActive ? " checkout-scrollbar-active" : ""} px-5 py-5 bg-white`
           }
         >
@@ -1730,7 +1721,7 @@ export default function EventCheckout({
                   return (
                     <div
                       key={city}
-                      className={`rounded-[0.75rem] border overflow-hidden ${
+                      className={`relative rounded-[0.75rem] border overflow-hidden ${
                         openCity ? "border-slate-200 bg-white" : "border-slate-200 bg-slate-50/70"
                       }`}
                     >
@@ -1747,56 +1738,89 @@ export default function EventCheckout({
                         )}
                       </button>
                       {openCity && (
-                        <div className="px-3 pb-3 space-y-2.5 border-t border-slate-100 pt-3">
+                        <div className="px-3 pb-5 space-y-2.5 border-t border-slate-100 pt-3">
                           {venues.map((venue) =>
                             venue.showtimes.map((s) => {
-                  const active = showtimeId === s.id;
                               const status = showtimeFillingLabel(s);
                               const chip = dateChip(s.starts_at);
+                              const mapsUrl = venue.address
+                                ? venueMapsUrl({
+                                    latitude: venue.latitude,
+                                    longitude: venue.longitude,
+                                    address: venue.address,
+                                    name: venue.venueName,
+                                  })
+                                : "";
+                              const detailsOpen = venueDetailsId === s.id;
+                              const canKnowMore = Boolean(venue.address);
                   return (
-                    <button
-                      key={s.id}
-                      type="button"
-                                  onClick={() => selectShowtime(s)}
-                                  className={`w-full text-left rounded-[0.625rem] border px-3.5 py-3 cursor-pointer transition-colors ${
-                                    active
-                                      ? "border-[#6900AA] bg-[#FBF6FF]"
-                                      : "border-slate-200 bg-white hover:border-slate-300"
-                                  }`}
+                    <div key={s.id} className={canKnowMore ? "pb-6" : ""}>
+                      <div className="rounded-[0.625rem] border border-slate-200 bg-white">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (status.label === "Sold Out") {
+                              toast.message("This showtime is sold out.");
+                              return;
+                            }
+                            selectShowtime(s);
+                            setIsMapFullscreen(false);
+                            setStep(2);
+                          }}
+                          className="w-full text-left px-3.5 py-3 cursor-pointer"
+                        >
+                          <p className="text-[0.9375rem] md:text-[1.0625rem] font-semibold text-gray-800">
+                            {venue.venueName}
+                          </p>
+                          <p className="mt-1 text-[0.9375rem] text-slate-500">
+                            {chip.date}
+                            <span className="mx-1.5 text-slate-300">|</span>
+                            {formatTime12h(s.starts_at)}
+                            {status.label === "Few Left" && (
+                              <>
+                                <span className="mx-1.5 text-slate-300">|</span>
+                                <span className="text-[#E85D04] font-semibold">Fast Filling</span>
+                              </>
+                            )}
+                            {status.label === "Sold Out" && (
+                              <>
+                                <span className="mx-1.5 text-slate-300">|</span>
+                                <span className="text-red-500 font-semibold">Sold Out</span>
+                              </>
+                            )}
+                          </p>
+                        </button>
+                        {detailsOpen && venue.address ? (
+                          <div className="px-3.5 pb-2">
+                            <div className="border-t border-slate-200 pt-3">
+                              <p className="text-[0.875rem] text-slate-600 leading-snug">
+                                {venue.address}
+                              </p>
+                              {mapsUrl ? (
+                                <button
+                                  type="button"
+                                  className="text-[0.725rem] font-medium text-[#e11d48] hover:underline cursor-pointer"
+                                  onClick={() =>
+                                    window.open(mapsUrl, "_blank", "noopener,noreferrer")
+                                  }
                                 >
-                                  <div className="flex items-start justify-between gap-2">
-                                    <p className="text-[0.9375rem] md:text-[1.0625rem] font-semibold text-gray-800">
-                                      {venue.venueName}
-                                    </p>
-                                    {active && (
-                                      <span className="shrink-0 h-5 w-5 rounded-full bg-[#6900AA] text-white flex items-center justify-center">
-                                        <Check size={12} strokeWidth={3} />
-                                      </span>
-                                    )}
-                                  </div>
-                                  <p className="mt-1 text-[0.9375rem] text-slate-500">
-                                    {chip.date}
-                                    <span className="mx-1.5 text-slate-300">|</span>
-                                    {formatTime12h(s.starts_at)}
-                                    {status.label === "Few Left" && (
-                                      <>
-                                        <span className="mx-1.5 text-slate-300">|</span>
-                                        <span className="text-[#E85D04] font-semibold">Fast Filling</span>
-                                      </>
-                                    )}
-                                    {status.label === "Sold Out" && (
-                                      <>
-                                        <span className="mx-1.5 text-slate-300">|</span>
-                                        <span className="text-red-500 font-semibold">Sold Out</span>
-                                      </>
-                                    )}
-                                  </p>
-                                  {venue.address && (
-                                    <p className="mt-1 text-[0.875rem] text-slate-400 line-clamp-1">
-                                      {venue.address}
-                                    </p>
-                                  )}
-                    </button>
+                                  View on maps
+                                </button>
+                              ) : null}
+                            </div>
+                          </div>
+                        ) : null}
+                        {canKnowMore ? (
+                          <button
+                            type="button"
+                            onClick={() => setVenueDetailsId(detailsOpen ? "" : s.id)}
+                            className="absolute left-3.5 bottom-8 z-[1] rounded-[0.3rem] translate-y-[62%] bg-[#E8E8E8] px-3 py-1.5 text-[0.8125rem] medium text-[#333] cursor-pointer"
+                          >
+                            {detailsOpen ? "Know less" : "Know more"}
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
                   );
                 })
                           )}
@@ -1807,21 +1831,6 @@ export default function EventCheckout({
                 })
               )}
 
-              {infoItems.length > 0 && (
-                <div className="pt-3 mt-1 grid grid-cols-2 sm:grid-cols-4 gap-3 border-t border-slate-100">
-                  {infoItems.map((item) => (
-                    <div key={item.label} className="flex flex-col items-center text-center gap-1.5 py-1">
-                      <span className="w-10 h-10 rounded-full bg-[#F7E9FF] text-[#6900AA] flex items-center justify-center">
-                        <item.icon size={16} />
-                      </span>
-                      <p className="text-[0.8125rem] md:text-[0.9375rem] font-bold text-gray-800 leading-tight px-0.5">
-                        {item.value}
-                      </p>
-                      <p className="text-[0.6875rem] md:text-[0.8125rem] text-slate-400">{item.label}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
           )}
 
@@ -2210,280 +2219,348 @@ export default function EventCheckout({
             </div>
           )}
 
-          {step === 4 && (
-            <form id="event-checkout-form" onSubmit={handleConfirm} className="space-y-4">
+          {step === 4 && selectedShowtime && (
+            <form id="event-checkout-form" onSubmit={handleConfirm} className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start">
               {holdId && secondsLeft !== null && (
                 <div
-                  className={`rounded-xl px-4 py-2.5 text-center text-sm font-bold border ${
+                  className={`lg:col-span-12 rounded-xl px-4 py-2.5 text-center text-sm font-bold border ${
                     secondsLeft <= 60
                       ? "bg-rose-50 border-rose-200 text-rose-700"
-                      : "bg-amber-50 border-amber-200 text-amber-800"
+                      : "bg-[#F3E8FF] border-[#E9D5FF] text-[#6B21A8]"
                   }`}
                 >
                   <span className="inline-flex items-center gap-2">
                     <Timer className="size-4" />
-                    Complete booking in{" "}
-                    <span className="font-mono text-base tracking-wider">
-                      {formatHoldCountdown(secondsLeft)}
-                    </span>
+                    Complete your booking in {formatHoldCountdown(secondsLeft)}
                   </span>
                 </div>
               )}
-              <aside
-                className={`overflow-hidden ${
-                  isPage ? "" : "rounded-[0.75rem] border border-slate-200 bg-white shadow-sm"
-                }`}
-              >
-                <div className="p-4 border-b border-slate-100">
-                  <p className="text-[1.0625rem] sm:text-[1.125rem] font-extrabold text-slate-900 leading-snug">
-                    {event.name}
-                  </p>
-                {selectedShowtime && (
-                    <p className="mt-1.5 text-[0.875rem] sm:text-[0.9375rem] text-slate-500 leading-relaxed">
-                      {formatDateTimeCustomer(selectedShowtime.starts_at).replace(", ", " | ")}
-                      {event.language
-                        ? ` | ${parseEventLanguages(event.language).join(", ") || event.language}`
-                        : ""}
-                      <br />
-                      {[selectedShowtime.venue_name, selectedShowtime.venue_address]
-                        .filter(Boolean)
-                        .join(", ")}
-                  </p>
-                )}
-                </div>
 
-                <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between gap-2">
-                  <span className="inline-flex items-center gap-2 text-[0.9375rem] text-slate-700 min-w-0">
-                    <Ticket size={14} className="text-[#6900AA] shrink-0" />
-                      <span>
-                      Ticket Mode:{" "}
-                      <strong>
-                        {ticketModeLabel(ticketMode)} ({ticketQty})
-                      </strong>
-                      </span>
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => navigateToStep(3)}
-                    className="shrink-0 text-[0.9375rem] font-semibold text-[#6900AA] cursor-pointer hover:underline"
-                  >
-                    Change
-                  </button>
-                </div>
+              <div className="lg:col-span-7 space-y-4">
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <h2 className="text-lg sm:text-xl font-bold text-slate-900 leading-tight">{event.name}</h2>
+                      <p className="mt-1 text-sm text-slate-500">
+                        {[
+                          parseEventLanguages(event.language).join(", ") || event.language,
+                          event.category_name,
+                          event.duration_minutes
+                            ? `${Math.floor(Number(event.duration_minutes) / 60)}h ${Number(event.duration_minutes) % 60}m`.replace(" 0m", "")
+                            : "",
+                        ].filter(Boolean).join("  •  ")}
+                      </p>
+                      <p className="mt-3 text-sm font-semibold text-slate-800">{selectedShowtime.venue_name || "Venue"}</p>
+                      {selectedShowtime.venue_address ? (
+                        <p className="mt-0.5 text-sm text-slate-500">{selectedShowtime.venue_address}</p>
+                      ) : null}
+                      {event.age_group ? (
+                        <span className="mt-3 inline-flex rounded-md bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600">
+                          {event.age_group}
+                        </span>
+                      ) : null}
+                    </div>
+                    {resolveMediaUrl(event.poster_vertical_url || event.poster_horizontal_url) ? (
+                      <img
+                        src={resolveMediaUrl(event.poster_vertical_url || event.poster_horizontal_url)}
+                        alt=""
+                        className="h-[4.5rem] w-12 shrink-0 rounded-md object-cover bg-slate-100 sm:h-20 sm:w-14"
+                      />
+                    ) : null}
+                  </div>
 
-                {ticketMode === "PHYSICAL_DELIVERY" && (
-                  <div className="px-4 py-3 border-b border-slate-100">
-                    <p className="text-[0.875rem] font-bold text-slate-900 mb-1">Delivery address</p>
-                    <p className="text-[0.875rem] text-slate-600 leading-relaxed">
+                  <div className="mt-4 border-t border-slate-100 pt-4">
+                    <p className="text-sm font-semibold text-slate-900">
+                      {getVenueDateTimeParts(selectedShowtime.starts_at)?.dateKey === venueDateStr()
+                        ? `Today, ${formatDateCustomer(selectedShowtime.starts_at)}`
+                        : formatDateCustomer(selectedShowtime.starts_at)}
+                    </p>
+                    <p className="mt-0.5 text-sm text-slate-500">
+                      {formatTime12h(selectedShowtime.starts_at)}
+                      {selectedShowtime.ends_at ? ` – ${formatTime12h(selectedShowtime.ends_at)}` : ""}
+                    </p>
+                  </div>
+
+                  <div className="mt-4 flex items-start justify-between gap-4 border-t border-slate-100 pt-4">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-slate-900">
+                        {ticketQty} ticket{ticketQty === 1 ? "" : "s"}
+                      </p>
+                      <p className="mt-0.5 text-sm text-slate-600">
+                        {[
+                          selectedLines.map((l) => l.ticket_type).filter(Boolean).join(", "),
+                          selectedSeats
+                            .map((s) => `${s.row_label || s.row || ""}${s.seat_label || s.number || ""}`.trim())
+                            .filter(Boolean)
+                            .join(", "),
+                        ].filter(Boolean).join("  •  ")}
+                      </p>
+                    </div>
+                    <p className="shrink-0 text-sm font-bold text-slate-900">{formatMoney(ticketAmount)}</p>
+                  </div>
+
+                  <div className="mt-4 flex items-center justify-between gap-3 border-t border-slate-100 pt-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-slate-900">{ticketModeLabel(ticketMode)}</p>
+                      <p className="mt-0.5 text-xs text-slate-500">{ticketModeConfirmNote(ticketMode)}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => navigateToStep(3)}
+                      className="shrink-0 text-sm font-semibold text-slate-900 hover:underline cursor-pointer"
+                    >
+                      Change
+                    </button>
+                  </div>
+
+                  {ticketMode === "PHYSICAL_DELIVERY" && (
+                    <p className="mt-3 text-sm text-slate-600">
                       {deliveryAddressLine}
                       {deliveryCity ? `, ${deliveryCity}` : ""}
                       {deliveryNotes ? ` · ${deliveryNotes}` : ""}
                     </p>
-                  </div>
-                )}
+                  )}
 
-                {ticketMode === "BOX_OFFICE" && selectedShowtime && (
-                  <div className="px-4 py-3 border-b border-slate-100">
-                    <p className="text-[0.875rem] font-bold text-slate-900 mb-1">Box office pickup</p>
-                    <p className="text-[0.875rem] text-slate-600 leading-relaxed">
-                      {[selectedShowtime.venue_name, selectedShowtime.venue_address]
-                        .filter(Boolean)
-                        .join(", ")}
+                  {ticketMode === "BOX_OFFICE" && (
+                    <p className="mt-3 text-sm text-slate-600">
+                      {[selectedShowtime.venue_name, selectedShowtime.venue_address].filter(Boolean).join(", ")}
                     </p>
-                  </div>
-                )}
-
-                <div className="px-4 py-3 space-y-2 border-b border-slate-100">
-                  <div className="flex justify-between text-[0.9375rem] text-slate-600">
-                    <span>Ticket(s) price</span>
-                    <span className="font-semibold text-slate-900">{formatMoney(ticketAmount)}</span>
-                  </div>
-                  <div className="flex justify-between text-[0.9375rem] text-slate-600">
-                    <div>
-                      <span>Convenience fees{conveniencePct ? ` (${conveniencePct}%)` : ""}</span>
-                      {convenienceFeeTax > 0 && (
-                        <p className="text-[10px] text-slate-400">
-                          Base: {formatMoney(convenienceFeeBase)} + {convenienceVatPct}% VAT ({formatMoney(convenienceFeeTax)})
-                        </p>
-                      )}
-                    </div>
-                    <span className="font-semibold text-slate-900">{formatMoney(convenienceFee)}</span>
-                  </div>
-                  {discountAmount > 0 && (
-                    <div className="flex justify-between text-[0.9375rem] text-[#57008E]">
-                      <span>Promo discount</span>
-                      <span className="font-semibold">−{formatMoney(discountAmount)}</span>
-                    </div>
                   )}
-                  {giftCardAmount > 0 && (
-                    <div className="flex justify-between text-[0.9375rem] text-[#57008E]">
-                      <span>Gift card</span>
-                      <span className="font-semibold">−{formatMoney(giftCardAmount)}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between text-[1rem] font-bold text-slate-900 pt-2 border-t border-dashed border-slate-200">
-                    <span>{giftCardAmount > 0 ? "Amount due" : "Order total"}</span>
-                    <span>{formatMoney(grandTotal)}</span>
-                  </div>
                 </div>
 
                 {!isOrganizer && (
-                  <div className="px-4 py-3 border-b border-slate-100 space-y-2">
-                    {appliedPromo ? (
-                      <div className="flex items-center justify-between gap-2 bg-[#F7E9FF] border border-[#E3BCFF] rounded-xl px-3 py-2">
-                        <div className="min-w-0">
-                          <p className="text-[0.875rem] font-bold text-[#6900AA] truncate">
-                            {appliedPromo.promo_code} · {appliedPromo.title}
-                            {appliedPromo.source === "platform" && (
-                              <span className="ml-1.5 text-[0.65rem] font-bold uppercase tracking-wide bg-[#6900AA] text-white px-1.5 py-0.5 rounded">
-                                BookMyBota
-                              </span>
-                            )}
-                          </p>
-                          <p className="text-[0.8125rem] text-[#57008E]">
-                            You save {formatMoney(appliedPromo.discount_amount)}
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={handleRemovePromo}
-                          className="text-[0.875rem] font-semibold text-[#6900AA] hover:underline shrink-0 cursor-pointer"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          value={promoInput}
-                          onChange={(e) => setPromoInput(e.target.value.toUpperCase())}
-                          placeholder="Promo code"
-                          className={`flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-[0.9375rem] focus:outline-none ${accentFocus} text-slate-800 font-semibold uppercase`}
-                        />
-                        <button
-                          type="button"
-                          onClick={handleApplyPromo}
-                          disabled={validatingPromo || !promoInput.trim()}
-                          className="px-3 py-2 rounded-xl border border-slate-200 text-[0.9375rem] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 shrink-0 cursor-pointer"
-                        >
-                          {validatingPromo ? <Loader2 size={14} className="animate-spin" /> : "Apply"}
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {!isOrganizer && (
-                  <div className="px-4 py-3 border-b border-slate-100 space-y-2">
-                    <p className="text-[0.8125rem] font-semibold text-slate-700 flex items-center gap-1.5">
-                      <Gift size={14} className="text-[#6900AA]" />
-                      Gift card
-                    </p>
-                    {appliedGiftCard ? (
-                      <div className="flex items-center justify-between gap-2 bg-[#F7E9FF] border border-[#E3BCFF] rounded-xl px-3 py-2">
-                        <div className="min-w-0">
-                          <p className="text-[0.875rem] font-bold text-[#6900AA] truncate">
-                            {appliedGiftCard.product_name} · {appliedGiftCard.code_masked}
-                          </p>
-                          <p className="text-[0.8125rem] text-[#57008E]">
-                            Applying {formatMoney(appliedGiftCard.amount_applicable)}
-                            {appliedGiftCard.balance_after > 0
-                              ? ` · ${formatMoney(appliedGiftCard.balance_after)} left after`
-                              : " · balance will be zero"}
-                          </p>
-                  </div>
-                        <button
-                          type="button"
-                          onClick={handleRemoveGiftCard}
-                          className="text-[0.875rem] font-semibold text-[#6900AA] hover:underline shrink-0 cursor-pointer"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        {redeemableGiftCards.length > 0 && (
-                          <select
-                            value={selectedGiftCardId}
-                            onChange={(e) => {
-                              setSelectedGiftCardId(e.target.value);
-                              if (e.target.value) setGiftCardInput("");
-                            }}
-                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-[0.875rem] text-slate-800"
+                  <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm space-y-4">
+                    <h2 className="text-base font-bold text-slate-900">Offers for you</h2>
+                    <div className="space-y-2">
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Promo code</p>
+                      {appliedPromo ? (
+                        <div className="flex items-center justify-between p-2.5 rounded-xl bg-purple-50 border border-purple-200 text-xs">
+                          <div className="min-w-0">
+                            <p className="font-bold text-slate-900 font-mono truncate">
+                              {appliedPromo.promo_code}
+                              {appliedPromo.source === "platform" ? " · BookMyBota" : ""}
+                            </p>
+                            <p className="text-emerald-600">You save {formatMoney(appliedPromo.discount_amount)}</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handleRemovePromo}
+                            className="text-xs text-rose-600 hover:underline font-semibold cursor-pointer shrink-0"
                           >
-                            <option value="">Select from My Gift Cards</option>
-                            {redeemableGiftCards.map((c) => (
-                              <option key={c.id} value={c.id}>
-                                {c.product_name || "Gift Card"} · {c.code_masked} ·{" "}
-                                {formatMoney(Number(c.current_balance))}
-                              </option>
-                            ))}
-                          </select>
-                        )}
+                            Remove
+                          </button>
+                        </div>
+                      ) : (
                         <div className="flex gap-2">
                           <input
                             type="text"
-                            value={giftCardInput}
-                            onChange={(e) => {
-                              setGiftCardInput(e.target.value.toUpperCase());
-                              if (e.target.value) setSelectedGiftCardId("");
-                            }}
-                            placeholder="Or enter gift card code"
-                            className={`flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-[0.875rem] focus:outline-none ${accentFocus} text-slate-800 font-mono`}
+                            value={promoInput}
+                            onChange={(e) => setPromoInput(e.target.value.toUpperCase())}
+                            placeholder="Enter promo code"
+                            className={`flex-1 px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs text-slate-900 uppercase placeholder:text-slate-400 focus:outline-none ${accentFocus}`}
                           />
                           <button
                             type="button"
-                            onClick={handleApplyGiftCard}
-                            disabled={
-                              validatingGiftCard ||
-                              (!selectedGiftCardId && !giftCardInput.trim()) ||
-                              orderTotal <= 0
-                            }
-                            className="px-3 py-2 rounded-xl border border-slate-200 text-[0.9375rem] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 shrink-0 cursor-pointer"
+                            onClick={handleApplyPromo}
+                            disabled={validatingPromo || !promoInput.trim()}
+                            className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-800 border border-slate-200 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
                           >
-                            {validatingGiftCard ? (
-                              <Loader2 size={14} className="animate-spin" />
-                            ) : (
-                              "Apply"
-                            )}
+                            {validatingPromo ? <Loader2 className="size-3.5 animate-spin" /> : null}
+                            Apply
                           </button>
-                </div>
-                </div>
-                    )}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="space-y-2 pt-1">
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Gift card</p>
+                      {appliedGiftCard ? (
+                        <div className="flex items-center justify-between gap-2 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2">
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold text-slate-900 truncate">
+                              {appliedGiftCard.product_name} · {appliedGiftCard.code_masked}
+                            </p>
+                            <p className="text-[11px] text-rose-700">
+                              Applying {formatMoney(appliedGiftCard.amount_applicable)}
+                              {appliedGiftCard.balance_after > 0
+                                ? ` · ${formatMoney(appliedGiftCard.balance_after)} left after`
+                                : " · balance will be zero"}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handleRemoveGiftCard}
+                            className="text-xs font-semibold text-rose-600 hover:underline shrink-0 cursor-pointer"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {redeemableGiftCards.length > 0 && (
+                            <select
+                              value={selectedGiftCardId}
+                              onChange={(e) => {
+                                setSelectedGiftCardId(e.target.value);
+                                if (e.target.value) setGiftCardInput("");
+                              }}
+                              className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900"
+                            >
+                              <option value="">Select from My Gift Cards</option>
+                              {redeemableGiftCards.map((c) => (
+                                <option key={c.id} value={c.id}>
+                                  {c.product_name || "Gift Card"} · {c.code_masked} · {formatMoney(Number(c.current_balance))}
+                                </option>
+                              ))}
+                            </select>
+                          )}
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              value={giftCardInput}
+                              onChange={(e) => {
+                                setGiftCardInput(e.target.value.toUpperCase());
+                                if (e.target.value) setSelectedGiftCardId("");
+                              }}
+                              placeholder="Or enter gift card code"
+                              className={`flex-1 px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs text-slate-900 font-mono uppercase placeholder:text-slate-400 focus:outline-none ${accentFocus}`}
+                            />
+                            <button
+                              type="button"
+                              onClick={handleApplyGiftCard}
+                              disabled={
+                                validatingGiftCard ||
+                                (!selectedGiftCardId && !giftCardInput.trim()) ||
+                                orderTotal <= 0
+                              }
+                              className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-800 border border-slate-200 disabled:opacity-50 cursor-pointer"
+                            >
+                              {validatingGiftCard ? <Loader2 className="size-3.5 animate-spin" /> : "Apply"}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
+              </div>
 
-                <div className="px-4 py-3 border-b border-slate-100">
-                  <div className="flex items-center justify-between gap-2 mb-2">
-                    <p className="text-[0.9375rem] font-bold text-slate-900">For sending booking details</p>
+              <aside className="lg:col-span-5 space-y-4 lg:sticky lg:top-4">
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <h2 className="text-base font-bold text-slate-900">Payment summary</h2>
+                  <div className="mt-4 space-y-3 text-sm">
+                    <details className="group">
+                      <summary className="flex cursor-pointer list-none items-center justify-between text-slate-700 [&::-webkit-details-marker]:hidden">
+                        <span className="inline-flex items-center gap-1">
+                          Order amount
+                          <ChevronDown className="size-3.5 text-slate-400 transition-transform group-open:rotate-180" />
+                        </span>
+                        <span className="font-semibold text-slate-900">{formatMoney(ticketAmount)}</span>
+                      </summary>
+                      <div className="mt-2 space-y-1.5 text-xs leading-snug text-slate-500">
+                        {selectedLines.map((line) => (
+                          <p key={`${line.ticket_type}-${line.unit}`}>
+                            {line.qty} × {line.ticket_type} ticket{line.qty === 1 ? "" : "s"} @ {formatMoney(line.unit)}
+                            <span className="block">each</span>
+                          </p>
+                        ))}
+                      </div>
+                    </details>
+                    <details className="group">
+                      <summary className="flex cursor-pointer list-none items-center justify-between text-slate-700 [&::-webkit-details-marker]:hidden">
+                        <span className="inline-flex items-center gap-1">
+                          Convenience fees
+                          <ChevronDown className="size-3.5 text-slate-400 transition-transform group-open:rotate-180" />
+                        </span>
+                        <span className="font-semibold text-slate-900">{formatMoney(convenienceFee)}</span>
+                      </summary>
+                      <div className="mt-2 space-y-1.5 text-xs text-slate-500">
+                        <div className="flex justify-between gap-4">
+                          <span>Base Amount</span>
+                          <span>{formatMoney(convenienceFeeBase)}</span>
+                        </div>
+                        {convenienceFeeTax > 0 ? (
+                          <div className="flex justify-between gap-4">
+                            <span>VAT @ {convenienceVatPct}%</span>
+                            <span>{formatMoney(convenienceFeeTax)}</span>
+                          </div>
+                        ) : null}
+                      </div>
+                    </details>
+                    {discountAmount > 0 ? (
+                      <div className="flex justify-between text-emerald-700">
+                        <span>Promo discount</span>
+                        <span className="font-semibold">−{formatMoney(discountAmount)}</span>
+                      </div>
+                    ) : null}
+                    {giftCardAmount > 0 ? (
+                      <div className="flex justify-between text-emerald-700">
+                        <span>Gift card</span>
+                        <span className="font-semibold">−{formatMoney(giftCardAmount)}</span>
+                      </div>
+                    ) : null}
+                    <div className="flex items-center justify-between border-t border-slate-100 pt-3 text-base font-bold text-slate-900">
+                      <span>{giftCardAmount > 0 ? "Amount due" : "To be paid"}</span>
+                      <span>{formatMoney(grandTotal)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <div className="flex items-center justify-between gap-3">
+                    <h2 className="text-base font-bold text-slate-900">Your details</h2>
                     <button
                       type="button"
                       onClick={openContactModal}
-                      className="inline-flex items-center gap-1 text-[0.875rem] font-semibold text-[#6900AA] cursor-pointer hover:underline"
+                      className="text-sm font-semibold text-slate-900 hover:underline cursor-pointer"
                     >
                       Edit
                     </button>
                   </div>
-                  <p className="text-[0.875rem] font-semibold text-slate-800">{name.trim() || "—"}</p>
-                  <p className="text-[0.875rem] text-slate-600">{phone ? `+251 ${phone}` : "—"}</p>
-                  <p className="text-[0.875rem] text-slate-600 truncate">{email || "—"}</p>
+                  <div className="mt-3 flex items-start gap-3">
+                    <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500">
+                      <User className="size-4" />
+                    </span>
+                    <div className="min-w-0 text-sm leading-5">
+                      <p className="font-semibold text-slate-900">{name.trim() || "Add your name"}</p>
+                      <p className="text-slate-500">{phone ? `+251 ${phone}` : "Add your phone number"}</p>
+                      <p className="truncate text-slate-500">{email.trim() || "Add your email"}</p>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="px-4 py-3.5 bg-slate-50 flex items-center justify-between gap-3">
-                  <span className="text-[1rem] font-semibold text-slate-800">Order total</span>
-                  <span className="text-[1.25rem] font-extrabold text-slate-900">
-                    {formatMoney(grandTotal)}
+                {!isOrganizer && (
+                  <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm">
+                    <Banknote className="size-4 shrink-0 text-slate-500" />
+                    <div className="min-w-0">
+                      <p className="font-semibold text-slate-900">Cash</p>
+                      <p className="text-xs text-slate-500">Pay at the venue</p>
+                    </div>
+                    <CheckCircle2 className="ml-auto size-4 shrink-0 text-emerald-600" />
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={!canConfirm || submitting}
+                  aria-busy={submitting || undefined}
+                  className="flex w-full items-center justify-between rounded-xl bg-black px-5 py-3.5 text-white disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+                >
+                  <span className="text-left">
+                    <span className="block text-sm font-bold">{formatMoney(grandTotal)}</span>
+                    <span className="block text-[10px] font-semibold tracking-wide text-white/70">TOTAL</span>
                   </span>
-                </div>
-                <p className="px-4 pb-3 text-[0.8125rem] text-slate-500 leading-relaxed">
-                  {ticketModeConfirmNote(ticketMode)}
-                </p>
+                  <span className="text-sm font-bold inline-flex items-center gap-2">
+                    {submitting ? <Loader2 size={16} className="animate-spin" /> : null}
+                    {submitting ? "Confirming…" : isOrganizer ? "Confirm & Send" : "Pay now"}
+                  </span>
+                </button>
               </aside>
             </form>
           )}
               </div>
 
+        {step !== 1 && (
         <div
           className={
             isPage
@@ -2491,23 +2568,7 @@ export default function EventCheckout({
               : "p-5 border-t border-slate-100 bg-white shrink-0"
           }
         >
-          <div className={isPage ? "max-w-[36rem] mx-auto" : ""}>
-          {step === 1 && (
-            <>
-              <button
-                type="button"
-                disabled={!showtimeId}
-                onClick={() => {
-                  setStep(2);
-                  setIsMapFullscreen(false);
-                }}
-                className={`w-full py-3.5 rounded-[0.5rem] ${accentBtn} disabled:bg-slate-300 disabled:text-white disabled:hover:bg-slate-300 text-white font-semibold text-[1.0625rem] inline-flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed`}
-              >
-                Continue
-                <ChevronRight size={16} />
-              </button>
-            </>
-          )}
+          <div className={isPage ? (step === 4 ? "max-w-6xl mx-auto" : "max-w-[36rem] mx-auto") : ""}>
           {step === 2 && (
             <>
               {isPage && (hasReservedSeats ? seatsReady : ticketQty > 0) ? (
@@ -2634,7 +2695,7 @@ export default function EventCheckout({
             </div>
           )}
           {step === 4 && (
-            <div className="flex gap-3">
+            <div className="flex">
               <button
                 type="button"
                 disabled={submitting}
@@ -2647,26 +2708,11 @@ export default function EventCheckout({
               >
                 <ArrowLeft size={14} /> Back
               </button>
-              <button
-                type="submit"
-                form="event-checkout-form"
-                disabled={!canConfirm || submitting}
-                aria-busy={submitting || undefined}
-                className={`flex-1 py-3 ${accentBtn} disabled:bg-slate-300 disabled:text-white disabled:hover:bg-slate-300 disabled:opacity-100 text-white font-semibold text-[1.0625rem] inline-flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed ${
-                  isPage ? "rounded-[0.5rem]" : "rounded-xl disabled:bg-[#E3BCFF] disabled:hover:bg-[#E3BCFF]"
-                }`}
-              >
-                {submitting && <Loader2 size={16} className="animate-spin" />}
-                {submitting
-                  ? "Confirming…"
-                  : isOrganizer
-                    ? `Confirm & Send · ${formatMoney(grandTotal)}`
-                    : `Confirm Booking · ${formatMoney(grandTotal)}`}
-              </button>
             </div>
           )}
           </div>
         </div>
+        )}
       </div>
   );
 
@@ -2688,6 +2734,14 @@ export default function EventCheckout({
 
   const checkoutModals = (
     <>
+      {bookedSuccessId ? (
+        <PaymentSuccessView
+          presentation="modal"
+          module="events"
+          bookingId={bookedSuccessId}
+          nextHref={`/customer/event-bookings/confirmation?id=${bookedSuccessId}`}
+        />
+      ) : null}
       {isMapFullscreen && desiredSeatQty != null && (
         <div className="fixed inset-0 z-[100] bg-white flex flex-col overflow-hidden">
           <header className="shrink-0 bg-white border-b border-slate-200">

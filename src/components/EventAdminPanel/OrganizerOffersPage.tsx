@@ -27,7 +27,7 @@ import {
   emptyEventOfferFormValues,
   type EventOfferFormValues,
 } from "@/lib/eventOfferFormSchema";
-import { formatDate } from "@/lib/dateFormat";
+import { formatDate, toDateInput } from "@/lib/dateFormat";
 
 /** YYYY-MM-DD for the day before a given date string */
 function dayBefore(dateStr: string): string {
@@ -561,9 +561,9 @@ export default function OrganizerOffersPage() {
       usage_limit: offer.usage_limit != null ? String(offer.usage_limit) : "",
       per_customer_limit:
         offer.per_customer_limit != null ? String(offer.per_customer_limit) : "",
-      start_date: offer.start_date || offer.valid_from?.slice(0, 10) || "",
+      start_date: offer.start_date || (offer.valid_from ? toDateInput(offer.valid_from) : "") || "",
       start_time: offer.start_time || "",
-      end_date: offer.end_date || offer.valid_until?.slice(0, 10) || "",
+      end_date: offer.end_date || (offer.valid_until ? toDateInput(offer.valid_until) : "") || "",
       end_time: offer.end_time || "",
       status: offer.status === "ACTIVE" || offer.is_active ? "ACTIVE" : "DRAFT",
       sort_order: String(offer.sort_order ?? 0),

@@ -50,13 +50,20 @@ const actionBtnSecondary =
 const actionBtnPrimary =
   "inline-flex min-h-[2.875rem] w-full items-center justify-center gap-1.5 rounded-xl bg-slate-900 px-2.5 py-2.5 text-[0.75rem] min-[480px]:text-[0.8125rem] lg:text-[0.8125rem] xl:text-[0.875rem] font-semibold text-white transition hover:bg-slate-800";
 
-function checkInWindow(bookingTime: string) {
-  const start = new Date(bookingTime);
-  const end = new Date(bookingTime);
-  if (Number.isNaN(start.getTime())) return null;
+function diningArrivalNote(bookingTime: string) {
+  const booked = new Date(bookingTime);
+  if (Number.isNaN(booked.getTime())) return "Please arrive on time for your booking.";
+  const start = new Date(booked);
+  const end = new Date(booked);
   start.setMinutes(start.getMinutes() - 30);
   end.setMinutes(end.getMinutes() + 15);
-  return `${formatTime12h(start)} – ${formatTime12h(end)}`;
+  const table = formatTime12h(booked);
+  const from = formatTime12h(start);
+  const until = formatTime12h(end);
+  if (table === "—" || from === "—" || until === "—") {
+    return "Please arrive on time for your booking.";
+  }
+  return `Your table is at ${table}. Please arrive between ${from} and ${until}.`;
 }
 
 function DetailCell({
@@ -204,7 +211,9 @@ function ConfirmationContent() {
   }
 
   const qrData = booking.qr_token || booking.id;
-  const windowLabel = checkInWindow(booking.booking_time);
+  const tableArrivalNote = booking.booking_time
+    ? diningArrivalNote(booking.booking_time)
+    : "Please arrive on time for your booking.";
   const appliedOffer = booking.applied_offer;
   const guestName =
     booking.guest_name?.trim() || booking.customer_name?.trim() || user?.name || "—";
@@ -279,13 +288,11 @@ function ConfirmationContent() {
         ticketCountLabel: `${booking.guests ?? "—"} Guest${
           Number(booking.guests) === 1 ? "" : "(s)"
         }`,
-        primaryLabel: "RESERVATION",
+        primaryLabel: "Confirmed booking",
         secondaryLabel: guestName !== "—" ? guestName : undefined,
         bookingCode: booking.id.slice(0, 8).toUpperCase(),
         showQr: false,
-        cancellationNote: windowLabel
-          ? `Check-in window: ${windowLabel}`
-          : "Please arrive on time for your reservation.",
+        cancellationNote: tableArrivalNote,
         totalFormatted: undefined,
         amountRows: [],
       });
@@ -315,7 +322,7 @@ function ConfirmationContent() {
           ) : undefined
         }
         backHref="/customer/dashboard"
-        pageTitle="Your Reservation"
+        pageTitle="Confirmed booking"
         title={booking.business_name || "Restaurant"}
         posterUrl={cover}
         whenLine={whenLine}
@@ -324,21 +331,18 @@ function ConfirmationContent() {
         ticketCountLabel={`${booking.guests ?? "—"} Guest${
           Number(booking.guests) === 1 ? "" : "(s)"
         }`}
-        primaryLabel="RESERVATION"
+        primaryLabel="Confirmed booking"
         secondaryLabel={guestName !== "—" ? guestName : undefined}
         bookingCode={booking.id.slice(0, 8).toUpperCase()}
         qrValue={qrData}
         showQr={false}
         directDetails={true}
         mTicketLabel="Dine-in"
-        cancellationNote={
-          windowLabel
-            ? `Check-in window: ${windowLabel}`
-            : "Please arrive on time for your reservation."
-        }
+        cancellationNote={tableArrivalNote}
         supportHref="/customer/help"
         onDownloadPdf={downloadDiningPdf}
         downloading={downloading}
+        exploreHref="/dining"
         detailsExtra={
           <div className="mt-2.5">
             <button
@@ -431,7 +435,7 @@ function ConfirmationContent() {
                 reserved.
               </p>
               <p className="mt-1 text-[0.8125rem] sm:text-[0.875rem] text-slate-500 leading-relaxed">
-                Show the Check-in QR at the restaurant
+                Show this booking at the restaurant
                 {appliedOffer?.title ? " to claim your dining offer" : ""}.
               </p>
             </div>
@@ -462,18 +466,7 @@ function ConfirmationContent() {
               />
               <div className="border-t border-dashed border-slate-300 px-5 py-5 sm:border-t-0 sm:px-6 sm:py-5 sm:pl-8">
                 <div className="mx-auto flex w-full max-w-[15rem] flex-col items-center text-center">
-                  {booking.qr_token ? (
-                    <img
-                      src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=6&data=${encodeURIComponent(qrData)}`}
-                      alt="Check-in QR code"
-                      className="h-[9.5rem] w-[9.5rem] sm:h-[10.5rem] sm:w-[10.5rem] rounded-lg border border-slate-200 bg-white p-1.5 shadow-sm"
-                    />
-                  ) : (
-                    <div className="flex h-[9.5rem] w-[9.5rem] sm:h-[10.5rem] sm:w-[10.5rem] items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 text-[0.75rem] text-slate-400 leading-snug">
-                      QR will appear once check-in scanning is enabled.
-                    </div>
-                  )}
-                  <p className="mt-3 text-[0.9375rem] font-bold text-slate-900">Check-in QR</p>
+                  <p className="text-[0.9375rem] font-bold text-slate-900">Confirmed booking</p>
                   <button
                     type="button"
                     onClick={copyBookingId}
@@ -483,20 +476,8 @@ function ConfirmationContent() {
                     {booking.id.slice(0, 8).toUpperCase()}
                   </button>
                   <p className="mt-2 text-[0.75rem] sm:text-[0.8125rem] text-slate-500 leading-relaxed">
-                    Show this QR at the restaurant
-                    {appliedOffer?.title ? " to claim your offer" : " for check-in"}.
+                    {tableArrivalNote}
                   </p>
-                  {windowLabel ? (
-                    <div className="mt-3 w-full rounded-xl bg-slate-100 px-3 py-2.5 flex items-center gap-2.5 text-left">
-                      <Clock size={15} className="text-slate-500 shrink-0" />
-                      <div className="min-w-0">
-                        <p className="text-[0.6875rem] text-slate-500 leading-tight">
-                          Check-in window
-                        </p>
-                        <p className="text-[0.8125rem] font-bold text-slate-900">{windowLabel}</p>
-                      </div>
-                    </div>
-                  ) : null}
                 </div>
               </div>
             </div>
@@ -538,11 +519,7 @@ function ConfirmationContent() {
                 icon={Clock}
                 label="Time"
                 value={formatTime12h(booking.booking_time)}
-                hint={
-                  booking.end_time
-                    ? `Arrive by ${formatTime12h(booking.end_time)}`
-                    : arrivalNote || undefined
-                }
+                hint={tableArrivalNote}
               />
               {appliedOffer?.title ? (
                 <DetailCell
@@ -554,9 +531,6 @@ function ConfirmationContent() {
                     undefined
                   }
                 />
-              ) : null}
-              {arrivalNote && !booking.end_time ? (
-                <DetailCell icon={Clock} label="Approx. arrival" value={arrivalNote} />
               ) : null}
             </div>
           </div>

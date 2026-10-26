@@ -83,47 +83,8 @@ export async function buildTicketCardPdf(options: TicketCardPdfOptions): Promise
   const cardX = (pageW - cardW) / 2; // centered (46mm margin on A4)
   const centerX = cardX + cardW / 2;
 
-  // ── Top Brand Header ───────────────────────────────────────────────────────
-  const headerTopY = 16;
-  const logoW = 38;
-  const logoH = 12.55; // Aspect ratio matches logo (~3.03:1)
-
-  // Official BookMyBota Logo (left)
-  try {
-    doc.addImage(BOOKMYBOTA_LOGO_BASE64, "PNG", cardX, headerTopY, logoW, logoH);
-  } catch {
-    // safe fallback
-  }
-
-  // Right Header: Status Pill with vector green dot (no unicode glitch)
-  const pillW = 28;
-  const pillH = 6.2;
-  const pillX = cardX + cardW - pillW;
-  const pillY = headerTopY + 1;
-
-  doc.setFillColor(232, 245, 233); // #E8F5E9
-  doc.setDrawColor(200, 230, 201); // #C8E6C9
-  doc.setLineWidth(0.25);
-  doc.roundedRect(pillX, pillY, pillW, pillH, 1.5, 1.5, "FD");
-
-  // Vector green circle bullet
-  doc.setFillColor(46, 125, 50);
-  doc.circle(pillX + 4.2, pillY + 3.1, 1, "F");
-
-  // Status text
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(7.2);
-  doc.setTextColor(46, 125, 50);
-  doc.text("CONFIRMED", pillX + 6.8, pillY + 4.3);
-
-  // Subtitle
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(6.5);
-  doc.setTextColor(117, 117, 117);
-  doc.text("Official Booking Pass", cardX + cardW, headerTopY + 11.5, { align: "right" });
-
   // ── Measure Exact Card Height (fits content like Image 2, no extra gap) ────
-  const cardStartY = 35;
+  const cardStartY = 16;
   const pad = 5.5;
   const posterW = 22;
   const posterH = 28;

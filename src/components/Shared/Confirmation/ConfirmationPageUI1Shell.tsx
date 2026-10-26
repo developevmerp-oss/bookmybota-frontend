@@ -23,6 +23,15 @@ const HIDE_SCROLLBAR =
 
 const logoSrc = typeof images.logo === "string" ? images.logo : images.logo.src;
 
+function BrandLogo() {
+  return (
+    <div className="mt-6 flex justify-center">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={logoSrc} alt="BookMyBota" className="h-10 sm:h-11 w-auto object-contain" />
+    </div>
+  );
+}
+
 export type ConfirmationAmountRow = {
   label: string;
   value: string;
@@ -56,6 +65,8 @@ export type ConfirmationPageUI1ShellProps = {
   mTicketLabel?: string;
   onDownloadPdf?: () => void | Promise<void>;
   downloading?: boolean;
+  /** Public listing for this panel (movie, event, or restaurant). */
+  exploreHref?: string;
   /** Extra footer under amount in details modal / bottom of card */
   detailsExtra?: ReactNode;
   /** Whether to render QR code (defaults to true; set to false for dining) */
@@ -250,6 +261,7 @@ export default function ConfirmationPageUI1Shell(props: ConfirmationPageUI1Shell
     mTicketLabel = "M-Ticket",
     onDownloadPdf,
     downloading = false,
+    exploreHref,
     detailsExtra,
     showQr = true,
     directDetails = true,
@@ -464,7 +476,17 @@ export default function ConfirmationPageUI1Shell(props: ConfirmationPageUI1Shell
           </button>
         ) : null}
 
+        {exploreHref ? (
+          <Link
+            href={exploreHref}
+            className="mt-2.5 inline-flex w-full items-center justify-center h-11 rounded-xl border border-[#111] bg-white text-[#111] text-[0.875rem] font-semibold hover:bg-slate-50 cursor-pointer"
+          >
+            Explore
+          </Link>
+        ) : null}
+
         {detailsExtra}
+        <BrandLogo />
       </div>
     </div>
   ) : (
@@ -637,14 +659,6 @@ export default function ConfirmationPageUI1Shell(props: ConfirmationPageUI1Shell
           {showAside && aside ? (
             <div className="w-full lg:w-[22rem] xl:w-[24rem] lg:shrink-0 print:hidden">
               {aside}
-              <div className="mt-8 flex justify-center">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={logoSrc}
-                  alt="Book My Bota"
-                  className="h-12 lg:h-14 w-auto object-contain"
-                />
-              </div>
             </div>
           ) : null}
         </div>
@@ -789,7 +803,16 @@ export default function ConfirmationPageUI1Shell(props: ConfirmationPageUI1Shell
                   Download PDF
                 </button>
               ) : null}
+              {exploreHref ? (
+                <Link
+                  href={exploreHref}
+                  className="mt-2.5 inline-flex w-full items-center justify-center h-11 rounded-lg border border-[#111] bg-white text-[#111] text-[0.875rem] font-semibold hover:bg-slate-50 cursor-pointer"
+                >
+                  Explore
+                </Link>
+              ) : null}
               {detailsExtra}
+              <BrandLogo />
             </div>
           </div>
         </div>

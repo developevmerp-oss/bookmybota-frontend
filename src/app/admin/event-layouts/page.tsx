@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { AdminListShimmer } from "@/components/Shared/Shimmer";
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowRight, Search } from "lucide-react";
@@ -129,7 +130,7 @@ function AdminEventLayoutsPageInner() {
 
       <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm">
         {isLoading ? (
-          <p className="p-8 text-center text-slate-400">Loading event layout requests…</p>
+          <AdminListShimmer rows={6} columns={5} showToolbar={false} />
         ) : requests.length === 0 ? (
           <p className="p-8 text-center text-slate-500">
             No layout requests in this view.
@@ -263,7 +264,7 @@ function AdminEventLayoutsPageInner() {
 
 export default function AdminEventLayoutsPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-slate-400 text-sm">Loading layouts...</div>}>
+    <Suspense fallback={<AdminListShimmer />}>
       <AdminEventLayoutsPageInner />
     </Suspense>
   );

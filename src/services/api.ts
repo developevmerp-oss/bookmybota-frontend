@@ -742,6 +742,8 @@ export interface BusinessListQuery extends PagedQuery {
   pure_veg?: boolean;
   serves_alcohol?: boolean;
   max_cost?: number;
+  offer_bucket?: 'any' | 'flat' | 'percent_upto_20' | 'percent_upto_50' | 'percent_high' | null;
+  meal?: 'breakfast' | 'lunch' | 'dinner' | 'fastfood' | '';
   sort?: 'relevance' | 'rating' | 'popular' | 'costAsc' | 'costDesc';
 }
 
@@ -1115,7 +1117,11 @@ export interface MovieContract {
   contract_number: string;
   body_html: string;
   terms_and_conditions?: string | null;
-  status: 'PENDING_SIGNATURES' | 'ACTIVE' | 'REJECTED';
+  status: 'PENDING_SIGNATURES' | 'ACTIVE' | 'REJECTED' | 'SUPERSEDED';
+  version?: number;
+  is_current?: boolean;
+  supersedes_contract_id?: string | null;
+  superseded_at?: string | null;
   convenience_fee_percent: number | string;
   commission_percent: number | string;
   beverage_commission_percent?: number | string;
@@ -3087,6 +3093,8 @@ export const api = createApi({
           pure_veg: params?.pure_veg ? 'true' : undefined,
           serves_alcohol: params?.serves_alcohol ? 'true' : undefined,
           max_cost: params?.max_cost,
+          offer_bucket: params?.offer_bucket || undefined,
+          meal: params?.meal || undefined,
           sort: params?.sort,
           page: params?.page,
           limit: params?.limit,
@@ -5536,10 +5544,36 @@ export const api = createApi({
       providesTags: (_r, _e, id) => [{ type: 'MovieContracts', id: `prefill-${id}` }],
     }),
 
-    getMovieContracts: builder.query<PaginatedList<MovieContract>, PagedQuery | void>({
-      query: (params) => `/admin/movie-contracts${toListQuery({ q: params?.q, page: params?.page, limit: params?.limit })}`,
+    getMovieContracts: builder.query<
+      PaginatedList<MovieContract>,
+      (PagedQuery & { scope?: 'current' | 'pending' | 'old' }) | void
+    >({
+      query: (params) =>
+        `/admin/movie-contracts${toListQuery({
+          q: params?.q,
+          page: params?.page,
+          limit: params?.limit,
+          scope: params?.scope,
+        })}`,
       transformResponse: (res: { data: MovieContract[] }) => unwrapPaginated(res),
       providesTags: ['MovieContracts'],
+    }),
+
+    getAdminMovieContractById: builder.query<MovieContract, string>({
+      query: (contractId) => `/admin/movie-contracts/by-id/${contractId}`,
+      transformResponse: (res: { data: MovieContract }) => res.data,
+      providesTags: (_r, _e, id) => [{ type: 'MovieContracts', id: `id-${id}` }],
+    }),
+
+    getAdminMovieContractHistory: builder.query<
+      { business_id: string; cinema_name: string; cinema_phone?: string; contracts: MovieContract[] },
+      string
+    >({
+      query: (businessId) => `/admin/movie-contracts/cinema/${businessId}/history`,
+      transformResponse: (res: {
+        data: { business_id: string; cinema_name: string; cinema_phone?: string; contracts: MovieContract[] };
+      }) => res.data,
+      providesTags: (_r, _e, id) => [{ type: 'MovieContracts', id: `history-${id}` }],
     }),
 
     getAdminMovieContract: builder.query<MovieContract, string>({
@@ -5560,6 +5594,26 @@ export const api = createApi({
       }
     >({
       query: (body) => ({ url: '/admin/movie-contracts', method: 'POST', body }),
+      transformResponse: (res: { data: MovieContract }) => res.data,
+      invalidatesTags: ['MovieContracts', 'Businesses'],
+    }),
+
+    reviseMovieContract: builder.mutation<
+      MovieContract,
+      {
+        businessId: string;
+        body_html: string;
+        terms_and_conditions?: string;
+        convenience_fee_percent?: number;
+        commission_percent?: number;
+        beverage_commission_percent?: number;
+      }
+    >({
+      query: ({ businessId, ...body }) => ({
+        url: `/admin/movie-contracts/cinema/${businessId}/revise`,
+        method: 'POST',
+        body,
+      }),
       transformResponse: (res: { data: MovieContract }) => res.data,
       invalidatesTags: ['MovieContracts', 'Businesses'],
     }),
@@ -5586,6 +5640,38 @@ export const api = createApi({
       }),
       transformResponse: (res: { data: MovieContract }) => res.data,
       invalidatesTags: ['MovieContracts', 'Businesses'],
+    }),
+
+    getCinemaContracts: builder.query<
+      PaginatedList<MovieContract>,
+      (PagedQuery & { scope?: 'current' | 'old' }) | void
+    >({
+      query: (params) =>
+        `/movies/cinema/contracts${toListQuery({
+          q: params?.q,
+          page: params?.page,
+          limit: params?.limit,
+          scope: params?.scope,
+        })}`,
+      transformResponse: (res: { data: MovieContract[] }) => unwrapPaginated(res),
+      providesTags: ['MovieContracts'],
+    }),
+
+    getCinemaContractById: builder.query<MovieContract, string>({
+      query: (contractId) => `/movies/cinema/contracts/${contractId}`,
+      transformResponse: (res: { data: MovieContract }) => res.data,
+      providesTags: (_r, _e, id) => [{ type: 'MovieContracts', id: `cinema-${id}` }],
+    }),
+
+    getCinemaContractHistory: builder.query<
+      { business_id: string; cinema_name: string; contracts: MovieContract[] },
+      void
+    >({
+      query: () => '/movies/cinema/contract/history',
+      transformResponse: (res: {
+        data: { business_id: string; cinema_name: string; contracts: MovieContract[] };
+      }) => res.data,
+      providesTags: ['MovieContracts'],
     }),
 
     getCinemaContract: builder.query<MovieContract, void>({
@@ -6451,9 +6537,16 @@ export const api = createApi({
       transformResponse: (res: { message?: string }) => res,
     }),
 
-    getEventLayout: builder.query<any, string>({
-      query: (id) => `/events/organizer/${id}/layout`,
-      providesTags: (_r, _e, id) => [{ type: 'EventLayouts', id }],
+    getEventLayout: builder.query<any, string | { eventId: string; session_token?: string }>({
+      query: (arg) => {
+        const id = typeof arg === 'string' ? arg : arg.eventId;
+        const session_token = typeof arg === 'object' ? arg.session_token : undefined;
+        return {
+          url: `/events/organizer/${id}/layout`,
+          params: session_token ? { session_token } : undefined,
+        };
+      },
+      providesTags: (_r, _e, arg) => [{ type: 'EventLayouts', id: typeof arg === 'string' ? arg : arg.eventId }],
     }),
 
     updateEventLayout: builder.mutation<any, { eventId: string; seating_config: any; seats: any[] }>({
@@ -6828,9 +6921,16 @@ export const api = createApi({
       providesTags: (_r, _e, id) => [{ type: 'PublicEvents', id }],
     }),
 
-    getPublicEventLayout: builder.query<any, string>({
-      query: (id) => `/events/public/${id}/layout`,
-      providesTags: (_r, _e, id) => [{ type: 'EventLayouts', id: `public-${id}` }],
+    getPublicEventLayout: builder.query<any, string | { eventId: string; session_token?: string }>({
+      query: (arg) => {
+        const id = typeof arg === 'string' ? arg : arg.eventId;
+        const session_token = typeof arg === 'object' ? arg.session_token : undefined;
+        return {
+          url: `/events/public/${id}/layout`,
+          params: session_token ? { session_token } : undefined,
+        };
+      },
+      providesTags: (_r, _e, arg) => [{ type: 'EventLayouts', id: `public-${typeof arg === 'string' ? arg : arg.eventId}` }],
     }),
 
     // ── Stadium Layout ─────────────────────────────────────────────────────────
@@ -8751,10 +8851,16 @@ export const {
   useGetEligibleContractCinemasQuery,
   useGetMovieContractPrefillQuery,
   useGetMovieContractsQuery,
+  useGetAdminMovieContractByIdQuery,
+  useGetAdminMovieContractHistoryQuery,
   useGetAdminMovieContractQuery,
   useCreateMovieContractMutation,
+  useReviseMovieContractMutation,
   useRequestAdminMovieContractOtpMutation,
   useSignAdminMovieContractMutation,
+  useGetCinemaContractsQuery,
+  useGetCinemaContractByIdQuery,
+  useGetCinemaContractHistoryQuery,
   useGetCinemaContractQuery,
   useRequestCinemaContractOtpMutation,
   useSignCinemaContractMutation,

@@ -11,6 +11,7 @@ import ContractRichTextEditor from "@/components/SuperAdmin/ContractRichTextEdit
 import MovieContractDocument from "@/components/MovieAdminPanel/MovieContractDocument";
 import {
   useCreateMovieContractMutation,
+  useReviseMovieContractMutation,
   useGetMovieContractPrefillQuery,
   useGetEligibleContractCinemasQuery,
   type MovieContract,
@@ -32,8 +33,11 @@ export default function CreateMovieContractPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const initialBusinessId = searchParams.get("businessId") ?? "";
+  const isRevise = searchParams.get("mode") === "revise";
 
-  const { data: eligible = [], isLoading: loadingEligible } = useGetEligibleContractCinemasQuery();
+  const { data: eligible = [], isLoading: loadingEligible } = useGetEligibleContractCinemasQuery(undefined, {
+    skip: isRevise,
+  });
   const {
     register,
     handleSubmit,
@@ -67,6 +71,8 @@ export default function CreateMovieContractPage() {
 
   const [previewContract, setPreviewContract] = useState<MovieContract | null>(null);
   const [createContract, { isLoading: creating }] = useCreateMovieContractMutation();
+  const [reviseContract, { isLoading: revising }] = useReviseMovieContractMutation();
+  const saving = creating || revising;
 
   useEffect(() => {
     if (initialBusinessId) setValue("business_id", initialBusinessId);
@@ -146,21 +152,37 @@ export default function CreateMovieContractPage() {
     }
 
     try {
-      const res = await createContract({
-        business_id: values.business_id,
-        body_html: values.body_html,
-        terms_and_conditions: values.terms ?? "",
-        convenience_fee_percent: conv,
-        commission_percent: comm,
-        beverage_commission_percent: bevComm,
-      }).unwrap();
-      toast.success(
-        (res as { message?: string }).message ||
-          "Cinema contract created. Sign with signature + OTP, then ask the cinema admin to sign."
-      );
-      router.push(`/admin/movie-contracts/${values.business_id}`);
+      if (isRevise) {
+        const res = await reviseContract({
+          businessId: values.business_id,
+          body_html: values.body_html,
+          terms_and_conditions: values.terms ?? "",
+          convenience_fee_percent: conv,
+          commission_percent: comm,
+          beverage_commission_percent: bevComm,
+        }).unwrap();
+        toast.success(
+          (res as { message?: string }).message ||
+            "Revised contract created. Both Super Admin and Cinema must sign again to reactivate."
+        );
+        router.push(`/admin/movie-contracts/${values.business_id}`);
+      } else {
+        const res = await createContract({
+          business_id: values.business_id,
+          body_html: values.body_html,
+          terms_and_conditions: values.terms ?? "",
+          convenience_fee_percent: conv,
+          commission_percent: comm,
+          beverage_commission_percent: bevComm,
+        }).unwrap();
+        toast.success(
+          (res as { message?: string }).message ||
+            "Cinema contract created. Sign with signature + OTP, then ask the cinema admin to sign."
+        );
+        router.push(`/admin/movie-contracts/${values.business_id}`);
+      }
     } catch (err) {
-      toast.error(extractApiError(err, "Failed to create cinema contract"));
+      toast.error(extractApiError(err, isRevise ? "Failed to revise contract" : "Failed to create cinema contract"));
     }
   };
 
@@ -195,12 +217,21 @@ export default function CreateMovieContractPage() {
         >
           <ArrowLeft size={16} /> Back to contracts
         </Link>
-        <h2 className="text-2xl font-bold text-white">Create Cinema Contract</h2>
+        <h2 className="text-2xl font-bold text-white">
+          {isRevise ? "Edit / Revise Cinema Platform Contract" : "Create Cinema Contract"}
+        </h2>
         <p className="text-zinc-400 mt-1">
-          Select a pending cinema partner, review auto-filled details, compose the contract with dynamic fields,
-          then open the contract and sign with your signature + email OTP. The cinema goes live only after the cinema admin also signs.
+          {isRevise
+            ? "Saving changes creates a new version awaiting dual signatures; the previous contract becomes SUPERSEDED."
+            : "Select a pending cinema partner, review auto-filled details, compose the contract with dynamic fields, then open the contract and sign with your signature + email OTP. The cinema goes live only after the cinema admin also signs."}
         </p>
       </div>
+
+      {isRevise ? (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-200">
+          Saving a revision supersedes the active contract. A new contract version will be created, requiring fresh signatures from Super Admin and the Cinema Partner.
+        </div>
+      ) : null}
 
       <form onSubmit={handleSubmit(onValid)} noValidate className="space-y-6">
         <div className="grid lg:grid-cols-2 gap-6">
@@ -211,137 +242,113 @@ export default function CreateMovieContractPage() {
               <label className="block text-sm font-medium text-zinc-400 mb-1">
                 Select Cinema Partner <span className="text-rose-500">*</span>
               </label>
-              <select
-                className="input-field w-full"
-                {...register("business_id")}
-                disabled={loadingEligible}
-              >
-                <option value="">Select pending cinema…</option>
-                {eligible.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name} {c.contract_status === "REJECTED" ? "(Rejected — needs revision)" : ""}
-                  </option>
-                ))}
-              </select>
+              {isRevise ? (
+                <input
+                  type="text"
+                  readOnly
+                  className="input-field w-full opacity-80 cursor-not-allowed"
+                  value={prefill?.business?.name ?? "Selected cinema"}
+                />
+              ) : (
+                <select
+                  className="input-field w-full"
+                  {...register("business_id")}
+                  disabled={loadingEligible}
+                >
+                  <option value="">Select pending cinema…</option>
+                  {eligible.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name} {c.contract_status === "REJECTED" ? "(rejected — re-issue)" : ""}
+                    </option>
+                  ))}
+                </select>
+              )}
               {errors.business_id && (
-                <p className="text-xs text-rose-400 font-medium mt-1">
-                  {errors.business_id.message}
-                </p>
+                <p className="text-xs text-rose-400 font-medium mt-1">{errors.business_id.message}</p>
               )}
             </div>
 
-            {loadingPrefill && (
-              <div className="flex items-center gap-2 text-zinc-400 text-sm py-2">
-                <Loader2 size={16} className="animate-spin text-rose-500" />
-                <span>Loading cinema profile and suggested contract terms…</span>
-              </div>
-            )}
-
-            {prefill && (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm pt-1">
-                {[
-                  ["Email", prefill.cinema_admin?.email],
-                  ["Phone", prefill.business.phone],
-                  ["Total Screens", prefill.business.total_screens ? `${prefill.business.total_screens} screens` : "0 screens"],
-                  ["Contract #", prefill.suggested.contract_number],
-                ].map(([label, val]) => (
-                  <div key={label} className="rounded-lg bg-white/5 border border-white/10 px-3 py-2">
-                    <p className="text-xs text-zinc-500">{label}</p>
-                    <p className="text-zinc-200 font-medium truncate">{val || "—"}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <div className="grid sm:grid-cols-2 gap-4">
+            <div className="grid sm:grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-medium text-zinc-400 mb-1">
-                  Convenience fee (%) <span className="text-rose-500">*</span>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1">
+                  Convenience Fee (%) <span className="text-rose-500">*</span>
                 </label>
                 <input
                   type="text"
                   inputMode="decimal"
-                  className={`input-field w-full ${convenienceError ? "border-rose-500" : ""}`}
+                  placeholder="0.00"
+                  className="input-field w-full"
                   {...register("convenience_fee", {
                     onChange: (e) => {
                       e.target.value = sanitizePercentInput(e.target.value);
                     },
                   })}
-                  placeholder="0–100"
                 />
-                <p className="text-xs text-zinc-500 mt-1">Charged to customer on ticket amount.</p>
                 {convenienceError && (
                   <p className="text-xs text-rose-400 font-medium mt-1">{convenienceError}</p>
                 )}
               </div>
               <div>
-                <label className="block text-sm font-medium text-zinc-400 mb-1">
-                  Ticket Commission (%) <span className="text-rose-500">*</span>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1">
+                  Commission (%) <span className="text-rose-500">*</span>
                 </label>
                 <input
                   type="text"
                   inputMode="decimal"
-                  className={`input-field w-full ${commissionError ? "border-rose-500" : ""}`}
+                  placeholder="0.00"
+                  className="input-field w-full"
                   {...register("commission", {
                     onChange: (e) => {
                       e.target.value = sanitizePercentInput(e.target.value);
                     },
                   })}
-                  placeholder="0–100"
                 />
-                <p className="text-xs text-zinc-500 mt-1">Taken from cinema on box-office tickets.</p>
                 {commissionError && (
                   <p className="text-xs text-rose-400 font-medium mt-1">{commissionError}</p>
+                )}
+              </div>
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1">
+                  Snacks/Bev Comm (%) <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="0.00"
+                  className="input-field w-full"
+                  {...register("beverage_commission", {
+                    onChange: (e) => {
+                      e.target.value = sanitizePercentInput(e.target.value);
+                    },
+                  })}
+                />
+                {beverageError && (
+                  <p className="text-xs text-rose-400 font-medium mt-1">{beverageError}</p>
                 )}
               </div>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-zinc-400 mb-1">
-                Snacks &amp; Beverages Commission (%) <span className="text-rose-500">*</span>
+                Contract Terms &amp; Conditions (Optional)
               </label>
-              <input
-                type="text"
-                inputMode="decimal"
-                className={`input-field w-full ${beverageError ? "border-rose-500" : ""}`}
-                {...register("beverage_commission", {
-                  onChange: (e) => {
-                    e.target.value = sanitizePercentInput(e.target.value);
-                  },
-                })}
-                placeholder="0–100"
-              />
-              <p className="text-xs text-zinc-500 mt-1">
-                Deducted from cinema food &amp; beverage sales. If &gt; 0%, cinema can add snacks in Movie Admin Panel. If 0%, snacks module is hidden for cinema.
-              </p>
-              {beverageError && (
-                <p className="text-xs text-rose-400 font-medium mt-1">{beverageError}</p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-zinc-400 mb-1">Terms &amp; Conditions</label>
               <textarea
                 rows={3}
                 className="input-field w-full"
+                placeholder="Additional specific terms, cancellation clauses, or penalty details..."
                 {...register("terms")}
-                placeholder="Optional summary terms…"
               />
             </div>
           </div>
 
           <div className="glass-panel rounded-2xl border border-white/10 p-6 space-y-4">
-            <h3 className="text-lg font-semibold text-white">
-              Contract details (rich text) <span className="text-rose-500">*</span>
-            </h3>
-            <p className="text-xs text-zinc-500">
-              Use <strong className="text-zinc-400">+ Insert Dynamic Field</strong> to add placeholders.
-              They appear as labeled chips in the editor — not raw HTML tags.
+            <h3 className="text-lg font-semibold text-white">Contract Body</h3>
+            <p className="text-xs text-zinc-400">
+              Use available dynamic placeholders like &#123;&#123;cinemaName&#125;&#125;, &#123;&#123;commissionPercent&#125;&#125;, etc.
             </p>
             <ContractRichTextEditor
               value={bodyHtml}
-              onChange={(html) => setValue("body_html", html, { shouldDirty: true, shouldValidate: false })}
-              minHeight="320px"
+              onChange={(html) => setValue("body_html", html)}
               dynamicFields={MOVIE_CONTRACT_DYNAMIC_FIELDS}
             />
             {errors.body_html && (
@@ -384,11 +391,11 @@ export default function CreateMovieContractPage() {
           </Link>
           <button
             type="submit"
-            disabled={creating || !businessId || !feesValid}
+            disabled={saving || !businessId || !feesValid}
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 text-white font-medium hover:bg-emerald-700 disabled:opacity-50"
           >
-            {creating ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />}
-            Create contract
+            {saving ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />}
+            {isRevise ? "Issue Revised Contract" : "Create contract"}
           </button>
         </div>
       </form>

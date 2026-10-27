@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Sparkles } from "lucide-react";
+import { ArrowRight, Compass, Sparkles } from "lucide-react";
 import { paymentSuccessCopy, type BookingPaymentModule } from "@/lib/paymentSuccess";
 
 type Props = {
@@ -13,6 +13,8 @@ type Props = {
   title?: string;
   subtitle?: string;
   nextLabel?: string;
+  exploreHref?: string;
+  exploreLabel?: string;
   /** page = full route. modal = overlay on the review screen. */
   presentation?: "page" | "modal";
 };
@@ -27,10 +29,14 @@ export default function PaymentSuccessView({
   title,
   subtitle,
   nextLabel,
+  exploreHref,
+  exploreLabel,
   presentation = "page",
 }: Props) {
   const router = useRouter();
   const copy = paymentSuccessCopy(module);
+  const targetExploreHref = exploreHref || copy.exploreHref || "/movies";
+  const targetExploreLabel = exploreLabel || copy.exploreLabel || "Explore";
   const playKey = `${module || "booking"}-${bookingId || nextHref}`;
   const [entered, setEntered] = useState(false);
   const [phase, setPhase] = useState<"idle" | "play" | "done">("idle");
@@ -250,6 +256,15 @@ export default function PaymentSuccessView({
           >
             {nextLabel || copy.nextLabel}
             <ArrowRight size={18} strokeWidth={2.5} />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => router.push(targetExploreHref)}
+            className="mt-3 w-full inline-flex items-center justify-center gap-2 h-11 rounded-xl border border-slate-300 bg-white text-slate-800 hover:bg-slate-50 hover:border-slate-400 text-[14px] font-semibold transition-all cursor-pointer shadow-sm active:scale-[0.99]"
+          >
+            <Compass size={16} className="text-[#6900AA]" />
+            {targetExploreLabel}
           </button>
 
           <p className="mt-4 text-xs text-[#9CA3AF] leading-snug max-w-[18rem]">

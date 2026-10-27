@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { AdminListShimmer } from "@/components/Shared/Shimmer";
 import { CalendarDays, Check, Loader2, Mail, MapPin, Phone, Tag, Users, X } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -213,7 +214,7 @@ export default function VenueInquiriesPage() {
       </div>
 
       {isLoading ? (
-        <p className="text-muted-foreground py-10 text-center text-sm">Loading inquiries…</p>
+        <AdminListShimmer rows={5} columns={4} showToolbar={false} showPagination={false} />
       ) : (
         <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] gap-4 lg:gap-5 items-start">
           <div className="space-y-3 min-w-0">

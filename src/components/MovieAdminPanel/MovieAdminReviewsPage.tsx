@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { AdminListShimmer } from "@/components/Shared/Shimmer";
 import { Loader2, MessageSquare, Star } from "lucide-react";
 import { useGetCinemaMovieReviewsQuery } from "@/services/api";
 import { formatDate } from "@/lib/dateFormat";
@@ -51,10 +52,7 @@ export default function MovieAdminReviewsPage() {
 
       <div className="glass-panel rounded-2xl border border-white/10 p-5 sm:p-6">
         {isLoading ? (
-          <div className="flex items-center justify-center py-16 text-zinc-400 gap-2">
-            <Loader2 className="animate-spin" size={22} />
-            Loading reviews…
-          </div>
+          <AdminListShimmer rows={5} columns={4} showToolbar={false} showPagination={false} />
         ) : reviews.length === 0 ? (
           <div className="text-center py-16 px-4">
             <div className="mx-auto w-14 h-14 rounded-full bg-fuchsia-500/10 flex items-center justify-center text-fuchsia-500 mb-4">

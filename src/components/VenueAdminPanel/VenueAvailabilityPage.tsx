@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { DashboardShimmer } from "@/components/Shared/Shimmer";
 import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import { CalendarDays, Loader2, Plus, Trash2 } from "lucide-react";
@@ -163,11 +164,7 @@ export default function VenueAvailabilityPage() {
   };
 
   if (isLoading) {
-    return (
-      <div className="w-full max-w-[1600px] mx-auto py-16 text-center text-muted-foreground text-sm">
-        Loading calendar…
-      </div>
-    );
+    return <DashboardShimmer />;
   }
 
   return (

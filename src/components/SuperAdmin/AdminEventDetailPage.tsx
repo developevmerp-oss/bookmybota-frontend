@@ -1,5 +1,6 @@
 "use client";
 import { use } from "react";
+import { DetailFormShimmer } from "@/components/Shared/Shimmer";
 import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import Link from "next/link";
@@ -168,7 +169,7 @@ export default function AdminEventDetailPage({
   };
 
   if (isLoading) {
-    return <div className="portal-muted p-10 text-center">Loading event...</div>;
+    return <DetailFormShimmer />;
   }
 
   if (!event) {

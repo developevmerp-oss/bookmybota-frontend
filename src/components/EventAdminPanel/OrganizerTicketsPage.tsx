@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { DashboardShimmer } from "@/components/Shared/Shimmer";
 import Link from "next/link";
 import {
   BarChart3,
@@ -108,9 +109,7 @@ export default function OrganizerTicketStatsPage() {
       </div>
 
       {isLoading ? (
-        <div className="org-card p-10 text-center portal-muted">
-          Loading ticket statistics…
-        </div>
+        <DashboardShimmer />
       ) : isError || !overall ? (
         <div className="org-card p-10 text-center portal-muted">
           Could not load statistics.

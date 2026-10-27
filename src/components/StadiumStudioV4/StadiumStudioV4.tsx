@@ -389,7 +389,7 @@ export default function StadiumStudioV4({
           <div className="flex items-center gap-1.5">
             <span className="text-slate-400">Est. Box Office:</span>
             <span className="font-bold text-rose-400">
-              ${capacitySummary.totalGrossRevenue.toLocaleString()}
+              {capacitySummary.totalGrossRevenue.toLocaleString()} ETB
             </span>
           </div>
         </div>

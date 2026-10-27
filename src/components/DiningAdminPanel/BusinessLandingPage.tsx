@@ -209,7 +209,7 @@ export default function BusinessLandingPage() {
       crossLinks={
         <p className="flex flex-wrap items-center justify-center gap-2">
           Also listing events?
-          <Link href="/organizer" className="text-[#6900AA] font-semibold hover:underline">
+          <Link href="/list-your-show/events" className="text-[#6900AA] font-semibold hover:underline">
             Partner as an organizer
           </Link>
         </p>

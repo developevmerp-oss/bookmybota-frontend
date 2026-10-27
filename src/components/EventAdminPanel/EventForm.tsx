@@ -42,7 +42,7 @@ const VenueLayoutMapPreview = dynamic(
   () => import("@/components/EventAdminPanel/VenueLayoutMapPreview"),
   {
     ssr: false,
-    loading: () => <p className="text-xs text-emerald-800">Loading seating map…</p>,
+    loading: () => <div className="h-40 w-full rounded-xl bg-emerald-50 animate-pulse" aria-label="Loading seating map" />,
   }
 );
 import { parseEventLanguages, LANGUAGE_OPTIONS, AGE_GROUP_OPTIONS } from "@/lib/eventValidation";
@@ -796,7 +796,12 @@ function VenueNameSearchField({
         />
         {showResults && !readOnly && debouncedQ.length >= 2 && !venueBusinessId && venues.length > 0 && (
           <div className="absolute z-30 left-0 right-0 top-full mt-1 max-h-52 overflow-y-auto rounded-lg border border-slate-200 bg-white divide-y divide-slate-100 shadow-lg">
-            {isFetching && <p className="px-3 py-2 text-xs text-slate-500">Searching…</p>}
+            {isFetching && (
+              <div className="space-y-2 px-3 py-2" aria-busy="true" aria-label="Searching venues">
+                <div className="h-8 rounded-lg bg-slate-100 animate-pulse" />
+                <div className="h-8 rounded-lg bg-slate-100 animate-pulse" />
+              </div>
+            )}
             {venues.map((v) => {
               const selected = venueBusinessId === v.id;
               const verified =
@@ -1105,7 +1110,7 @@ function SeatingLayoutFields({
           <p className="text-xs text-slate-500 mb-2">
             These are the venue partner&apos;s published layouts. Select a layout to use it for this event, or choose below to request a custom layout.
           </p>
-          {layoutsFetching && <p className="text-xs text-slate-500 mb-2">Loading venue layouts…</p>}
+          {layoutsFetching && <div className="mb-2 h-8 w-full rounded-lg bg-slate-100 animate-pulse" aria-label="Loading venue layouts" />}
           {!layoutsFetching && liveLayouts.length === 0 ? (
             <p className="text-xs text-amber-800 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
               This venue has no published seating layout yet.
@@ -1153,7 +1158,7 @@ function SeatingLayoutFields({
               </p>
             </div>
             {showTemplateLoading ? (
-              <p className="text-xs text-slate-600">Loading seating map…</p>
+              <div className="h-40 w-full rounded-xl bg-slate-100 animate-pulse" aria-label="Loading seating map" />
             ) : templateError ? (
               <p className="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">
                 Could not load this seating map.
@@ -2377,7 +2382,12 @@ function ArtistBlock({
               )}
               {showResults && !readOnly && debouncedQ.length >= 2 && (
                 <div className="mt-2 max-h-40 overflow-y-auto rounded-lg border border-slate-200 bg-white divide-y divide-slate-100 shadow-sm">
-                  {isFetching && <p className="px-3 py-2 text-xs text-slate-500">Searching…</p>}
+                  {isFetching && (
+                    <div className="space-y-2 px-3 py-2" aria-busy="true" aria-label="Searching artists">
+                      <div className="h-8 rounded-lg bg-slate-100 animate-pulse" />
+                      <div className="h-8 rounded-lg bg-slate-100 animate-pulse" />
+                    </div>
+                  )}
                   {!isFetching && partners.length === 0 && (
                     <p className="px-3 py-2 text-xs text-slate-500">
                       No matches — continue to add &quot;{debouncedQ}&quot; as a new artist.
@@ -3739,7 +3749,11 @@ export default function EventForm({
                 Select a category to see available {isSports ? "sport types" : "genres"}.
               </p>
             ) : mastersLoading ? (
-              <p className="portal-muted text-sm">Loading {isSports ? "sport types" : "genres"}...</p>
+              <div className="flex flex-wrap gap-2" aria-busy="true" aria-label="Loading genres">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <span key={i} className="h-8 w-20 rounded-full bg-slate-100 animate-pulse" />
+                ))}
+              </div>
             ) : masters?.genres?.length ? (
               <div className="flex flex-wrap gap-2">
                 {masters.genres.map((g) => (
@@ -3882,7 +3896,7 @@ export default function EventForm({
               {!categoryTypeId ? (
                 <p className="portal-muted text-sm">Select a category in Event details first.</p>
               ) : mastersLoading ? (
-                <p className="portal-muted text-sm">Loading sport types...</p>
+                <div className="h-10 w-full rounded-lg bg-slate-100 animate-pulse" aria-label="Loading sport types" />
               ) : masters?.genres?.length ? (
                 <div className="flex flex-wrap gap-2">
                   {masters.genres.map((g) => (
@@ -4483,7 +4497,7 @@ export default function EventForm({
           {!categoryTypeId ? (
             <p className="portal-muted text-sm">Select a category to see the document checklist.</p>
           ) : mastersLoading ? (
-            <p className="portal-muted text-sm">Loading document requirements...</p>
+            <div className="space-y-2" aria-label="Loading document requirements">{Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-12 rounded-lg bg-slate-100 animate-pulse" />)}</div>
           ) : eventDocuments.length ? (
             <EventDocUploadsList
               docs={eventDocuments}
@@ -4510,7 +4524,7 @@ export default function EventForm({
           {!categoryTypeId ? (
             <p className="portal-muted text-sm">Select a category to load the T&amp;C checklist.</p>
           ) : mastersLoading ? (
-            <p className="portal-muted text-sm">Loading terms &amp; conditions...</p>
+            <div className="h-24 w-full rounded-lg bg-slate-100 animate-pulse" aria-label="Loading terms" />
           ) : (
             <div className="space-y-4">
               {(masters?.terms?.length || selectedTerms.length) ? (

@@ -3,6 +3,7 @@
 import { Suspense, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import PaymentSuccessView from "@/components/Shared/PaymentSuccessView";
+import { ConfirmationPageUI1Shimmer } from "@/components/Shared/Shimmer";
 import {
   paymentSuccessCopy,
   sanitizePaymentSuccessNext,
@@ -47,11 +48,7 @@ function PaymentSuccessContent() {
 export default function BookingPaymentSuccessPage() {
   return (
     <Suspense
-      fallback={
-        <div className="min-h-[100dvh] flex items-center justify-center bg-[#F7F5FB] text-[#6B7280] text-sm">
-          Loading…
-        </div>
-      }
+      fallback={<ConfirmationPageUI1Shimmer />}
     >
       <PaymentSuccessContent />
     </Suspense>

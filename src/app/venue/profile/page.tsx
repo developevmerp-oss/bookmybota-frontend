@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { DetailFormShimmer } from "@/components/Shared/Shimmer";
 import { useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
@@ -149,7 +150,7 @@ export default function VenueProfilePage() {
 
   if (isLoading || !user) {
     return (
-      <div className="p-10 text-center text-muted-foreground font-medium">Loading venue profile...</div>
+      <DetailFormShimmer />
     );
   }
 

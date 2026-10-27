@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { AdminListShimmer } from "@/components/Shared/Shimmer";
 import Link from "next/link";
 import { Film } from "lucide-react";
 import { useGetPartnerMovieCatalogQuery } from "@/services/api";
@@ -52,7 +53,7 @@ export default function MovieCatalogBrowsePage() {
       />
 
       {isLoading ? (
-        <p className="text-zinc-400">Loading catalog…</p>
+        <AdminListShimmer rows={6} columns={4} showToolbar={false} />
       ) : movies.length === 0 ? (
         <div className="glass-panel rounded-2xl border border-white/10 p-10 text-center text-zinc-500">
           No active movies in the catalog yet. Ask Super Admin to add titles.

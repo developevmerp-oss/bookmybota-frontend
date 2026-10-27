@@ -322,9 +322,10 @@ export default function MovieReviewsSection({
         </div>
 
         {isLoading ? (
-          <div className="flex items-center justify-center py-10 text-slate-400 gap-2 text-sm">
-            <Loader2 className="size-5 animate-spin" style={{ color: BRAND }} />
-            Loading reviews…
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3" aria-busy="true" aria-label="Loading reviews">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="h-36 rounded-2xl bg-slate-100 animate-pulse" />
+            ))}
           </div>
         ) : reviews.length === 0 ? null : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">

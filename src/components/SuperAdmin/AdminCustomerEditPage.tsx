@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { DetailFormShimmer } from "@/components/Shared/Shimmer";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
@@ -64,7 +65,7 @@ export default function AdminCustomerEditPage() {
   };
 
   if (isLoading) {
-    return <div className="text-white p-10 text-center">Loading customer...</div>;
+    return <DetailFormShimmer />;
   }
 
   if (!c) {

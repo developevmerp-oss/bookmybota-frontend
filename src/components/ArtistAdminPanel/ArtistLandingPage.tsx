@@ -218,11 +218,11 @@ export default function ArtistLandingPage() {
       crossLinks={
         <p className="flex flex-wrap items-center justify-center gap-2">
           Also partnering as
-          <Link href="/venue" className="text-[#6900AA] font-semibold hover:underline">
+          <Link href="/list-your-show/venue" className="text-[#6900AA] font-semibold hover:underline">
             a venue
           </Link>
           <span>or</span>
-          <Link href="/business" className="text-[#6900AA] font-semibold hover:underline">
+          <Link href="/list-your-show/dining" className="text-[#6900AA] font-semibold hover:underline">
             a restaurant
           </Link>
           ?

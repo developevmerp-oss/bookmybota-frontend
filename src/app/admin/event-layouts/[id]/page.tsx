@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { DetailFormShimmer } from "@/components/Shared/Shimmer";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import dynamic from "next/dynamic";
@@ -301,7 +302,7 @@ export default function AdminEventLayoutDetailPage() {
   };
 
   if (isLoading) {
-    return <p className="text-zinc-400 p-8">Loading request…</p>;
+    return <DetailFormShimmer />;
   }
 
   if (!request) {

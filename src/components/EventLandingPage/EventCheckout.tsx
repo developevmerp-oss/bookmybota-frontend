@@ -234,7 +234,7 @@ export default function EventCheckout({
   const [cancelTxnOpen, setCancelTxnOpen] = useState(false);
   const [cancelTxnAction, setCancelTxnAction] = useState<"back" | "exit">("back");
   const [ticketMode, setTicketMode] = useState<TicketDeliveryMode>("M_TICKET");
-  const [sessionToken, setSessionToken] = useState<string | undefined>(undefined);
+  const [sessionToken, setSessionToken] = useState<string | undefined>(readHoldSessionToken);
   const [holdId, setHoldId] = useState<string | null>(null);
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
@@ -311,8 +311,12 @@ export default function EventCheckout({
   const { data: myGiftCards = [] } = useGetMyGiftCardsQuery(undefined, {
     skip: !customerId || isOrganizer,
   });
-  const { data: layoutData } = useGetEventLayoutQuery(event.id, { skip: !isOrganizer });
-  const { data: publicLayoutData } = useGetPublicEventLayoutQuery(event.id, { skip: isOrganizer });
+  const layoutArg = useMemo(() => {
+    return sessionToken ? { eventId: event.id, session_token: sessionToken } : event.id;
+  }, [event.id, sessionToken]);
+
+  const { data: layoutData } = useGetEventLayoutQuery(layoutArg, { skip: !isOrganizer });
+  const { data: publicLayoutData } = useGetPublicEventLayoutQuery(layoutArg, { skip: isOrganizer });
 
   const activeLayoutData = isOrganizer ? layoutData : publicLayoutData;
 
@@ -344,6 +348,75 @@ export default function EventCheckout({
       document.body.style.overflow = prev;
     };
   }, [isMapFullscreen]);
+
+  useEffect(() => {
+    const ownHold = (activeLayoutData as any)?.data?.own_hold || (activeLayoutData as any)?.own_hold;
+    if (!ownHold || ownHold.status !== "ACTIVE") return;
+
+    if (ownHold.id) {
+      setHoldId((curr) => curr || ownHold.id);
+    }
+    if (ownHold.expires_at) {
+      setExpiresAt((curr) => curr || resolveHoldExpiresAt({ expires_at: ownHold.expires_at }));
+    }
+    if (ownHold.showtime_id) {
+      setShowtimeId((curr) => curr || ownHold.showtime_id);
+    }
+
+    const heldSeatIds: string[] = Array.isArray(ownHold.event_seat_ids)
+      ? ownHold.event_seat_ids.map(String)
+      : [];
+    if (heldSeatIds.length > 0) {
+      const allSeats: any[] =
+        (activeLayoutData as any)?.data?.seats || (activeLayoutData as any)?.seats || [];
+      const heldSet = new Set(heldSeatIds);
+      const matched = allSeats.filter((s: any) => heldSet.has(String(s.id)));
+
+      setSelectedSeats((curr) => {
+        if (curr && curr.length > 0) return curr;
+        if (matched.length > 0) return matched;
+        return heldSeatIds.map((id) => ({ id, status: "AVAILABLE" }));
+      });
+
+      setDesiredSeatQty((curr) =>
+        curr == null || curr < heldSeatIds.length ? heldSeatIds.length : curr
+      );
+      setSeatCountPick((curr) =>
+        curr == null || curr < heldSeatIds.length ? heldSeatIds.length : curr
+      );
+
+      setQtyByType((curr) => {
+        if (Object.keys(curr).length > 0) return curr;
+        const next: Record<string, number> = {};
+        matched.forEach((s) => {
+          const tid = String(s.ticket_type_id || "");
+          if (tid) next[tid] = (next[tid] || 0) + 1;
+        });
+        return Object.keys(next).length > 0 ? next : curr;
+      });
+    }
+  }, [activeLayoutData]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !isPage) return;
+    const handlePopState = () => {
+      setStep((curr) => {
+        if (curr === 4) return 3;
+        if (curr === 3) return 2;
+        if (curr === 2) return 1;
+        return curr;
+      });
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [isPage]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !isPage) return;
+    if (step > 1) {
+      window.history.pushState({ eventCheckoutStep: step }, "", window.location.href);
+    }
+  }, [step, isPage]);
 
   const showtimes = event.showtimes || [];
   const allTicketTypes = event.ticket_types || [];
@@ -895,7 +968,7 @@ export default function EventCheckout({
   };
 
   useEffect(() => {
-    if (step !== 4 || !expiresAt || !holdId) {
+    if (!expiresAt || !holdId) {
       setSecondsLeft(null);
       return;
     }
@@ -910,7 +983,7 @@ export default function EventCheckout({
     tick();
     const id = window.setInterval(tick, 1000);
     return () => window.clearInterval(id);
-  }, [step, expiresAt, holdId]);
+  }, [expiresAt, holdId]);
 
   const hasReservedSeats = Boolean(activeLayoutData?.data?.seats?.length) || isStadiumLayout;
   const maxSeatQtyPick = useMemo(() => {
@@ -1343,6 +1416,24 @@ export default function EventCheckout({
     }
 
     if (selectedSeats.length > 0) {
+      const currentSeatIds = selectedSeats.map((s) => String(s.id)).sort().join(",");
+      const isHoldActive = Boolean(
+        holdId && expiresAt && (secondsLeft === null || secondsLeft > 0) && !timeOutOpen
+      );
+      const heldSeatIds = (
+        ((activeLayoutData as any)?.data?.own_hold?.event_seat_ids ||
+          (activeLayoutData as any)?.own_hold?.event_seat_ids ||
+          []) as string[]
+      )
+        .map(String)
+        .sort()
+        .join(",");
+
+      if (isHoldActive && heldSeatIds && currentSeatIds === heldSeatIds) {
+        setStep(4);
+        return;
+      }
+
       setHolding(true);
       try {
         const existing = sessionToken || readHoldSessionToken();
@@ -1393,9 +1484,6 @@ export default function EventCheckout({
     if (targetStep === 4) {
       void proceedToReview();
       return;
-    }
-    if (targetStep < 4 && holdId) {
-      void releaseActiveHold().then(() => clearSeatHoldState());
     }
     setStep(targetStep);
   };
@@ -1708,6 +1796,21 @@ export default function EventCheckout({
               <p className="text-[0.9375rem] md:text-[1.0625rem] text-slate-500 mt-1.5 leading-relaxed">
                 {stepSubtitle}
               </p>
+            </div>
+          )}
+
+          {holdId && secondsLeft !== null && secondsLeft > 0 && !timeOutOpen && step < 4 && (
+            <div
+              className={`rounded-xl px-4 py-2.5 text-center text-sm font-bold border mb-4 ${
+                secondsLeft <= 60
+                  ? "bg-rose-50 border-rose-200 text-rose-700"
+                  : "bg-[#F3E8FF] border-[#E9D5FF] text-[#6B21A8]"
+              }`}
+            >
+              <span className="inline-flex items-center gap-2">
+                <Timer className="size-4" />
+                Complete your booking in {formatHoldCountdown(secondsLeft)}
+              </span>
             </div>
           )}
 
@@ -2699,7 +2802,7 @@ export default function EventCheckout({
               <button
                 type="button"
                 disabled={submitting}
-                onClick={() => requestLeaveConfirmStep("back")}
+                onClick={() => setStep(3)}
                 className={`px-4 py-3 border text-slate-700 font-semibold text-[1rem] inline-flex items-center gap-1 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
                   isPage
                     ? "rounded-[0.5rem] border-slate-300 bg-white"
@@ -2797,6 +2900,18 @@ export default function EventCheckout({
                       <span className="hidden sm:inline">Grid</span>
                     </button>
                   </div>
+                )}
+                {holdId && secondsLeft !== null && secondsLeft > 0 && !timeOutOpen && (
+                  <span
+                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border ${
+                      secondsLeft <= 60
+                        ? "bg-rose-50 border-rose-200 text-rose-700"
+                        : "bg-[#F3E8FF] border-[#E9D5FF] text-[#6B21A8]"
+                    }`}
+                  >
+                    <Timer className="size-3.5" />
+                    {formatHoldCountdown(secondsLeft)}
+                  </span>
                 )}
                 <p className="text-[0.8125rem] md:max-lg:text-[1rem] lg:text-[0.8125rem] font-extrabold text-[#6900AA] tabular-nums">
                   {selectedSeats.length}/{desiredSeatQty}
@@ -3294,9 +3409,7 @@ export default function EventCheckout({
               className="w-full py-3 rounded-xl bg-[#6900AA] hover:bg-[#57008E] text-white text-sm font-extrabold cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
             >
               {releasingHold ? (
-                <>
-                  <Loader2 size={16} className="animate-spin" /> Please wait…
-                </>
+                <Loader2 size={16} className="animate-spin" aria-label="Try Again" />
               ) : (
                 "Try Again"
               )}

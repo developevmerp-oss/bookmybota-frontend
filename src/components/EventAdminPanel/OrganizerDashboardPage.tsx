@@ -23,6 +23,7 @@ import {
   Zap,
 } from "lucide-react";
 import OrganizerLandingPage from "@/components/EventAdminPanel/OrganizerLandingPage";
+import { DashboardShimmer } from "@/components/Shared/Shimmer";
 import { organizerWorkflowLabel } from "@/lib/contractPlaceholders";
 import { formatMoney } from "@/lib/currencyFormat";
 import { formatDate, formatTime12h } from "@/lib/dateFormat";
@@ -159,14 +160,7 @@ function OrganizerDashboard() {
   const isLoading = settingsLoading || eventsLoading || statsLoading;
 
   if (isLoading || !user) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <div className="text-center space-y-2">
-          <div className="mx-auto h-8 w-8 rounded-full border-2 border-rose-500/30 border-t-rose-500 animate-spin" />
-          <p className="text-sm font-medium text-slate-500">Loading Event Dashboard...</p>
-        </div>
-      </div>
-    );
+    return <DashboardShimmer />;
   }
 
   const stats = [

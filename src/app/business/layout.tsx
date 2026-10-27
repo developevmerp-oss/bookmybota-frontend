@@ -7,6 +7,7 @@ import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage, setCredentials } from "@/features/auth/authSlice";
 import { useGetBusinessSettingsQuery } from "@/services/api";
 import SessionGuard from "@/components/Shared/SessionGuard";
+import { PartnerPanelShimmer } from "@/components/Shared/Shimmer";
 import PartnerProfileHoverMenu from "@/components/Shared/PartnerProfileHoverMenu";
 import { clearSessionForRole, readSessionForRole } from "@/lib/authStorage";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
@@ -259,8 +260,8 @@ export default function BusinessLayout({ children }: { children: React.ReactNode
   const [checkingAuth, setCheckingAuth] = useState(true);
 
   const isLoginPage = pathname === "/business/login";
-  const isPublicLanding =
-    pathname === "/business" || pathname === "/business/register" || isLoginPage;
+  const isRegisterPage = pathname === "/business/register";
+  const isPublicLanding = pathname === "/business" || isRegisterPage || isLoginPage;
   const isBusinessAdmin = user?.role === "business_admin";
 
   useEffect(() => {
@@ -284,16 +285,12 @@ export default function BusinessLayout({ children }: { children: React.ReactNode
     setCheckingAuth(false);
   }, [dispatch, router, isPublicLanding, isLoginPage, pathname]);
 
-  if (isLoginPage) {
+  if (isLoginPage || isRegisterPage) {
     return <>{children}</>;
   }
 
   if (checkingAuth) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-500 font-medium">
-        Loading...
-      </div>
-    );
+    return <PartnerPanelShimmer />;
   }
 
   if (!isBusinessAdmin) {

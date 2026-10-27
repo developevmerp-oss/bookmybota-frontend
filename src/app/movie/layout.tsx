@@ -7,6 +7,7 @@ import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage, setCredentials } from "@/features/auth/authSlice";
 import { useGetBusinessSettingsQuery, useGetCinemaContractQuery } from "@/services/api";
 import SessionGuard from "@/components/Shared/SessionGuard";
+import { PartnerPanelShimmer } from "@/components/Shared/Shimmer";
 import PartnerProfileHoverMenu, {
   MOVIE_CONTRACT_PROFILE_LINKS,
 } from "@/components/Shared/PartnerProfileHoverMenu";
@@ -268,8 +269,8 @@ export default function MovieLayout({ children }: { children: React.ReactNode })
   const [checkingAuth, setCheckingAuth] = useState(true);
 
   const isLoginPage = pathname === "/movie/login";
-  const isPublicLanding =
-    pathname === "/movie" || pathname === "/movie/register" || isLoginPage;
+  const isRegisterPage = pathname === "/movie/register";
+  const isPublicLanding = pathname === "/movie" || isRegisterPage || isLoginPage;
   const isMovieAdmin = user?.role === "movie_admin";
 
   useEffect(() => {
@@ -293,16 +294,12 @@ export default function MovieLayout({ children }: { children: React.ReactNode })
     setCheckingAuth(false);
   }, [dispatch, router, isPublicLanding, isLoginPage, pathname]);
 
-  if (isLoginPage) {
+  if (isLoginPage || isRegisterPage) {
     return <>{children}</>;
   }
 
   if (checkingAuth) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-500 font-medium">
-        Loading...
-      </div>
-    );
+    return <PartnerPanelShimmer />;
   }
 
   if (!isMovieAdmin) {

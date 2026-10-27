@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { AdminListShimmer } from "@/components/Shared/Shimmer";
 import { Controller, useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import { Loader2, Pencil, Plus, Tag, Trash2 } from "lucide-react";
@@ -462,10 +463,7 @@ export default function MovieAdminOffersPage() {
 
       <div className="glass-panel rounded-2xl border border-white/10 p-5 sm:p-6">
         {isLoading ? (
-          <div className="flex items-center justify-center py-16 text-zinc-400 gap-2">
-            <Loader2 className="animate-spin" size={22} />
-            Loading offers…
-          </div>
+          <AdminListShimmer rows={5} columns={4} showToolbar={false} showPagination={false} />
         ) : offers.length === 0 ? (
           <div className="text-center py-16 px-4">
             <div className="mx-auto w-14 h-14 rounded-full bg-fuchsia-500/10 flex items-center justify-center text-fuchsia-500 mb-4">

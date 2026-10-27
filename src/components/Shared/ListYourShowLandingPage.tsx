@@ -128,12 +128,12 @@ const HOST_IMAGE_CARDS = [
   {
     label: "Dining",
     image: imageSrc(images.diningPartnerHero),
-    href: "/business",
+    href: "/list-your-show/dining",
   },
   {
     label: "Movie",
     image: imageSrc(images.moviePartnerHero),
-    href: "/movie",
+    href: "/list-your-show/movie",
   },
   {
     label: "Concert",
@@ -153,12 +153,12 @@ const HOST_IMAGE_CARDS = [
   {
     label: "Artist",
     image: imageSrc(images.artistPartnerHero),
-    href: "/artist",
+    href: "/list-your-show/artist",
   },
   {
     label: "Venue",
     image: imageSrc(images.venuePartnerHero),
-    href: "/venue",
+    href: "/list-your-show/venue",
   },
   {
     label: "Music",

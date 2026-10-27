@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useState, type ReactNode } from "react";
+import { DetailFormShimmer } from "@/components/Shared/Shimmer";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
@@ -151,7 +152,7 @@ function ProfileDetailsForm() {
   if (!user || isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[12rem] text-slate-500 text-sm">
-        Loading profile...
+        <DetailFormShimmer />
       </div>
     );
   }
@@ -323,7 +324,7 @@ export default function AdminProfilePage() {
     <Suspense
       fallback={
         <div className="w-full flex items-center justify-center min-h-[12rem] text-slate-500 text-sm">
-          Loading profile...
+          <DetailFormShimmer />
         </div>
       }
     >

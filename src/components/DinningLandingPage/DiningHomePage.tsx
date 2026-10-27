@@ -69,7 +69,6 @@ import {
   DiningHomeOfferCard,
   DiningOfferBucket,
   buildDiningHomeOfferCards,
-  businessMatchesOfferBucket,
   diningFiltersEqual,
   diningFiltersFromSearchParams,
   extractCuisines,
@@ -420,42 +419,6 @@ function OfferPromoCard({
       </div>
     </div>
   );
-}
-
-function timeToMinutes(value?: string): number | null {
-  if (!value) return null;
-  const match = value.trim().match(/^(\d{1,2}):(\d{2})/);
-  if (!match) return null;
-  return Number(match[1]) * 60 + Number(match[2]);
-}
-
-function hoursOverlapWindow(
-  hours: Business["operating_hours"],
-  startMin: number,
-  endMin: number
-): boolean {
-  if (!hours) return true;
-  const days = Object.values(hours);
-  if (days.length === 0) return true;
-  return days.some((day) => {
-    if (!day || day.closed) return false;
-    const open = timeToMinutes(day.open);
-    const close = timeToMinutes(day.close);
-    if (open == null || close == null) return true;
-    return open < endMin && close > startMin;
-  });
-}
-
-function matchesMealOccasion(business: Business, meal: MealOccasion | ""): boolean {
-  if (!meal) return true;
-  const hay = `${business.name} ${business.cuisine || ""} ${business.type_name || ""} ${business.description || ""}`.toLowerCase();
-  if (meal === "fastfood") {
-    return /fast\s*food|burger|pizza|fried|snack|quick bite|street food/.test(hay);
-  }
-  if (meal === "breakfast") return hoursOverlapWindow(business.operating_hours, 6 * 60, 11 * 60);
-  if (meal === "lunch") return hoursOverlapWindow(business.operating_hours, 11 * 60, 16 * 60);
-  if (meal === "dinner") return hoursOverlapWindow(business.operating_hours, 17 * 60, 23 * 60);
-  return true;
 }
 
 const EXPLORE_CUISINES = [
@@ -932,7 +895,7 @@ function LocationDropdown({ onSelect, onDetect, detecting, onClose }: LocationDr
         </div>
         <div>
           <p className="text-sm font-semibold text-slate-800">
-            {detecting ? "Detecting your location..." : "Use My Current Location"}
+            Use My Current Location
           </p>
           <p className="text-xs text-slate-400 mt-0.5">Auto-detect via GPS</p>
         </div>
@@ -1058,8 +1021,16 @@ export default function Home() {
   };
 
   const handleSearchSubmit = () => {
-    setSearchQuery(searchInput);
+    setSearchQuery(searchInput.trim());
   };
+
+  useEffect(() => {
+    const handle = window.setTimeout(() => {
+      const next = searchInput.trim();
+      setSearchQuery((prev) => (prev === next ? prev : next));
+    }, 300);
+    return () => window.clearTimeout(handle);
+  }, [searchInput]);
 
   // Restore with In The Mood For section below.
   // const handleMoodSelect = (query: string) => {
@@ -1220,6 +1191,8 @@ export default function Home() {
       pure_veg: diningFilters.pureVeg || undefined,
       serves_alcohol: diningFilters.servesAlcohol || undefined,
       max_cost: diningFilters.maxCost > 0 ? diningFilters.maxCost : undefined,
+      offer_bucket: diningFilters.offerBucket || undefined,
+      meal: mealOccasion || undefined,
       sort: diningFilters.sort,
       page: currentPage,
       limit: DINING_LIST_LIMIT,
@@ -1230,13 +1203,28 @@ export default function Home() {
       diningFilters.cuisines,
       diningFilters.minRating,
       diningFilters.offersOnly,
+      diningFilters.offerBucket,
       diningFilters.pureVeg,
       diningFilters.servesAlcohol,
       diningFilters.maxCost,
       diningFilters.sort,
+      mealOccasion,
       currentPage,
     ]
   );
+
+  const narrowingFiltersActive =
+    Boolean(searchQuery) ||
+    activeCategories.length > 0 ||
+    Boolean(mealOccasion) ||
+    diningFilters.cuisines.length > 0 ||
+    diningFilters.minRating > 0 ||
+    diningFilters.offersOnly ||
+    Boolean(diningFilters.offerBucket) ||
+    diningFilters.pureVeg ||
+    diningFilters.servesAlcohol ||
+    diningFilters.maxCost > 0 ||
+    diningFilters.bookTable;
 
   const {
     data: cityBusinessesData,
@@ -1255,6 +1243,7 @@ export default function Home() {
   const cityBusinessItems = cityBusinessesData?.items ?? [];
   const usingDiningFallback =
     hasSelectedCity &&
+    !narrowingFiltersActive &&
     !cityBusinessesLoading &&
     cityBusinessItems.length === 0 &&
     (cityBusinessesData?.meta?.total ?? 0) === 0;
@@ -1345,7 +1334,7 @@ export default function Home() {
   const detectCurrentLocation = useCallback(async () => {
     setLocationLoading(true);
     setLocationError(false);
-    setLocationLabel("Detecting...");
+    setLocationLabel("");
 
     // Helper to apply result to state
     const applyCity = (city: string) => {
@@ -1559,22 +1548,7 @@ export default function Home() {
     return cards;
   }, [sectionPool, cuisineOptions, cuisineMasters, activeCity]);
 
-  const filteredRestaurants = useMemo(() => {
-    const mealFiltered = loadedRestaurants.filter((r) => matchesMealOccasion(r, mealOccasion));
-    if (!diningFilters.offerBucket) return mealFiltered;
-    return mealFiltered.filter((r) =>
-      businessMatchesOfferBucket(r, diningFilters.offerBucket)
-    );
-  }, [loadedRestaurants, mealOccasion, diningFilters.offerBucket]);
-
-  const bucketFilteredFromPool = useMemo(() => {
-    if (!diningFilters.offerBucket) return null;
-    return sectionPool
-      .filter((r) => businessMatchesOfferBucket(r, diningFilters.offerBucket))
-      .filter((r) => matchesMealOccasion(r, mealOccasion));
-  }, [diningFilters.offerBucket, sectionPool, mealOccasion]);
-
-  const displayRestaurants = bucketFilteredFromPool ?? filteredRestaurants;
+  const displayRestaurants = loadedRestaurants;
 
   useEffect(() => {
     setCurrentPage(1);
@@ -1595,8 +1569,7 @@ export default function Home() {
     });
   }, [businessesData, currentPage]);
 
-  const hasMoreRestaurants =
-    !diningFilters.offerBucket && Boolean(businessesData?.meta?.has_next);
+  const hasMoreRestaurants = Boolean(businessesData?.meta?.has_next);
   const loadingMore = businessesFetching && currentPage > 1;
   /** Initial load + filter/search refetch while list is empty — card-matched shimmer. */
   const showRestaurantShimmer =
@@ -1679,9 +1652,7 @@ export default function Home() {
     locationCity && locationCity !== "All Cities" ? locationCity : "All Cities";
   const totalRestaurants = useStaticDining
     ? staticDiningCards.length
-    : diningFilters.offerBucket
-      ? displayRestaurants.length
-      : businessesData?.meta?.total ?? filteredRestaurants.length;
+    : businessesData?.meta?.total ?? displayRestaurants.length;
   const restaurantCountLabel = `${totalRestaurants} restaurant${totalRestaurants !== 1 ? "s" : ""}`;
 
   const getFilteredSectionTitle = () => {
@@ -1793,7 +1764,11 @@ export default function Home() {
                       locationLoading ? "text-slate-400" : "text-slate-800"
                     }`}
                   >
-                    {locationLabel}
+                    {locationLoading ? (
+                      <span className="inline-block h-3.5 w-24 rounded bg-slate-200 animate-pulse" aria-label="Detecting location" />
+                    ) : (
+                      locationLabel
+                    )}
                   </span>
                   <ChevronDown
                     size={14}
@@ -2336,10 +2311,11 @@ export default function Home() {
                 <CitySectionEmptyNotice message="No dining options available in your city yet." />
               ) : (
                 <p className="text-sm text-slate-500 mt-0.5">
-                  {locationLoading ? (
-                    <span className="flex items-center gap-1.5">
-                      <Loader2 size={12} className="animate-spin" /> Locating restaurants…
-                    </span>
+                  {locationLoading || showRestaurantShimmer ? (
+                    <span
+                      className="mt-1 inline-block h-3.5 w-44 rounded bg-slate-200 animate-pulse"
+                      aria-label="Locating restaurants"
+                    />
                   ) : (
                     <>
                       <span className="font-semibold text-slate-700">{cityDisplay}</span>
@@ -2428,10 +2404,7 @@ export default function Home() {
                     className="inline-flex items-center justify-center gap-2 min-w-[160px] px-8 py-3 rounded-full bg-[#6900AA] text-white text-sm font-semibold hover:bg-[#57008E] disabled:opacity-60 transition-colors"
                   >
                     {loadingMore ? (
-                      <>
-                        <Loader2 size={16} className="animate-spin" />
-                        Loading...
-                      </>
+                      <Loader2 size={16} className="animate-spin" aria-label="Loading more restaurants" />
                     ) : (
                       "Load More"
                     )}

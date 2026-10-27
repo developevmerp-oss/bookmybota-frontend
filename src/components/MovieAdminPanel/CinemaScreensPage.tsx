@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { AdminListShimmer } from "@/components/Shared/Shimmer";
 import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import { toast } from "sonner";
@@ -746,7 +747,7 @@ export default function CinemaScreensPage() {
 
       <div className="glass-panel rounded-2xl border border-white/10 overflow-hidden">
         {isLoading ? (
-          <p className="p-8 text-center text-zinc-400">Loading screens…</p>
+          <AdminListShimmer rows={5} columns={4} showToolbar={false} />
         ) : screens.length === 0 ? (
           <p className="p-8 text-center text-zinc-500">No screens yet. Create Screen 1 to get started.</p>
         ) : (

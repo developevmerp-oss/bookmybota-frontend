@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { DetailFormShimmer } from "@/components/Shared/Shimmer";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
@@ -261,11 +262,11 @@ export default function AdminMovieFormPage({ mode, movieId }: AdminMovieFormPage
   const saving = creating || updating;
 
   if (isEdit && (isLoading || mastersLoading)) {
-    return <div className="text-slate-500 p-10 text-center">Loading movie…</div>;
+    return <DetailFormShimmer />;
   }
 
   if (!isEdit && mastersLoading) {
-    return <div className="text-slate-500 p-10 text-center">Loading movie masters…</div>;
+    return <DetailFormShimmer />;
   }
 
   if (isEdit && !movie && !isLoading) {
@@ -280,7 +281,7 @@ export default function AdminMovieFormPage({ mode, movieId }: AdminMovieFormPage
   }
 
   if (!hydrated) {
-    return <div className="text-slate-500 p-10 text-center">Loading…</div>;
+    return <DetailFormShimmer />;
   }
 
   const masterLink = (

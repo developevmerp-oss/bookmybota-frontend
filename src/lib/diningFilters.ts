@@ -308,11 +308,6 @@ export function extractCuisines(businesses: Business[]): string[] {
   return Array.from(set).sort((a, b) => a.localeCompare(b));
 }
 
-function businessText(b: Business): string {
-  const amenities = (b.amenities || []).join(" ");
-  return `${b.name || ""} ${b.cuisine || ""} ${b.type_name || ""} ${b.description || ""} ${amenities}`.toLowerCase();
-}
-
 export function applyDiningFilters(
   businesses: Business[],
   filters: DiningFilterState
@@ -320,7 +315,6 @@ export function applyDiningFilters(
   let list = businesses.filter((r) => {
     const cuisine = r.cuisine || "";
     const rating = Number(r.rating || 0);
-    const text = businessText(r);
     const cost = Number(r.average_cost || 0);
 
     const matchesCuisine =
@@ -336,10 +330,17 @@ export function applyDiningFilters(
           ? businessMatchesOfferBucket(r, filters.offerBucket)
           : businessHasOffer(r);
     const matchesBookTable = !filters.bookTable || r.is_open !== false;
-    const matchesVeg = !filters.pureVeg || /veg|vegetarian|jain/.test(text);
+    const amenityText = (r.amenities || []).join(" ");
+    const vegHay = `${r.name || ""} ${r.cuisine || ""} ${amenityText}`.toLowerCase();
+    const alcoholHay = `${r.name || ""} ${r.cuisine || ""} ${r.type_name || ""} ${amenityText}`.toLowerCase();
+    const matchesVeg =
+      !filters.pureVeg ||
+      /pure\s*veg|\bjain\b/.test(vegHay) ||
+      (/\bvegetarian\b/.test(vegHay) && !/vegetarian\s*friendly/.test(vegHay));
     const matchesAlcohol =
-      !filters.servesAlcohol || /alcohol|bar|wine|beer|liquor|cocktail/.test(text);
-    const matchesCost = !filters.maxCost || !cost || cost <= filters.maxCost;
+      !filters.servesAlcohol ||
+      /full\s*bar|\balcohol\b|\bbar\b|\bwine\b|\bbeer\b|\bliquor\b|\bcocktail\b|\bpub\b|\blounge\b/.test(alcoholHay);
+    const matchesCost = !filters.maxCost || (cost > 0 && cost <= filters.maxCost);
 
     return (
       matchesCuisine &&

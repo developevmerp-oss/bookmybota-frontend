@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { DetailFormShimmer, AdminListShimmer } from "@/components/Shared/Shimmer";
 import { useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
@@ -33,6 +34,7 @@ import {
   type MarketingCampaign,
   type PartnerDocumentUpload,
 } from "@/services/api";
+import { formatMoney as formatMoneyUtil } from "@/lib/currencyFormat";
 
 interface AdminPartnerDetailPageProps {
   module: "dining" | "event" | "venue" | "artist" | "cinema";
@@ -178,7 +180,7 @@ function promotionStatusClass(status?: string) {
 function formatMoney(v?: number | string | null) {
   const n = Number(v);
   if (!Number.isFinite(n)) return "—";
-  return `$${n.toFixed(2)}`;
+  return formatMoneyUtil(n, { decimals: 2 });
 }
 
 function PromotionCard({ camp }: { camp: MarketingCampaign }) {
@@ -326,7 +328,7 @@ export default function AdminPartnerDetailPage({ module }: AdminPartnerDetailPag
 
   if (isLoading) {
     return (
-      <div className="w-full py-16 text-center text-sm text-slate-500">Loading partner...</div>
+      <DetailFormShimmer />
     );
   }
 
@@ -766,7 +768,7 @@ export default function AdminPartnerDetailPage({ module }: AdminPartnerDetailPag
           </div>
 
           {promotionsLoading ? (
-            <p className="text-sm text-slate-500 py-8 text-center">Loading promotions…</p>
+            <AdminListShimmer rows={4} columns={4} showToolbar={false} showPagination={false} />
           ) : promotions.length === 0 ? (
             <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-10 sm:py-12 text-center">
               <Megaphone size={28} className="mx-auto text-slate-300 mb-2" />

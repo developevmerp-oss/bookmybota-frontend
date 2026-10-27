@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, CheckCircle, Loader2, Lock } from "lucide-react";
 import { toast } from "sonner";
 import AuthGate from "@/components/Shared/AuthGate";
+import { AuthFormShimmer } from "@/components/Shared/Shimmer";
 import PasswordInput from "@/components/Shared/PasswordInput";
 import { resolvePartnerLoginHref } from "@/components/Shared/PartnerAuthHeader";
 import { useResetPasswordMutation } from "@/services/api";
@@ -148,9 +149,7 @@ export default function ResetPasswordPage() {
   return (
     <AuthGate mode="guest" guestRoles={[]}>
       <Suspense
-        fallback={
-          <div className="min-h-screen flex items-center justify-center text-slate-500">Loading…</div>
-        }
+        fallback={<AuthFormShimmer />}
       >
         <ResetPasswordForm />
       </Suspense>

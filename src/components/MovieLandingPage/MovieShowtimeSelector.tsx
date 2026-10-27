@@ -45,6 +45,7 @@ import {
   stableSearchParamsString,
 } from "@/lib/filterUrlSync";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
+import { ShowtimeListShimmer } from "@/components/Shared/Shimmer";
 import {
   formatDateCustomer,
   formatTime12h,
@@ -1990,9 +1991,7 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
 
       <div className="space-y-3">
         {isLoading ? (
-          <div className="rounded-xl border border-[#E8E8E8] bg-white p-12 text-center text-[#6B7280]">
-            Loading screening cinemas and showtimes…
-          </div>
+          <ShowtimeListShimmer />
         ) : filteredCinemas.length === 0 ? (
           <div className="rounded-xl border border-[#E8E8E8] bg-white p-10 text-center space-y-3">
             <Film size={36} className="mx-auto text-[#C4C4C4]" />

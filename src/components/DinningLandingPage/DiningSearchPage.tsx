@@ -242,6 +242,7 @@ function SearchContent() {
     cuisines: diningFilters.cuisines.length > 0 ? diningFilters.cuisines : undefined,
     min_rating: diningFilters.minRating > 0 ? diningFilters.minRating : undefined,
     offers_only: diningFilters.offersOnly || undefined,
+    offer_bucket: diningFilters.offerBucket || undefined,
     pure_veg: diningFilters.pureVeg || undefined,
     serves_alcohol: diningFilters.servesAlcohol || undefined,
     max_cost: diningFilters.maxCost > 0 ? diningFilters.maxCost : undefined,
@@ -434,9 +435,10 @@ function SearchContent() {
             </h2>
             <p className="text-sm text-slate-500 mt-1">
               {loadingBusinesses ? (
-                <span className="flex items-center gap-1.5">
-                  <Loader2 size={14} className="animate-spin text-rose-600" /> Finding restaurants...
-                </span>
+                <span
+                  className="mt-1 inline-block h-3.5 w-36 rounded bg-slate-200 animate-pulse"
+                  aria-label="Finding restaurants"
+                />
               ) : (
                 `${businessesData?.meta?.total ?? filteredRestaurants.length} venue${(businessesData?.meta?.total ?? filteredRestaurants.length) !== 1 ? "s" : ""} available`
               )}
@@ -541,10 +543,7 @@ function SearchContent() {
                   className="inline-flex items-center justify-center gap-2 min-w-[160px] px-8 py-3 rounded-full bg-[#6900AA] text-white text-sm font-semibold hover:bg-[#57008E] disabled:opacity-60 transition-colors"
                 >
                   {isLoadingMore ? (
-                    <>
-                      <Loader2 size={16} className="animate-spin" />
-                      Loading...
-                    </>
+                    <Loader2 size={16} className="animate-spin" aria-label="Loading more restaurants" />
                   ) : (
                     "Load More"
                   )}

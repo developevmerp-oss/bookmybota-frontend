@@ -261,12 +261,16 @@ export default function CitySelectModal({
             className="mt-4 inline-flex items-center gap-2 text-base font-semibold cursor-pointer disabled:opacity-60"
             style={{ color: ACCENT }}
           >
-            <Locate size={18} />
-            {detecting ? "Detecting..." : "Use Current Location"}
+            <Locate size={18} className={detecting ? "animate-pulse" : ""} />
+            Use Current Location
           </button>
 
           {isLoading ? (
-            <p className="text-slate-400 text-center py-12">Loading cities…</p>
+            <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-x-4 gap-y-3" aria-busy="true" aria-label="Loading cities">
+              {Array.from({ length: 12 }).map((_, i) => (
+                <span key={i} className="h-9 rounded-lg bg-slate-100 animate-pulse" />
+              ))}
+            </div>
           ) : searching ? (
             <div className="mt-6">
               {filteredCities.length === 0 ? (

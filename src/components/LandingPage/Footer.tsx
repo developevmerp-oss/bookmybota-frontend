@@ -11,11 +11,11 @@ const logoOnDarkSrc =
   typeof images.logoOnDark === "string" ? images.logoOnDark : images.logoOnDark.src;
 
 const PARTNER_CTAS: Array<{ label: string; href: string; primary?: boolean }> = [
-  { label: "List your event", href: "/organizer", primary: true },
-  { label: "List restaurant", href: "/business" },
-  { label: "Partner venue", href: "/venue" },
-  { label: "Join as artist", href: "/artist" },
-  { label: "List cinema", href: "/movie" },
+  { label: "List your event", href: "/list-your-show/events", primary: true },
+  { label: "List restaurant", href: "/list-your-show/dining" },
+  { label: "Partner venue", href: "/list-your-show/venue" },
+  { label: "Join as artist", href: "/list-your-show/artist" },
+  { label: "List cinema", href: "/list-your-show/movie" },
 ];
 
 const COLUMNS = [
@@ -25,7 +25,7 @@ const COLUMNS = [
       { label: "Now Showing", href: "/movies" },
       { label: "Browse Cinemas", href: "/movies/cinemas" },
       { label: "Gift Cards", href: "/gift-cards" },
-      { label: "List your cinema", href: "/movie" },
+      { label: "List your cinema", href: "/list-your-show/movie" },
     ],
   },
   {
@@ -34,21 +34,21 @@ const COLUMNS = [
       { label: "Discover Events", href: "/events" },
       { label: "Venues", href: "/venues" },
       { label: "Artists", href: "/artists" },
-      { label: "List your event", href: "/organizer" },
+      { label: "List your event", href: "/list-your-show/events" },
     ],
   },
   {
     title: "Dining",
     links: [
       { label: "Restaurants", href: "/dining" },
-      { label: "List restaurant", href: "/business" },
+      { label: "List restaurant", href: "/list-your-show/dining" },
     ],
   },
   {
     title: "Partners",
     links: [
-      { label: "Partner your venue", href: "/venue" },
-      { label: "Join as artist", href: "/artist" },
+      { label: "Partner your venue", href: "/list-your-show/venue" },
+      { label: "Join as artist", href: "/list-your-show/artist" },
       { label: "List Your Show", href: "/list-your-show" },
     ],
   },

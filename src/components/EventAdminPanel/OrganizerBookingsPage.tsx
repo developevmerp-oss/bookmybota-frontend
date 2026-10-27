@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, Suspense } from "react";
+import { AdminListShimmer } from "@/components/Shared/Shimmer";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Plus } from "lucide-react";
@@ -176,7 +177,7 @@ function OrganizerBookingsContent() {
 
       <div className="org-card overflow-hidden">
         {isLoading ? (
-          <div className="p-10 text-center portal-muted">Loading bookings…</div>
+          <AdminListShimmer rows={6} columns={5} showToolbar={false} />
         ) : bookings.length === 0 ? (
           <div className="p-10 text-center portal-muted">
             No bookings yet for this filter. They will appear when customers complete checkout on your
@@ -256,7 +257,7 @@ export default function OrganizerBookingsPage() {
   return (
     <Suspense
       fallback={
-        <div className="p-10 text-center portal-muted">Loading bookings…</div>
+        <AdminListShimmer rows={6} columns={5} showToolbar={false} />
       }
     >
       <OrganizerBookingsContent />

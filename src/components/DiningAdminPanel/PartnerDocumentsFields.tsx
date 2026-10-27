@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { DetailFormShimmer } from "@/components/Shared/Shimmer";
 import { Eye, Loader2, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -225,7 +226,7 @@ export default function PartnerDocumentsFields({
       </div>
 
       {isLoading ? (
-        <p className={mutedClass}>Loading document checklist...</p>
+        <DetailFormShimmer fields={3} />
       ) : masters.length === 0 ? (
         <p className="text-amber-700 text-sm">No document types configured yet.</p>
       ) : (

@@ -1,23 +1,15 @@
 "use client";
 
-import PartnerOnboardForm from "@/components/DiningAdminPanel/PartnerOnboardForm";
+import Footer from "@/components/LandingPage/Footer";
+import OrganizerAccountSetupForm from "@/components/EventAdminPanel/OrganizerAccountSetupForm";
 
 export default function BusinessRegisterPage() {
   return (
-    <div className="min-h-screen bg-slate-50 font-sans">
-      <main className="w-full flex justify-center px-4 pt-8 sm:pt-10 pb-16">
-        <div className="w-full max-w-[680px]">
-          <PartnerOnboardForm
-            partnerType="combined"
-            variant="light"
-            mode="create"
-            backHref="/business"
-            title="Register Business"
-            subtitle="Create your business profile. A temporary password is auto-generated; login details are emailed after Super Admin approval."
-            successDetail="Your account is disabled until a Super Admin enables it. You will not be able to log in until then. Redirecting…"
-          />
-        </div>
-      </main>
+    <div className="min-h-screen bg-[#f5f5f7] font-sans text-[#111111] overflow-x-hidden">
+      <div className="w-full flex justify-center px-4 pt-8 sm:pt-10 pb-16">
+        <OrganizerAccountSetupForm backHref="/business" module="dining" />
+      </div>
+      <Footer />
     </div>
   );
 }

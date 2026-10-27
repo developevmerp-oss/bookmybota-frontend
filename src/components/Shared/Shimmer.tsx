@@ -1637,3 +1637,155 @@ export function ListYourShowLandingShimmer({
     </Wrap>
   );
 }
+
+/** Partner panels (dining, cinema, events, venue, artist): sidebar, header, and list. */
+export function PartnerPanelShimmer() {
+  return (
+    <Wrap>
+      <div className="min-h-screen bg-slate-50 flex" aria-busy="true" aria-label="Loading panel">
+        <aside className="hidden md:flex w-64 shrink-0 flex-col border-r border-slate-200 bg-white">
+          <div className="h-16 border-b border-slate-200 px-4 flex items-center gap-3">
+            <Skeleton circle width={36} height={36} />
+            <div className="min-w-0 flex-1 space-y-1.5">
+              <Skeleton width="70%" height={14} />
+              <Skeleton width="45%" height={10} />
+            </div>
+          </div>
+          <div className="p-3 space-y-1.5">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3 rounded-xl px-3 py-2.5">
+                <Skeleton width={18} height={18} borderRadius={4} />
+                <Skeleton width={i % 3 === 0 ? "62%" : "48%"} height={14} />
+              </div>
+            ))}
+          </div>
+        </aside>
+        <div className="flex-1 min-w-0">
+          <header className="h-16 border-b border-slate-200 bg-white px-4 sm:px-8 flex items-center justify-between">
+            <div className="space-y-2">
+              <Skeleton width={160} height={18} />
+              <Skeleton width={240} height={12} className="hidden sm:block" />
+            </div>
+            <Skeleton circle width={36} height={36} />
+          </header>
+          <div className="p-3 sm:p-4 md:p-6 lg:p-8">
+            <AdminListShimmer rows={6} columns={5} showPagination={false} />
+          </div>
+        </div>
+      </div>
+    </Wrap>
+  );
+}
+
+/** Login, reset password, and other centered auth cards. */
+export function AuthFormShimmer() {
+  return (
+    <Wrap>
+      <div
+        className="min-h-[calc(100dvh-72px)] flex items-center justify-center bg-slate-50 px-4"
+        aria-busy="true"
+        aria-label="Loading"
+      >
+        <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-sm space-y-4">
+          <Skeleton width={48} height={48} borderRadius={12} />
+          <Skeleton width="55%" height={28} />
+          <Skeleton width="80%" height={14} />
+          <Skeleton height={44} borderRadius={10} />
+          <Skeleton height={44} borderRadius={10} />
+          <Skeleton height={46} borderRadius={10} />
+        </div>
+      </div>
+    </Wrap>
+  );
+}
+
+/** Partner dashboard: stat cards, then a list. */
+export function DashboardShimmer() {
+  return (
+    <Wrap>
+      <div className="space-y-6" aria-busy="true" aria-label="Loading dashboard">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="rounded-2xl border border-slate-200 bg-white p-5 space-y-3">
+              <Skeleton width={36} height={36} borderRadius={10} />
+              <Skeleton width="50%" height={12} />
+              <Skeleton width="70%" height={26} />
+            </div>
+          ))}
+        </div>
+        <AdminListShimmer rows={5} columns={4} showToolbar={false} showPagination={false} />
+      </div>
+    </Wrap>
+  );
+}
+
+/** Edit and detail forms: title plus stacked fields. */
+export function DetailFormShimmer({ fields = 6 }: { fields?: number }) {
+  return (
+    <Wrap>
+      <div className="w-full space-y-4" aria-busy="true" aria-label="Loading">
+        <Skeleton width={220} height={28} />
+        <Skeleton width="36%" height={14} />
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 space-y-4">
+          {Array.from({ length: fields }).map((_, i) => (
+            <div key={i}>
+              <Skeleton width={96} height={12} className="mb-2" />
+              <Skeleton height={42} borderRadius={10} />
+            </div>
+          ))}
+          <Skeleton width={148} height={42} borderRadius={10} />
+        </div>
+      </div>
+    </Wrap>
+  );
+}
+
+/** Cinema / movie showtime rows. */
+export function ShowtimeListShimmer({ count = 3 }: { count?: number }) {
+  return (
+    <Wrap>
+      <div className="space-y-4" aria-busy="true" aria-label="Loading showtimes">
+        {Array.from({ length: count }).map((_, i) => (
+          <div key={i} className="rounded-2xl border border-[#E8E2F2] bg-white p-4 sm:p-5 flex gap-4">
+            <Skeleton width={72} height={108} borderRadius={10} className="shrink-0" />
+            <div className="min-w-0 flex-1 space-y-3">
+              <Skeleton width="46%" height={20} />
+              <Skeleton width="28%" height={12} />
+              <div className="flex flex-wrap gap-2">
+                {[0, 1, 2, 3].map((slot) => (
+                  <Skeleton key={slot} width={76} height={36} borderRadius={8} />
+                ))}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </Wrap>
+  );
+}
+
+/** Seat map placeholder matching the booking map frame. */
+export function SeatMapShimmer({
+  className = "",
+  fill = false,
+}: {
+  className?: string;
+  fill?: boolean;
+}) {
+  return (
+    <Wrap>
+      <div
+        className={`flex ${fill ? "h-full min-h-0" : "h-[550px] min-h-[320px]"} flex-col items-center justify-center gap-4 rounded-2xl border border-slate-200 bg-slate-100 px-6 ${className}`}
+        aria-busy="true"
+        aria-label="Loading seating map"
+      >
+        <Skeleton width={180} height={10} borderRadius={999} />
+        <div className="grid grid-cols-8 sm:grid-cols-12 gap-1.5">
+          {Array.from({ length: 48 }).map((_, i) => (
+            <Skeleton key={i} width={18} height={18} borderRadius={4} />
+          ))}
+        </div>
+      </div>
+    </Wrap>
+  );
+}

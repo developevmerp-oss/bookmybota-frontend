@@ -416,7 +416,7 @@ export default function AdminGiftCardContentPanel() {
               <tr>
                 <td colSpan={3} className="px-3 py-10 text-center text-zinc-500">
                   <span className="inline-flex items-center gap-2">
-                    <Loader2 size={16} className="animate-spin" /> Loading…
+                    <Loader2 size={16} className="animate-spin" />
                   </span>
                 </td>
               </tr>

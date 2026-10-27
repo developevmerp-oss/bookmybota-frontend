@@ -395,7 +395,7 @@ function SettlementDetailPanel({
 
       {isLoading || !run ? (
         <div className="flex items-center gap-2 py-10 text-zinc-400 justify-center">
-          <Loader2 className="animate-spin" size={18} /> Loading…
+          <Loader2 className="animate-spin" size={18} />
         </div>
       ) : (
         <>
@@ -592,7 +592,7 @@ function CinemaSettlementDetailPanel({
 
         {isLoading || !run ? (
           <div className="flex items-center gap-2 py-10 text-zinc-400 justify-center">
-            <Loader2 className="animate-spin" size={18} /> Loading…
+            <Loader2 className="animate-spin" size={18} />
           </div>
         ) : (
           <>
@@ -827,7 +827,7 @@ function DiningSettlementDetailPanel({
 
         {isLoading || !run ? (
           <div className="flex items-center gap-2 py-10 text-zinc-400 justify-center">
-            <Loader2 className="animate-spin" size={18} /> Loading…
+            <Loader2 className="animate-spin" size={18} />
           </div>
         ) : (
           <>
@@ -1600,7 +1600,7 @@ export default function AdminOrganizerPayoutsPage() {
             </div>
             {pendingLoading ? (
               <div className="flex items-center justify-center gap-2 py-10 text-zinc-400">
-                <Loader2 className="animate-spin" size={16} /> Loading pending bookings…
+                <Loader2 className="animate-spin" size={16} />
               </div>
             ) : pendingError ? (
               <p className="px-4 py-8 text-center text-rose-400 text-sm">
@@ -2063,7 +2063,7 @@ export default function AdminOrganizerPayoutsPage() {
               </div>
               {cinemaPendingLoading ? (
                 <div className="flex items-center justify-center gap-2 py-10 text-zinc-400">
-                  <Loader2 className="animate-spin" size={16} /> Loading pending…
+                  <Loader2 className="animate-spin" size={16} />
                 </div>
               ) : cinemaPendingError ? (
                 <p className="px-4 py-8 text-center text-rose-400 text-sm">
@@ -2326,7 +2326,7 @@ export default function AdminOrganizerPayoutsPage() {
               </div>
               {diningPendingLoading ? (
                 <div className="flex items-center justify-center gap-2 py-10 text-zinc-400">
-                  <Loader2 className="animate-spin" size={16} /> Loading pending…
+                  <Loader2 className="animate-spin" size={16} />
                 </div>
               ) : diningPendingList.length === 0 ? (
                 <p className="px-4 py-8 text-center text-zinc-500 text-sm">
@@ -2522,7 +2522,7 @@ export default function AdminOrganizerPayoutsPage() {
                 </div>
                 {diningSettlementsLoading ? (
                   <div className="flex items-center justify-center gap-2 py-12 text-zinc-400">
-                    <Loader2 className="animate-spin" size={16} /> Loading runs…
+                    <Loader2 className="animate-spin" size={16} />
                   </div>
                 ) : diningRuns.length === 0 ? (
                   <p className="px-4 py-12 text-center text-zinc-500 text-sm">
@@ -2702,7 +2702,7 @@ export default function AdminOrganizerPayoutsPage() {
               <div className="glass-panel rounded-2xl border border-white/5 overflow-hidden">
                 {diningLoading ? (
                   <div className="flex items-center justify-center gap-2 py-16 text-zinc-400">
-                    <Loader2 className="animate-spin" size={18} /> Loading dining payables…
+                    <Loader2 className="animate-spin" size={18} />
                   </div>
                 ) : diningError ? (
                   <p className="text-center text-rose-400 py-16">Could not load dining settlements.</p>

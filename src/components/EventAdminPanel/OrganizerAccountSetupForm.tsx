@@ -65,11 +65,11 @@ const textareaClass = `${inputClass} min-h-[96px] resize-y`;
 interface OrganizerAccountSetupFormProps {
   backHref?: string;
   /** Partner module for docs/terms/registration payload. Defaults to event organizer. */
-  module?: "event" | "venue" | "artist" | "cinema";
+  module?: "event" | "venue" | "artist" | "cinema" | "dining";
 }
 
 const MODULE_COPY: Record<
-  "event" | "venue" | "artist" | "cinema",
+  "event" | "venue" | "artist" | "cinema" | "dining",
   {
     heading: string;
     intro: string;
@@ -135,6 +135,19 @@ const MODULE_COPY: Record<
     submitLabel: "Submit & Register Cinema",
     termsVersion: "cinema-v1",
   },
+  dining: {
+    heading: "Dining Account Setup",
+    intro:
+      "Please fill in the below details so that we can setup an account for your restaurant or hospitality business in our system and give you access to manage bookings, tables, and promotions.",
+    detailsTitle: "Restaurant Details",
+    nameLabel: "Restaurant / Business Name",
+    namePlaceholder: "Enter your restaurant or business name",
+    addressLabel: "Restaurant Address",
+    addressPlaceholder: "Enter your restaurant address",
+    typeMissing: "Dining partner type is not configured. Please contact support.",
+    submitLabel: "Submit & Register Restaurant",
+    termsVersion: "dining-v1",
+  },
 };
 
 export default function OrganizerAccountSetupForm({
@@ -153,7 +166,7 @@ export default function OrganizerAccountSetupForm({
   const [step1Done, setStep1Done] = useState(false);
   const [submittingRegistration, setSubmittingRegistration] = useState(false);
 
-  const needsSubtype = module === "venue" || module === "artist";
+  const needsSubtype = module === "venue" || module === "artist" || module === "dining";
   const requireAddress = module !== "artist";
 
   const schema = useMemo(
@@ -188,7 +201,7 @@ export default function OrganizerAccountSetupForm({
   const [cityId, setCityId] = useState<number | "">("");
   const { data: regCities = [] } = useGetCitiesQuery(
     countryId ? { country_id: Number(countryId) } : undefined,
-    { skip: !countryId || !["venue", "artist", "event", "cinema"].includes(module) }
+    { skip: !countryId || !["venue", "artist", "event", "cinema", "dining"].includes(module) }
   );
   const [venueMeta] = useState<VenueMeta>(() => defaultVenueMeta());
   const [documents, setDocuments] = useState<PartnerDocumentUpload[]>([]);
@@ -207,7 +220,13 @@ export default function OrganizerAccountSetupForm({
   }, [businessTypes, module]);
 
   const subtypeOptions = useMemo(() => {
-    if (!needsSubtype || moduleParentId == null) return [];
+    if (!needsSubtype) return [];
+    if (module === "dining") {
+      return businessTypes
+        .filter((t) => t.module_key === "dining" && t.parent_type_id != null)
+        .sort((a, b) => a.name.localeCompare(b.name));
+    }
+    if (moduleParentId == null) return [];
     const bySlug = new Map<string, (typeof businessTypes)[number]>();
     for (const t of businessTypes) {
       if (t.module_key !== module || t.parent_type_id !== moduleParentId) continue;
@@ -235,7 +254,7 @@ export default function OrganizerAccountSetupForm({
   }, [needsSubtype, subtypeId, subtypeOptions, setValue]);
 
   const hasValidLocation = useMemo(() => {
-    const needsGeo = module === "venue" || module === "artist" || module === "event" || module === "cinema";
+    const needsGeo = ["venue", "artist", "event", "cinema", "dining"].includes(module);
     if (!needsGeo) return true;
     return !!countryId && !!cityId;
   }, [module, countryId, cityId]);
@@ -303,7 +322,9 @@ export default function OrganizerAccountSetupForm({
       const message =
         module === "artist"
           ? "Please select an artist type under Artist, such as Singer or Band."
-          : "Please select a venue type under Venue, such as Banquet Hall or Auditorium.";
+          : module === "dining"
+            ? "Please select a dining type, such as Fine Dining, Cafe, or Pub."
+            : "Please select a venue type under Venue, such as Banquet Hall or Auditorium.";
       setError(message);
       toast.error(message);
       setStep(1);
@@ -350,7 +371,7 @@ export default function OrganizerAccountSetupForm({
         cover_image_url: coverImageUrl.trim() || undefined,
         registration_terms_accepted: true,
         registration_terms_version: copy.termsVersion,
-        ...(module === "venue" || module === "artist" || module === "event" || module === "cinema"
+        ...(module === "venue" || module === "artist" || module === "event" || module === "cinema" || module === "dining"
           ? {
               city_id: Number(cityId),
               ...(module === "venue"
@@ -405,14 +426,18 @@ export default function OrganizerAccountSetupForm({
             ? "Artist registration received"
             : module === "venue"
               ? "Venue registration received"
-              : "Registration received"}
+              : module === "dining"
+                ? "Restaurant registration received"
+                : "Registration received"}
         </h2>
         <p className="text-sm text-slate-500 max-w-md mx-auto">
           {module === "artist"
             ? "Your artist account is disabled until a Super Admin enables it. Login details will be emailed after approval. Redirecting…"
             : module === "venue"
               ? "Your venue account is disabled until a Super Admin enables it. Login details will be emailed after approval. Redirecting…"
-              : "Your account is disabled until a Super Admin enables it. Login details will be emailed after approval. Redirecting…"}
+              : module === "dining"
+                ? "Your restaurant account is disabled until a Super Admin enables it. Login details will be emailed after approval. Redirecting…"
+                : "Your account is disabled until a Super Admin enables it. Login details will be emailed after approval. Redirecting…"}
         </p>
       </div>
     );
@@ -472,13 +497,20 @@ export default function OrganizerAccountSetupForm({
                 {needsSubtype && (
                   <div>
                     <label className={labelClass}>
-                      {module === "artist" ? "Artist type" : "Venue type"} {reqStar}
+                      {module === "artist"
+                        ? "Artist type"
+                        : module === "dining"
+                          ? "Dining type"
+                          : "Venue type"}{" "}
+                      {reqStar}
                     </label>
                     <select className={inputClass} {...register("subtypeId")}>
                       <option value="">
                         {module === "artist"
                           ? "Select artist type (e.g. Singer, Band)"
-                          : "Select venue type (Auditorium, Banquet Hall, Stadium, Ground)"}
+                          : module === "dining"
+                            ? "Select dining type (e.g. Fine Dining, Cafe, Pub)"
+                            : "Select venue type (Auditorium, Banquet Hall, Stadium, Ground)"}
                       </option>
                       {subtypeOptions.map((t) => (
                         <option key={t.id} value={t.id}>
@@ -491,8 +523,8 @@ export default function OrganizerAccountSetupForm({
                     )}
                     {subtypeOptions.length === 0 && (
                       <p className="mt-1 text-xs text-amber-700">
-                        No {module === "artist" ? "artist" : "venue"} types configured yet. Ask Super
-                        Admin to add subtypes under {module === "artist" ? "Artist" : "Venue"}.
+                        No {module === "artist" ? "artist" : module === "dining" ? "dining" : "venue"} types configured yet. Ask Super
+                        Admin to add subtypes under {module === "artist" ? "Artist" : module === "dining" ? "Dining" : "Venue"}.
                       </p>
                     )}
                   </div>
@@ -525,7 +557,7 @@ export default function OrganizerAccountSetupForm({
                     )}
                   </div>
                 )}
-                {(module === "venue" || module === "artist" || module === "event" || module === "cinema") && (
+                {(module === "venue" || module === "artist" || module === "event" || module === "cinema" || module === "dining") && (
                   <div>
                     <VenueLocationFields
                       countryId={countryId}
@@ -542,16 +574,18 @@ export default function OrganizerAccountSetupForm({
                     {locationError && <p className={fieldErrorClass}>{locationError}</p>}
                   </div>
                 )}
-                {(module === "artist" || module === "venue" || module === "event" || module === "cinema") && (
+                {(module === "artist" || module === "venue" || module === "event" || module === "cinema" || module === "dining") && (
                   <div>
                     <label className={labelClass}>
                       {module === "artist"
                         ? "Artist image"
                         : module === "venue"
                           ? "Venue cover image"
-                          : module === "event"
-                            ? "Organisation cover image"
-                            : "Cinema cover image"}{" "}
+                          : module === "dining"
+                            ? "Restaurant / Dining cover image"
+                            : module === "event"
+                              ? "Organisation cover image"
+                              : "Cinema cover image"}{" "}
                       {module === "artist" ? reqStar : null}
                     </label>
                     <CroppedImageField
@@ -585,7 +619,9 @@ export default function OrganizerAccountSetupForm({
                                 ? "Artist image uploaded"
                                 : module === "event"
                                   ? "Organisation image uploaded"
-                                  : "Image uploaded"
+                                  : module === "dining"
+                                    ? "Restaurant image uploaded"
+                                    : "Image uploaded"
                             );
                           }
                         } catch (err) {
@@ -602,7 +638,9 @@ export default function OrganizerAccountSetupForm({
                                 ? "Upload artist image"
                                 : module === "event"
                                   ? "Upload organisation image"
-                                  : "Add photo"}
+                                  : module === "dining"
+                                    ? "Upload restaurant image"
+                                    : "Add photo"}
                           </span>
                         </>
                       }
@@ -615,7 +653,9 @@ export default function OrganizerAccountSetupForm({
                           ? "Shown on your organisation profile and event listings."
                           : module === "cinema"
                             ? "Shown on the public cinema listing and profile page."
-                            : "Shown on the public venue listing and profile page."}
+                            : module === "dining"
+                              ? "Shown on the public restaurant listing and profile page."
+                              : "Shown on the public venue listing and profile page."}
                     </p>
                   </div>
                 )}

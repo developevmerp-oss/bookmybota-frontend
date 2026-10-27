@@ -296,7 +296,7 @@ export default function CinemaSettlementsPage() {
 
           {isLoading ? (
             <div className="text-center py-12 portal-muted">
-              <Loader2 className="animate-spin inline mr-2" size={18} /> Loading ledger...
+              <Loader2 className="animate-spin inline mr-2" size={18} />
             </div>
           ) : (
             <>
@@ -419,7 +419,7 @@ export default function CinemaSettlementsPage() {
 
                 {customersLoading ? (
                   <div className="text-center py-10 portal-muted">
-                    <Loader2 className="animate-spin inline mr-2" size={16} /> Loading…
+                    <Loader2 className="animate-spin inline mr-2" size={16} />
                   </div>
                 ) : (
                   <>
@@ -674,7 +674,7 @@ function SettlementsTab({
         </div>
         {pendingLoading ? (
           <div className="text-center py-10 portal-muted">
-            <Loader2 className="animate-spin inline mr-2" size={16} /> Loading…
+            <Loader2 className="animate-spin inline mr-2" size={16} />
           </div>
         ) : pendingItems.length === 0 ? (
           <p className="px-5 py-8 text-center portal-muted text-sm">
@@ -755,7 +755,7 @@ function SettlementsTab({
 
         {settlementsLoading ? (
           <div className="text-center py-10 portal-muted">
-            <Loader2 className="animate-spin inline mr-2" size={16} /> Loading settlements…
+            <Loader2 className="animate-spin inline mr-2" size={16} />
           </div>
         ) : settlements.length === 0 ? (
           <p className="px-5 py-8 text-center portal-muted text-sm">
@@ -863,7 +863,7 @@ function SettlementDetailModal({
         <div className="overflow-y-auto p-5 space-y-4">
           {loading || !run ? (
             <div className="text-center py-10 portal-muted">
-              <Loader2 className="animate-spin inline mr-2" size={16} /> Loading…
+              <Loader2 className="animate-spin inline mr-2" size={16} />
             </div>
           ) : (
             <>

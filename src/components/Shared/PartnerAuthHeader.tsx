@@ -40,7 +40,7 @@ export function partnerLoginHrefForPath(pathname: string | null): string {
 }
 
 export function partnerAuthConfigForPath(pathname: string | null): PartnerLoginConfig {
-  if (pathname?.startsWith("/business")) {
+  if (pathname?.startsWith("/business") || pathname === "/dining/register") {
     return {
       role: "business_admin",
       title: "Dining Login",

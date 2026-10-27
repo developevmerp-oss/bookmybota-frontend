@@ -87,7 +87,7 @@ function TermsContent() {
   if (isLoading) {
     return (
       <div className="flex justify-center py-10 text-slate-500 gap-2 items-center text-sm">
-        <Loader2 size={16} className="animate-spin" /> Loading terms…
+        <Loader2 size={16} className="animate-spin" />
       </div>
     );
   }
@@ -116,7 +116,7 @@ function FaqsContent() {
   if (isLoading) {
     return (
       <div className="flex justify-center py-10 text-slate-500 gap-2 items-center text-sm">
-        <Loader2 size={16} className="animate-spin" /> Loading FAQs…
+        <Loader2 size={16} className="animate-spin" />
       </div>
     );
   }

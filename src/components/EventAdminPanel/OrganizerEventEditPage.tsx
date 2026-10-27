@@ -1,6 +1,7 @@
 "use client";
 
 import { use, useState } from "react";
+import { DetailFormShimmer } from "@/components/Shared/Shimmer";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Ticket } from "lucide-react";
@@ -72,7 +73,7 @@ export default function EditOrganizerEventPage({
   };
 
   if (isLoading) {
-    return <div className="portal-muted p-10 text-center">Loading event...</div>;
+    return <DetailFormShimmer />;
   }
 
   if (!event) {

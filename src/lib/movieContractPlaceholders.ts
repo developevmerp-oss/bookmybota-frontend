@@ -27,7 +27,11 @@ export interface MovieContractRecord {
   contract_number: string;
   body_html: string;
   terms_and_conditions?: string | null;
-  status: 'PENDING_SIGNATURES' | 'ACTIVE' | 'REJECTED';
+  status: 'PENDING_SIGNATURES' | 'ACTIVE' | 'REJECTED' | 'SUPERSEDED';
+  version?: number;
+  is_current?: boolean;
+  supersedes_contract_id?: string | null;
+  superseded_at?: string | null;
   convenience_fee_percent: number | string;
   commission_percent: number | string;
   beverage_commission_percent?: number | string;
@@ -79,6 +83,8 @@ export function movieContractStatusLabel(status: string): string {
       return 'Active — Cinema is Live';
     case 'REJECTED':
       return 'Rejected';
+    case 'SUPERSEDED':
+      return 'Superseded (old version)';
     default:
       return status;
   }

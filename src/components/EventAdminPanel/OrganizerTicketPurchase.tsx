@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { DetailFormShimmer } from "@/components/Shared/Shimmer";
 import { X, Ticket } from "lucide-react";
 import EventCheckout from "@/components/EventLandingPage/EventCheckout";
 import {
@@ -65,7 +66,7 @@ export default function OrganizerTicketPurchase({
     if (isLoading || !eventDetail) {
       return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40">
-          <div className="bg-white rounded-2xl px-8 py-6 text-slate-600 text-sm">Loading event…</div>
+          <DetailFormShimmer fields={4} />
         </div>
       );
     }

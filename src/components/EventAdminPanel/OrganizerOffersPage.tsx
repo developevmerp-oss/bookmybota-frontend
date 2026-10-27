@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { AdminListShimmer } from "@/components/Shared/Shimmer";
 import { Controller, useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import { Loader2, MapPin, Pencil, Plus, Tag, Trash2 } from "lucide-react";
@@ -629,7 +630,7 @@ export default function OrganizerOffersPage() {
       )}
 
       {isLoading ? (
-        <p className="portal-muted text-center py-10">Loading offers...</p>
+        <AdminListShimmer rows={5} columns={4} showToolbar={false} showPagination={false} />
       ) : offers.length === 0 ? (
         <div className="org-card p-10 text-center portal-muted">
           No offers yet. Create one for a live or pending event.

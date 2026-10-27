@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { DetailFormShimmer } from "@/components/Shared/Shimmer";
 import { useParams } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import EventContractDocument from "@/components/EventAdminPanel/EventContractDocument";
@@ -13,7 +14,7 @@ export default function AdminEventContractViewByIdPage() {
   const { data: contract, isLoading, isError } = useGetAdminEventContractByIdQuery(contractId);
 
   if (isLoading) {
-    return <div className="p-10 text-center text-zinc-500">Loading contract…</div>;
+    return <DetailFormShimmer />;
   }
 
   if (isError || !contract) {

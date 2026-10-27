@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { DetailFormShimmer } from "@/components/Shared/Shimmer";
 import { useParams } from "next/navigation";
 import PartnerOnboardForm from "@/components/DiningAdminPanel/PartnerOnboardForm";
 import { useGetAdminBusinessQuery } from "@/services/api";
@@ -68,7 +69,7 @@ export default function AdminPartnerFormPage({ module, mode }: AdminPartnerFormP
   }
 
   if (isLoading) {
-    return <div className="text-white p-10 text-center">Loading partner...</div>;
+    return <DetailFormShimmer />;
   }
 
   if (!biz) {

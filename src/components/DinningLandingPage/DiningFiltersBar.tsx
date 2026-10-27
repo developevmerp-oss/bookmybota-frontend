@@ -2,9 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
+import { useRouter } from "next/navigation";
 import { Check, ChevronDown, Search, SlidersHorizontal, X } from "lucide-react";
 import type { DiningFilterState, SortOption } from "@/lib/diningFilters";
-import { useGetDiningCuisinesQuery } from "@/services/api";
+import { restaurantHref } from "@/lib/businessPublicPath";
+import { resolveMediaUrl } from "@/lib/mediaUrl";
+import { useGetBusinessesPagedQuery, useGetDiningCuisinesQuery, type Business } from "@/services/api";
 import "./DiningSearchPopup.css";
 
 const RECENT_SEARCHES_KEY = "dining_recent_searches";
@@ -373,6 +376,7 @@ export default function DiningFiltersBar({
   onSearchChange,
   onSearchSubmit,
 }: DiningFiltersBarProps) {
+  const router = useRouter();
   const effectiveCategoriesSelected = useMemo(() => {
     if (categoriesSelected.length > 0) return categoriesSelected;
     if (category && category !== "All") return [category];
@@ -383,6 +387,7 @@ export default function DiningFiltersBar({
   const [showSort, setShowSort] = useState(false);
   const [showSearchPopup, setShowSearchPopup] = useState(false);
   const [searchDraft, setSearchDraft] = useState(searchValue);
+  const [suggestionTerm, setSuggestionTerm] = useState("");
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [draft, setDraft] = useState<DiningFilterState>(filters);
@@ -459,6 +464,21 @@ export default function DiningFiltersBar({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showSearchPopup]);
 
+  const typedSearch = searchDraft.trim();
+  useEffect(() => {
+    if (!showSearchPopup) return;
+    const handle = window.setTimeout(() => setSuggestionTerm(typedSearch), 200);
+    return () => window.clearTimeout(handle);
+  }, [showSearchPopup, typedSearch]);
+
+  const { data: suggestionData, isFetching: suggestionsLoading } = useGetBusinessesPagedQuery(
+    { module: "dining", q: suggestionTerm, page: 1, limit: 6 },
+    { skip: !showSearchPopup || suggestionTerm.length < 1 }
+  );
+  const suggestionRestaurants = suggestionTerm.length > 0 ? suggestionData?.items ?? [] : [];
+  const suggestionsPending =
+    typedSearch.length > 0 && (typedSearch !== suggestionTerm || suggestionsLoading);
+
   useEffect(() => {
     if (!showSearch || !openSearchSignal) return;
     setShowFilter(false);
@@ -480,6 +500,20 @@ export default function DiningFiltersBar({
       setRecentSearches(updated.slice(0, MAX_RECENT_SEARCHES));
     }
     closeSearchPopup();
+  };
+
+  const rememberSearch = (term: string) => {
+    const next = term.trim();
+    if (!next) return;
+    const updated = [next, ...readRecentSearches().filter((item) => item.toLowerCase() !== next.toLowerCase())];
+    writeRecentSearches(updated);
+    setRecentSearches(updated.slice(0, MAX_RECENT_SEARCHES));
+  };
+
+  const openRestaurant = (business: Business) => {
+    rememberSearch(typedSearch || business.name);
+    closeSearchPopup();
+    router.push(restaurantHref(business));
   };
 
   const removeRecentSearch = (term: string) => {
@@ -847,8 +881,74 @@ export default function DiningFiltersBar({
                 ) : null}
               </div>
 
-              <div className="dining-search-popup__results border-t border-slate-100">
+              <div className="dining-search-popup__results border-t border-slate-100 max-h-[min(52vh,420px)] overflow-y-auto">
                 <div className="px-5 sm:px-6 pt-4 pb-5">
+                  {typedSearch ? (
+                    <>
+                      <p className="text-[15px] font-bold text-slate-900 mb-1">Restaurants</p>
+                      {suggestionsPending && suggestionRestaurants.length === 0 ? (
+                        <ul className="divide-y divide-slate-50" aria-busy="true" aria-label="Searching restaurants">
+                          {Array.from({ length: 3 }).map((_, i) => (
+                            <li key={i} className="flex items-center gap-3 py-3">
+                              <span className="h-11 w-11 shrink-0 rounded-lg bg-slate-100 animate-pulse" />
+                              <span className="min-w-0 flex-1 space-y-2">
+                                <span className="block h-3.5 w-2/3 rounded bg-slate-100 animate-pulse" />
+                                <span className="block h-3 w-1/2 rounded bg-slate-100 animate-pulse" />
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : suggestionRestaurants.length === 0 ? (
+                        <p className="py-3 text-sm text-slate-400">No restaurants found</p>
+                      ) : (
+                        <ul className="divide-y divide-slate-50">
+                          {suggestionRestaurants.map((restaurant) => {
+                            const cover = resolveMediaUrl(restaurant.cover_image_url);
+                            const detail = [restaurant.cuisine, restaurant.city_name || restaurant.address]
+                              .filter(Boolean)
+                              .join(" · ");
+                            return (
+                              <li key={restaurant.id}>
+                                <button
+                                  type="button"
+                                  onClick={() => openRestaurant(restaurant)}
+                                  className="flex w-full items-center gap-3 py-3 text-left cursor-pointer group"
+                                >
+                                  {cover ? (
+                                    <img
+                                      src={cover}
+                                      alt=""
+                                      className="h-11 w-11 shrink-0 rounded-lg object-cover bg-slate-100"
+                                    />
+                                  ) : (
+                                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-400">
+                                      <Search size={16} />
+                                    </span>
+                                  )}
+                                  <span className="min-w-0">
+                                    <span className="block truncate text-[15px] font-semibold text-slate-800 group-hover:text-[#6900AA]">
+                                      {restaurant.name}
+                                    </span>
+                                    {detail ? (
+                                      <span className="block truncate text-sm text-slate-500">{detail}</span>
+                                    ) : null}
+                                  </span>
+                                </button>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => commitSearch(typedSearch)}
+                        className="mt-2 w-full rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-[#6900AA] hover:bg-[#faf5ff] cursor-pointer"
+                      >
+                        See all results for “{typedSearch}”
+                      </button>
+                    </>
+                  ) : (
+                    <>
                   <p className="text-[15px] font-bold text-slate-900 mb-1">Recent Searches</p>
                   {recentSearches.length === 0 ? (
                     <p className="py-3 text-sm text-slate-400">No recent searches yet</p>
@@ -881,6 +981,8 @@ export default function DiningFiltersBar({
                         </li>
                       ))}
                     </ul>
+                  )}
+                    </>
                   )}
                 </div>
               </div>

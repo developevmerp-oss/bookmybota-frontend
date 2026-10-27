@@ -18,6 +18,7 @@ import {
   LayoutGrid,
 } from "lucide-react";
 import { toast } from "sonner";
+import { SeatMapShimmer } from "@/components/Shared/Shimmer";
 import { formatMoney } from "@/lib/currencyFormat";
 import {
   useGetPublicStadiumBlocksQuery,
@@ -1334,12 +1335,7 @@ export default function StadiumLayoutViewer({
   );
 
   if (isLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center gap-3 h-full min-h-[320px] bg-[#F8FAFC] text-slate-700">
-        <Loader2 className="w-9 h-9 text-[#6900AA] animate-spin" />
-        <p className="text-sm font-medium text-slate-500">Loading stadium map…</p>
-      </div>
-    );
+    return <SeatMapShimmer fill className="bg-[#F8FAFC]" />;
   }
 
   if (isError || !data) {
@@ -3484,9 +3480,8 @@ export default function StadiumLayoutViewer({
 
         {/* Seats fetch loading — map view until seat data arrives */}
         {seatsPending && !showTierPicker && (
-          <div className="absolute inset-0 z-50 flex flex-col items-center justify-center gap-3 bg-white/90 backdrop-blur-[3px] pointer-events-none">
-            <Loader2 className="w-10 h-10 text-[#6900AA] animate-spin" />
-            <p className="text-sm font-semibold text-gray-800">Loading seats…</p>
+          <div className="absolute inset-0 z-50 bg-white/80 backdrop-blur-[2px] pointer-events-none">
+            <SeatMapShimmer fill className="border-0 bg-transparent" />
           </div>
         )}
 

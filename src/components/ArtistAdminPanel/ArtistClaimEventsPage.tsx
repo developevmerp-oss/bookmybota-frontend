@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { AdminListShimmer } from "@/components/Shared/Shimmer";
 import { toast } from "sonner";
 import { readSessionForRole } from "@/lib/authStorage";
 import {
@@ -47,7 +48,7 @@ export default function ArtistClaimEventsPage() {
       </div>
 
       {isLoading ? (
-        <p className="text-muted-foreground text-sm">Loading…</p>
+        <AdminListShimmer rows={4} columns={4} showToolbar={false} showPagination={false} />
       ) : events.length === 0 ? (
         <div className="org-card p-6 text-sm text-muted-foreground">
           No claimable events right now. When an organizer adds you and submits for approval, it will show

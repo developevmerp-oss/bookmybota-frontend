@@ -8,6 +8,7 @@ import { loadFromStorage, setCredentials } from "@/features/auth/authSlice";
 import { useGetBusinessSettingsQuery } from "@/services/api";
 import AuthGate from "@/components/Shared/AuthGate";
 import SessionGuard from "@/components/Shared/SessionGuard";
+import { PartnerPanelShimmer } from "@/components/Shared/Shimmer";
 import PartnerProfileHoverMenu from "@/components/Shared/PartnerProfileHoverMenu";
 import { clearSessionForRole, readSessionForRole } from "@/lib/authStorage";
 import {
@@ -245,11 +246,7 @@ export default function VenueLayout({ children }: { children: React.ReactNode })
   }
 
   if (checkingAuth) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background text-muted-foreground font-medium">
-        Loading...
-      </div>
-    );
+    return <PartnerPanelShimmer />;
   }
 
   if (!isVenueAdmin) {

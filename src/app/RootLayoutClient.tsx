@@ -20,7 +20,8 @@ export default function RootLayoutClient({
   const isOrganizerRegister = pathname === "/organizer/register";
   const isVenueRegister = pathname === "/venue/register";
   const isArtistRegister = pathname === "/artist/register";
-  const isBusinessRegister = pathname === "/business/register";
+  const isBusinessRegister =
+    pathname === "/business/register" || pathname === "/dining/register";
   const isMovieRegister = pathname === "/movie/register";
   const isPartnerRegisterPage =
     isOrganizerRegister ||

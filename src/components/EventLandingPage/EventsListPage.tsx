@@ -2078,7 +2078,7 @@ export default function PublicEventsPage() {
             </p>
             {isCategoryBrowse ? (
               categoryMastersLoading ? (
-                <p className="py-2 text-sm text-slate-500">Loading genres…</p>
+                <div className="flex flex-wrap gap-2 py-2" aria-busy="true" aria-label="Loading genres">{Array.from({ length: 6 }).map((_, i) => <span key={i} className="h-8 w-20 rounded-full bg-slate-100 animate-pulse" />)}</div>
               ) : categoryGenreOptions.length ? (
                 <div className="grid grid-cols-2 gap-x-4">
                   {categoryGenreOptions.map((g) => (

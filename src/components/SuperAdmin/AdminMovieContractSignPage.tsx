@@ -1,16 +1,18 @@
 "use client";
 
 import Link from "next/link";
+import { DetailFormShimmer } from "@/components/Shared/Shimmer";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
-import { ArrowLeft, CheckCircle, Loader2, Mail } from "lucide-react";
+import { ArrowLeft, CheckCircle, Loader2, Mail, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import MovieContractDocument from "@/components/MovieAdminPanel/MovieContractDocument";
 import SignaturePad from "@/components/EventAdminPanel/SignaturePad";
 import {
   useGetAdminMovieContractQuery,
+  useGetAdminMovieContractHistoryQuery,
   useRequestAdminMovieContractOtpMutation,
   useSignAdminMovieContractMutation,
 } from "@/services/api";
@@ -46,8 +48,10 @@ export default function AdminMovieContractSignPage() {
   });
 
   const { data: contract, isLoading, isError } = useGetAdminMovieContractQuery(businessId);
+  const { data: history } = useGetAdminMovieContractHistoryQuery(businessId, { skip: !businessId });
   const [requestOtp, { isLoading: sendingOtp }] = useRequestAdminMovieContractOtpMutation();
   const [signAdmin, { isLoading: signing }] = useSignAdminMovieContractMutation();
+  const oldVersions = (history?.contracts ?? []).filter((c) => !c.is_current);
 
   const handleRequestOtp = async () => {
     try {
@@ -74,7 +78,7 @@ export default function AdminMovieContractSignPage() {
   };
 
   if (isLoading) {
-    return <div className="p-10 text-center text-zinc-500">Loading cinema contract…</div>;
+    return <DetailFormShimmer />;
   }
 
   if (isError || !contract) {
@@ -99,8 +103,22 @@ export default function AdminMovieContractSignPage() {
         >
           <ArrowLeft size={16} /> Back to contracts
         </Link>
-        <h2 className="text-2xl font-bold text-white">{contract.cinema_name}</h2>
-        <p className="text-zinc-400">{movieContractStatusLabel(contract.status)}</p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-2xl font-bold text-white">{contract.cinema_name}</h2>
+            <p className="text-zinc-400">
+              {movieContractStatusLabel(contract.status)} · v{contract.version ?? 1} · Current
+            </p>
+          </div>
+          {contract.status === "ACTIVE" ? (
+            <Link
+              href={`/admin/movie-contracts/create?businessId=${businessId}&mode=revise`}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-600 text-white font-medium hover:bg-amber-500"
+            >
+              <Pencil size={16} /> Edit contract
+            </Link>
+          ) : null}
+        </div>
       </div>
 
       {contract.status === "REJECTED" && (
@@ -119,6 +137,27 @@ export default function AdminMovieContractSignPage() {
       )}
 
       <MovieContractDocument contract={contract} />
+
+      {oldVersions.length > 0 ? (
+        <div className="glass-panel rounded-2xl border border-white/10 p-5 space-y-3">
+          <h3 className="text-white font-semibold">Old contracts for this cinema</h3>
+          <ul className="space-y-2 text-sm">
+            {oldVersions.map((c) => (
+              <li key={c.id} className="flex items-center justify-between gap-3 text-zinc-300">
+                <span>
+                  {c.contract_number} · v{c.version ?? "—"} · {movieContractStatusLabel(c.status)}
+                </span>
+                <Link
+                  href={`/admin/movie-contracts/view/${c.id}`}
+                  className="text-emerald-400 hover:text-emerald-300"
+                >
+                  View
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
       {needsSign && (
         <form

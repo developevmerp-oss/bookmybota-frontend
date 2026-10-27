@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { AdminListShimmer } from "@/components/Shared/Shimmer";
 import Image from "next/image";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -219,7 +220,7 @@ export default function CinemaBeveragesPage() {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] text-zinc-400">
         <Loader2 className="w-8 h-8 animate-spin text-fuchsia-500 mb-3" />
-        <p className="text-sm">Loading cinema snack catalog...</p>
+        <AdminListShimmer rows={5} columns={4} showToolbar={false} showPagination={false} />
       </div>
     );
   }

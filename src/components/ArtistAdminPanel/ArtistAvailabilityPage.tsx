@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { AdminListShimmer } from "@/components/Shared/Shimmer";
 import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import { Loader2, Plus, Trash2 } from "lucide-react";
@@ -173,7 +174,7 @@ export default function ArtistAvailabilityPage() {
       </div>
 
       {isLoading ? (
-        <p className="text-muted-foreground py-10 text-center">Loading calendar…</p>
+        <AdminListShimmer rows={4} columns={4} showToolbar={false} showPagination={false} />
       ) : (
         <div className="space-y-6">
           <form

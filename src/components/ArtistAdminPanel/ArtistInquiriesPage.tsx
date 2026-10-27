@@ -1,6 +1,7 @@
 "use client";
 
 import { Mail, MapPin, Phone, CalendarDays, Tag } from "lucide-react";
+import { AdminListShimmer } from "@/components/Shared/Shimmer";
 import { useGetArtistMyInquiriesQuery } from "@/services/api";
 import { formatDate, formatDateTime12h, formatHm12h } from "@/lib/dateFormat";
 
@@ -23,7 +24,7 @@ export default function ArtistInquiriesPage() {
       ) : null}
 
       {isLoading ? (
-        <p className="text-muted-foreground py-10 text-center text-sm">Loading inquiries…</p>
+        <AdminListShimmer rows={5} columns={4} showToolbar={false} showPagination={false} />
       ) : inquiries.length === 0 ? (
         <div className="org-card p-8 sm:p-10 text-center text-muted-foreground text-sm">
           No inquiries yet. Customers can request you from your public profile — you&apos;ll get an email when

@@ -230,7 +230,7 @@ export default function GiftCardBuyPage() {
   if (designLoading) {
     return (
       <div className="bg-[#F5F5F5] min-h-[calc(100vh-4rem)] flex items-center justify-center gap-2 text-slate-500">
-        <Loader2 className="animate-spin" size={18} /> Loading design…
+        <Loader2 className="animate-spin" size={18} aria-label="Loading design" />
       </div>
     );
   }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { DetailFormShimmer } from "@/components/Shared/Shimmer";
 import { Controller, useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import { ImagePlus } from "lucide-react";
@@ -101,7 +102,7 @@ export default function ArtistProfilePage() {
 
   if (isLoading || !user) {
     return (
-      <div className="p-10 text-center text-muted-foreground font-medium">Loading artist profile...</div>
+      <DetailFormShimmer />
     );
   }
 

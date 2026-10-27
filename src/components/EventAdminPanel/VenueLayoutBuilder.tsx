@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useEffect, useRef, useLayoutEffect, useCallback, useMemo } from "react";
+import { DetailFormShimmer } from "@/components/Shared/Shimmer";
 import { Stage, Layer, Rect, Circle, Ellipse, Line, Text, Group, Transformer, Image as KonvaImage } from "react-konva";
 import useImage from "use-image";
 import { toast } from "sonner";
@@ -938,7 +939,7 @@ export default function VenueLayoutBuilder({
     }
   };
 
-  if (!skipEvent && (eventLoading || layoutLoading)) return <div className="p-8 text-center text-zinc-400">Loading editor...</div>;
+  if (!skipEvent && (eventLoading || layoutLoading)) return <DetailFormShimmer />;
   if (!skipEvent && !eventDetails) return <div className="p-8 text-center text-rose-500">Event not found.</div>;
 
   const handleStageMouseDown = (e: any) => {
@@ -1928,9 +1929,9 @@ export default function VenueLayoutBuilder({
     };
 
     const newLabels: Label[] = [
-      { id: Math.random().toString(36).substr(2, 9), text: "₹410 RECLINER ROWS", x: 1480, y: 880, fontSize: 16 },
-      { id: Math.random().toString(36).substr(2, 9), text: "₹300 PRIME ROWS", x: 1500, y: 1080, fontSize: 16 },
-      { id: Math.random().toString(36).substr(2, 9), text: "₹280 CLASSIC PLUS ROWS", x: 1460, y: 1480, fontSize: 16 },
+      { id: Math.random().toString(36).substr(2, 9), text: "410 ETB RECLINER ROWS", x: 1480, y: 880, fontSize: 16 },
+      { id: Math.random().toString(36).substr(2, 9), text: "300 ETB PRIME ROWS", x: 1500, y: 1080, fontSize: 16 },
+      { id: Math.random().toString(36).substr(2, 9), text: "280 ETB CLASSIC PLUS ROWS", x: 1460, y: 1480, fontSize: 16 },
     ];
 
     let newSeats: Seat[] = [];

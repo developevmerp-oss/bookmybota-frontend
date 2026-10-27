@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { AdminListShimmer, DetailFormShimmer } from "@/components/Shared/Shimmer";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -301,7 +302,7 @@ export default function VenueLayoutRequestsPage() {
           </div>
           <div className="p-4 sm:p-5 max-h-[340px] overflow-y-auto">
             {isLoading ? (
-              <p className="text-sm text-muted-foreground py-8 text-center">Loading requests…</p>
+              <AdminListShimmer rows={4} columns={4} showToolbar={false} showPagination={false} />
             ) : requests.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-border bg-muted/20 px-4 py-10 text-center">
                 <p className="text-sm text-muted-foreground">No layout requests yet.</p>
@@ -398,7 +399,7 @@ export default function VenueLayoutRequestsPage() {
 
         <div className="p-4 sm:p-5">
           {loadingOptions ? (
-            <p className="text-sm text-muted-foreground py-10 text-center">Loading layout options…</p>
+            <AdminListShimmer rows={4} columns={3} showToolbar={false} showPagination={false} />
           ) : layoutOptions.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-border bg-muted/30 px-6 py-14 text-center">
               <p className="font-medium text-foreground">No layout options yet</p>
@@ -652,7 +653,7 @@ export default function VenueLayoutRequestsPage() {
         </div>
         <div className="p-4 sm:p-5">
           {loadingLogs ? (
-            <p className="text-sm text-muted-foreground py-8 text-center">Loading activity…</p>
+            <AdminListShimmer rows={4} columns={3} showToolbar={false} showPagination={false} />
           ) : activityLogs.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-border bg-muted/20 px-4 py-10 text-center">
               <p className="text-sm text-muted-foreground">No activity yet.</p>
@@ -782,7 +783,7 @@ export default function VenueLayoutRequestsPage() {
               </button>
             </div>
             {loadingView ? (
-              <p className="text-muted-foreground py-10 text-center text-sm">Loading layout…</p>
+              <DetailFormShimmer fields={4} />
             ) : (
               <>
                 <LayoutSeatPreview

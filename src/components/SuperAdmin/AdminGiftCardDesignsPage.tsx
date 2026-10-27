@@ -294,7 +294,7 @@ export default function AdminGiftCardDesignsPage({
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {isLoading ? (
           <div className="col-span-full flex justify-center py-16 text-zinc-400 gap-2">
-            <Loader2 className="animate-spin" size={18} /> Loading designs…
+            <Loader2 className="animate-spin" size={18} />
           </div>
         ) : designs.length === 0 ? (
           <div className="col-span-full text-center py-16 text-zinc-500">

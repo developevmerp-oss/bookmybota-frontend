@@ -7,6 +7,7 @@ import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage, setCredentials } from "@/features/auth/authSlice";
 import { useGetBusinessSettingsQuery } from "@/services/api";
 import SessionGuard from "@/components/Shared/SessionGuard";
+import { PartnerPanelShimmer } from "@/components/Shared/Shimmer";
 import PartnerProfileHoverMenu, {
   ORGANIZER_CONTRACT_PROFILE_LINKS,
 } from "@/components/Shared/PartnerProfileHoverMenu";
@@ -263,8 +264,8 @@ export default function OrganizerLayout({ children }: { children: React.ReactNod
   const [checkingAuth, setCheckingAuth] = useState(true);
 
   const isLoginPage = pathname === "/organizer/login";
-  const isPublicLanding =
-    pathname === "/organizer" || pathname === "/organizer/register" || isLoginPage;
+  const isRegisterPage = pathname === "/organizer/register";
+  const isPublicLanding = pathname === "/organizer" || isRegisterPage || isLoginPage;
   const isEventAdmin = user?.role === "event_admin";
 
   useEffect(() => {
@@ -288,16 +289,12 @@ export default function OrganizerLayout({ children }: { children: React.ReactNod
     setCheckingAuth(false);
   }, [dispatch, router, isPublicLanding, isLoginPage, pathname]);
 
-  if (isLoginPage) {
+  if (isLoginPage || isRegisterPage) {
     return <>{children}</>;
   }
 
   if (checkingAuth) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background text-muted-foreground font-medium">
-        Loading...
-      </div>
-    );
+    return <PartnerPanelShimmer />;
   }
 
   if (!isEventAdmin) {

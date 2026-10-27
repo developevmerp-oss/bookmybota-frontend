@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { AdminListShimmer } from "@/components/Shared/Shimmer";
 import { toast } from "sonner";
 import {
   Calendar,
@@ -342,10 +343,7 @@ export default function MoviePartnerBookingsPage() {
 
           {/* Bookings List */}
           {isLoading ? (
-            <div className="flex items-center justify-center py-20 text-zinc-400 gap-2">
-              <Loader2 className="animate-spin" size={24} />
-              Loading bookings…
-            </div>
+            <AdminListShimmer rows={6} columns={5} showToolbar={false} />
           ) : bookings.length === 0 ? (
             <div className="glass-panel rounded-2xl border border-white/10 p-12 text-center text-zinc-500 space-y-2">
               <Ticket size={40} className="mx-auto text-zinc-600" />

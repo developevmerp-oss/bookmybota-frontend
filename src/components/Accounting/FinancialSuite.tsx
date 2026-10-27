@@ -646,8 +646,12 @@ export default function FinancialSuite({
                 <tbody className="divide-y divide-white/5 text-sm text-zinc-300">
                   {tbLoading ? (
                     <tr>
-                      <td colSpan={6} className="py-8 text-center text-zinc-500">
-                        Loading trial balance...
+                      <td colSpan={6} className="py-4">
+                        <div className="space-y-2" aria-busy="true" aria-label="Loading trial balance">
+                          {Array.from({ length: 4 }).map((_, i) => (
+                            <div key={i} className="h-8 rounded-lg bg-zinc-100 animate-pulse" />
+                          ))}
+                        </div>
                       </td>
                     </tr>
                   ) : !tbData?.data?.accounts?.length ? (
@@ -1017,8 +1021,12 @@ export default function FinancialSuite({
                 <tbody className="divide-y divide-white/5 text-sm text-zinc-300">
                   {ledgerLoading ? (
                     <tr>
-                      <td colSpan={6} className="py-8 text-center text-zinc-500">
-                        Loading ledger entries...
+                      <td colSpan={6} className="py-4">
+                        <div className="space-y-2" aria-busy="true" aria-label="Loading ledger">
+                          {Array.from({ length: 4 }).map((_, i) => (
+                            <div key={i} className="h-8 rounded-lg bg-zinc-100 animate-pulse" />
+                          ))}
+                        </div>
                       </td>
                     </tr>
                   ) : !ledgerData?.entries?.length ? (
@@ -1165,8 +1173,12 @@ export default function FinancialSuite({
                 <tbody className="divide-y divide-white/5 text-sm text-zinc-300">
                   {invoicesLoading ? (
                     <tr>
-                      <td colSpan={8} className="py-8 text-center text-zinc-500">
-                        Loading invoices...
+                      <td colSpan={8} className="py-4">
+                        <div className="space-y-2" aria-busy="true" aria-label="Loading invoices">
+                          {Array.from({ length: 4 }).map((_, i) => (
+                            <div key={i} className="h-8 rounded-lg bg-zinc-100 animate-pulse" />
+                          ))}
+                        </div>
                       </td>
                     </tr>
                   ) : !invoicesData?.invoices?.length ? (
@@ -1514,7 +1526,7 @@ export default function FinancialSuite({
 
           {coaLoading ? (
             <div className="flex items-center justify-center py-16 text-zinc-500 gap-2">
-              <RefreshCw size={16} className="animate-spin" /> Loading accounts...
+              <RefreshCw size={16} className="animate-spin" aria-label="Loading accounts" />
             </div>
           ) : (
             <div className="overflow-x-auto">

@@ -11,10 +11,7 @@ const UniversalVenueDesigner = dynamic(
     ssr: false,
     loading: () => (
       <div className="w-full h-[calc(100vh-60px)] flex flex-col items-center justify-center bg-slate-950 text-white gap-3">
-        <Loader2 className="w-8 h-8 animate-spin text-red-500" />
-        <span className="text-xs font-bold tracking-wider text-slate-400 uppercase">
-          Loading Universal Venue Designer...
-        </span>
+        <Loader2 className="w-8 h-8 animate-spin text-red-500" aria-label="Loading venue designer" />
       </div>
     ),
   }

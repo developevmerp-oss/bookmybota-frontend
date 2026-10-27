@@ -40,6 +40,7 @@ import {
   YAxis,
 } from "recharts";
 import { useGetAdminStatsQuery, type AdminStatsPanel } from "@/services/api";
+import { formatMoney } from "@/lib/currencyFormat";
 
 const PANEL_ICONS: Record<string, typeof Store> = {
   dining: UtensilsCrossed,
@@ -59,10 +60,7 @@ const PANEL_ICONS: Record<string, typeof Store> = {
 const PIE_COLORS = ["#e11d48", "#2563eb", "#059669", "#d97706"];
 
 function money(n: number | undefined | null) {
-  return `$${(Number(n) || 0).toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
+  return formatMoney(n, { decimals: 2 });
 }
 
 function MetricCard({

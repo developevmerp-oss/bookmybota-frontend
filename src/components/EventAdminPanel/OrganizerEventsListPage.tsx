@@ -6,6 +6,7 @@ import { MoreVertical, Plus, Search } from "lucide-react";
 import { useGetOrganizerEventsQuery } from "@/services/api";
 import { contractStatusLabel, organizerWorkflowLabel } from "@/lib/contractPlaceholders";
 import Pagination from "@/components/Shared/Pagination";
+import { AdminListShimmer } from "@/components/Shared/Shimmer";
 import { PAGE_SIZE } from "@/lib/pagination";
 import { formatDate, getVenueDateTimeParts } from "@/lib/dateFormat";
 
@@ -115,7 +116,7 @@ export default function OrganizerEventsPage() {
         </div>
 
         {isLoading ? (
-          <div className="py-14 text-center text-muted-foreground text-sm">Loading events...</div>
+          <AdminListShimmer rows={6} columns={5} showToolbar={false} />
         ) : events.length === 0 ? (
           <div className="py-14 text-center">
             <p className="text-muted-foreground mb-3 text-sm">No events match this filter.</p>

@@ -77,7 +77,7 @@ import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { isGiftCardSpendable } from "@/lib/giftCardOwnership";
 import { resolveHoldExpiresAt } from "@/lib/holdCountdown";
 import { pickContiguousBlock } from "@/lib/bmsSeatAutoSelect";
-import { CustomerFullscreenShimmer } from "@/components/Shared/Shimmer";
+import { CustomerFullscreenShimmer, SeatMapShimmer } from "@/components/Shared/Shimmer";
 import MovieSeatQtyModal from "@/components/MovieLandingPage/MovieSeatQtyModal";
 import images from "@/Images";
 
@@ -223,12 +223,7 @@ const VenueLayoutViewer = dynamic(
   () => import("@/components/EventLandingPage/VenueLayoutViewer"),
   {
     ssr: false,
-    loading: () => (
-      <div className="h-[550px] flex flex-col items-center justify-center gap-3 text-slate-500 bg-slate-100 rounded-2xl border border-slate-200">
-        <Loader2 className="size-8 animate-spin text-[#F84464]" />
-        <p className="text-sm">Loading interactive seating map…</p>
-      </div>
-    ),
+    loading: () => <SeatMapShimmer />,
   }
 );
 
@@ -267,6 +262,36 @@ function readHoldSessionToken(): string | undefined {
 function writeHoldSessionToken(token: string) {
   if (typeof window === "undefined") return;
   sessionStorage.setItem(HOLD_SESSION_KEY, token);
+}
+
+function normalizeSeatId(id: string): string {
+  const clean = String(id || "").trim().toUpperCase();
+  const m = clean.match(/^([A-Z]+)0*(\d+)$/);
+  return m ? `${m[1]}${m[2]}` : clean;
+}
+
+function isSameSeat(
+  idA: string,
+  idB: string,
+  rowA?: string,
+  rowB?: string,
+  numA?: string | number,
+  numB?: string | number
+): boolean {
+  if (!idA && !idB) return false;
+  if (idA === idB) return true;
+  const normA = normalizeSeatId(idA);
+  const normB = normalizeSeatId(idB);
+  if (normA && normA === normB) return true;
+
+  if (rowA && rowB && numA != null && numB != null) {
+    const rA = String(rowA).trim().toUpperCase();
+    const rB = String(rowB).trim().toUpperCase();
+    const nA = Number(String(numA).replace(/^0+/, ""));
+    const nB = Number(String(numB).replace(/^0+/, ""));
+    if (rA && rB && rA === rB && nA === nB) return true;
+  }
+  return false;
 }
 
 const fieldErrorClass = "mt-1.5 text-[11px] font-semibold text-rose-600";
@@ -316,11 +341,13 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
 
   /** BMS: pick seat count on the map first; URL `qty` means the picker was confirmed. */
   const hasQtyParam = searchParams.has("qty");
+  const [overrideQty, setOverrideQty] = useState<number | null>(null);
   const qty = useMemo(() => {
+    if (overrideQty !== null) return overrideQty;
     const raw = Number(searchParams.get("qty") || 2);
     if (!Number.isFinite(raw) || raw < 1) return 2;
     return Math.min(10, Math.floor(raw));
-  }, [searchParams]);
+  }, [searchParams, overrideQty]);
   const [qtyModalOpen, setQtyModalOpen] = useState(!hasQtyParam);
   const [qtyModalDismissible, setQtyModalDismissible] = useState(false);
   const [accessModalOpen, setAccessModalOpen] = useState(false);
@@ -333,7 +360,9 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
   }, [searchParams, showtimeId]);
 
   const [step, setStep] = useState<BookingStep>("seats");
-  const [sessionToken, setSessionToken] = useState<string | undefined>(undefined);
+  const [sessionToken, setSessionToken] = useState<string | undefined>(() =>
+    readHoldSessionToken()
+  );
   const [holdId, setHoldId] = useState<string | null>(null);
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
@@ -508,7 +537,24 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
   const bookedSet = useMemo(() => {
     const booked = layoutData?.booked_seat_identifiers ?? [];
     const held = layoutData?.held_seat_identifiers ?? [];
-    return new Set([...booked, ...held]);
+    const set = new Set<string>();
+    for (const raw of [...booked, ...held]) {
+      if (!raw) continue;
+      const s = String(raw).trim();
+      set.add(s);
+      set.add(s.toUpperCase());
+      set.add(s.toLowerCase());
+      const match = s.match(/^([A-Za-z]+)0*(\d+)$/);
+      if (match) {
+        const prefix = match[1];
+        const num = Number(match[2]);
+        set.add(`${prefix}${num}`);
+        set.add(`${prefix}${String(num).padStart(2, "0")}`);
+        set.add(`${prefix.toUpperCase()}${num}`);
+        set.add(`${prefix.toUpperCase()}${String(num).padStart(2, "0")}`);
+      }
+    }
+    return set;
   }, [layoutData]);
 
   const hasCanvasLayout = useMemo(() => {
@@ -944,7 +990,9 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
   const findGridSeatContext = useCallback(
     (seatId: string) => {
       for (const row of gridRows) {
-        const idx = row.seats.findIndex((s) => s.id === seatId);
+        const idx = row.seats.findIndex((s) =>
+          isSameSeat(s.id, seatId, s.row, undefined, s.number, undefined)
+        );
         if (idx >= 0) {
           return { row, index: idx, seat: row.seats[idx] };
         }
@@ -953,6 +1001,68 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
     },
     [gridRows]
   );
+
+  const isSeatSelected = useCallback(
+    (seatId: string, rowLabel?: string, seatNumber?: string | number) => {
+      return selectedSeats.some((s) =>
+        isSameSeat(s.seat_identifier, seatId, s.row_label, rowLabel, s.seat_number, seatNumber)
+      );
+    },
+    [selectedSeats]
+  );
+
+  useEffect(() => {
+    if (!layoutData?.own_hold) return;
+    const hold = layoutData.own_hold;
+    if (hold.status !== "ACTIVE") return;
+
+    const expiresMs = new Date(hold.expires_at).getTime();
+    if (Number.isNaN(expiresMs) || expiresMs <= Date.now()) return;
+
+    setHoldId(hold.id);
+    setExpiresAt(hold.expires_at);
+
+    const heldCount = Array.isArray(hold.seat_identifiers) ? hold.seat_identifiers.length : 0;
+    if (heldCount > 0) {
+      setOverrideQty(heldCount);
+      setQtyModalOpen(false);
+    }
+
+    setSelectedSeats((prev) => {
+      if (prev.length > 0) return prev;
+      if (Array.isArray(hold.seats_json) && hold.seats_json.length > 0) {
+        return hold.seats_json;
+      }
+      if (Array.isArray(hold.seat_identifiers) && hold.seat_identifiers.length > 0) {
+        const reconstructed: MovieBookingSeatPayload[] = [];
+        for (const rawId of hold.seat_identifiers) {
+          const ctx = findGridSeatContext(rawId);
+          if (ctx) {
+            reconstructed.push({
+              seat_identifier: ctx.seat.id,
+              tier_name: ctx.seat.tierName,
+              row_label: ctx.seat.row,
+              seat_number: String(ctx.seat.number).padStart(2, "0"),
+              unit_price: ctx.seat.price,
+            });
+          } else {
+            const m = String(rawId).match(/^([A-Za-z]+)0*(\d+)$/);
+            const r = m ? m[1].toUpperCase() : rawId.charAt(0);
+            const n = m ? String(m[2]).padStart(2, "0") : rawId.slice(1);
+            reconstructed.push({
+              seat_identifier: rawId,
+              tier_name: "",
+              row_label: r,
+              seat_number: n,
+              unit_price: 200,
+            });
+          }
+        }
+        return reconstructed;
+      }
+      return prev;
+    });
+  }, [layoutData?.own_hold, findGridSeatContext]);
 
   /** BMS-style: contiguous available seats on the same row (aisle-aware). */
   const autoSelectNeighborSeats = useCallback(
@@ -1005,9 +1115,15 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
     if (seat.isBooked) return;
 
     // Tap a selected seat → deselect only that seat (adjust like BMS)
-    const exists = selectedSeats.some((s) => s.seat_identifier === seat.id);
+    const exists = selectedSeats.some((s) =>
+      isSameSeat(s.seat_identifier, seat.id, s.row_label, seat.row, s.seat_number, seat.number)
+    );
     if (exists) {
-      applyMovieSeats(selectedSeats.filter((s) => s.seat_identifier !== seat.id));
+      applyMovieSeats(
+        selectedSeats.filter(
+          (s) => !isSameSeat(s.seat_identifier, seat.id, s.row_label, seat.row, s.seat_number, seat.number)
+        )
+      );
       return;
     }
 
@@ -1372,6 +1488,24 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
       setAuthModalOpen(true);
       return;
     }
+    // If hold is active and seats are already held, we can directly advance if seats haven't changed
+    if (holdId && expiresAt && new Date(expiresAt).getTime() > Date.now()) {
+      const heldIds = new Set(
+        Array.isArray(layoutData?.own_hold?.seat_identifiers)
+          ? layoutData.own_hold.seat_identifiers.map((id: string) => normalizeSeatId(id))
+          : []
+      );
+      const currentSelectedIds = selectedSeats.map((s) => normalizeSeatId(s.seat_identifier));
+      const isSameHold =
+        heldIds.size > 0 &&
+        heldIds.size === currentSelectedIds.length &&
+        currentSelectedIds.every((id) => heldIds.has(id));
+
+      if (isSameHold) {
+        setStep(showtimeBeverages.length > 0 ? "beverages" : "review");
+        return;
+      }
+    }
     await proceedCreateHold();
   };
 
@@ -1382,7 +1516,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
   }, [pendingAfterAuth, isCustomerLoggedIn, authModalOpen]);
 
   useEffect(() => {
-    if ((step !== "review" && step !== "beverages") || !expiresAt) {
+    if (!expiresAt) {
       setSecondsLeft(null);
       return;
     }
@@ -1397,7 +1531,25 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
     tick();
     const id = window.setInterval(tick, 1000);
     return () => window.clearInterval(id);
-  }, [step, expiresAt]);
+  }, [expiresAt]);
+
+  useEffect(() => {
+    if (step !== "seats") {
+      window.history.pushState({ bmbMovieStep: step }, "");
+    }
+  }, [step]);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      if (step === "review") {
+        setStep(showtimeBeverages.length > 0 ? "beverages" : "seats");
+      } else if (step === "beverages") {
+        setStep("seats");
+      }
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [step, showtimeBeverages.length]);
 
   const onConfirmBooking = async (values: MovieCheckoutFormValues) => {
     if (!holdId) {
@@ -2203,8 +2355,10 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                         >
                           <div className="flex items-center gap-2.5 sm:gap-3">
                           {rowGroup.seats.map((seat, seatIdx) => {
-                            const isSelected = selectedSeats.some(
-                              (s) => s.seat_identifier === seat.id
+                            const isSelected = isSeatSelected(
+                              seat.id,
+                              rowGroup.rowLabel,
+                              seat.number
                             );
                             const isAisleGap =
                               seat.isAisleGap ?? (seatIdx === 3 || seatIdx === 9);
@@ -2351,8 +2505,10 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                             )}
                             <div className="flex items-center justify-center gap-px">
                               {rowGroup.seats.map((seat, seatIdx) => {
-                                const isSelected = selectedSeats.some(
-                                  (s) => s.seat_identifier === seat.id
+                                const isSelected = isSeatSelected(
+                                  seat.id,
+                                  rowGroup.rowLabel,
+                                  seat.number
                                 );
                                 const isAisleGap =
                                   seat.isAisleGap ?? (seatIdx === 3 || seatIdx === 9);
@@ -2554,8 +2710,10 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                     <div className="flex-1 flex items-center justify-center min-w-0">
                       <div className="flex items-center gap-1.5 sm:gap-2">
                       {rowGroup.seats.map((seat, seatIdx) => {
-                        const isSelected = selectedSeats.some(
-                          (s) => s.seat_identifier === seat.id
+                        const isSelected = isSeatSelected(
+                          seat.id,
+                          rowGroup.rowLabel,
+                          seat.number
                         );
                         const isAisleGap = seat.isAisleGap ?? (seatIdx === 3 || seatIdx === 9);
                         const seatLabel = String(seatIdx + 1).padStart(2, "0");
@@ -2687,6 +2845,29 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                 className="h-12 lg:h-14 w-auto object-contain"
               />
             </Link>
+            {step !== "seats" && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (step === "review") {
+                    setStep(showtimeBeverages.length > 0 ? "beverages" : "seats");
+                  } else {
+                    setStep("seats");
+                  }
+                }}
+                className="hidden lg:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-100 cursor-pointer transition-colors ml-2"
+                title={
+                  step === "review" && showtimeBeverages.length > 0
+                    ? "Back to snacks"
+                    : "Back to seats"
+                }
+              >
+                <ChevronLeft className="size-4" />
+                {step === "review" && showtimeBeverages.length > 0
+                  ? "Back to snacks"
+                  : "Back to seats"}
+              </button>
+            )}
           </div>
 
           {/* Desktop center — movie title + theater / date / time / screen */}
@@ -2778,14 +2959,28 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
         </div>
       ) : null}
 
-      {step === "review" && secondsLeft !== null && (
+      {secondsLeft !== null && secondsLeft > 0 && (
         <div
-          className={`shrink-0 px-4 py-2 text-center text-[13px] font-medium border-b ${secondsLeft <= 60
-              ? "bg-rose-50 border-rose-200 text-rose-700"
+          className={`shrink-0 px-4 py-2 text-center text-[13px] font-medium border-b flex items-center justify-center gap-3 transition-colors ${
+            secondsLeft <= 60
+              ? "bg-rose-50 border-rose-200 text-rose-700 font-bold animate-pulse"
               : "bg-[#F3E8FF] border-[#E9D5FF] text-[#6B21A8]"
-            }`}
+          }`}
         >
-          Complete your booking in {formatCountdown(secondsLeft)}
+          <span>
+            {step === "seats"
+              ? `Your seats are held! Complete your booking in ${formatCountdown(secondsLeft)}`
+              : `Complete your booking in ${formatCountdown(secondsLeft)}`}
+          </span>
+          {step === "seats" && selectedSeats.length > 0 && (
+            <button
+              type="button"
+              onClick={handleContinue}
+              className="px-3 py-1 text-xs font-bold rounded-md bg-[#6B21A8] text-white hover:bg-[#581c87] cursor-pointer transition-colors shadow-sm"
+            >
+              Continue to checkout →
+            </button>
+          )}
         </div>
       )}
 

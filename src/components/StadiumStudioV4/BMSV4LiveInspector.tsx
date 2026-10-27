@@ -190,7 +190,7 @@ export default function BMSV4LiveInspector({
               <option value="">-- Unassigned (Default Price) --</option>
               {ticketTypes.map((tt) => (
                 <option key={tt.id} value={tt.id}>
-                  {tt.name} ({tt.price != null ? `$${tt.price}` : "Free"})
+                  {tt.name} ({tt.price != null ? `${tt.price} ETB` : "Free"})
                 </option>
               ))}
             </select>

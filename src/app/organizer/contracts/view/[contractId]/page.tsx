@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { DetailFormShimmer } from "@/components/Shared/Shimmer";
 import { useParams } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import EventContractDocument from "@/components/EventAdminPanel/EventContractDocument";
@@ -13,7 +14,7 @@ export default function OrganizerContractViewByIdPage() {
   const { data: contract, isLoading, isError } = useGetOrganizerEventContractByIdQuery(contractId);
 
   if (isLoading) {
-    return <div className="p-10 text-center portal-muted">Loading contract…</div>;
+    return <DetailFormShimmer />;
   }
 
   if (isError || !contract) {

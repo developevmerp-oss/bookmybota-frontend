@@ -216,7 +216,7 @@ export default function CreateEventContractPage() {
                   value={
                     prefill?.event?.name
                       ? `${prefill.event.name} — ${prefill.event.organizer_name ?? ""}`
-                      : eventId || "Loading…"
+                      : eventId || ""
                   }
                   disabled
                   readOnly
@@ -242,7 +242,7 @@ export default function CreateEventContractPage() {
 
             {loadingPrefill && eventId && (
               <p className="text-sm text-zinc-500 flex items-center gap-2">
-                <Loader2 size={14} className="animate-spin" /> Loading event details…
+                <Loader2 size={14} className="animate-spin" aria-label="Loading event details" />
               </p>
             )}
 

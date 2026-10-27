@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { DetailFormShimmer } from "@/components/Shared/Shimmer";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 import { ArrowLeft, CheckCircle, Loader2, Mail, XCircle } from "lucide-react";
@@ -71,7 +72,7 @@ export default function OrganizerContractPage() {
   };
 
   if (isLoading) {
-    return <div className="p-10 text-center portal-muted">Loading contract…</div>;
+    return <DetailFormShimmer />;
   }
 
   if (isError || !contract) {

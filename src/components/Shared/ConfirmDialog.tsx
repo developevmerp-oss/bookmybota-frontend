@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { Loader2 } from "lucide-react";
 
 type ConfirmVariant = "danger" | "success" | "warning";
 
@@ -104,7 +105,11 @@ export default function ConfirmDialog({
             disabled={busy}
             className={`px-4 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-50 transition-colors ${confirmClass}`}
           >
-            {busy ? "Please wait..." : confirmLabel}
+            {busy ? (
+              <Loader2 className="size-4 animate-spin" aria-label={confirmLabel} />
+            ) : (
+              confirmLabel
+            )}
           </button>
         </div>
       </div>

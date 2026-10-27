@@ -2,13 +2,14 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Loader2, Ticket } from "lucide-react";
+import { Ticket } from "lucide-react";
 import {
   useGetPublicGiftCardDesignCategoriesQuery,
   useGetPublicGiftCardDesignsQuery,
   useGetPublicGiftCardSettingsQuery,
 } from "@/services/api";
 import GiftCardDesignFace from "@/components/GiftCards/GiftCardDesignFace";
+import { CustomerGiftCardsShimmer } from "@/components/Shared/Shimmer";
 import {
   DEFAULT_GIFT_CARD_VALIDITY_DAYS,
   formatGiftCardValidityLabel,
@@ -70,10 +71,7 @@ export default function GiftCardsBrowsePage() {
         </div>
 
         {isLoading ? (
-          <div className="flex justify-center py-20 text-slate-500 gap-2 items-center">
-            <Loader2 className="animate-spin" size={20} />
-            Loading designs…
-          </div>
+          <CustomerGiftCardsShimmer embedded />
         ) : isError ? (
           <p className="text-center text-rose-600 py-16">Could not load designs. Try again later.</p>
         ) : designs.length === 0 ? (

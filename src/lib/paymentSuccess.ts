@@ -9,25 +9,38 @@ type PaymentSuccessOpts = {
 
 const MODULE_COPY: Record<
   BookingPaymentModule,
-  { eyebrow: string; title: string; subtitle: string; nextLabel: string }
+  {
+    eyebrow: string;
+    title: string;
+    subtitle: string;
+    nextLabel: string;
+    exploreHref: string;
+    exploreLabel: string;
+  }
 > = {
   movies: {
     eyebrow: "Movie booking",
     title: "Booking successful",
     subtitle: "Your seats are reserved. Continue to view your M-Ticket and booking details.",
     nextLabel: "View M-Ticket",
+    exploreHref: "/movies",
+    exploreLabel: "Explore",
   },
   events: {
     eyebrow: "Event booking",
     title: "Booking successful",
     subtitle: "Your tickets are confirmed. Continue to view your booking and QR code.",
     nextLabel: "View tickets",
+    exploreHref: "/events",
+    exploreLabel: "Explore",
   },
   dining: {
     eyebrow: "Table booking",
     title: "Booking successful",
     subtitle: "Your table is confirmed. Continue to view your booking details.",
     nextLabel: "View booking",
+    exploreHref: "/dining",
+    exploreLabel: "Explore",
   },
 };
 
@@ -49,6 +62,8 @@ export function paymentSuccessCopy(module: string | null | undefined) {
     title: "Booking successful",
     subtitle: "Your booking is confirmed. Continue to view the details.",
     nextLabel: "Continue",
+    exploreHref: "/movies",
+    exploreLabel: "Explore",
   };
 }
 

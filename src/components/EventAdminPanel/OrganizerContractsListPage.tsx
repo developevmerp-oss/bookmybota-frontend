@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { AdminListShimmer } from "@/components/Shared/Shimmer";
 import Link from "next/link";
 import { FileSignature } from "lucide-react";
 import { useGetOrganizerEventContractsQuery } from "@/services/api";
@@ -69,7 +70,7 @@ export default function OrganizerContractsListPage({ scope = "current" }: { scop
       />
 
       {isLoading ? (
-        <p className="portal-muted text-center py-10">Loading…</p>
+        <AdminListShimmer rows={5} columns={4} showToolbar={false} />
       ) : contracts.length === 0 ? (
         <div className="org-card p-10 text-center portal-muted">
           {scope === "old" ? "No old contracts yet." : "No current contracts yet."}

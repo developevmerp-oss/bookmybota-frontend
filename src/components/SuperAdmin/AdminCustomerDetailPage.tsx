@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { DetailFormShimmer } from "@/components/Shared/Shimmer";
 import { useState } from "react";
 import { useParams } from "next/navigation";
 import { Archive, ArrowLeft, CheckCircle, Pencil, Undo2, XCircle } from "lucide-react";
@@ -35,7 +36,7 @@ export default function AdminCustomerDetailPage() {
   const [confirmBusy, setConfirmBusy] = useState(false);
 
   if (isLoading) {
-    return <div className="text-white p-10 text-center">Loading customer...</div>;
+    return <DetailFormShimmer />;
   }
 
   if (!c) {

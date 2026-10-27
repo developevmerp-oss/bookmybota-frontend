@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { DetailFormShimmer } from "@/components/Shared/Shimmer";
 import { useState } from "react";
 import { ArrowLeft, CheckCircle, Loader2, Mail, XCircle } from "lucide-react";
 import { toast } from "sonner";
@@ -8,9 +9,11 @@ import MovieContractDocument from "@/components/MovieAdminPanel/MovieContractDoc
 import SignaturePad from "@/components/EventAdminPanel/SignaturePad";
 import {
   useGetCinemaContractQuery,
+  useGetCinemaContractHistoryQuery,
   useRejectCinemaContractMutation,
   useRequestCinemaContractOtpMutation,
   useSignCinemaContractMutation,
+  type MovieContract,
 } from "@/services/api";
 import { movieContractStatusLabel } from "@/lib/movieContractPlaceholders";
 import { extractApiError } from "@/lib/apiErrors";
@@ -21,10 +24,15 @@ export default function CinemaContractPage() {
   const [otp, setOtp] = useState("");
   const [otpHint, setOtpHint] = useState<string | null>(null);
 
+  const [selectedOldContract, setSelectedOldContract] = useState<MovieContract | null>(null);
+
   const { data: contract, isLoading, isError } = useGetCinemaContractQuery();
+  const { data: history } = useGetCinemaContractHistoryQuery();
   const [requestOtp, { isLoading: sendingOtp }] = useRequestCinemaContractOtpMutation();
   const [sign, { isLoading: signing }] = useSignCinemaContractMutation();
   const [reject, { isLoading: rejecting }] = useRejectCinemaContractMutation();
+
+  const oldVersions = (history?.contracts ?? []).filter((c) => !c.is_current);
 
   const handleRequestOtp = async () => {
     try {
@@ -67,7 +75,7 @@ export default function CinemaContractPage() {
   };
 
   if (isLoading) {
-    return <div className="p-10 text-center portal-muted">Loading contract…</div>;
+    return <DetailFormShimmer />;
   }
 
   if (isError || !contract) {
@@ -97,7 +105,7 @@ export default function CinemaContractPage() {
         </Link>
         <h2 className="portal-heading text-2xl font-bold">Platform contract</h2>
         <p className="portal-muted">
-          {movieContractStatusLabel(contract.status)}
+          {movieContractStatusLabel(contract.status)} · v{contract.version ?? 1} · Current
           {contract.contract_number ? ` · #${contract.contract_number}` : ""}
         </p>
         {contract.status === "REJECTED" && contract.rejection_reason ? (
@@ -119,6 +127,51 @@ export default function CinemaContractPage() {
       </div>
 
       <MovieContractDocument contract={contract} />
+
+      {oldVersions.length > 0 ? (
+        <div className="org-card p-5 space-y-3">
+          <h3 className="portal-heading text-base font-semibold">Previous contract versions</h3>
+          <p className="text-xs portal-muted">
+            These previous versions were superseded when revised agreements were issued.
+          </p>
+          <ul className="space-y-2 text-sm">
+            {oldVersions.map((c) => (
+              <li key={c.id} className="flex items-center justify-between gap-3 p-3 rounded-lg bg-slate-50 border border-slate-200">
+                <span className="text-slate-700">
+                  #{c.contract_number} · v{c.version ?? "—"} · {movieContractStatusLabel(c.status)}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedOldContract(c)}
+                  className="text-rose-600 hover:text-rose-800 font-medium text-xs cursor-pointer"
+                >
+                  View document
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      {selectedOldContract ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
+          <div className="relative w-full max-w-3xl my-8 bg-white rounded-2xl p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+              <h3 className="text-lg font-bold text-slate-900">
+                Superseded Contract v{selectedOldContract.version ?? "—"} ({selectedOldContract.contract_number})
+              </h3>
+              <button
+                type="button"
+                onClick={() => setSelectedOldContract(null)}
+                className="px-3 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold"
+              >
+                Close
+              </button>
+            </div>
+            <MovieContractDocument contract={selectedOldContract} />
+          </div>
+        </div>
+      ) : null}
 
       {needsSign && (
         <div className="org-card p-5 space-y-5">

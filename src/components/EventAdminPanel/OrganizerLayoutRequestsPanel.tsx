@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { AdminListShimmer } from "@/components/Shared/Shimmer";
 import { Eye } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -20,7 +21,7 @@ export default function OrganizerLayoutRequestsPanel({ eventId }: { eventId: str
   const requests = (event?.layout_requests || []).filter((r) => r.status !== "DRAFT");
 
   if (isLoading) {
-    return <p className="text-sm text-zinc-400">Loading layout requests…</p>;
+    return <AdminListShimmer rows={4} columns={4} showToolbar={false} showPagination={false} />;
   }
 
   if (requests.length === 0) {

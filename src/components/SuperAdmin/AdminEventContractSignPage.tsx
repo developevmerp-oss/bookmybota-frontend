@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { DetailFormShimmer } from "@/components/Shared/Shimmer";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
@@ -77,7 +78,7 @@ export default function AdminEventContractDetailPage() {
   };
 
   if (isLoading) {
-    return <div className="p-10 text-center text-zinc-500">Loading contract…</div>;
+    return <DetailFormShimmer />;
   }
 
   if (isError || !contract) {

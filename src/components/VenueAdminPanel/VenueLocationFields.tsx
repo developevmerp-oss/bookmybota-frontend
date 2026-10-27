@@ -62,9 +62,7 @@ export default function VenueLocationFields({
             onCityChange("");
           }}
         >
-          <option value="">
-            {countriesLoading ? "Loading countries…" : "Select country"}
-          </option>
+          <option value="">Select country</option>
           {countries.map((c) => (
             <option key={c.id} value={c.id}>
               {c.name}
@@ -86,9 +84,9 @@ export default function VenueLocationFields({
           <option value="">
             {!countryId
               ? "Select country first"
-              : citiesLoading
-                ? "Loading cities…"
-                : cities.length
+              : cities.length
+                ? "Select city"
+                : citiesLoading
                   ? "Select city"
                   : "No cities for this country"}
           </option>

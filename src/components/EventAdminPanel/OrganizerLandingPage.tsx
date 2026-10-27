@@ -294,7 +294,7 @@ export default function OrganizerLandingPage({
         <p className="flex flex-wrap items-center justify-center gap-2">
           Already partnered for dining?
           <Link
-            href="/business"
+            href="/list-your-show/dining"
             className="text-[#6900AA] font-semibold hover:underline inline-flex items-center gap-1"
           >
             <UtensilsCrossed size={12} /> Partner with Us

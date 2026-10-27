@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useEffect, useRef } from "react";
+import { AdminListShimmer } from "@/components/Shared/Shimmer";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useForm, useFieldArray } from "react-hook-form";
@@ -741,9 +742,7 @@ export default function MovieShowtimesPage() {
       )}
 
       {isLoading ? (
-        <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 p-12 text-center text-slate-500">
-          Loading schedule…
-        </div>
+        <AdminListShimmer rows={5} columns={4} showToolbar={false} showPagination={false} />
       ) : showtimes.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 p-12 text-center space-y-3">
           <Film size={36} className="mx-auto text-slate-400" />

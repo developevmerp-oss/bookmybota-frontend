@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { DetailFormShimmer } from "@/components/Shared/Shimmer";
 import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import { Html5Qrcode } from "html5-qrcode";
@@ -322,7 +323,7 @@ export default function MovieScanPage() {
   };
 
   if (!user?.business_id) {
-    return <p className="portal-muted">Loading cinema account…</p>;
+    return <DetailFormShimmer fields={4} />;
   }
 
   const seatsLabel =

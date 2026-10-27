@@ -12,6 +12,7 @@ import {
 import { isTokenExpired } from "@/lib/authSession";
 import { useAppDispatch } from "@/lib/hooks";
 import { loadFromStorage, setCredentials, clearCredentials } from "@/features/auth/authSlice";
+import { AuthFormShimmer, PartnerPanelShimmer } from "@/components/Shared/Shimmer";
 
 type Mode =
   /** Must be logged in with one of `roles` */
@@ -32,11 +33,6 @@ interface AuthGateProps {
   loading?: ReactNode;
 }
 
-const defaultLoading = (
-  <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-500 font-medium">
-    Loading...
-  </div>
-);
 
 /**
  * Client-side route guard.
@@ -122,6 +118,8 @@ export default function AuthGate({
     };
   }, [mode, rolesKey, guestRolesKey, guestRoles, router, dispatch]);
 
-  if (!ready) return <>{loading ?? defaultLoading}</>;
+  if (!ready) {
+    return <>{loading ?? (mode === "guest" ? <AuthFormShimmer /> : <PartnerPanelShimmer />)}</>;
+  }
   return <>{children}</>;
 }

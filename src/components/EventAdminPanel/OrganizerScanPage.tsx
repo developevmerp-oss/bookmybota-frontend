@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { DetailFormShimmer } from "@/components/Shared/Shimmer";
 import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import { Html5Qrcode } from "html5-qrcode";
@@ -285,7 +286,7 @@ export default function OrganizerScanPage() {
   };
 
   if (!user?.business_id) {
-    return <p className="text-zinc-400">Loading organizer account...</p>;
+    return <DetailFormShimmer fields={3} />;
   }
 
   const ticketSummary = scanned?.items?.length

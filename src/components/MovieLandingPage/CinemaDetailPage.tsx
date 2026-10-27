@@ -51,7 +51,7 @@ import {
   matchesAnyNormalized,
   normalizeFilterKey,
 } from "@/lib/movieShowtimeFilters";
-import { CustomerFullscreenShimmer } from "@/components/Shared/Shimmer";
+import { CustomerFullscreenShimmer, ShowtimeListShimmer } from "@/components/Shared/Shimmer";
 
 const PAGE_BG = "#F4F2F8";
 const BRAND = "#6900AA";
@@ -1393,10 +1393,7 @@ export default function CinemaDetailPage({ cinemaId }: { cinemaId: string }) {
               Showtimes will appear here when this cinema is live with scheduled movies.
             </div>
           ) : loadingShows || loadingMovies ? (
-            <div className="rounded-2xl border border-[#E8E2F2] bg-white flex flex-col items-center justify-center py-16 gap-3 text-slate-400">
-              <Loader2 size={28} className="animate-spin text-[#6900AA]" />
-              <p className="text-sm font-medium">Loading showtimes…</p>
-            </div>
+            <ShowtimeListShimmer />
           ) : filteredRows.length === 0 ? (
             <div className="rounded-2xl border border-[#E8E2F2] bg-white px-5 py-16 text-center space-y-3">
               {hasLiveShowtimes && hasActiveFilters ? (

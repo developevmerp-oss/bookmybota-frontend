@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { ArrowLeft, Loader2, Mail } from "lucide-react";
 import { toast } from "sonner";
 import AuthGate from "@/components/Shared/AuthGate";
+import { AuthFormShimmer } from "@/components/Shared/Shimmer";
 import { resolvePartnerLoginHref } from "@/components/Shared/PartnerAuthHeader";
 import { useForgotPasswordMutation } from "@/services/api";
 import { extractApiError } from "@/lib/apiErrors";
@@ -136,11 +137,7 @@ export default function ForgotPasswordPage() {
   return (
     <AuthGate mode="guest" guestRoles={[]}>
       <Suspense
-        fallback={
-          <div className="min-h-[calc(100dvh-72px)] flex items-center justify-center bg-slate-50 text-slate-500">
-            Loading...
-          </div>
-        }
+        fallback={<AuthFormShimmer />}
       >
         <ForgotPasswordForm />
       </Suspense>

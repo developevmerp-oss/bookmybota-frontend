@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
+import { DetailFormShimmer } from "@/components/Shared/Shimmer";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ImagePlus, Lock, Save, User } from "lucide-react";
 import { toast } from "sonner";
@@ -113,7 +114,7 @@ function MovieProfileContent() {
   };
 
   if (isLoading || !user) {
-    return <div className="text-slate-500 p-10 text-center text-sm">Loading cinema profile…</div>;
+    return <DetailFormShimmer />;
   }
 
   const tabs = [
@@ -318,9 +319,7 @@ export default function MovieProfilePage() {
   return (
     <Suspense
       fallback={
-        <div className="w-full flex items-center justify-center min-h-[12rem] text-slate-500 text-sm">
-          Loading profile...
-        </div>
+        <DetailFormShimmer />
       }
     >
       <MovieProfileContent />

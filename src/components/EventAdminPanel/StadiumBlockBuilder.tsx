@@ -138,6 +138,9 @@ export interface StadiumGroundConfig {
   pitch_label: string;
   stage_label?: string;
   catwalk_label?: string;
+  stage_color?: string;
+  catwalk_width?: number;
+  catwalk_length?: number;
   turf_color: string;
   track_color?: string;
   shape?: "rectangle" | "oval" | "capsule";
@@ -3402,6 +3405,9 @@ export default function StadiumBlockBuilder({
       pitch_label: label,
       stage_label: type === "festival_t_stage" ? (prev.stage_label || "MAIN STAGE") : prev.stage_label,
       catwalk_label: type === "festival_t_stage" ? (prev.catwalk_label || "") : prev.catwalk_label,
+      stage_color: type === "festival_t_stage" ? (prev.stage_color || "#4c1d95") : prev.stage_color,
+      catwalk_width: type === "festival_t_stage" ? (prev.catwalk_width ?? 16) : prev.catwalk_width,
+      catwalk_length: type === "festival_t_stage" ? (prev.catwalk_length ?? 18) : prev.catwalk_length,
       turf_color: color,
       track_color: track,
       shape: type === "cricket" ? "oval" : "rectangle",
@@ -4722,116 +4728,156 @@ export default function StadiumBlockBuilder({
                       y={pitchH * 0.02}
                       width={pitchW * 0.80}
                       height={pitchH * 0.18}
-                      fill="#4c1d95"
+                      fill={groundConfig.stage_color || "#4c1d95"}
                       opacity={groundConfig.turf_color === "#ffffff" || !groundConfig.turf_color ? 0.12 : 0.35}
                       cornerRadius={12}
                       shadowColor="#a855f7"
                       shadowBlur={20}
                     />
 
-                    {/* 1. Main Stage (Top Wide Rectangle) */}
-                    <Rect
-                      x={pitchW * 0.12}
-                      y={pitchH * 0.03}
-                      width={pitchW * 0.76}
-                      height={pitchH * 0.16}
-                      fill="#4c1d95"
-                      stroke="#c084fc"
-                      strokeWidth={3}
-                      cornerRadius={8}
-                      shadowColor="#a855f7"
-                      shadowBlur={16}
-                    />
+                    {/* Unified T-Stage Deck & Catwalk Runway (Seamless Single Geometry - Same Color, No Seam/Gap) */}
+                    {(() => {
+                      const sX = pitchW * 0.12;
+                      const sY = pitchH * 0.03;
+                      const sW = pitchW * 0.76;
+                      const sH = pitchH * 0.16;
+                      const sBottom = sY + sH;
 
-                    {/* Stage Rig / Spotlight Accents */}
-                    <Circle x={pitchW * 0.15} y={pitchH * 0.06} radius={6} fill="#fbbf24" opacity={0.85} />
-                    <Circle x={pitchW * 0.20} y={pitchH * 0.06} radius={6} fill="#ec4899" opacity={0.85} />
-                    <Circle x={pitchW * 0.80} y={pitchH * 0.06} radius={6} fill="#ec4899" opacity={0.85} />
-                    <Circle x={pitchW * 0.85} y={pitchH * 0.06} radius={6} fill="#fbbf24" opacity={0.85} />
+                      const stageColor = groundConfig.stage_color || "#4c1d95";
+                      const cWidthPct = Math.min(0.35, Math.max(0.08, ((groundConfig.catwalk_width ?? 16) / 100)));
+                      const cLengthPct = Math.min(0.40, Math.max(0.08, ((groundConfig.catwalk_length ?? 18) / 100)));
 
-                    {/* Stage Label (Editable via Sidebar) */}
-                    {((groundConfig.stage_label ?? groundConfig.pitch_label) || "MAIN STAGE").trim().length > 0 && (
-                      <Text
-                        text={`🎤 ${((groundConfig.stage_label ?? groundConfig.pitch_label) || "MAIN STAGE").trim().toUpperCase()}`}
-                        x={pitchW * 0.12}
-                        y={pitchH * 0.03 + pitchH * 0.05}
-                        width={pitchW * 0.76}
-                        align="center"
-                        fontSize={Math.max(14, pitchH * 0.04)}
-                        fontStyle="bold"
-                        fill="#ffffff"
-                      />
-                    )}
+                      const cW = pitchW * cWidthPct;
+                      const cH = pitchH * cLengthPct;
+                      const cX = (pitchW - cW) / 2;
+                      const cBottom = sBottom + cH;
 
-                    {/* 2. Catwalk / T-Runway (Projecting Down into Audience) */}
-                    <Rect
-                      x={pitchW * 0.42}
-                      y={pitchH * 0.19}
-                      width={pitchW * 0.16}
-                      height={pitchH * 0.18}
-                      fill="#581c87"
-                      stroke="#d8b4fe"
-                      strokeWidth={2.5}
-                      cornerRadius={[0, 0, 8, 8]}
-                    />
+                      // Single closed polygon for entire T-Stage deck (Main Stage + Catwalk)
+                      const tStagePoints = [
+                        sX, sY,              // top-left of main stage
+                        sX + sW, sY,         // top-right of main stage
+                        sX + sW, sBottom,    // bottom-right of main stage
+                        cX + cW, sBottom,    // right intersection into runway
+                        cX + cW, cBottom,    // bottom-right tip of runway
+                        cX, cBottom,         // bottom-left tip of runway
+                        cX, sBottom,         // left intersection from runway to stage
+                        sX, sBottom          // bottom-left of main stage
+                      ];
 
-                    {/* Catwalk Runway Floor Edge Lights */}
-                    <Line
-                      points={[
-                        pitchW * 0.435, pitchH * 0.20,
-                        pitchW * 0.435, pitchH * 0.35
-                      ]}
-                      stroke="#e9d5ff"
-                      strokeWidth={1.5}
-                      dash={[4, 6]}
-                      opacity={0.7}
-                    />
-                    <Line
-                      points={[
-                        pitchW * 0.565, pitchH * 0.20,
-                        pitchW * 0.565, pitchH * 0.35
-                      ]}
-                      stroke="#e9d5ff"
-                      strokeWidth={1.5}
-                      dash={[4, 6]}
-                      opacity={0.7}
-                    />
+                      return (
+                        <>
+                          {/* 1. Seamless Unified T-Stage Deck */}
+                          <Line
+                            points={tStagePoints}
+                            closed={true}
+                            fill={stageColor}
+                            stroke="#c084fc"
+                            strokeWidth={3}
+                            lineJoin="round"
+                            shadowColor="#a855f7"
+                            shadowBlur={16}
+                          />
 
-                    {/* Optional Catwalk Text (Only shown if user explicitly typed a label; static 'CATWALK' removed) */}
-                    {groundConfig.catwalk_label && groundConfig.catwalk_label.trim().length > 0 && (
-                      <Text
-                        text={groundConfig.catwalk_label.trim().toUpperCase()}
-                        x={pitchW * 0.42}
-                        y={pitchH * 0.19 + pitchH * 0.06}
-                        width={pitchW * 0.16}
-                        align="center"
-                        fontSize={Math.max(10, pitchH * 0.026)}
-                        fontStyle="bold"
-                        fill="#f3e8ff"
-                      />
-                    )}
+                          {/* Stage Rig / Spotlight Accents on Main Deck */}
+                          <Circle x={sX + sW * 0.04} y={sY + sH * 0.22} radius={6} fill="#fbbf24" opacity={0.85} />
+                          <Circle x={sX + sW * 0.10} y={sY + sH * 0.22} radius={6} fill="#ec4899" opacity={0.85} />
+                          <Circle x={sX + sW * 0.90} y={sY + sH * 0.22} radius={6} fill="#ec4899" opacity={0.85} />
+                          <Circle x={sX + sW * 0.96} y={sY + sH * 0.22} radius={6} fill="#fbbf24" opacity={0.85} />
 
-                    {/* Stage Barricade Guidelines */}
-                    <Line
-                      points={[
-                        pitchW * 0.10, pitchH * 0.19,
-                        pitchW * 0.41, pitchH * 0.19
-                      ]}
-                      stroke="#64748b"
-                      strokeWidth={1.5}
-                      dash={[6, 4]}
-                      opacity={0.5}
-                    />
-                    <Line
-                      points={[
-                        pitchW * 0.59, pitchH * 0.19,
-                        pitchW * 0.90, pitchH * 0.19
-                      ]}
-                      stroke="#64748b"
-                      strokeWidth={1.5}
-                      dash={[6, 4]}
-                      opacity={0.5}
-                    />
+                          {/* Main Stage Label */}
+                          {((groundConfig.stage_label ?? groundConfig.pitch_label) || "MAIN STAGE").trim().length > 0 && (
+                            <Text
+                              text={`🎤 ${((groundConfig.stage_label ?? groundConfig.pitch_label) || "MAIN STAGE").trim().toUpperCase()}`}
+                              x={sX}
+                              y={sY + sH * 0.30}
+                              width={sW}
+                              align="center"
+                              fontSize={Math.max(14, pitchH * 0.04)}
+                              fontStyle="bold"
+                              fill="#ffffff"
+                            />
+                          )}
+
+                          {/* Catwalk Runway Floor Edge Lights */}
+                          <Line
+                            points={[
+                              cX + cW * 0.10, sBottom + 6,
+                              cX + cW * 0.10, cBottom - 6
+                            ]}
+                            stroke="#e9d5ff"
+                            strokeWidth={2}
+                            dash={[4, 6]}
+                            opacity={0.8}
+                          />
+                          <Line
+                            points={[
+                              cX + cW * 0.90, sBottom + 6,
+                              cX + cW * 0.90, cBottom - 6
+                            ]}
+                            stroke="#e9d5ff"
+                            strokeWidth={2}
+                            dash={[4, 6]}
+                            opacity={0.8}
+                          />
+
+                          {/* Optional Runway Label (Only shown if custom label is typed) */}
+                          {groundConfig.catwalk_label && groundConfig.catwalk_label.trim().length > 0 && (
+                            <Text
+                              text={groundConfig.catwalk_label.trim().toUpperCase()}
+                              x={cX}
+                              y={sBottom + cH * 0.35}
+                              width={cW}
+                              align="center"
+                              fontSize={Math.max(10, pitchH * 0.026)}
+                              fontStyle="bold"
+                              fill="#f3e8ff"
+                            />
+                          )}
+
+                          {/* Crowd Control Barricades around the Stage & Runway */}
+                          <Line
+                            points={[
+                              pitchW * 0.08, sBottom + 2,
+                              cX - 12, sBottom + 2
+                            ]}
+                            stroke="#94a3b8"
+                            strokeWidth={1.5}
+                            dash={[5, 5]}
+                            opacity={0.7}
+                          />
+                          <Line
+                            points={[
+                              cX + cW + 12, sBottom + 2,
+                              pitchW * 0.92, sBottom + 2
+                            ]}
+                            stroke="#94a3b8"
+                            strokeWidth={1.5}
+                            dash={[5, 5]}
+                            opacity={0.7}
+                          />
+                          <Line
+                            points={[
+                              cX - 12, sBottom + 2,
+                              cX - 12, cBottom + 12
+                            ]}
+                            stroke="#94a3b8"
+                            strokeWidth={1.5}
+                            dash={[5, 5]}
+                            opacity={0.7}
+                          />
+                          <Line
+                            points={[
+                              cX + cW + 12, sBottom + 2,
+                              cX + cW + 12, cBottom + 12
+                            ]}
+                            stroke="#94a3b8"
+                            strokeWidth={1.5}
+                            dash={[5, 5]}
+                            opacity={0.7}
+                          />
+                        </>
+                      );
+                    })()}
 
                     {/* FOH Audio Console / Sound Booth */}
                     <Rect
@@ -6082,6 +6128,9 @@ export default function StadiumBlockBuilder({
                           pitch_label: "FESTIVAL T-STAGE & ARENA",
                           stage_label: "MAIN STAGE",
                           catwalk_label: "",
+                          stage_color: "#4c1d95",
+                          catwalk_width: 16,
+                          catwalk_length: 18,
                           turf_color: "#ffffff",
                           track_color: "#ffffff",
                           shape: "rectangle",
@@ -8672,41 +8721,153 @@ export default function StadiumBlockBuilder({
                   </div>
 
                   {groundConfig.sport_type === "festival_t_stage" ? (
-                    <div className="space-y-3">
-                      <div>
-                        <label className="text-xs font-bold text-slate-700 block mb-1">🎤 Stage Deck Label</label>
-                        <input
-                          className="w-full text-xs font-bold bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 shadow-sm"
-                          value={groundConfig.stage_label ?? groundConfig.pitch_label}
-                          onChange={(e) =>
-                            setGroundConfig((prev) => ({
-                              ...prev,
-                              stage_label: e.target.value,
-                              pitch_label: e.target.value,
-                            }))
-                          }
-                          placeholder="e.g. MAIN STAGE or ARTIST / FESTIVAL NAME"
-                        />
-                      </div>
-                      <div>
-                        <div className="flex items-center justify-between mb-1">
-                          <label className="text-xs font-bold text-slate-700">T-Runway / Catwalk Label</label>
-                          <span className="text-[10px] text-slate-400 font-semibold">Optional</span>
+                    <div className="space-y-3.5">
+                      {/* Dedicated Catwalk & Stage Customization Section */}
+                      <div className="p-3 bg-gradient-to-br from-purple-50 via-indigo-50/40 to-slate-50 border border-purple-200/80 rounded-2xl space-y-3 shadow-xs">
+                        <div className="flex items-center gap-1.5 text-purple-900 font-bold text-xs">
+                          <span>🎸</span>
+                          <span>Stage & Catwalk Section Editor</span>
                         </div>
-                        <input
-                          className="w-full text-xs font-bold bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 shadow-sm"
-                          value={groundConfig.catwalk_label ?? ""}
-                          onChange={(e) =>
-                            setGroundConfig((prev) => ({
-                              ...prev,
-                              catwalk_label: e.target.value,
-                            }))
-                          }
-                          placeholder="Leave empty for clean runway (No text)"
-                        />
-                        <p className="text-[10px] text-slate-500 mt-1">
-                          Text on catwalk is removed by default. Type here only if you wish to label it.
-                        </p>
+
+                        {/* Stage & Catwalk Deck Color */}
+                        <div>
+                          <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                            Stage & Catwalk Deck Color
+                          </label>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="color"
+                              className="w-10 h-8 rounded-lg border border-slate-300 cursor-pointer bg-white p-0.5 shadow-sm"
+                              value={groundConfig.stage_color || "#4c1d95"}
+                              onChange={(e) =>
+                                setGroundConfig((prev) => ({
+                                  ...prev,
+                                  stage_color: e.target.value,
+                                }))
+                              }
+                            />
+                            <div className="flex flex-wrap gap-1 flex-1">
+                              {[
+                                { color: "#4c1d95", name: "Royal Purple" },
+                                { color: "#312e81", name: "Indigo Night" },
+                                { color: "#18181b", name: "Obsidian" },
+                                { color: "#831843", name: "Pink Rose" },
+                                { color: "#1e293b", name: "Slate Navy" },
+                                { color: "#0f766e", name: "Deep Teal" },
+                              ].map((item) => (
+                                <button
+                                  key={item.color}
+                                  type="button"
+                                  title={item.name}
+                                  onClick={() => setGroundConfig((p) => ({ ...p, stage_color: item.color }))}
+                                  className={`w-6 h-6 rounded-md border shadow-sm hover:scale-110 transition-transform ${
+                                    (groundConfig.stage_color || "#4c1d95") === item.color
+                                      ? "border-purple-600 ring-2 ring-purple-300"
+                                      : "border-slate-300"
+                                  }`}
+                                  style={{ backgroundColor: item.color }}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Catwalk Width Slider */}
+                        <div>
+                          <div className="flex items-center justify-between text-[11px] font-bold text-slate-700 mb-1">
+                            <span>Catwalk Runway Width</span>
+                            <span className="text-purple-700 font-mono bg-purple-100/90 px-1.5 py-0.5 rounded text-[10px]">
+                              {groundConfig.catwalk_width ?? 16}%
+                            </span>
+                          </div>
+                          <input
+                            type="range"
+                            min={10}
+                            max={30}
+                            step={1}
+                            value={groundConfig.catwalk_width ?? 16}
+                            onChange={(e) =>
+                              setGroundConfig((prev) => ({
+                                ...prev,
+                                catwalk_width: Number(e.target.value),
+                              }))
+                            }
+                            className="w-full accent-purple-600 cursor-pointer h-1.5 bg-purple-200 rounded-lg"
+                          />
+                          <div className="flex justify-between text-[9px] text-slate-400 mt-0.5">
+                            <span>Slim (10%)</span>
+                            <span>Standard (16%)</span>
+                            <span>Wide (30%)</span>
+                          </div>
+                        </div>
+
+                        {/* Catwalk Length / Runway Extension Slider */}
+                        <div>
+                          <div className="flex items-center justify-between text-[11px] font-bold text-slate-700 mb-1">
+                            <span>Catwalk Runway Length / Extension</span>
+                            <span className="text-purple-700 font-mono bg-purple-100/90 px-1.5 py-0.5 rounded text-[10px]">
+                              {groundConfig.catwalk_length ?? 18}%
+                            </span>
+                          </div>
+                          <input
+                            type="range"
+                            min={10}
+                            max={35}
+                            step={1}
+                            value={groundConfig.catwalk_length ?? 18}
+                            onChange={(e) =>
+                              setGroundConfig((prev) => ({
+                                ...prev,
+                                catwalk_length: Number(e.target.value),
+                              }))
+                            }
+                            className="w-full accent-purple-600 cursor-pointer h-1.5 bg-purple-200 rounded-lg"
+                          />
+                          <div className="flex justify-between text-[9px] text-slate-400 mt-0.5">
+                            <span>Short (10%)</span>
+                            <span>Standard (18%)</span>
+                            <span>Deep Runway (35%)</span>
+                          </div>
+                        </div>
+
+                        {/* Main Stage Label */}
+                        <div>
+                          <label className="text-[11px] font-bold text-slate-700 block mb-1">🎤 Stage Deck Label</label>
+                          <input
+                            className="w-full text-xs font-bold bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 shadow-sm"
+                            value={groundConfig.stage_label ?? groundConfig.pitch_label}
+                            onChange={(e) =>
+                              setGroundConfig((prev) => ({
+                                ...prev,
+                                stage_label: e.target.value,
+                                pitch_label: e.target.value,
+                              }))
+                            }
+                            placeholder="e.g. MAIN STAGE or ARTIST / FESTIVAL NAME"
+                          />
+                        </div>
+
+                        {/* Catwalk Runway Label */}
+                        <div>
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="text-[11px] font-bold text-slate-700">T-Runway / Catwalk Label</label>
+                            <span className="text-[10px] text-slate-400 font-semibold">Optional</span>
+                          </div>
+                          <input
+                            className="w-full text-xs font-bold bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 shadow-sm"
+                            value={groundConfig.catwalk_label ?? ""}
+                            onChange={(e) =>
+                              setGroundConfig((prev) => ({
+                                ...prev,
+                                catwalk_label: e.target.value,
+                              }))
+                            }
+                            placeholder="Leave empty for clean runway (No text)"
+                          />
+                          <p className="text-[10px] text-slate-500 mt-1">
+                            Text on catwalk is hidden by default for a clean aesthetic. Type here only if you wish to label it.
+                          </p>
+                        </div>
                       </div>
                     </div>
                   ) : (

@@ -3120,6 +3120,7 @@ export const api = createApi({
       query: () => '/businesses/cuisines',
       transformResponse: (res: { data?: DiningCuisineMaster[] }) => res?.data ?? [],
       providesTags: [{ type: 'DiningMasters', id: 'PUBLIC_LIST' }],
+      keepUnusedDataFor: 300,
     }),
 
     getCities: builder.query<CityMaster[], { q?: string; popular?: boolean; country_id?: number } | void>({
@@ -3133,6 +3134,7 @@ export const api = createApi({
       },
       transformResponse: (res: { data?: CityMaster[] }) => res?.data ?? [],
       providesTags: [{ type: 'CityMasters', id: 'PUBLIC_LIST' }],
+      keepUnusedDataFor: 300,
     }),
 
     getBusinessTypes: builder.query<
@@ -3144,6 +3146,7 @@ export const api = createApi({
         return `/businesses/types${qs}`;
       },
       transformResponse: (res: { data: BusinessType[] }) => res.data || [],
+      keepUnusedDataFor: 300,
     }),
 
     getPartnerDocumentMasters: builder.query<
@@ -6691,6 +6694,7 @@ export const api = createApi({
       query: () => '/events/public/filters',
       transformResponse: (res: { data: PublicEventFilters }) => res.data,
       providesTags: ['PublicEvents'],
+      keepUnusedDataFor: 300,
     }),
 
     getPublicRegisteredVenues: builder.query<
@@ -7726,6 +7730,7 @@ export const api = createApi({
       transformResponse: (res: { data?: PublicMovieFilters }) =>
         res?.data ?? { languages: [], genres: [], formats: [] },
       providesTags: [{ type: 'Movies', id: 'PUBLIC_FILTERS' }],
+      keepUnusedDataFor: 300,
     }),
 
     getPublicMovie: builder.query<Movie, string>({

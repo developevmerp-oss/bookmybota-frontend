@@ -21,12 +21,16 @@ export function useHomeCatalog(city: string) {
     isLoading: cityEventsLoading,
     isFetching: cityEventsFetching,
   } = useGetPublicEventsQuery(hasCity ? { city } : undefined);
+  // Only query heavy global catalog as fallback if a selected city returns 0 results
+  const needEventsFallback =
+    hasCity && !cityEventsLoading && !cityEventsFetching && cityEvents.length === 0;
+
   const {
     data: allEvents = [],
     isLoading: allEventsLoading,
     isFetching: allEventsFetching,
   } = useGetPublicEventsQuery(undefined, {
-    skip: !hasCity,
+    skip: !needEventsFallback,
   });
 
   const {
@@ -37,13 +41,17 @@ export function useHomeCatalog(city: string) {
     module: "dining",
     ...(hasCity ? { city } : {}),
   });
+
+  const needDiningFallback =
+    hasCity && !cityDiningLoading && !cityDiningFetching && cityDining.length === 0;
+
   const {
     data: allDiningRaw = [],
     isLoading: allDiningLoading,
     isFetching: allDiningFetching,
   } = useGetBusinessesQuery(
     { module: "dining" },
-    { skip: !hasCity }
+    { skip: !needDiningFallback }
   );
 
   const fallbackEvents = hasCity ? allEvents : cityEvents;

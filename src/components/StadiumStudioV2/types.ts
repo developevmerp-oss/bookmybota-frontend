@@ -79,6 +79,9 @@ export interface StadiumGroundConfigV2 {
   pitch_label: string;
   stage_label?: string;
   catwalk_label?: string;
+  stage_color?: string;
+  catwalk_width?: number;
+  catwalk_length?: number;
   turf_color: string;
   track_color?: string;
   shape?: "rectangle" | "oval" | "capsule";

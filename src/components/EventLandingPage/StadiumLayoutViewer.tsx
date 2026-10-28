@@ -1881,116 +1881,157 @@ export default function StadiumLayoutViewer({
                     y={pitchH * 0.02}
                     width={pitchW * 0.80}
                     height={pitchH * 0.18}
-                    fill="#4c1d95"
+                    fill={(data as any)?.ground?.stage_color || "#4c1d95"}
                     opacity={((data as any)?.ground?.turf_color && (data as any)?.ground?.turf_color !== "#090d16" && (data as any)?.ground?.turf_color !== "#ffffff") ? 0.35 : 0.12}
                     cornerRadius={12}
                     shadowColor="#a855f7"
                     shadowBlur={20}
                   />
 
-                  {/* 1. Main Stage */}
-                  <Rect
-                    x={pitchW * 0.12}
-                    y={pitchH * 0.03}
-                    width={pitchW * 0.76}
-                    height={pitchH * 0.16}
-                    fill="#4c1d95"
-                    stroke="#c084fc"
-                    strokeWidth={3}
-                    cornerRadius={8}
-                    shadowColor="#a855f7"
-                    shadowBlur={16}
-                  />
+                  {/* Unified T-Stage Deck & Catwalk Runway (Seamless Single Geometry - Same Color, No Seam/Gap) */}
+                  {(() => {
+                    const ground = (data as any)?.ground || {};
+                    const sX = pitchW * 0.12;
+                    const sY = pitchH * 0.03;
+                    const sW = pitchW * 0.76;
+                    const sH = pitchH * 0.16;
+                    const sBottom = sY + sH;
 
-                  {/* Stage Rig / Spotlight Accents */}
-                  <Circle x={pitchW * 0.15} y={pitchH * 0.06} radius={6} fill="#fbbf24" opacity={0.85} />
-                  <Circle x={pitchW * 0.20} y={pitchH * 0.06} radius={6} fill="#ec4899" opacity={0.85} />
-                  <Circle x={pitchW * 0.80} y={pitchH * 0.06} radius={6} fill="#ec4899" opacity={0.85} />
-                  <Circle x={pitchW * 0.85} y={pitchH * 0.06} radius={6} fill="#fbbf24" opacity={0.85} />
+                    const stageColor = ground.stage_color || "#4c1d95";
+                    const cWidthPct = Math.min(0.35, Math.max(0.08, ((ground.catwalk_width ?? 16) / 100)));
+                    const cLengthPct = Math.min(0.40, Math.max(0.08, ((ground.catwalk_length ?? 18) / 100)));
 
-                  {/* Stage Label */}
-                  {(((data as any)?.ground?.stage_label ?? (data as any)?.ground?.pitch_label) || "MAIN STAGE").trim().length > 0 && (
-                    <Text
-                      text={`🎤 ${(((data as any)?.ground?.stage_label ?? (data as any)?.ground?.pitch_label) || "MAIN STAGE").trim().toUpperCase()}`}
-                      x={pitchW * 0.12}
-                      y={pitchH * 0.03 + pitchH * 0.05}
-                      width={pitchW * 0.76}
-                      align="center"
-                      fontSize={Math.max(14, pitchH * 0.04)}
-                      fontStyle="bold"
-                      fill="#ffffff"
-                    />
-                  )}
+                    const cW = pitchW * cWidthPct;
+                    const cH = pitchH * cLengthPct;
+                    const cX = (pitchW - cW) / 2;
+                    const cBottom = sBottom + cH;
 
-                  {/* 2. Catwalk / T-Runway (Projecting Down into Audience) */}
-                  <Rect
-                    x={pitchW * 0.42}
-                    y={pitchH * 0.19}
-                    width={pitchW * 0.16}
-                    height={pitchH * 0.18}
-                    fill="#581c87"
-                    stroke="#d8b4fe"
-                    strokeWidth={2.5}
-                    cornerRadius={[0, 0, 8, 8]}
-                  />
+                    // Single closed polygon for entire T-Stage deck (Main Stage + Catwalk)
+                    const tStagePoints = [
+                      sX, sY,              // top-left of main stage
+                      sX + sW, sY,         // top-right of main stage
+                      sX + sW, sBottom,    // bottom-right of main stage
+                      cX + cW, sBottom,    // right intersection into runway
+                      cX + cW, cBottom,    // bottom-right tip of runway
+                      cX, cBottom,         // bottom-left tip of runway
+                      cX, sBottom,         // left intersection from runway to stage
+                      sX, sBottom          // bottom-left of main stage
+                    ];
 
-                  {/* Catwalk Runway Floor Edge Lights */}
-                  <Line
-                    points={[
-                      pitchW * 0.435, pitchH * 0.20,
-                      pitchW * 0.435, pitchH * 0.35
-                    ]}
-                    stroke="#e9d5ff"
-                    strokeWidth={1.5}
-                    dash={[4, 6]}
-                    opacity={0.7}
-                  />
-                  <Line
-                    points={[
-                      pitchW * 0.565, pitchH * 0.20,
-                      pitchW * 0.565, pitchH * 0.35
-                    ]}
-                    stroke="#e9d5ff"
-                    strokeWidth={1.5}
-                    dash={[4, 6]}
-                    opacity={0.7}
-                  />
+                    return (
+                      <>
+                        {/* 1. Seamless Unified T-Stage Deck */}
+                        <Line
+                          points={tStagePoints}
+                          closed={true}
+                          fill={stageColor}
+                          stroke="#c084fc"
+                          strokeWidth={3}
+                          lineJoin="round"
+                          shadowColor="#a855f7"
+                          shadowBlur={16}
+                        />
 
-                  {/* Optional Catwalk Text (Only shown if custom label is configured; static 'CATWALK' removed) */}
-                  {(data as any)?.ground?.catwalk_label && (data as any)?.ground?.catwalk_label.trim().length > 0 && (
-                    <Text
-                      text={(data as any).ground.catwalk_label.trim().toUpperCase()}
-                      x={pitchW * 0.42}
-                      y={pitchH * 0.19 + pitchH * 0.06}
-                      width={pitchW * 0.16}
-                      align="center"
-                      fontSize={Math.max(10, pitchH * 0.026)}
-                      fontStyle="bold"
-                      fill="#f3e8ff"
-                    />
-                  )}
+                        {/* Stage Rig / Spotlight Accents on Main Deck */}
+                        <Circle x={sX + sW * 0.04} y={sY + sH * 0.22} radius={6} fill="#fbbf24" opacity={0.85} />
+                        <Circle x={sX + sW * 0.10} y={sY + sH * 0.22} radius={6} fill="#ec4899" opacity={0.85} />
+                        <Circle x={sX + sW * 0.90} y={sY + sH * 0.22} radius={6} fill="#ec4899" opacity={0.85} />
+                        <Circle x={sX + sW * 0.96} y={sY + sH * 0.22} radius={6} fill="#fbbf24" opacity={0.85} />
 
-                  {/* Stage Barricade Guidelines */}
-                  <Line
-                    points={[
-                      pitchW * 0.10, pitchH * 0.19,
-                      pitchW * 0.41, pitchH * 0.19
-                    ]}
-                    stroke="#64748b"
-                    strokeWidth={1.5}
-                    dash={[6, 4]}
-                    opacity={0.5}
-                  />
-                  <Line
-                    points={[
-                      pitchW * 0.59, pitchH * 0.19,
-                      pitchW * 0.90, pitchH * 0.19
-                    ]}
-                    stroke="#64748b"
-                    strokeWidth={1.5}
-                    dash={[6, 4]}
-                    opacity={0.5}
-                  />
+                        {/* Main Stage Label */}
+                        {(((ground.stage_label ?? ground.pitch_label) || "MAIN STAGE").trim().length > 0) && (
+                          <Text
+                            text={`🎤 ${((ground.stage_label ?? ground.pitch_label) || "MAIN STAGE").trim().toUpperCase()}`}
+                            x={sX}
+                            y={sY + sH * 0.30}
+                            width={sW}
+                            align="center"
+                            fontSize={Math.max(14, pitchH * 0.04)}
+                            fontStyle="bold"
+                            fill="#ffffff"
+                          />
+                        )}
+
+                        {/* Catwalk Runway Floor Edge Lights */}
+                        <Line
+                          points={[
+                            cX + cW * 0.10, sBottom + 6,
+                            cX + cW * 0.10, cBottom - 6
+                          ]}
+                          stroke="#e9d5ff"
+                          strokeWidth={2}
+                          dash={[4, 6]}
+                          opacity={0.8}
+                        />
+                        <Line
+                          points={[
+                            cX + cW * 0.90, sBottom + 6,
+                            cX + cW * 0.90, cBottom - 6
+                          ]}
+                          stroke="#e9d5ff"
+                          strokeWidth={2}
+                          dash={[4, 6]}
+                          opacity={0.8}
+                        />
+
+                        {/* Optional Runway Label (Only shown if custom label is configured) */}
+                        {ground.catwalk_label && ground.catwalk_label.trim().length > 0 && (
+                          <Text
+                            text={ground.catwalk_label.trim().toUpperCase()}
+                            x={cX}
+                            y={sBottom + cH * 0.35}
+                            width={cW}
+                            align="center"
+                            fontSize={Math.max(10, pitchH * 0.026)}
+                            fontStyle="bold"
+                            fill="#f3e8ff"
+                          />
+                        )}
+
+                        {/* Crowd Control Barricades around the Stage & Runway */}
+                        <Line
+                          points={[
+                            pitchW * 0.08, sBottom + 2,
+                            cX - 12, sBottom + 2
+                          ]}
+                          stroke="#94a3b8"
+                          strokeWidth={1.5}
+                          dash={[5, 5]}
+                          opacity={0.7}
+                        />
+                        <Line
+                          points={[
+                            cX + cW + 12, sBottom + 2,
+                            pitchW * 0.92, sBottom + 2
+                          ]}
+                          stroke="#94a3b8"
+                          strokeWidth={1.5}
+                          dash={[5, 5]}
+                          opacity={0.7}
+                        />
+                        <Line
+                          points={[
+                            cX - 12, sBottom + 2,
+                            cX - 12, cBottom + 12
+                          ]}
+                          stroke="#94a3b8"
+                          strokeWidth={1.5}
+                          dash={[5, 5]}
+                          opacity={0.7}
+                        />
+                        <Line
+                          points={[
+                            cX + cW + 12, sBottom + 2,
+                            cX + cW + 12, cBottom + 12
+                          ]}
+                          stroke="#94a3b8"
+                          strokeWidth={1.5}
+                          dash={[5, 5]}
+                          opacity={0.7}
+                        />
+                      </>
+                    );
+                  })()}
 
                   {/* FOH Audio Console / Sound Booth */}
                   <Rect

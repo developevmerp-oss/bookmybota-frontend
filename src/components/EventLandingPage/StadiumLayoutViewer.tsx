@@ -1550,7 +1550,19 @@ export default function StadiumLayoutViewer({
                       }`}
                   >
                     <span className="block text-[11px] md:max-lg:text-[13px] lg:text-[12px] font-extrabold leading-snug text-slate-900 line-clamp-2 lg:line-clamp-none">
-                      {block.stand_type === "standing" ? `🧍 ${block.name}` : block.name}
+                      {(() => {
+                        const bLower = (block.name || "").toLowerCase();
+                        const icon = bLower.includes("platinum") || bLower.includes("plat")
+                          ? "💎"
+                          : bLower.includes("gold")
+                          ? "⭐"
+                          : bLower.includes("silver")
+                          ? "🪙"
+                          : bLower.includes("pit") || block.stand_type === "standing"
+                          ? "🔥"
+                          : "🎟️";
+                        return `${icon} ${block.name}`;
+                      })()}
                     </span>
                     {minPrice != null && minPrice > 0 && (
                       <span className="block text-[11px] md:max-lg:text-[13px] lg:text-[12px] font-bold text-slate-800 leading-tight mt-0.5">
@@ -1857,7 +1869,7 @@ export default function StadiumLayoutViewer({
                   />
                 </>
               ) : ((data as any)?.ground?.sport_type === "festival_t_stage") ? (
-                // 🎸 5. FESTIVAL T-STAGE & TIERED ZONES (Stage + Catwalk + Fan Pit L/R + Platinum + Gold + Silver)
+                // 🎸 5. FESTIVAL T-STAGE & PERFORMANCE ARENA
                 <>
                   {/* Dark Arena Base */}
                   <Rect
@@ -1866,9 +1878,22 @@ export default function StadiumLayoutViewer({
                     width={pitchW}
                     height={pitchH}
                     fill={(data as any)?.ground?.turf_color || "#090d16"}
-                    stroke="#818cf8"
-                    strokeWidth={3}
+                    stroke="#6366f1"
+                    strokeWidth={2.5}
                     cornerRadius={16}
+                  />
+
+                  {/* Stage Ambient Glow Effect */}
+                  <Rect
+                    x={pitchW * 0.10}
+                    y={pitchH * 0.02}
+                    width={pitchW * 0.80}
+                    height={pitchH * 0.18}
+                    fill="#4c1d95"
+                    opacity={0.35}
+                    cornerRadius={12}
+                    shadowColor="#a855f7"
+                    shadowBlur={26}
                   />
 
                   {/* 1. Main Stage */}
@@ -1884,18 +1909,28 @@ export default function StadiumLayoutViewer({
                     shadowColor="#a855f7"
                     shadowBlur={16}
                   />
-                  <Text
-                    text="🎤 MAIN STAGE"
-                    x={pitchW * 0.12}
-                    y={pitchH * 0.03 + pitchH * 0.05}
-                    width={pitchW * 0.76}
-                    align="center"
-                    fontSize={Math.max(14, pitchH * 0.04)}
-                    fontStyle="bold"
-                    fill="#ffffff"
-                  />
 
-                  {/* 2. Catwalk / T-Runway */}
+                  {/* Stage Rig / Spotlight Accents */}
+                  <Circle x={pitchW * 0.15} y={pitchH * 0.06} radius={6} fill="#fbbf24" opacity={0.85} />
+                  <Circle x={pitchW * 0.20} y={pitchH * 0.06} radius={6} fill="#ec4899" opacity={0.85} />
+                  <Circle x={pitchW * 0.80} y={pitchH * 0.06} radius={6} fill="#ec4899" opacity={0.85} />
+                  <Circle x={pitchW * 0.85} y={pitchH * 0.06} radius={6} fill="#fbbf24" opacity={0.85} />
+
+                  {/* Stage Label */}
+                  {(((data as any)?.ground?.stage_label ?? (data as any)?.ground?.pitch_label) || "MAIN STAGE").trim().length > 0 && (
+                    <Text
+                      text={`🎤 ${(((data as any)?.ground?.stage_label ?? (data as any)?.ground?.pitch_label) || "MAIN STAGE").trim().toUpperCase()}`}
+                      x={pitchW * 0.12}
+                      y={pitchH * 0.03 + pitchH * 0.05}
+                      width={pitchW * 0.76}
+                      align="center"
+                      fontSize={Math.max(14, pitchH * 0.04)}
+                      fontStyle="bold"
+                      fill="#ffffff"
+                    />
+                  )}
+
+                  {/* 2. Catwalk / T-Runway (Projecting Down into Audience) */}
                   <Rect
                     x={pitchW * 0.42}
                     y={pitchH * 0.19}
@@ -1906,125 +1941,87 @@ export default function StadiumLayoutViewer({
                     strokeWidth={2.5}
                     cornerRadius={[0, 0, 8, 8]}
                   />
-                  <Text
-                    text="CATWALK"
-                    x={pitchW * 0.42}
-                    y={pitchH * 0.19 + pitchH * 0.06}
-                    width={pitchW * 0.16}
-                    align="center"
-                    fontSize={Math.max(10, pitchH * 0.026)}
-                    fontStyle="bold"
-                    fill="#f3e8ff"
+
+                  {/* Catwalk Runway Floor Edge Lights */}
+                  <Line
+                    points={[
+                      pitchW * 0.435, pitchH * 0.20,
+                      pitchW * 0.435, pitchH * 0.35
+                    ]}
+                    stroke="#e9d5ff"
+                    strokeWidth={1.5}
+                    dash={[4, 6]}
+                    opacity={0.7}
+                  />
+                  <Line
+                    points={[
+                      pitchW * 0.565, pitchH * 0.20,
+                      pitchW * 0.565, pitchH * 0.35
+                    ]}
+                    stroke="#e9d5ff"
+                    strokeWidth={1.5}
+                    dash={[4, 6]}
+                    opacity={0.7}
                   />
 
-                  {/* 3. Fan Pit Left */}
-                  <Rect
-                    x={pitchW * 0.12}
-                    y={pitchH * 0.20}
-                    width={pitchW * 0.27}
-                    height={pitchH * 0.16}
-                    fill="#831843"
-                    stroke="#f472b6"
-                    strokeWidth={2}
-                    cornerRadius={8}
+                  {/* Optional Catwalk Text (Only shown if custom label is configured; static 'CATWALK' removed) */}
+                  {(data as any)?.ground?.catwalk_label && (data as any)?.ground?.catwalk_label.trim().length > 0 && (
+                    <Text
+                      text={(data as any).ground.catwalk_label.trim().toUpperCase()}
+                      x={pitchW * 0.42}
+                      y={pitchH * 0.19 + pitchH * 0.06}
+                      width={pitchW * 0.16}
+                      align="center"
+                      fontSize={Math.max(10, pitchH * 0.026)}
+                      fontStyle="bold"
+                      fill="#f3e8ff"
+                    />
+                  )}
+
+                  {/* Stage Barricade Guidelines */}
+                  <Line
+                    points={[
+                      pitchW * 0.10, pitchH * 0.19,
+                      pitchW * 0.41, pitchH * 0.19
+                    ]}
+                    stroke="#64748b"
+                    strokeWidth={1.5}
+                    dash={[6, 4]}
+                    opacity={0.5}
                   />
-                  <Text
-                    text="🔥 FAN PIT (L)"
-                    x={pitchW * 0.12}
-                    y={pitchH * 0.20 + pitchH * 0.05}
-                    width={pitchW * 0.27}
-                    align="center"
-                    fontSize={Math.max(11, pitchH * 0.03)}
-                    fontStyle="bold"
-                    fill="#fdf2f8"
+                  <Line
+                    points={[
+                      pitchW * 0.59, pitchH * 0.19,
+                      pitchW * 0.90, pitchH * 0.19
+                    ]}
+                    stroke="#64748b"
+                    strokeWidth={1.5}
+                    dash={[6, 4]}
+                    opacity={0.5}
                   />
 
-                  {/* 4. Fan Pit Right */}
+                  {/* FOH Audio Console / Sound Booth */}
                   <Rect
-                    x={pitchW * 0.61}
-                    y={pitchH * 0.20}
-                    width={pitchW * 0.27}
-                    height={pitchH * 0.16}
-                    fill="#831843"
-                    stroke="#f472b6"
-                    strokeWidth={2}
-                    cornerRadius={8}
+                    x={pitchW * 0.44}
+                    y={pitchH * 0.92}
+                    width={pitchW * 0.12}
+                    height={pitchH * 0.06}
+                    fill="#1e1b4b"
+                    stroke="#4338ca"
+                    strokeWidth={1.5}
+                    cornerRadius={4}
+                    opacity={0.65}
                   />
                   <Text
-                    text="🔥 FAN PIT (R)"
-                    x={pitchW * 0.61}
-                    y={pitchH * 0.20 + pitchH * 0.05}
-                    width={pitchW * 0.27}
+                    text="🎛️ FOH / AUDIO"
+                    x={pitchW * 0.44}
+                    y={pitchH * 0.92 + pitchH * 0.015}
+                    width={pitchW * 0.12}
                     align="center"
-                    fontSize={Math.max(11, pitchH * 0.03)}
+                    fontSize={9}
                     fontStyle="bold"
-                    fill="#fdf2f8"
-                  />
-
-                  {/* 5. Platinum Tier */}
-                  <Rect
-                    x={pitchW * 0.10}
-                    y={pitchH * 0.39}
-                    width={pitchW * 0.80}
-                    height={pitchH * 0.17}
-                    fill="#0f172a"
-                    stroke="#38bdf8"
-                    strokeWidth={2.5}
-                    cornerRadius={8}
-                  />
-                  <Text
-                    text="💎 PLATINUM"
-                    x={pitchW * 0.10}
-                    y={pitchH * 0.39 + pitchH * 0.055}
-                    width={pitchW * 0.80}
-                    align="center"
-                    fontSize={Math.max(13, pitchH * 0.035)}
-                    fontStyle="bold"
-                    fill="#38bdf8"
-                  />
-
-                  {/* 6. Gold Tier */}
-                  <Rect
-                    x={pitchW * 0.10}
-                    y={pitchH * 0.58}
-                    width={pitchW * 0.80}
-                    height={pitchH * 0.17}
-                    fill="#1c1917"
-                    stroke="#eab308"
-                    strokeWidth={2.5}
-                    cornerRadius={8}
-                  />
-                  <Text
-                    text="⭐ GOLD"
-                    x={pitchW * 0.10}
-                    y={pitchH * 0.58 + pitchH * 0.055}
-                    width={pitchW * 0.80}
-                    align="center"
-                    fontSize={Math.max(13, pitchH * 0.035)}
-                    fontStyle="bold"
-                    fill="#eab308"
-                  />
-
-                  {/* 7. Silver Tier */}
-                  <Rect
-                    x={pitchW * 0.10}
-                    y={pitchH * 0.77}
-                    width={pitchW * 0.80}
-                    height={pitchH * 0.17}
-                    fill="#020617"
-                    stroke="#94a3b8"
-                    strokeWidth={2.5}
-                    cornerRadius={8}
-                  />
-                  <Text
-                    text="🪙 SILVER"
-                    x={pitchW * 0.10}
-                    y={pitchH * 0.77 + pitchH * 0.055}
-                    width={pitchW * 0.80}
-                    align="center"
-                    fontSize={Math.max(13, pitchH * 0.035)}
-                    fontStyle="bold"
-                    fill="#cbd5e1"
+                    fill="#818cf8"
+                    opacity={0.75}
                   />
                 </>
               ) : ((data as any)?.ground?.sport_type === "custom") ? (
@@ -2799,107 +2796,192 @@ export default function StadiumLayoutViewer({
                       )}
                     </>
                   ) : (
-                    // ── Single-Tier Stand: standard Rect/Pill rendering ──
-                    <>
-                      <Rect
-                        x={0}
-                        y={0}
-                        width={block.width}
-                        height={block.height}
-                        fill={
-                          isSelected
-                            ? isSoldOut
-                              ? "#E2E8F0"
-                              : "#F3E8FF"
-                            : isSoldOut
-                              ? "#94A3B8"
-                              : block.color || "#2563eb"
-                        }
-                        opacity={isSelected ? 0.92 : 0.95}
-                        stroke={
-                          isSelected
-                            ? "#6900AA"
-                            : isHovered
-                              ? "#6900AA"
-                              : isSoldOut
-                                ? "#94A3B8"
-                                : "rgba(15,23,42,0.18)"
-                        }
-                        strokeWidth={isSelected ? 4 : isHovered ? 3 : 1.5}
-                        cornerRadius={
-                          (block as any).shape === "pill"
-                            ? Math.min(block.width, block.height) / 2
-                            : (block as any).shape === "curved"
-                              ? [
-                                Math.min(block.width, block.height) * 0.45,
-                                Math.min(block.width, block.height) * 0.45,
-                                12,
-                                12,
-                              ]
-                              : 12
-                        }
-                        shadowColor="#0f172a"
-                        shadowBlur={isHovered || isSelected ? 10 : 4}
-                        shadowOpacity={0.12}
-                        perfectDrawEnabled={false}
-                      />
+                    // ── Single-Tier Stand: Premium Luxury Card / Pill rendering ──
+                    (() => {
+                      const bName = block.name || "";
+                      const bLower = bName.toLowerCase();
+                      const isPlatinum = bLower.includes("platinum") || bLower.includes("plat");
+                      const isGold = bLower.includes("gold");
+                      const isSilver = bLower.includes("silver");
+                      const isFanPit = bLower.includes("fan pit") || bLower.includes("fanpit") || bLower.includes("pit");
 
-                      {/* Stand Name & Price Header - Hidden when zoomed in and selected */}
-                      {!isSelected && (
+                      // Theme styling for tiers
+                      let standBg = isSoldOut ? "#1e293b" : (block.color || "#1e293b");
+                      let standStroke = "rgba(255,255,255,0.22)";
+                      let accentColor = block.color || "#6366f1";
+                      let tierIcon = isStanding ? "🔥" : "🎟️";
+                      let shadowCol = "#000000";
+                      let priceHighlight = "#fef08a";
+
+                      if (isPlatinum) {
+                        standBg = isSoldOut ? "#1e293b" : "#0a192f"; // Luxury deep midnight sapphire
+                        standStroke = isSelected ? "#38bdf8" : isHovered ? "#7dd3fc" : "#0284c7";
+                        accentColor = "#38bdf8";
+                        tierIcon = "💎";
+                        shadowCol = "#0284c7";
+                        priceHighlight = "#7dd3fc";
+                      } else if (isGold) {
+                        standBg = isSoldOut ? "#1e293b" : "#1c1404"; // Luxury deep obsidian gold
+                        standStroke = isSelected ? "#f59e0b" : isHovered ? "#fde047" : "#d97706";
+                        accentColor = "#f59e0b";
+                        tierIcon = "⭐";
+                        shadowCol = "#d97706";
+                        priceHighlight = "#fde047";
+                      } else if (isSilver) {
+                        standBg = isSoldOut ? "#1e293b" : "#0f172a"; // Luxury metallic slate
+                        standStroke = isSelected ? "#cbd5e1" : isHovered ? "#f1f5f9" : "#64748b";
+                        accentColor = "#cbd5e1";
+                        tierIcon = "🪙";
+                        shadowCol = "#64748b";
+                        priceHighlight = "#e2e8f0";
+                      } else if (isFanPit) {
+                        standBg = isSoldOut ? "#1e293b" : "#2e0819"; // Luxury electric rose velvet
+                        standStroke = isSelected ? "#f472b6" : isHovered ? "#fbcfe8" : "#db2777";
+                        accentColor = "#f472b6";
+                        tierIcon = "🔥";
+                        shadowCol = "#ec4899";
+                        priceHighlight = "#fbcfe8";
+                      }
+
+                      if (isSoldOut) {
+                        standBg = "#1e293b";
+                        standStroke = "#475569";
+                        accentColor = "#64748b";
+                        priceHighlight = "#ef4444";
+                      } else if (isSelected) {
+                        standStroke = "#a855f7";
+                      } else if (isHovered) {
+                        standStroke = "#ffffff";
+                      }
+
+                      const pillW = Math.min(block.width - 24, 250);
+                      const pillH = Math.min(26, Math.max(20, block.height * 0.30));
+                      const pillX = (block.width - pillW) / 2;
+                      const pillY = Math.max(block.height * 0.52, block.height - pillH - 8);
+
+                      return (
                         <>
-                          <Text
-                            text={isStanding ? `🧍 ${block.name.toUpperCase()}` : block.name.toUpperCase()}
+                          {/* Stand Card Base */}
+                          <Rect
                             x={0}
-                            y={Math.max(6, block.height * 0.12)}
+                            y={0}
                             width={block.width}
-                            align="center"
-                            fontSize={Math.max(15, Math.min(block.width, block.height) * 0.16) * mapLabelScale}
-                            fontStyle="bold"
-                            fill={isSoldOut ? "#94a3b8" : "#ffffff"}
-                            shadowColor="#000000"
-                            shadowBlur={6}
-                            shadowOpacity={0.6}
-                            listening={false}
-                            wrap="none"
-                            ellipsis={true}
+                            height={block.height}
+                            fill={standBg}
+                            opacity={isSelected ? 0.96 : 0.94}
+                            stroke={standStroke}
+                            strokeWidth={isSelected ? 3.5 : isHovered ? 2.5 : 1.75}
+                            cornerRadius={
+                              (block as any).shape === "pill"
+                                ? Math.min(block.width, block.height) / 2
+                                : (block as any).shape === "curved"
+                                  ? [
+                                    Math.min(block.width, block.height) * 0.45,
+                                    Math.min(block.width, block.height) * 0.45,
+                                    14,
+                                    14,
+                                  ]
+                                  : 14
+                            }
+                            shadowColor={shadowCol}
+                            shadowBlur={isHovered ? 20 : isSelected ? 16 : 8}
+                            shadowOpacity={isHovered ? 0.75 : 0.35}
                             perfectDrawEnabled={false}
                           />
 
-                          {block.total > 0 && (
+                          {/* Top Metallic / Neon Accent Strip */}
+                          {!isSoldOut && (
+                            <Rect
+                              x={14}
+                              y={2.5}
+                              width={Math.max(0, block.width - 28)}
+                              height={3}
+                              cornerRadius={1.5}
+                              fill={accentColor}
+                              opacity={0.9}
+                              listening={false}
+                              perfectDrawEnabled={false}
+                            />
+                          )}
+
+                          {/* Stand Name Header - Hidden when zoomed in and selected */}
+                          {!isSelected && (
+                            <>
+                              <Text
+                                text={`${tierIcon} ${block.name.toUpperCase()}`}
+                                x={6}
+                                y={Math.max(6, block.height * 0.13)}
+                                width={block.width - 12}
+                                align="center"
+                                fontSize={Math.max(13, Math.min(block.width * 0.055, block.height * 0.22)) * mapLabelScale}
+                                fontStyle="bold"
+                                fill={isSoldOut ? "#94a3b8" : "#ffffff"}
+                                shadowColor="#000000"
+                                shadowBlur={5}
+                                shadowOpacity={0.7}
+                                listening={false}
+                                wrap="none"
+                                ellipsis={true}
+                                perfectDrawEnabled={false}
+                              />
+
+                              {/* Sleek Pill Badge for Price & Passes / Seats left */}
+                              {block.total > 0 && (
+                                <Group x={pillX} y={pillY} listening={false}>
+                                  <Rect
+                                    x={0}
+                                    y={0}
+                                    width={pillW}
+                                    height={pillH}
+                                    cornerRadius={pillH / 2}
+                                    fill="rgba(0, 0, 0, 0.55)"
+                                    stroke={isSoldOut ? "rgba(239, 68, 68, 0.4)" : "rgba(255, 255, 255, 0.22)"}
+                                    strokeWidth={1}
+                                    perfectDrawEnabled={false}
+                                  />
+                                  <Text
+                                    text={
+                                      isSoldOut
+                                        ? "SOLD OUT"
+                                        : `${minPrice != null && minPrice > 0 ? formatPrice(minPrice) + "  •  " : ""}${block.available} ${isStanding ? "passes" : "seats"} left`
+                                    }
+                                    x={0}
+                                    y={(pillH - 12) / 2}
+                                    width={pillW}
+                                    align="center"
+                                    fontSize={Math.max(10, Math.min(12, pillH * 0.52))}
+                                    fontStyle="bold"
+                                    fill={priceHighlight}
+                                    shadowColor="#000000"
+                                    shadowBlur={3}
+                                    listening={false}
+                                    wrap="none"
+                                    ellipsis={true}
+                                    perfectDrawEnabled={false}
+                                  />
+                                </Group>
+                              )}
+                            </>
+                          )}
+
+                          {/* Click to Zoom In / Pick Passes Hint on Hover */}
+                          {isHovered && !selectedBlockId && !isSoldOut && (
                             <Text
-                              text={standPriceAndLeftLabel(block, minPrice)}
+                              text={isStanding ? "⚡ Click to Select Passes" : "🔍 Click to Zoom In"}
                               x={0}
-                              y={Math.max(28, block.height * 0.52)}
+                              y={block.height - 18}
                               width={block.width}
                               align="center"
-                              fontSize={Math.max(11, Math.min(block.width, block.height) * 0.11) * mapLabelScale}
+                              fontSize={10}
                               fontStyle="bold"
-                              fill={isSoldOut ? "#ef4444" : "#FEF08A"}
-                              shadowColor="#000000"
-                              shadowBlur={4}
+                              fill="#ffffff"
                               listening={false}
                               perfectDrawEnabled={false}
                             />
                           )}
                         </>
-                      )}
-                    </>
-                  )}
-
-                  {/* Click to Zoom In / Pick Passes Hint on Hover */}
-                  {isHovered && !selectedBlockId && !isSoldOut && (
-                    <Text
-                      text={isStanding ? "🧍 Click to Pick Passes" : "🔍 Click to Zoom In"}
-                      x={0}
-                      y={block.height - 20}
-                      width={block.width}
-                      align="center"
-                      fontSize={11}
-                      fontStyle="bold"
-                      fill="#ffffff"
-                      listening={false}
-                      perfectDrawEnabled={false}
-                    />
+                      );
+                    })()
                   )}
                 </Group>
               );

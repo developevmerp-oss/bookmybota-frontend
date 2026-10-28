@@ -136,6 +136,8 @@ export interface StadiumGroundConfig {
   enabled?: boolean;
   sport_type: "football" | "cricket" | "basketball" | "tennis" | "concert" | "festival_t_stage" | "custom";
   pitch_label: string;
+  stage_label?: string;
+  catwalk_label?: string;
   turf_color: string;
   track_color?: string;
   shape?: "rectangle" | "oval" | "capsule";
@@ -3398,6 +3400,8 @@ export default function StadiumBlockBuilder({
       enabled: true,
       sport_type: type,
       pitch_label: label,
+      stage_label: type === "festival_t_stage" ? (prev.stage_label || "MAIN STAGE") : prev.stage_label,
+      catwalk_label: type === "festival_t_stage" ? (prev.catwalk_label || "") : prev.catwalk_label,
       turf_color: color,
       track_color: track,
       shape: type === "cricket" ? "oval" : "rectangle",
@@ -4696,7 +4700,7 @@ export default function StadiumBlockBuilder({
                     />
                   </>
                 ) : groundConfig.sport_type === "festival_t_stage" ? (
-                  // 🎸 5. FESTIVAL T-STAGE & TIERED ZONES (Stage + Catwalk + Fan Pit L/R + Platinum + Gold + Silver)
+                  // 🎸 5. FESTIVAL T-STAGE & PERFORMANCE ARENA
                   <>
                     {/* Dark Arena Base */}
                     <Rect
@@ -4705,9 +4709,22 @@ export default function StadiumBlockBuilder({
                       width={pitchW}
                       height={pitchH}
                       fill={groundConfig.turf_color || "#090d16"}
-                      stroke="#818cf8"
-                      strokeWidth={3}
+                      stroke="#6366f1"
+                      strokeWidth={2.5}
                       cornerRadius={16}
+                    />
+
+                    {/* Stage Ambient Glow Effect */}
+                    <Rect
+                      x={pitchW * 0.10}
+                      y={pitchH * 0.02}
+                      width={pitchW * 0.80}
+                      height={pitchH * 0.18}
+                      fill="#4c1d95"
+                      opacity={0.35}
+                      cornerRadius={12}
+                      shadowColor="#a855f7"
+                      shadowBlur={26}
                     />
 
                     {/* 1. Main Stage (Top Wide Rectangle) */}
@@ -4723,16 +4740,26 @@ export default function StadiumBlockBuilder({
                       shadowColor="#a855f7"
                       shadowBlur={16}
                     />
-                    <Text
-                      text="🎤 MAIN STAGE"
-                      x={pitchW * 0.12}
-                      y={pitchH * 0.03 + pitchH * 0.05}
-                      width={pitchW * 0.76}
-                      align="center"
-                      fontSize={Math.max(14, pitchH * 0.04)}
-                      fontStyle="bold"
-                      fill="#ffffff"
-                    />
+
+                    {/* Stage Rig / Spotlight Accents */}
+                    <Circle x={pitchW * 0.15} y={pitchH * 0.06} radius={6} fill="#fbbf24" opacity={0.85} />
+                    <Circle x={pitchW * 0.20} y={pitchH * 0.06} radius={6} fill="#ec4899" opacity={0.85} />
+                    <Circle x={pitchW * 0.80} y={pitchH * 0.06} radius={6} fill="#ec4899" opacity={0.85} />
+                    <Circle x={pitchW * 0.85} y={pitchH * 0.06} radius={6} fill="#fbbf24" opacity={0.85} />
+
+                    {/* Stage Label (Editable via Sidebar) */}
+                    {((groundConfig.stage_label ?? groundConfig.pitch_label) || "MAIN STAGE").trim().length > 0 && (
+                      <Text
+                        text={`🎤 ${((groundConfig.stage_label ?? groundConfig.pitch_label) || "MAIN STAGE").trim().toUpperCase()}`}
+                        x={pitchW * 0.12}
+                        y={pitchH * 0.03 + pitchH * 0.05}
+                        width={pitchW * 0.76}
+                        align="center"
+                        fontSize={Math.max(14, pitchH * 0.04)}
+                        fontStyle="bold"
+                        fill="#ffffff"
+                      />
+                    )}
 
                     {/* 2. Catwalk / T-Runway (Projecting Down into Audience) */}
                     <Rect
@@ -4745,125 +4772,87 @@ export default function StadiumBlockBuilder({
                       strokeWidth={2.5}
                       cornerRadius={[0, 0, 8, 8]}
                     />
-                    <Text
-                      text="CATWALK"
-                      x={pitchW * 0.42}
-                      y={pitchH * 0.19 + pitchH * 0.06}
-                      width={pitchW * 0.16}
-                      align="center"
-                      fontSize={Math.max(10, pitchH * 0.026)}
-                      fontStyle="bold"
-                      fill="#f3e8ff"
+
+                    {/* Catwalk Runway Floor Edge Lights */}
+                    <Line
+                      points={[
+                        pitchW * 0.435, pitchH * 0.20,
+                        pitchW * 0.435, pitchH * 0.35
+                      ]}
+                      stroke="#e9d5ff"
+                      strokeWidth={1.5}
+                      dash={[4, 6]}
+                      opacity={0.7}
+                    />
+                    <Line
+                      points={[
+                        pitchW * 0.565, pitchH * 0.20,
+                        pitchW * 0.565, pitchH * 0.35
+                      ]}
+                      stroke="#e9d5ff"
+                      strokeWidth={1.5}
+                      dash={[4, 6]}
+                      opacity={0.7}
                     />
 
-                    {/* 3. Fan Pit Left (Flanking Catwalk) */}
-                    <Rect
-                      x={pitchW * 0.12}
-                      y={pitchH * 0.20}
-                      width={pitchW * 0.27}
-                      height={pitchH * 0.16}
-                      fill="#831843"
-                      stroke="#f472b6"
-                      strokeWidth={2}
-                      cornerRadius={8}
+                    {/* Optional Catwalk Text (Only shown if user explicitly typed a label; static 'CATWALK' removed) */}
+                    {groundConfig.catwalk_label && groundConfig.catwalk_label.trim().length > 0 && (
+                      <Text
+                        text={groundConfig.catwalk_label.trim().toUpperCase()}
+                        x={pitchW * 0.42}
+                        y={pitchH * 0.19 + pitchH * 0.06}
+                        width={pitchW * 0.16}
+                        align="center"
+                        fontSize={Math.max(10, pitchH * 0.026)}
+                        fontStyle="bold"
+                        fill="#f3e8ff"
+                      />
+                    )}
+
+                    {/* Stage Barricade Guidelines */}
+                    <Line
+                      points={[
+                        pitchW * 0.10, pitchH * 0.19,
+                        pitchW * 0.41, pitchH * 0.19
+                      ]}
+                      stroke="#64748b"
+                      strokeWidth={1.5}
+                      dash={[6, 4]}
+                      opacity={0.5}
                     />
-                    <Text
-                      text="🔥 FAN PIT (L)"
-                      x={pitchW * 0.12}
-                      y={pitchH * 0.20 + pitchH * 0.05}
-                      width={pitchW * 0.27}
-                      align="center"
-                      fontSize={Math.max(11, pitchH * 0.03)}
-                      fontStyle="bold"
-                      fill="#fdf2f8"
+                    <Line
+                      points={[
+                        pitchW * 0.59, pitchH * 0.19,
+                        pitchW * 0.90, pitchH * 0.19
+                      ]}
+                      stroke="#64748b"
+                      strokeWidth={1.5}
+                      dash={[6, 4]}
+                      opacity={0.5}
                     />
 
-                    {/* 4. Fan Pit Right (Flanking Catwalk) */}
+                    {/* FOH Audio Console / Sound Booth */}
                     <Rect
-                      x={pitchW * 0.61}
-                      y={pitchH * 0.20}
-                      width={pitchW * 0.27}
-                      height={pitchH * 0.16}
-                      fill="#831843"
-                      stroke="#f472b6"
-                      strokeWidth={2}
-                      cornerRadius={8}
+                      x={pitchW * 0.44}
+                      y={pitchH * 0.92}
+                      width={pitchW * 0.12}
+                      height={pitchH * 0.06}
+                      fill="#1e1b4b"
+                      stroke="#4338ca"
+                      strokeWidth={1.5}
+                      cornerRadius={4}
+                      opacity={0.65}
                     />
                     <Text
-                      text="🔥 FAN PIT (R)"
-                      x={pitchW * 0.61}
-                      y={pitchH * 0.20 + pitchH * 0.05}
-                      width={pitchW * 0.27}
+                      text="🎛️ FOH / AUDIO"
+                      x={pitchW * 0.44}
+                      y={pitchH * 0.92 + pitchH * 0.015}
+                      width={pitchW * 0.12}
                       align="center"
-                      fontSize={Math.max(11, pitchH * 0.03)}
+                      fontSize={9}
                       fontStyle="bold"
-                      fill="#fdf2f8"
-                    />
-
-                    {/* 5. Platinum Tier */}
-                    <Rect
-                      x={pitchW * 0.10}
-                      y={pitchH * 0.39}
-                      width={pitchW * 0.80}
-                      height={pitchH * 0.17}
-                      fill="#0f172a"
-                      stroke="#38bdf8"
-                      strokeWidth={2.5}
-                      cornerRadius={8}
-                    />
-                    <Text
-                      text="💎 PLATINUM"
-                      x={pitchW * 0.10}
-                      y={pitchH * 0.39 + pitchH * 0.055}
-                      width={pitchW * 0.80}
-                      align="center"
-                      fontSize={Math.max(13, pitchH * 0.035)}
-                      fontStyle="bold"
-                      fill="#38bdf8"
-                    />
-
-                    {/* 6. Gold Tier */}
-                    <Rect
-                      x={pitchW * 0.10}
-                      y={pitchH * 0.58}
-                      width={pitchW * 0.80}
-                      height={pitchH * 0.17}
-                      fill="#1c1917"
-                      stroke="#eab308"
-                      strokeWidth={2.5}
-                      cornerRadius={8}
-                    />
-                    <Text
-                      text="⭐ GOLD"
-                      x={pitchW * 0.10}
-                      y={pitchH * 0.58 + pitchH * 0.055}
-                      width={pitchW * 0.80}
-                      align="center"
-                      fontSize={Math.max(13, pitchH * 0.035)}
-                      fontStyle="bold"
-                      fill="#eab308"
-                    />
-
-                    {/* 7. Silver Tier */}
-                    <Rect
-                      x={pitchW * 0.10}
-                      y={pitchH * 0.77}
-                      width={pitchW * 0.80}
-                      height={pitchH * 0.17}
-                      fill="#020617"
-                      stroke="#94a3b8"
-                      strokeWidth={2.5}
-                      cornerRadius={8}
-                    />
-                    <Text
-                      text="🪙 SILVER"
-                      x={pitchW * 0.10}
-                      y={pitchH * 0.77 + pitchH * 0.055}
-                      width={pitchW * 0.80}
-                      align="center"
-                      fontSize={Math.max(13, pitchH * 0.035)}
-                      fontStyle="bold"
-                      fill="#cbd5e1"
+                      fill="#818cf8"
+                      opacity={0.75}
                     />
                   </>
                 ) : groundConfig.sport_type === "custom" ? (
@@ -6089,6 +6078,8 @@ export default function StadiumBlockBuilder({
                           enabled: true,
                           sport_type: "festival_t_stage",
                           pitch_label: "FESTIVAL T-STAGE & ARENA",
+                          stage_label: "MAIN STAGE",
+                          catwalk_label: "",
                           turf_color: "#090d16",
                           track_color: "#020617",
                           shape: "rectangle",
@@ -8678,20 +8669,60 @@ export default function StadiumBlockBuilder({
                     </select>
                   </div>
 
-                  <div>
-                    <label className="text-xs font-bold text-slate-700 block mb-1">Center Ground Label</label>
-                    <input
-                      className="w-full text-xs font-bold bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 shadow-sm"
-                      value={groundConfig.pitch_label}
-                      onChange={(e) =>
-                        setGroundConfig((prev) => ({
-                          ...prev,
-                          pitch_label: e.target.value,
-                        }))
-                      }
-                      placeholder="e.g. MAIN PITCH or STAGE"
-                    />
-                  </div>
+                  {groundConfig.sport_type === "festival_t_stage" ? (
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-xs font-bold text-slate-700 block mb-1">🎤 Stage Deck Label</label>
+                        <input
+                          className="w-full text-xs font-bold bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 shadow-sm"
+                          value={groundConfig.stage_label ?? groundConfig.pitch_label}
+                          onChange={(e) =>
+                            setGroundConfig((prev) => ({
+                              ...prev,
+                              stage_label: e.target.value,
+                              pitch_label: e.target.value,
+                            }))
+                          }
+                          placeholder="e.g. MAIN STAGE or ARTIST / FESTIVAL NAME"
+                        />
+                      </div>
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="text-xs font-bold text-slate-700">T-Runway / Catwalk Label</label>
+                          <span className="text-[10px] text-slate-400 font-semibold">Optional</span>
+                        </div>
+                        <input
+                          className="w-full text-xs font-bold bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 shadow-sm"
+                          value={groundConfig.catwalk_label ?? ""}
+                          onChange={(e) =>
+                            setGroundConfig((prev) => ({
+                              ...prev,
+                              catwalk_label: e.target.value,
+                            }))
+                          }
+                          placeholder="Leave empty for clean runway (No text)"
+                        />
+                        <p className="text-[10px] text-slate-500 mt-1">
+                          Text on catwalk is removed by default. Type here only if you wish to label it.
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 block mb-1">Center Ground Label</label>
+                      <input
+                        className="w-full text-xs font-bold bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 shadow-sm"
+                        value={groundConfig.pitch_label}
+                        onChange={(e) =>
+                          setGroundConfig((prev) => ({
+                            ...prev,
+                            pitch_label: e.target.value,
+                          }))
+                        }
+                        placeholder="e.g. MAIN PITCH or STAGE"
+                      />
+                    </div>
+                  )}
 
                   <div>
                     <label className="text-xs font-bold text-slate-700 block mb-1">Turf / Court Color</label>

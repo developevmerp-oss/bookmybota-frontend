@@ -56,6 +56,7 @@ import {
   formatEventDateLine,
   hasCityFilter,
   preferCityOrAll,
+  prioritizeEvents,
 } from "@/components/LandingPage/homeUtils";
 import CitySectionEmptyNotice from "@/components/LandingPage/CitySectionEmptyNotice";
 import ListingPromoSlider from "@/components/LandingPage/ListingPromoSlider";
@@ -1201,7 +1202,8 @@ export default function PublicEventsPage() {
   const hasCity = hasCityFilter(city);
 
   /** Listing cards: city-first with same-filter all-city fallback (landing PreferCityOrAll). */
-  const listingEvents = preferCityOrAll(events, allPublicEvents, hasCity);
+  const rawListingEvents = preferCityOrAll(events, allPublicEvents, hasCity);
+  const listingEvents = useMemo(() => prioritizeEvents(rawListingEvents), [rawListingEvents]);
 
   const {
     data: allEventsForExploreData,

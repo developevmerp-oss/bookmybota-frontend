@@ -206,6 +206,9 @@ export default function EventCheckout({
 }: Props) {
   const isOrganizer = mode === "organizer";
   const isPage = variant === "page";
+  const eventPosterUrl = resolveMediaUrl(
+    event.poster_vertical_url || event.poster_horizontal_url
+  );
   const dispatch = useAppDispatch();
   const selectedCity = useSelectedCity();
   const authUser = useAppSelector((state) => state.auth.user);
@@ -899,18 +902,18 @@ export default function EventCheckout({
       const deliveryPayload =
         ticketMode === "PHYSICAL_DELIVERY"
           ? {
-              delivery_address_line: (delivery.delivery_address_line || "").trim(),
-              delivery_city: (delivery.delivery_city || "").trim(),
-              delivery_notes: (delivery.delivery_notes || "").trim() || undefined,
-            }
+            delivery_address_line: (delivery.delivery_address_line || "").trim(),
+            delivery_city: (delivery.delivery_city || "").trim(),
+            delivery_notes: (delivery.delivery_notes || "").trim() || undefined,
+          }
           : {};
 
       const holdPayload =
         selectedSeats.length > 0 && holdId
           ? {
-              hold_id: holdId,
-              session_token: sessionToken || readHoldSessionToken(),
-            }
+            hold_id: holdId,
+            session_token: sessionToken || readHoldSessionToken(),
+          }
           : {};
 
       let result;
@@ -994,8 +997,8 @@ export default function EventCheckout({
     const available = isStadiumLayout
       ? 10
       : (activeLayoutData?.data?.seats || []).filter(
-          (s: { status?: string }) => String(s.status || "").toUpperCase() === "AVAILABLE"
-        ).length;
+        (s: { status?: string }) => String(s.status || "").toUpperCase() === "AVAILABLE"
+      ).length;
     const cap = fromTickets.length ? Math.max(...fromTickets) : 10;
     if (available > 0) return Math.min(10, cap, available);
     return Math.min(10, cap);
@@ -1097,7 +1100,7 @@ export default function EventCheckout({
                 const nextSeat = sorted[seatIdx + 1];
                 const gapRatio = nextSeat
                   ? (Number(nextSeat.coordinate_x ?? 0) - Number(seat.coordinate_x ?? 0)) /
-                    normalStep
+                  normalStep
                   : 1;
                 const gapAfter =
                   gapRatio > 2.4 ? 3 : gapRatio > 1.7 ? 2 : gapRatio > 1.35 ? 1 : 0;
@@ -1492,9 +1495,8 @@ export default function EventCheckout({
     selectedShowtime && step >= 2 ? (
       <div className="shrink-0 bg-[#E8ECF0] border-y border-slate-200/80">
         <div
-          className={`${
-            isPage ? "max-w-[36rem] mx-auto" : ""
-          } px-3 sm:px-4 py-2.5 text-[0.9375rem] sm:text-[1rem] font-semibold text-slate-700 text-center leading-snug`}
+          className={`${isPage ? "max-w-[36rem] mx-auto" : ""
+            } px-3 sm:px-4 py-2.5 text-[0.9375rem] sm:text-[1rem] font-semibold text-slate-700 text-center leading-snug`}
         >
           <span>{selectedShowtime.venue_name || "Venue"}</span>
           <span className="mx-1.5 text-slate-400">|</span>
@@ -1520,37 +1522,34 @@ export default function EventCheckout({
             const done = step > s.n;
             const active = step === s.n;
             const clickable = canNavigateToStep(s.n);
-  return (
+            return (
               <li key={s.n} className="flex items-center gap-0.5 sm:gap-1 shrink-0">
-      <button
-        type="button"
+                <button
+                  type="button"
                   onClick={() => navigateToStep(s.n)}
                   disabled={!clickable}
                   aria-current={active ? "step" : undefined}
                   aria-label={`Go to ${s.label}`}
-                  className={`flex items-center gap-1 sm:gap-1.5 rounded-md text-left transition-opacity ${
-                    clickable
+                  className={`flex items-center gap-1 sm:gap-1.5 rounded-md text-left transition-opacity ${clickable
                       ? "cursor-pointer hover:opacity-75"
                       : active
                         ? "cursor-default"
                         : "cursor-not-allowed"
-                  }`}
+                    }`}
                 >
                   <span
-                    className={`h-6 w-6 sm:h-7 sm:w-7 rounded-full flex items-center justify-center text-[0.75rem] sm:text-[0.875rem] font-bold shrink-0 ${
-                      done
+                    className={`h-6 w-6 sm:h-7 sm:w-7 rounded-full flex items-center justify-center text-[0.75rem] sm:text-[0.875rem] font-bold shrink-0 ${done
                         ? "bg-[#6900AA] text-white"
                         : active
                           ? "bg-slate-900 text-white"
                           : "bg-white border border-slate-300 text-slate-400"
-                    }`}
+                      }`}
                   >
                     {done ? <Check size={12} strokeWidth={3} /> : s.n}
                   </span>
                   <span
-                    className={`whitespace-nowrap text-[0.625rem] md:text-[0.8125rem] font-normal leading-tight ${
-                      active || done ? "text-slate-900" : "text-slate-400"
-                    }`}
+                    className={`whitespace-nowrap text-[0.625rem] md:text-[0.8125rem] font-normal leading-tight ${active || done ? "text-slate-900" : "text-slate-400"
+                      }`}
                   >
                     {s.n === 4 ? (
                       <>
@@ -1638,14 +1637,14 @@ export default function EventCheckout({
       desiredSeatQty != null
         ? Math.max(1, desiredSeatQty)
         : Math.max(
-            1,
-            Number(
-              (
-                pricingTicketPool.find((t) => t.id === String(next[0]?.ticket_type_id || "")) ||
-                ticketTypes.find((t) => t.id === String(next[0]?.ticket_type_id || ""))
-              )?.max_per_order
-            ) || 10
-          );
+          1,
+          Number(
+            (
+              pricingTicketPool.find((t) => t.id === String(next[0]?.ticket_type_id || "")) ||
+              ticketTypes.find((t) => t.id === String(next[0]?.ticket_type_id || ""))
+            )?.max_per_order
+          ) || 10
+        );
 
     if (next.length > hardCap) {
       next = next.slice(0, hardCap);
@@ -1668,1002 +1667,1033 @@ export default function EventCheckout({
   };
 
   const panel = (
-      <div
-        className={
-          isPage
-            ? "relative w-full h-full min-h-0 flex flex-col overflow-hidden bg-[#F5F5F5]"
-            : "relative h-full w-full max-w-[26.25rem] bg-white shadow-2xl flex flex-col"
-        }
-      >
-        {isPage && (
-          <div className="z-30 bg-white border-b border-slate-200 shrink-0">
-            <div className="relative flex items-center min-h-[3.25rem] sm:min-h-[3.5rem] lg:min-h-[4.75rem]">
-              <Link
-                href="/"
-                className="absolute left-3 sm:left-5 hidden lg:flex shrink-0 items-center z-[1]"
-              >
-                <img
-                  src={typeof images.logo === "string" ? images.logo : images.logo.src}
-                  alt="Book My Bota"
-                  className="h-[3.75rem] w-auto max-w-[16rem] object-contain object-left"
-                />
-              </Link>
-              <div className={`mx-auto flex w-full items-center px-4 sm:px-5 ${step === 4 ? "max-w-6xl" : "max-w-[36rem]"}`}>
-                <div className="relative flex w-full items-center py-2.5">
-                  <button
-                    type="button"
-                    onClick={() => (step === 4 ? requestLeaveConfirmStep("exit") : onClose())}
-                    aria-label="Back to event"
-                    className="absolute left-0 z-[1] h-9 w-9 rounded-full text-[#111] flex items-center justify-center hover:bg-slate-100 cursor-pointer shrink-0"
-                  >
-                    <ArrowLeft size={22} strokeWidth={2} />
-                  </button>
-                  <h1 className="min-w-0 w-full px-10 text-center text-[1.05rem] sm:text-[1.2rem] font-bold leading-snug text-[#111] break-words">
-                    {step === 4 ? "Review your booking" : event.name}
-                  </h1>
+    <div
+      className={
+        isPage
+          ? "relative w-full h-full min-h-0 flex flex-col overflow-hidden bg-[#F5F5F5]"
+          : "relative h-full w-full max-w-[26.25rem] bg-white shadow-2xl flex flex-col"
+      }
+    >
+      {isPage && (
+        <div className="z-30 bg-white border-b border-slate-200 shrink-0">
+          <div className="relative flex items-center min-h-[3.5rem] sm:min-h-[4rem] lg:min-h-[4.75rem]">
+            <Link
+              href="/"
+              className="absolute left-3 sm:left-5 hidden lg:flex shrink-0 items-center z-[1]"
+              title="Book My Bota"
+            >
+              <img
+                src={typeof images.logo === "string" ? images.logo : images.logo.src}
+                alt="Book My Bota"
+                className="h-9 lg:h-11 w-auto object-contain object-left"
+              />
+            </Link>
+            <div className={`mx-auto flex w-full items-center px-4 sm:px-5 ${step === 4 ? "max-w-6xl" : "max-w-[40rem]"}`}>
+              <div className="relative flex w-full items-center justify-center py-2 sm:py-2.5">
+                <button
+                  type="button"
+                  onClick={() => (step === 4 ? requestLeaveConfirmStep("exit") : onClose())}
+                  aria-label="Back to event"
+                  className="absolute left-0 z-[1] h-9 w-9 rounded-full text-[#111] flex items-center justify-center hover:bg-slate-100 cursor-pointer shrink-0 transition-colors"
+                >
+                  <ArrowLeft size={22} strokeWidth={2} />
+                </button>
+
+                <div className="flex items-center justify-center gap-2.5 sm:gap-3 px-10 min-w-0 max-w-full">
+                  {eventPosterUrl ? (
+                    <img
+                      src={eventPosterUrl}
+                      alt={event.name}
+                      className="h-10 w-7.5 sm:h-12 sm:w-9 shrink-0 rounded-md object-cover shadow-sm border border-slate-200/90"
+                    />
+                  ) : null}
+                  <div className="min-w-0 text-left">
+                    <h1 className="text-[1.05rem] sm:text-[1.2rem] font-bold leading-snug text-[#111] truncate">
+                      {step === 4 ? "Review your booking" : event.name}
+                    </h1>
+                    {step === 4 ? (
+                      <p className="text-xs text-slate-500 font-medium truncate">
+                        {event.name}
+                      </p>
+                    ) : event.category_name ? (
+                      <p className="text-xs text-slate-500 font-medium truncate">
+                        {event.category_name}
+                        {event.age_group ? ` · ${event.age_group}` : ""}
+                      </p>
+                    ) : null}
+                  </div>
                 </div>
               </div>
             </div>
-            {pageStepper}
           </div>
-        )}
-
-        {isPage && step >= 2 && step < 4 && showtimeSummaryBar}
-
-        {!isPage && (
-          <div className="px-5 pt-4 pb-4 border-b border-slate-100 shrink-0 bg-white">
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-[1.1875rem] font-extrabold tracking-tight leading-none">
-                <span className="text-[#111111]">Book My </span>
-                <span className="text-[#6900AA]">Bota</span>
-              </p>
-              <span className="inline-flex items-center gap-1 text-[0.8125rem] font-medium text-slate-500">
-                <Shield size={12} className="text-[#6900AA]" />
-                Secure Booking
-              </span>
-          <button
-            type="button"
-            onClick={onClose}
-                className="w-8 h-8 rounded-full border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50 cursor-pointer"
-            aria-label="Close"
-          >
-                <X size={14} />
-          </button>
+          {pageStepper}
         </div>
+      )}
 
-            <p className="mt-4 text-[0.8125rem] font-bold uppercase tracking-[0.14em] text-slate-400">
-              Step {step} of {CHECKOUT_STEPS.length}
-              {isOrganizer ? " Â· Organizer sale" : ""}
+      {isPage && step >= 2 && step < 4 && showtimeSummaryBar}
+
+      {!isPage && (
+        <div className="px-5 pt-4 pb-4 border-b border-slate-100 shrink-0 bg-white">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[1.1875rem] font-extrabold tracking-tight leading-none">
+              <span className="text-[#111111]">Book My </span>
+              <span className="text-[#6900AA]">Bota</span>
             </p>
+            <span className="inline-flex items-center gap-1 text-[0.8125rem] font-medium text-slate-500">
+              <Shield size={12} className="text-[#6900AA]" />
+              Secure Booking
+            </span>
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-8 h-8 rounded-full border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50 cursor-pointer"
+              aria-label="Close"
+            >
+              <X size={14} />
+            </button>
+          </div>
 
-            <div className="mt-4 grid grid-cols-4 gap-0.5">
-              {CHECKOUT_STEPS.map((s) => {
-                const done = step > s.n;
-                const active = step === s.n;
-                const clickable = canNavigateToStep(s.n);
-                return (
-                  <button
-                    key={s.n}
-                    type="button"
-                    onClick={() => navigateToStep(s.n)}
-                    disabled={!clickable}
-                    aria-current={active ? "step" : undefined}
-                    aria-label={`Go to ${s.short}`}
-                    className={`flex flex-col items-center min-w-0 rounded-lg py-1 transition-opacity ${
-                      clickable
-                        ? "cursor-pointer hover:opacity-75"
-                        : active
-                          ? "cursor-default"
-                          : "cursor-not-allowed"
-                    }`}
-                  >
-                    <span
-                      className={`w-8 h-8 rounded-full flex items-center justify-center text-[0.9375rem] font-bold ${
-                        done || active
-                          ? "bg-[#6900AA] text-white"
-                          : "border-2 border-slate-200 text-slate-400 bg-white"
-                      }`}
-                    >
-                      {done ? <Check size={14} strokeWidth={3} /> : s.n}
-                    </span>
-                    <span
-                      className={`mt-1.5 text-[0.625rem] md:text-[0.6875rem] font-normal text-center leading-tight ${
-                        active || done ? "text-slate-900" : "text-slate-400"
-                      }`}
-                    >
-                      {s.short}
-                    </span>
-                  </button>
-                );
-              })}
+          <div className="mt-3 flex items-center gap-2.5 pt-3 border-t border-slate-100">
+            {eventPosterUrl ? (
+              <img
+                src={eventPosterUrl}
+                alt={event.name}
+                className="h-10 w-7.5 shrink-0 rounded-md object-cover shadow-sm border border-slate-200/90"
+              />
+            ) : null}
+            <div className="min-w-0">
+              <h2 className="text-sm font-bold text-slate-900 truncate">
+                {event.name}
+              </h2>
+              {event.category_name ? (
+                <p className="text-xs text-slate-500 truncate">{event.category_name}</p>
+              ) : null}
             </div>
+          </div>
+
+          <p className="mt-4 text-[0.8125rem] font-bold uppercase tracking-[0.14em] text-slate-400">
+            Step {step} of {CHECKOUT_STEPS.length}
+            {isOrganizer ? " Â· Organizer sale" : ""}
+          </p>
+
+          <div className="mt-4 grid grid-cols-4 gap-0.5">
+            {CHECKOUT_STEPS.map((s) => {
+              const done = step > s.n;
+              const active = step === s.n;
+              const clickable = canNavigateToStep(s.n);
+              return (
+                <button
+                  key={s.n}
+                  type="button"
+                  onClick={() => navigateToStep(s.n)}
+                  disabled={!clickable}
+                  aria-current={active ? "step" : undefined}
+                  aria-label={`Go to ${s.short}`}
+                  className={`flex flex-col items-center min-w-0 rounded-lg py-1 transition-opacity ${clickable
+                      ? "cursor-pointer hover:opacity-75"
+                      : active
+                        ? "cursor-default"
+                        : "cursor-not-allowed"
+                    }`}
+                >
+                  <span
+                    className={`w-8 h-8 rounded-full flex items-center justify-center text-[0.9375rem] font-bold ${done || active
+                        ? "bg-[#6900AA] text-white"
+                        : "border-2 border-slate-200 text-slate-400 bg-white"
+                      }`}
+                  >
+                    {done ? <Check size={14} strokeWidth={3} /> : s.n}
+                  </span>
+                  <span
+                    className={`mt-1.5 text-[0.625rem] md:text-[0.6875rem] font-normal text-center leading-tight ${active || done ? "text-slate-900" : "text-slate-400"
+                      }`}
+                  >
+                    {s.short}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      <div
+        onScroll={handleCheckoutScroll}
+        className={
+          isPage
+            ? `flex-1 min-h-0 overflow-y-auto overscroll-y-contain checkout-scrollbar${checkoutScrollActive ? " checkout-scrollbar-active" : ""} w-full ${step === 4 ? "max-w-6xl" : "max-w-[36rem]"} mx-auto px-4 sm:px-5 py-4 sm:py-5 pb-8`
+            : `flex-1 min-h-0 overflow-y-auto checkout-scrollbar${checkoutScrollActive ? " checkout-scrollbar-active" : ""} px-5 py-5 bg-white`
+        }
+      >
+        {showStepHeader && (
+          <div className="mb-5">
+            <h3 className="text-[0.9375rem] md:text-[1.0625rem] font-semibold text-gray-800 tracking-tight">
+              {stepTitle}
+            </h3>
+            <p className="text-[0.9375rem] md:text-[1.0625rem] text-slate-500 mt-1.5 leading-relaxed">
+              {stepSubtitle}
+            </p>
           </div>
         )}
 
-        <div
-          onScroll={handleCheckoutScroll}
-          className={
-            isPage
-              ? `flex-1 min-h-0 overflow-y-auto overscroll-y-contain checkout-scrollbar${checkoutScrollActive ? " checkout-scrollbar-active" : ""} w-full ${step === 4 ? "max-w-6xl" : "max-w-[36rem]"} mx-auto px-4 sm:px-5 py-4 sm:py-5 pb-8`
-              : `flex-1 min-h-0 overflow-y-auto checkout-scrollbar${checkoutScrollActive ? " checkout-scrollbar-active" : ""} px-5 py-5 bg-white`
-          }
-        >
-          {showStepHeader && (
-            <div className="mb-5">
-              <h3 className="text-[0.9375rem] md:text-[1.0625rem] font-semibold text-gray-800 tracking-tight">
-                {stepTitle}
-              </h3>
-              <p className="text-[0.9375rem] md:text-[1.0625rem] text-slate-500 mt-1.5 leading-relaxed">
-                {stepSubtitle}
-              </p>
-            </div>
-          )}
-
-          {holdId && secondsLeft !== null && secondsLeft > 0 && !timeOutOpen && step < 4 && (
-            <div
-              className={`rounded-xl px-4 py-2.5 text-center text-sm font-bold border mb-4 ${
-                secondsLeft <= 60
-                  ? "bg-rose-50 border-rose-200 text-rose-700"
-                  : "bg-[#F3E8FF] border-[#E9D5FF] text-[#6B21A8]"
+        {holdId && secondsLeft !== null && secondsLeft > 0 && !timeOutOpen && step < 4 && (
+          <div
+            className={`rounded-xl px-4 py-2.5 text-center text-sm font-bold border mb-4 ${secondsLeft <= 60
+                ? "bg-rose-50 border-rose-200 text-rose-700"
+                : "bg-[#F3E8FF] border-[#E9D5FF] text-[#6B21A8]"
               }`}
-            >
-              <span className="inline-flex items-center gap-2">
-                <Timer className="size-4" />
-                Complete your booking in {formatHoldCountdown(secondsLeft)}
-              </span>
-            </div>
-          )}
+          >
+            <span className="inline-flex items-center gap-2">
+              <Timer className="size-4" />
+              Complete your booking in {formatHoldCountdown(secondsLeft)}
+            </span>
+          </div>
+        )}
 
-          {step === 1 && (
-            <div className="space-y-3">
-              {cityVenueGroups.length === 0 ? (
-                <p className="text-[1rem] text-slate-500">Showtimes coming soon.</p>
-              ) : (
-                cityVenueGroups.map(({ city, venues }) => {
-                  const openCity = expandedCity === city;
-                  return (
-                    <div
-                      key={city}
-                      className={`relative rounded-[0.75rem] border overflow-hidden ${
-                        openCity ? "border-slate-200 bg-white" : "border-slate-200 bg-slate-50/70"
+        {step === 1 && (
+          <div className="space-y-3">
+            {cityVenueGroups.length === 0 ? (
+              <p className="text-[1rem] text-slate-500">Showtimes coming soon.</p>
+            ) : (
+              cityVenueGroups.map(({ city, venues }) => {
+                const openCity = expandedCity === city;
+                return (
+                  <div
+                    key={city}
+                    className={`relative rounded-[0.75rem] border overflow-hidden ${openCity ? "border-slate-200 bg-white" : "border-slate-200 bg-slate-50/70"
                       }`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setExpandedCity(openCity ? "" : city)}
+                      className="w-full flex items-center justify-between gap-3 px-4 py-3.5 text-left cursor-pointer hover:bg-slate-50"
                     >
-                      <button
-                        type="button"
-                        onClick={() => setExpandedCity(openCity ? "" : city)}
-                        className="w-full flex items-center justify-between gap-3 px-4 py-3.5 text-left cursor-pointer hover:bg-slate-50"
-                      >
-                        <span className="text-[0.9375rem] md:text-[1.0625rem] font-semibold text-gray-800">{city}</span>
-                        {openCity ? (
-                          <ChevronUp size={18} className="text-slate-500 shrink-0" />
-                        ) : (
-                          <ChevronDown size={18} className="text-slate-500 shrink-0" />
+                      <span className="text-[0.9375rem] md:text-[1.0625rem] font-semibold text-gray-800">{city}</span>
+                      {openCity ? (
+                        <ChevronUp size={18} className="text-slate-500 shrink-0" />
+                      ) : (
+                        <ChevronDown size={18} className="text-slate-500 shrink-0" />
+                      )}
+                    </button>
+                    {openCity && (
+                      <div className="px-3 pb-5 space-y-2.5 border-t border-slate-100 pt-3">
+                        {venues.map((venue) =>
+                          venue.showtimes.map((s) => {
+                            const status = showtimeFillingLabel(s);
+                            const chip = dateChip(s.starts_at);
+                            const mapsUrl = venue.address
+                              ? venueMapsUrl({
+                                latitude: venue.latitude,
+                                longitude: venue.longitude,
+                                address: venue.address,
+                                name: venue.venueName,
+                              })
+                              : "";
+                            const detailsOpen = venueDetailsId === s.id;
+                            const canKnowMore = Boolean(venue.address);
+                            return (
+                              <div key={s.id} className={canKnowMore ? "pb-6" : ""}>
+                                <div className="rounded-[0.625rem] border border-slate-200 bg-white">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (status.label === "Sold Out") {
+                                        toast.message("This showtime is sold out.");
+                                        return;
+                                      }
+                                      selectShowtime(s);
+                                      setIsMapFullscreen(false);
+                                      setStep(2);
+                                    }}
+                                    className="w-full text-left px-3.5 py-3 cursor-pointer"
+                                  >
+                                    <p className="text-[0.9375rem] md:text-[1.0625rem] font-semibold text-gray-800">
+                                      {venue.venueName}
+                                    </p>
+                                    <p className="mt-1 text-[0.9375rem] text-slate-500">
+                                      {chip.date}
+                                      <span className="mx-1.5 text-slate-300">|</span>
+                                      {formatTime12h(s.starts_at)}
+                                      {status.label === "Few Left" && (
+                                        <>
+                                          <span className="mx-1.5 text-slate-300">|</span>
+                                          <span className="text-[#E85D04] font-semibold">Fast Filling</span>
+                                        </>
+                                      )}
+                                      {status.label === "Sold Out" && (
+                                        <>
+                                          <span className="mx-1.5 text-slate-300">|</span>
+                                          <span className="text-red-500 font-semibold">Sold Out</span>
+                                        </>
+                                      )}
+                                    </p>
+                                  </button>
+                                  {detailsOpen && venue.address ? (
+                                    <div className="px-3.5 pb-2">
+                                      <div className="border-t border-slate-200 pt-3">
+                                        <p className="text-[0.875rem] text-slate-600 leading-snug">
+                                          {venue.address}
+                                        </p>
+                                        {mapsUrl ? (
+                                          <button
+                                            type="button"
+                                            className="text-[0.725rem] font-medium text-[#e11d48] hover:underline cursor-pointer"
+                                            onClick={() =>
+                                              window.open(mapsUrl, "_blank", "noopener,noreferrer")
+                                            }
+                                          >
+                                            View on maps
+                                          </button>
+                                        ) : null}
+                                      </div>
+                                    </div>
+                                  ) : null}
+                                  {canKnowMore ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => setVenueDetailsId(detailsOpen ? "" : s.id)}
+                                      className="absolute left-3.5 bottom-8 z-[1] rounded-[0.3rem] translate-y-[62%] bg-[#E8E8E8] px-3 py-1.5 text-[0.8125rem] medium text-[#333] cursor-pointer"
+                                    >
+                                      {detailsOpen ? "Know less" : "Know more"}
+                                    </button>
+                                  ) : null}
+                                </div>
+                              </div>
+                            );
+                          })
                         )}
-                      </button>
-                      {openCity && (
-                        <div className="px-3 pb-5 space-y-2.5 border-t border-slate-100 pt-3">
-                          {venues.map((venue) =>
-                            venue.showtimes.map((s) => {
-                              const status = showtimeFillingLabel(s);
-                              const chip = dateChip(s.starts_at);
-                              const mapsUrl = venue.address
-                                ? venueMapsUrl({
-                                    latitude: venue.latitude,
-                                    longitude: venue.longitude,
-                                    address: venue.address,
-                                    name: venue.venueName,
-                                  })
-                                : "";
-                              const detailsOpen = venueDetailsId === s.id;
-                              const canKnowMore = Boolean(venue.address);
-                  return (
-                    <div key={s.id} className={canKnowMore ? "pb-6" : ""}>
-                      <div className="rounded-[0.625rem] border border-slate-200 bg-white">
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
+
+          </div>
+        )}
+
+        {step === 2 && (
+          <div className="space-y-3">
+            {selectedShowtime && !isPage && (
+              <div className="rounded-[0.5rem] bg-slate-100 px-3.5 py-2.5 text-[0.9375rem] sm:text-[1rem] text-slate-700">
+                <span className="font-semibold">{selectedShowtime.venue_name || "Venue"}</span>
+                <span className="mx-1.5 text-slate-400">|</span>
+                <span>
+                  {dateChip(selectedShowtime.starts_at).day}{" "}
+                  {dateChip(selectedShowtime.starts_at).date} | {formatTime12h(selectedShowtime.starts_at)}
+                </span>
+              </div>
+            )}
+
+            {hasReservedSeats ? (
+              <div className="space-y-4">
+                {desiredSeatQty == null ? (
+                  <div className="bg-white border border-slate-200 rounded-xl p-5 sm:p-6 space-y-5">
+                    <div className="text-center">
+                      <h4 className="text-[1.0625rem] md:text-[1.1875rem] font-semibold text-gray-800">
+                        How many seats?
+                      </h4>
+                      <p className="mt-1 text-[0.875rem] md:text-[0.9375rem] text-slate-500">
+                        Pick a count, then choose your seats on the full seating map
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-5 gap-2.5 max-w-sm mx-auto">
+                      {Array.from({ length: maxSeatQtyPick }, (_, i) => i + 1).map((n) => (
                         <button
+                          key={n}
                           type="button"
                           onClick={() => {
-                            if (status.label === "Sold Out") {
-                              toast.message("This showtime is sold out.");
-                              return;
-                            }
-                            selectShowtime(s);
-                            setIsMapFullscreen(false);
-                            setStep(2);
+                            setDesiredSeatQty(n);
+                            setSeatCountPick(n);
+                            setSelectedSeats([]);
+                            setSeatViewMode("canvas");
+                            setIsMapFullscreen(true);
                           }}
-                          className="w-full text-left px-3.5 py-3 cursor-pointer"
+                          className={`h-12 rounded-xl text-sm font-semibold cursor-pointer transition ${seatCountPick === n
+                              ? "text-white shadow-sm"
+                              : "bg-[#F5F5F5] text-[#333] hover:bg-[#EDE4F7]"
+                            }`}
+                          style={
+                            seatCountPick === n
+                              ? { background: seatCountActiveGradient }
+                              : undefined
+                          }
                         >
-                          <p className="text-[0.9375rem] md:text-[1.0625rem] font-semibold text-gray-800">
-                            {venue.venueName}
-                          </p>
-                          <p className="mt-1 text-[0.9375rem] text-slate-500">
-                            {chip.date}
-                            <span className="mx-1.5 text-slate-300">|</span>
-                            {formatTime12h(s.starts_at)}
-                            {status.label === "Few Left" && (
-                              <>
-                                <span className="mx-1.5 text-slate-300">|</span>
-                                <span className="text-[#E85D04] font-semibold">Fast Filling</span>
-                              </>
-                            )}
-                            {status.label === "Sold Out" && (
-                              <>
-                                <span className="mx-1.5 text-slate-300">|</span>
-                                <span className="text-red-500 font-semibold">Sold Out</span>
-                              </>
-                            )}
-                          </p>
+                          {n}
                         </button>
-                        {detailsOpen && venue.address ? (
-                          <div className="px-3.5 pb-2">
-                            <div className="border-t border-slate-200 pt-3">
-                              <p className="text-[0.875rem] text-slate-600 leading-snug">
-                                {venue.address}
-                              </p>
-                              {mapsUrl ? (
-                                <button
-                                  type="button"
-                                  className="text-[0.725rem] font-medium text-[#e11d48] hover:underline cursor-pointer"
-                                  onClick={() =>
-                                    window.open(mapsUrl, "_blank", "noopener,noreferrer")
-                                  }
-                                >
-                                  View on maps
-                                </button>
-                              ) : null}
-                            </div>
-                          </div>
-                        ) : null}
-                        {canKnowMore ? (
-                          <button
-                            type="button"
-                            onClick={() => setVenueDetailsId(detailsOpen ? "" : s.id)}
-                            className="absolute left-3.5 bottom-8 z-[1] rounded-[0.3rem] translate-y-[62%] bg-[#E8E8E8] px-3 py-1.5 text-[0.8125rem] medium text-[#333] cursor-pointer"
-                          >
-                            {detailsOpen ? "Know less" : "Know more"}
-                          </button>
-                        ) : null}
-                      </div>
+                      ))}
                     </div>
-                  );
-                })
-                          )}
-                        </div>
+                  </div>
+                ) : (
+                  <div className="bg-white border border-slate-200 rounded-xl p-5 text-center space-y-4">
+                    <div>
+                      <h4 className="text-[1.125rem] font-extrabold text-slate-900">
+                        {selectedSeats.length}/{desiredSeatQty} seat
+                        {desiredSeatQty === 1 ? "" : "s"} selected
+                      </h4>
+                      <p className="mt-1 text-[0.875rem] text-slate-500">
+                        {seatsReady
+                          ? "Seats locked in — continue when you are ready"
+                          : "Open the map to finish selecting your seats"}
+                      </p>
+                      {ticketAmount > 0 && (
+                        <p className={`mt-2 text-[1.0625rem] font-bold ${accentIcon}`}>
+                          {formatMoney(ticketAmount, { compact: true })}
+                        </p>
                       )}
                     </div>
-                  );
-                })
-              )}
-
-            </div>
-          )}
-
-          {step === 2 && (
-            <div className="space-y-3">
-              {selectedShowtime && !isPage && (
-                <div className="rounded-[0.5rem] bg-slate-100 px-3.5 py-2.5 text-[0.9375rem] sm:text-[1rem] text-slate-700">
-                  <span className="font-semibold">{selectedShowtime.venue_name || "Venue"}</span>
-                  <span className="mx-1.5 text-slate-400">|</span>
-                  <span>
-                    {dateChip(selectedShowtime.starts_at).day}{" "}
-                    {dateChip(selectedShowtime.starts_at).date} | {formatTime12h(selectedShowtime.starts_at)}
-                  </span>
-                </div>
-              )}
-
-              {hasReservedSeats ? (
-                <div className="space-y-4">
-                  {desiredSeatQty == null ? (
-                    <div className="bg-white border border-slate-200 rounded-xl p-5 sm:p-6 space-y-5">
-                      <div className="text-center">
-                        <h4 className="text-[1.0625rem] md:text-[1.1875rem] font-semibold text-gray-800">
-                          How many seats?
-                        </h4>
-                        <p className="mt-1 text-[0.875rem] md:text-[0.9375rem] text-slate-500">
-                          Pick a count, then choose your seats on the full seating map
-                        </p>
-                      </div>
-                      <div className="grid grid-cols-5 gap-2.5 max-w-sm mx-auto">
-                        {Array.from({ length: maxSeatQtyPick }, (_, i) => i + 1).map((n) => (
-                          <button
-                            key={n}
-                            type="button"
-                            onClick={() => {
-                              setDesiredSeatQty(n);
-                              setSeatCountPick(n);
-                              setSelectedSeats([]);
-                              setSeatViewMode("canvas");
-                              setIsMapFullscreen(true);
-                            }}
-                            className={`h-12 rounded-xl text-sm font-semibold cursor-pointer transition ${
-                              seatCountPick === n
-                                ? "text-white shadow-sm"
-                                : "bg-[#F5F5F5] text-[#333] hover:bg-[#EDE4F7]"
-                            }`}
-                            style={
-                              seatCountPick === n
-                                ? { background: seatCountActiveGradient }
-                                : undefined
-                            }
-                          >
-                            {n}
-                          </button>
-                        ))}
-                      </div>
+                    <div className="flex flex-col sm:flex-row gap-2.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDesiredSeatQty(null);
+                          setSeatCountPick(null);
+                          setSelectedSeats([]);
+                          setIsMapFullscreen(false);
+                        }}
+                        className="flex-1 py-3 rounded-xl border border-slate-200 text-slate-700 text-[0.9375rem] font-semibold cursor-pointer hover:bg-slate-50"
+                      >
+                        Change count
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setIsMapFullscreen(true)}
+                        className={`flex-1 py-3 rounded-xl ${accentBtn} text-white text-[0.9375rem] font-bold cursor-pointer inline-flex items-center justify-center gap-2`}
+                      >
+                        <Maximize2 className="size-4" />
+                        {selectedSeats.length > 0 ? "Edit seats on map" : "Open seating map"}
+                      </button>
                     </div>
-                  ) : (
-                    <div className="bg-white border border-slate-200 rounded-xl p-5 text-center space-y-4">
-                      <div>
-                        <h4 className="text-[1.125rem] font-extrabold text-slate-900">
-                          {selectedSeats.length}/{desiredSeatQty} seat
-                          {desiredSeatQty === 1 ? "" : "s"} selected
-                        </h4>
-                        <p className="mt-1 text-[0.875rem] text-slate-500">
-                          {seatsReady
-                            ? "Seats locked in — continue when you are ready"
-                            : "Open the map to finish selecting your seats"}
-                        </p>
-                        {ticketAmount > 0 && (
-                          <p className={`mt-2 text-[1.0625rem] font-bold ${accentIcon}`}>
-                            {formatMoney(ticketAmount, { compact: true })}
-                          </p>
-                        )}
-                      </div>
-                      <div className="flex flex-col sm:flex-row gap-2.5">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setDesiredSeatQty(null);
-                            setSeatCountPick(null);
-                            setSelectedSeats([]);
-                            setIsMapFullscreen(false);
-                          }}
-                          className="flex-1 py-3 rounded-xl border border-slate-200 text-slate-700 text-[0.9375rem] font-semibold cursor-pointer hover:bg-slate-50"
-                        >
-                          Change count
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setIsMapFullscreen(true)}
-                          className={`flex-1 py-3 rounded-xl ${accentBtn} text-white text-[0.9375rem] font-bold cursor-pointer inline-flex items-center justify-center gap-2`}
-                        >
-                          <Maximize2 className="size-4" />
-                          {selectedSeats.length > 0 ? "Edit seats on map" : "Open seating map"}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ) : ticketTypes.length === 0 ? (
-                <p className="text-[1rem] text-slate-500">No ticket types yet.</p>
-              ) : (
-                <div className="space-y-3">
-                  <p className="text-[0.8125rem] text-slate-500">
-                    Choose one ticket type. Selecting another type clears your current selection.
-                  </p>
-                  {ticketTypes.map((t) => {
+                  </div>
+                )}
+              </div>
+            ) : ticketTypes.length === 0 ? (
+              <p className="text-[1rem] text-slate-500">No ticket types yet.</p>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-[0.8125rem] text-slate-500">
+                  Choose one ticket type. Selecting another type clears your current selection.
+                </p>
+                {ticketTypes.map((t) => {
                   const available = Number(t.available_count) || 0;
-                    const total = Number(t.total_count) || 0;
-                    const maxPerOrder = Math.max(1, Number((t as { max_per_order?: number }).max_per_order) || 10);
-                    const maxQty = Math.min(available, maxPerOrder);
+                  const total = Number(t.total_count) || 0;
+                  const maxPerOrder = Math.max(1, Number((t as { max_per_order?: number }).max_per_order) || 10);
+                  const maxQty = Math.min(available, maxPerOrder);
                   const qty = qtyByType[t.id] || 0;
-                    const status = ticketAvail(available, total);
-                    const soldOut = available <= 0;
+                  const status = ticketAvail(available, total);
+                  const soldOut = available <= 0;
                   return (
                     <div
                       key={t.id}
-                        className={`rounded-[0.75rem] px-4 py-3.5 flex items-center justify-between gap-3 bg-white shadow-[0_0.125rem_0.75rem_rgba(15,23,42,0.06)] border ${
-                          qty > 0
-                            ? "border-[#6900AA]"
-                            : soldOut
-                              ? "border-slate-100 opacity-60"
-                              : "border-transparent"
+                      className={`rounded-[0.75rem] px-4 py-3.5 flex items-center justify-between gap-3 bg-white shadow-[0_0.125rem_0.75rem_rgba(15,23,42,0.06)] border ${qty > 0
+                          ? "border-[#6900AA]"
+                          : soldOut
+                            ? "border-slate-100 opacity-60"
+                            : "border-transparent"
                         }`}
-                      >
-                        <div className="min-w-0">
-                          <p className="font-bold text-[1.0625rem] sm:text-[1.125rem] text-slate-900 uppercase tracking-wide">
-                            {t.ticket_type}
-                          </p>
-                          <p className="mt-1.5 text-[1.0625rem] sm:text-[1.125rem] font-extrabold text-slate-900">
-                            {formatMoney(Number(t.price) || 0, { compact: true })}
-                            {status.label === "Few Left" && (
-                              <span className="ml-2.5 text-[0.9375rem] font-semibold text-[#E85D04] normal-case">
-                                Fast Filling
-                              </span>
-                            )}
-                            {soldOut && (
-                              <span className="ml-2.5 text-[0.9375rem] font-semibold text-[#E11D48] normal-case">
-                                Sold out
-                              </span>
-                            )}
-                          </p>
-                          {!soldOut && (
-                            <p className="mt-1 text-[0.75rem] font-medium text-slate-500 normal-case">
-                              Max {maxPerOrder} per order
-                            </p>
+                    >
+                      <div className="min-w-0">
+                        <p className="font-bold text-[1.0625rem] sm:text-[1.125rem] text-slate-900 uppercase tracking-wide">
+                          {t.ticket_type}
+                        </p>
+                        <p className="mt-1.5 text-[1.0625rem] sm:text-[1.125rem] font-extrabold text-slate-900">
+                          {formatMoney(Number(t.price) || 0, { compact: true })}
+                          {status.label === "Few Left" && (
+                            <span className="ml-2.5 text-[0.9375rem] font-semibold text-[#E85D04] normal-case">
+                              Fast Filling
+                            </span>
                           )}
+                          {soldOut && (
+                            <span className="ml-2.5 text-[0.9375rem] font-semibold text-[#E11D48] normal-case">
+                              Sold out
+                            </span>
+                          )}
+                        </p>
+                        {!soldOut && (
+                          <p className="mt-1 text-[0.75rem] font-medium text-slate-500 normal-case">
+                            Max {maxPerOrder} per order
+                          </p>
+                        )}
                       </div>
-                        <div className="shrink-0">
-                          {soldOut ? null : qty === 0 ? (
-                        <button
-                          type="button"
-                              onClick={() => setQty(t.id, 1, maxQty)}
-                              className="min-w-[4.75rem] px-3.5 py-2 rounded-[0.375rem] border-2 border-[#6900AA] text-[#6900AA] text-[1rem] font-bold cursor-pointer hover:bg-[#F7E9FF] transition-colors"
-                        >
-                              Add
-                        </button>
-                          ) : (
-                            <div className="flex items-center gap-0 rounded-[0.375rem] border-2 border-[#6900AA] overflow-hidden bg-white">
-                        <button
-                          type="button"
-                                onClick={() => setQty(t.id, qty - 1, maxQty)}
-                                className="w-9 h-9 flex items-center justify-center text-[#6900AA] cursor-pointer hover:bg-[#F7E9FF]"
-                              >
-                                <Minus size={15} />
-                              </button>
-                              <span className="w-8 text-center font-bold text-[1.0625rem] text-slate-900">
-                                {qty}
-                              </span>
-                              <button
-                                type="button"
-                                disabled={qty >= maxQty}
-                                onClick={() => setQty(t.id, qty + 1, maxQty)}
-                                className="w-9 h-9 flex items-center justify-center text-[#6900AA] cursor-pointer hover:bg-[#F7E9FF] disabled:opacity-40"
-                              >
-                                <Plus size={15} />
-                        </button>
-                            </div>
-                          )}
+                      <div className="shrink-0">
+                        {soldOut ? null : qty === 0 ? (
+                          <button
+                            type="button"
+                            onClick={() => setQty(t.id, 1, maxQty)}
+                            className="min-w-[4.75rem] px-3.5 py-2 rounded-[0.375rem] border-2 border-[#6900AA] text-[#6900AA] text-[1rem] font-bold cursor-pointer hover:bg-[#F7E9FF] transition-colors"
+                          >
+                            Add
+                          </button>
+                        ) : (
+                          <div className="flex items-center gap-0 rounded-[0.375rem] border-2 border-[#6900AA] overflow-hidden bg-white">
+                            <button
+                              type="button"
+                              onClick={() => setQty(t.id, qty - 1, maxQty)}
+                              className="w-9 h-9 flex items-center justify-center text-[#6900AA] cursor-pointer hover:bg-[#F7E9FF]"
+                            >
+                              <Minus size={15} />
+                            </button>
+                            <span className="w-8 text-center font-bold text-[1.0625rem] text-slate-900">
+                              {qty}
+                            </span>
+                            <button
+                              type="button"
+                              disabled={qty >= maxQty}
+                              onClick={() => setQty(t.id, qty + 1, maxQty)}
+                              className="w-9 h-9 flex items-center justify-center text-[#6900AA] cursor-pointer hover:bg-[#F7E9FF] disabled:opacity-40"
+                            >
+                              <Plus size={15} />
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
+                })}
+              </div>
+            )}
+          </div>
+        )}
 
-          {step === 3 && (
-            <div className="space-y-4 pb-2">
-              <div>
-                <p className="text-[0.9375rem] font-semibold text-gray-800 mb-1">
-                  How do you want your tickets?
+        {step === 3 && (
+          <div className="space-y-4 pb-2">
+            <div>
+              <p className="text-[0.9375rem] font-semibold text-gray-800 mb-1">
+                How do you want your tickets?
+              </p>
+              {availableTicketModes.length === 1 && (
+                <p className="text-[0.8125rem] text-slate-500">
+                  This event only offers {availableTicketModes[0].label.toLowerCase()}.
                 </p>
-                {availableTicketModes.length === 1 && (
-                  <p className="text-[0.8125rem] text-slate-500">
-                    This event only offers {availableTicketModes[0].label.toLowerCase()}.
+              )}
+              <div className="space-y-2.5 mt-3">
+                {availableTicketModes.map((option) => {
+                  const Icon = ticketModeIcon(option.id);
+                  const selected = ticketMode === option.id;
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      onClick={() => setTicketMode(option.id)}
+                      className={`w-full text-left rounded-xl border p-4 transition-colors cursor-pointer ${selected
+                          ? "border-[#6900AA] bg-[#FBF6FF]"
+                          : "border-slate-200 bg-white hover:border-slate-300"
+                        }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <span
+                          className={`mt-0.5 h-5 w-5 rounded-full border-2 flex items-center justify-center shrink-0 ${selected
+                              ? "border-[#6900AA] bg-[#6900AA]"
+                              : "border-slate-300 bg-white"
+                            }`}
+                        >
+                          {selected && <span className="h-2 w-2 rounded-full bg-white" />}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Icon size={16} className="text-[#6900AA] shrink-0" />
+                            <p className="text-[1.0625rem] font-bold text-slate-900">
+                              {option.label}
+                            </p>
+                            {option.recommended && (
+                              <span className="text-[0.6875rem] font-bold uppercase tracking-wide text-[#6900AA] bg-[#F7E9FF] px-2 py-0.5 rounded-full">
+                                Recommended
+                              </span>
+                            )}
+                          </div>
+                          <p className="mt-1.5 text-[0.9375rem] text-slate-500 leading-relaxed">
+                            {option.description}
+                          </p>
+                          <span
+                            role="presentation"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setTicketModeDetailsOpen(option.id);
+                            }}
+                            className="mt-2 inline-block text-[0.875rem] font-semibold text-[#6900AA] hover:underline cursor-pointer"
+                          >
+                            View details
+                          </span>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {ticketMode === "BOX_OFFICE" && selectedShowtime && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-4">
+                <p className="text-[0.875rem] font-bold text-amber-900">Pickup location</p>
+                <p className="mt-1 text-[0.9375rem] text-amber-950 font-semibold">
+                  {selectedShowtime.venue_name || "Venue box office"}
+                </p>
+                {selectedShowtime.venue_address && (
+                  <p className="mt-1 text-[0.875rem] text-amber-900/80">
+                    {selectedShowtime.venue_address}
                   </p>
                 )}
-                <div className="space-y-2.5 mt-3">
-                  {availableTicketModes.map((option) => {
-                    const Icon = ticketModeIcon(option.id);
-                    const selected = ticketMode === option.id;
-                    return (
-                      <button
-                        key={option.id}
-                        type="button"
-                        onClick={() => setTicketMode(option.id)}
-                        className={`w-full text-left rounded-xl border p-4 transition-colors cursor-pointer ${
-                          selected
-                            ? "border-[#6900AA] bg-[#FBF6FF]"
-                            : "border-slate-200 bg-white hover:border-slate-300"
-                        }`}
-                      >
-                        <div className="flex items-start gap-3">
-                          <span
-                            className={`mt-0.5 h-5 w-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                              selected
-                                ? "border-[#6900AA] bg-[#6900AA]"
-                                : "border-slate-300 bg-white"
-                            }`}
-                          >
-                            {selected && <span className="h-2 w-2 rounded-full bg-white" />}
-                          </span>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <Icon size={16} className="text-[#6900AA] shrink-0" />
-                              <p className="text-[1.0625rem] font-bold text-slate-900">
-                                {option.label}
-                              </p>
-                              {option.recommended && (
-                                <span className="text-[0.6875rem] font-bold uppercase tracking-wide text-[#6900AA] bg-[#F7E9FF] px-2 py-0.5 rounded-full">
-                                  Recommended
-                                </span>
-                              )}
-                            </div>
-                            <p className="mt-1.5 text-[0.9375rem] text-slate-500 leading-relaxed">
-                              {option.description}
-                            </p>
-                            <span
-                              role="presentation"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setTicketModeDetailsOpen(option.id);
-                              }}
-                              className="mt-2 inline-block text-[0.875rem] font-semibold text-[#6900AA] hover:underline cursor-pointer"
-                            >
-                              View details
-                            </span>
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
+                <p className="mt-2 text-[0.8125rem] text-amber-900/70 leading-relaxed">
+                  Arrive with your booking ID and photo ID. Counter opens about 60–90 minutes
+                  before showtime.
+                </p>
               </div>
+            )}
 
-              {ticketMode === "BOX_OFFICE" && selectedShowtime && (
-                <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-4">
-                  <p className="text-[0.875rem] font-bold text-amber-900">Pickup location</p>
-                  <p className="mt-1 text-[0.9375rem] text-amber-950 font-semibold">
-                    {selectedShowtime.venue_name || "Venue box office"}
-                  </p>
-                  {selectedShowtime.venue_address && (
-                    <p className="mt-1 text-[0.875rem] text-amber-900/80">
-                      {selectedShowtime.venue_address}
+            {ticketMode === "PHYSICAL_DELIVERY" && (
+              <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+                <p className="text-[0.9375rem] font-bold text-slate-900">Delivery address</p>
+                <div>
+                  <label className="block text-[0.875rem] font-semibold text-slate-800 mb-1">
+                    {reqStar} Street / house / area
+                  </label>
+                  <input
+                    {...registerDelivery("delivery_address_line")}
+                    className={`w-full rounded-lg border border-slate-300 px-3 py-2.5 text-[0.9375rem] text-slate-900 focus:outline-none ${accentFocus} focus:ring-1 focus:ring-[#6900AA]/30`}
+                    placeholder="e.g. Bole Road, Building 12, Apt 4"
+                  />
+                  {deliveryErrors.delivery_address_line && (
+                    <p className={fieldErrorClass}>{deliveryErrors.delivery_address_line.message}</p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-[0.875rem] font-semibold text-slate-800 mb-1">
+                    {reqStar} City
+                  </label>
+                  <input
+                    {...registerDelivery("delivery_city")}
+                    className={`w-full rounded-lg border border-slate-300 px-3 py-2.5 text-[0.9375rem] text-slate-900 focus:outline-none ${accentFocus} focus:ring-1 focus:ring-[#6900AA]/30`}
+                    placeholder="e.g. Addis Ababa"
+                  />
+                  {deliveryErrors.delivery_city && (
+                    <p className={fieldErrorClass}>{deliveryErrors.delivery_city.message}</p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-[0.875rem] font-semibold text-slate-800 mb-1">
+                    Delivery notes <span className="font-normal text-slate-400">(optional)</span>
+                  </label>
+                  <textarea
+                    {...registerDelivery("delivery_notes")}
+                    rows={2}
+                    className={`w-full rounded-lg border border-slate-300 px-3 py-2.5 text-[0.9375rem] text-slate-900 focus:outline-none resize-none ${accentFocus} focus:ring-1 focus:ring-[#6900AA]/30`}
+                    placeholder="Landmark, gate code, preferred time..."
+                  />
+                </div>
+                <p className="text-[0.8125rem] text-slate-500 leading-relaxed">
+                  Printed tickets are usually delivered in 3–5 business days within city limits.
+                </p>
+              </div>
+            )}
+
+            <div className="rounded-xl border border-slate-200 bg-white p-4 pb-4">
+              <p className="text-[0.9375rem] font-bold text-slate-900 mb-3">
+                {isOrganizer ? "Customer contact" : "Sign in & contact details"}
+              </p>
+
+              {isOrganizer ? (
+                <>
+                  {contactDetailsReady ? (
+                    <div className="space-y-1">
+                      <p className="text-[0.875rem] font-semibold text-slate-800">{name}</p>
+                      <p className="text-[0.875rem] text-slate-600">
+                        {phone ? `+251 ${phone}` : "—"}
+                      </p>
+                      <p className="text-[0.875rem] text-slate-600 truncate">{email}</p>
+                    </div>
+                  ) : (
+                    <p className="text-[0.875rem] text-slate-500">
+                      Add customer name, phone, and email to send tickets.
                     </p>
                   )}
-                  <p className="mt-2 text-[0.8125rem] text-amber-900/70 leading-relaxed">
-                    Arrive with your booking ID and photo ID. Counter opens about 60–90 minutes
-                    before showtime.
-                  </p>
-                </div>
-              )}
-
-              {ticketMode === "PHYSICAL_DELIVERY" && (
-                <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
-                  <p className="text-[0.9375rem] font-bold text-slate-900">Delivery address</p>
-                  <div>
-                    <label className="block text-[0.875rem] font-semibold text-slate-800 mb-1">
-                      {reqStar} Street / house / area
-                    </label>
-                    <input
-                      {...registerDelivery("delivery_address_line")}
-                      className={`w-full rounded-lg border border-slate-300 px-3 py-2.5 text-[0.9375rem] text-slate-900 focus:outline-none ${accentFocus} focus:ring-1 focus:ring-[#6900AA]/30`}
-                      placeholder="e.g. Bole Road, Building 12, Apt 4"
-                    />
-                    {deliveryErrors.delivery_address_line && (
-                      <p className={fieldErrorClass}>{deliveryErrors.delivery_address_line.message}</p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-[0.875rem] font-semibold text-slate-800 mb-1">
-                      {reqStar} City
-                    </label>
-                    <input
-                      {...registerDelivery("delivery_city")}
-                      className={`w-full rounded-lg border border-slate-300 px-3 py-2.5 text-[0.9375rem] text-slate-900 focus:outline-none ${accentFocus} focus:ring-1 focus:ring-[#6900AA]/30`}
-                      placeholder="e.g. Addis Ababa"
-                    />
-                    {deliveryErrors.delivery_city && (
-                      <p className={fieldErrorClass}>{deliveryErrors.delivery_city.message}</p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-[0.875rem] font-semibold text-slate-800 mb-1">
-                      Delivery notes <span className="font-normal text-slate-400">(optional)</span>
-                    </label>
-                    <textarea
-                      {...registerDelivery("delivery_notes")}
-                      rows={2}
-                      className={`w-full rounded-lg border border-slate-300 px-3 py-2.5 text-[0.9375rem] text-slate-900 focus:outline-none resize-none ${accentFocus} focus:ring-1 focus:ring-[#6900AA]/30`}
-                      placeholder="Landmark, gate code, preferred time..."
-                    />
-                  </div>
-                  <p className="text-[0.8125rem] text-slate-500 leading-relaxed">
-                    Printed tickets are usually delivered in 3–5 business days within city limits.
-                  </p>
-                </div>
-              )}
-
-              <div className="rounded-xl border border-slate-200 bg-white p-4 pb-4">
-                <p className="text-[0.9375rem] font-bold text-slate-900 mb-3">
-                  {isOrganizer ? "Customer contact" : "Sign in & contact details"}
-                </p>
-
-                {isOrganizer ? (
-                  <>
-                    {contactDetailsReady ? (
-                      <div className="space-y-1">
-                        <p className="text-[0.875rem] font-semibold text-slate-800">{name}</p>
-                        <p className="text-[0.875rem] text-slate-600">
-                          {phone ? `+251 ${phone}` : "—"}
-                        </p>
-                        <p className="text-[0.875rem] text-slate-600 truncate">{email}</p>
-                      </div>
-                    ) : (
-                      <p className="text-[0.875rem] text-slate-500">
-                        Add customer name, phone, and email to send tickets.
-                      </p>
-                    )}
-                    <button
-                      type="button"
-                      onClick={openContactModal}
-                      className="mt-3 text-[0.875rem] font-semibold text-[#6900AA] hover:underline cursor-pointer"
-                    >
-                      {contactDetailsReady ? "Edit contact details" : "Add contact details"}
-                    </button>
-                  </>
-                ) : isCustomerLoggedIn ? (
-                  <>
-                    <div className="space-y-1">
-                      <p className="text-[0.875rem] font-semibold text-slate-800">
-                        {name || authUser?.name}
-                      </p>
-                      <p className="text-[0.875rem] text-slate-600">
-                        {phone ? `+251 ${phone}` : authUser?.phone ? `+251 ${authUser.phone}` : "—"}
-                      </p>
-                      <p className="text-[0.875rem] text-slate-600 truncate">
-                        {email || authUser?.email}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={openContactModal}
-                      className="mt-3 text-[0.875rem] font-semibold text-[#6900AA] hover:underline cursor-pointer"
-                    >
-                      Edit contact details
-                    </button>
-                  </>
-                ) : (
-                  <div className="space-y-3">
-                    <p className="text-[0.875rem] text-slate-500 leading-relaxed">
-                      Sign in with your phone number to book tickets and receive your M-Ticket.
+                  <button
+                    type="button"
+                    onClick={openContactModal}
+                    className="mt-3 text-[0.875rem] font-semibold text-[#6900AA] hover:underline cursor-pointer"
+                  >
+                    {contactDetailsReady ? "Edit contact details" : "Add contact details"}
+                  </button>
+                </>
+              ) : isCustomerLoggedIn ? (
+                <>
+                  <div className="space-y-1">
+                    <p className="text-[0.875rem] font-semibold text-slate-800">
+                      {name || authUser?.name}
                     </p>
-                    <button
-                      type="button"
-                      onClick={() => setAuthModalOpen(true)}
-                      className={`w-full py-3 rounded-xl ${accentBtn} text-white font-semibold text-[1rem] cursor-pointer`}
-                    >
-                      Sign in with phone
-                    </button>
+                    <p className="text-[0.875rem] text-slate-600">
+                      {phone ? `+251 ${phone}` : authUser?.phone ? `+251 ${authUser.phone}` : "—"}
+                    </p>
+                    <p className="text-[0.875rem] text-slate-600 truncate">
+                      {email || authUser?.email}
+                    </p>
                   </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {step === 4 && selectedShowtime && (
-            <form id="event-checkout-form" onSubmit={handleConfirm} className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start">
-              {holdId && secondsLeft !== null && (
-                <div
-                  className={`lg:col-span-12 rounded-xl px-4 py-2.5 text-center text-sm font-bold border ${
-                    secondsLeft <= 60
-                      ? "bg-rose-50 border-rose-200 text-rose-700"
-                      : "bg-[#F3E8FF] border-[#E9D5FF] text-[#6B21A8]"
-                  }`}
-                >
-                  <span className="inline-flex items-center gap-2">
-                    <Timer className="size-4" />
-                    Complete your booking in {formatHoldCountdown(secondsLeft)}
-                  </span>
+                  <button
+                    type="button"
+                    onClick={openContactModal}
+                    className="mt-3 text-[0.875rem] font-semibold text-[#6900AA] hover:underline cursor-pointer"
+                  >
+                    Edit contact details
+                  </button>
+                </>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-[0.875rem] text-slate-500 leading-relaxed">
+                    Sign in with your phone number to book tickets and receive your M-Ticket.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setAuthModalOpen(true)}
+                    className={`w-full py-3 rounded-xl ${accentBtn} text-white font-semibold text-[1rem] cursor-pointer`}
+                  >
+                    Sign in with phone
+                  </button>
                 </div>
               )}
+            </div>
+          </div>
+        )}
 
-              <div className="lg:col-span-7 space-y-4">
-                <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="min-w-0">
-                      <h2 className="text-lg sm:text-xl font-bold text-slate-900 leading-tight">{event.name}</h2>
-                      <p className="mt-1 text-sm text-slate-500">
-                        {[
-                          parseEventLanguages(event.language).join(", ") || event.language,
-                          event.category_name,
-                          event.duration_minutes
-                            ? `${Math.floor(Number(event.duration_minutes) / 60)}h ${Number(event.duration_minutes) % 60}m`.replace(" 0m", "")
-                            : "",
-                        ].filter(Boolean).join("  •  ")}
-                      </p>
-                      <p className="mt-3 text-sm font-semibold text-slate-800">{selectedShowtime.venue_name || "Venue"}</p>
-                      {selectedShowtime.venue_address ? (
-                        <p className="mt-0.5 text-sm text-slate-500">{selectedShowtime.venue_address}</p>
-                      ) : null}
-                      {event.age_group ? (
-                        <span className="mt-3 inline-flex rounded-md bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600">
-                          {event.age_group}
-                        </span>
-                      ) : null}
-                    </div>
-                    {resolveMediaUrl(event.poster_vertical_url || event.poster_horizontal_url) ? (
-                      <img
-                        src={resolveMediaUrl(event.poster_vertical_url || event.poster_horizontal_url)}
-                        alt=""
-                        className="h-[4.5rem] w-12 shrink-0 rounded-md object-cover bg-slate-100 sm:h-20 sm:w-14"
-                      />
+        {step === 4 && selectedShowtime && (
+          <form id="event-checkout-form" onSubmit={handleConfirm} className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start">
+            {holdId && secondsLeft !== null && (
+              <div
+                className={`lg:col-span-12 rounded-xl px-4 py-2.5 text-center text-sm font-bold border ${secondsLeft <= 60
+                    ? "bg-rose-50 border-rose-200 text-rose-700"
+                    : "bg-[#F3E8FF] border-[#E9D5FF] text-[#6B21A8]"
+                  }`}
+              >
+                <span className="inline-flex items-center gap-2">
+                  <Timer className="size-4" />
+                  Complete your booking in {formatHoldCountdown(secondsLeft)}
+                </span>
+              </div>
+            )}
+
+            <div className="lg:col-span-7 space-y-4">
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm">
+                <div className="flex items-start justify-between gap-4 sm:gap-6">
+                  <div className="min-w-0 flex-1">
+                    <h2 className="text-lg sm:text-xl font-bold text-slate-900 leading-tight">{event.name}</h2>
+                    <p className="mt-1 text-sm text-slate-500">
+                      {[
+                        parseEventLanguages(event.language).join(", ") || event.language,
+                        event.category_name,
+                        event.duration_minutes
+                          ? `${Math.floor(Number(event.duration_minutes) / 60)}h ${Number(event.duration_minutes) % 60}m`.replace(" 0m", "")
+                          : "",
+                      ].filter(Boolean).join("  •  ")}
+                    </p>
+                    <p className="mt-2 text-sm font-semibold text-slate-800">{selectedShowtime.venue_name || "Venue"}</p>
+                    {selectedShowtime.venue_address ? (
+                      <p className="mt-0.5 text-sm text-slate-500">{selectedShowtime.venue_address}</p>
+                    ) : null}
+                    {event.age_group ? (
+                      <span className="mt-2 inline-flex rounded-md bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600">
+                        {event.age_group}
+                      </span>
                     ) : null}
                   </div>
-
-                  <div className="mt-4 border-t border-slate-100 pt-4">
-                    <p className="text-sm font-semibold text-slate-900">
-                      {getVenueDateTimeParts(selectedShowtime.starts_at)?.dateKey === venueDateStr()
-                        ? `Today, ${formatDateCustomer(selectedShowtime.starts_at)}`
-                        : formatDateCustomer(selectedShowtime.starts_at)}
-                    </p>
-                    <p className="mt-0.5 text-sm text-slate-500">
-                      {formatTime12h(selectedShowtime.starts_at)}
-                      {selectedShowtime.ends_at ? ` – ${formatTime12h(selectedShowtime.ends_at)}` : ""}
-                    </p>
-                  </div>
-
-                  <div className="mt-4 flex items-start justify-between gap-4 border-t border-slate-100 pt-4">
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-slate-900">
-                        {ticketQty} ticket{ticketQty === 1 ? "" : "s"}
-                      </p>
-                      <p className="mt-0.5 text-sm text-slate-600">
-                        {[
-                          selectedLines.map((l) => l.ticket_type).filter(Boolean).join(", "),
-                          selectedSeats
-                            .map((s) => `${s.row_label || s.row || ""}${s.seat_label || s.number || ""}`.trim())
-                            .filter(Boolean)
-                            .join(", "),
-                        ].filter(Boolean).join("  •  ")}
-                      </p>
-                    </div>
-                    <p className="shrink-0 text-sm font-bold text-slate-900">{formatMoney(ticketAmount)}</p>
-                  </div>
-
-                  <div className="mt-4 flex items-center justify-between gap-3 border-t border-slate-100 pt-3">
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-slate-900">{ticketModeLabel(ticketMode)}</p>
-                      <p className="mt-0.5 text-xs text-slate-500">{ticketModeConfirmNote(ticketMode)}</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => navigateToStep(3)}
-                      className="shrink-0 text-sm font-semibold text-slate-900 hover:underline cursor-pointer"
-                    >
-                      Change
-                    </button>
-                  </div>
-
-                  {ticketMode === "PHYSICAL_DELIVERY" && (
-                    <p className="mt-3 text-sm text-slate-600">
-                      {deliveryAddressLine}
-                      {deliveryCity ? `, ${deliveryCity}` : ""}
-                      {deliveryNotes ? ` · ${deliveryNotes}` : ""}
-                    </p>
-                  )}
-
-                  {ticketMode === "BOX_OFFICE" && (
-                    <p className="mt-3 text-sm text-slate-600">
-                      {[selectedShowtime.venue_name, selectedShowtime.venue_address].filter(Boolean).join(", ")}
-                    </p>
-                  )}
+                  {eventPosterUrl ? (
+                    <img
+                      src={eventPosterUrl}
+                      alt={event.name}
+                      className="h-28 w-20 sm:h-32 sm:w-24 shrink-0 rounded-xl object-cover bg-slate-100 shadow-xs border border-slate-200/80"
+                    />
+                  ) : null}
                 </div>
 
-                {!isOrganizer && (
-                  <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm space-y-4">
-                    <h2 className="text-base font-bold text-slate-900">Offers for you</h2>
-                    <div className="space-y-2">
-                      <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Promo code</p>
-                      {appliedPromo ? (
-                        <div className="flex items-center justify-between p-2.5 rounded-xl bg-purple-50 border border-purple-200 text-xs">
-                          <div className="min-w-0">
-                            <p className="font-bold text-slate-900 font-mono truncate">
-                              {appliedPromo.promo_code}
-                              {appliedPromo.source === "platform" ? " · BookMyBota" : ""}
-                            </p>
-                            <p className="text-emerald-600">You save {formatMoney(appliedPromo.discount_amount)}</p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={handleRemovePromo}
-                            className="text-xs text-rose-600 hover:underline font-semibold cursor-pointer shrink-0"
-                          >
-                            Remove
-                          </button>
+                <div className="mt-3 border-t border-slate-100 pt-3">
+                  <p className="text-sm font-semibold text-slate-900">
+                    {getVenueDateTimeParts(selectedShowtime.starts_at)?.dateKey === venueDateStr()
+                      ? `Today, ${formatDateCustomer(selectedShowtime.starts_at)}`
+                      : formatDateCustomer(selectedShowtime.starts_at)}
+                  </p>
+                  <p className="mt-0.5 text-sm text-slate-500">
+                    {formatTime12h(selectedShowtime.starts_at)}
+                    {selectedShowtime.ends_at ? ` – ${formatTime12h(selectedShowtime.ends_at)}` : ""}
+                  </p>
+                </div>
+
+                <div className="mt-3 flex items-start justify-between gap-4 border-t border-slate-100 pt-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-slate-900">
+                      {ticketQty} ticket{ticketQty === 1 ? "" : "s"}
+                    </p>
+                    <p className="mt-0.5 text-sm text-slate-600">
+                      {[
+                        selectedLines.map((l) => l.ticket_type).filter(Boolean).join(", "),
+                        selectedSeats
+                          .map((s) => `${s.row_label || s.row || ""}${s.seat_label || s.number || ""}`.trim())
+                          .filter(Boolean)
+                          .join(", "),
+                      ].filter(Boolean).join("  •  ")}
+                    </p>
+                  </div>
+                  <p className="shrink-0 text-sm font-bold text-slate-900">{formatMoney(ticketAmount)}</p>
+                </div>
+
+                <div className="mt-3 flex items-center justify-between gap-3 border-t border-slate-100 pt-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-slate-900">{ticketModeLabel(ticketMode)}</p>
+                    <p className="mt-0.5 text-xs text-slate-500">{ticketModeConfirmNote(ticketMode)}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => navigateToStep(3)}
+                    className="shrink-0 text-sm font-semibold text-slate-900 hover:underline cursor-pointer"
+                  >
+                    Change
+                  </button>
+                </div>
+
+                {ticketMode === "PHYSICAL_DELIVERY" && (
+                  <p className="mt-3 text-sm text-slate-600">
+                    {deliveryAddressLine}
+                    {deliveryCity ? `, ${deliveryCity}` : ""}
+                    {deliveryNotes ? ` · ${deliveryNotes}` : ""}
+                  </p>
+                )}
+
+                {ticketMode === "BOX_OFFICE" && (
+                  <p className="mt-3 text-sm text-slate-600">
+                    {[selectedShowtime.venue_name, selectedShowtime.venue_address].filter(Boolean).join(", ")}
+                  </p>
+                )}
+              </div>
+
+              {!isOrganizer && (
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm space-y-4">
+                  <h2 className="text-base font-bold text-slate-900">Offers for you</h2>
+                  <div className="space-y-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Promo code</p>
+                    {appliedPromo ? (
+                      <div className="flex items-center justify-between p-2.5 rounded-xl bg-purple-50 border border-purple-200 text-xs">
+                        <div className="min-w-0">
+                          <p className="font-bold text-slate-900 font-mono truncate">
+                            {appliedPromo.promo_code}
+                            {appliedPromo.source === "platform" ? " · BookMyBota" : ""}
+                          </p>
+                          <p className="text-emerald-600">You save {formatMoney(appliedPromo.discount_amount)}</p>
                         </div>
-                      ) : (
+                        <button
+                          type="button"
+                          onClick={handleRemovePromo}
+                          className="text-xs text-rose-600 hover:underline font-semibold cursor-pointer shrink-0"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={promoInput}
+                          onChange={(e) => setPromoInput(e.target.value.toUpperCase())}
+                          placeholder="Enter promo code"
+                          className={`flex-1 px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs text-slate-900 uppercase placeholder:text-slate-400 focus:outline-none ${accentFocus}`}
+                        />
+                        <button
+                          type="button"
+                          onClick={handleApplyPromo}
+                          disabled={validatingPromo || !promoInput.trim()}
+                          className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-800 border border-slate-200 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
+                        >
+                          {validatingPromo ? <Loader2 className="size-3.5 animate-spin" /> : null}
+                          Apply
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-2 pt-1">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Gift card</p>
+                    {appliedGiftCard ? (
+                      <div className="flex items-center justify-between gap-2 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2">
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-slate-900 truncate">
+                            {appliedGiftCard.product_name} · {appliedGiftCard.code_masked}
+                          </p>
+                          <p className="text-[11px] text-rose-700">
+                            Applying {formatMoney(appliedGiftCard.amount_applicable)}
+                            {appliedGiftCard.balance_after > 0
+                              ? ` · ${formatMoney(appliedGiftCard.balance_after)} left after`
+                              : " · balance will be zero"}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleRemoveGiftCard}
+                          className="text-xs font-semibold text-rose-600 hover:underline shrink-0 cursor-pointer"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {redeemableGiftCards.length > 0 && (
+                          <select
+                            value={selectedGiftCardId}
+                            onChange={(e) => {
+                              setSelectedGiftCardId(e.target.value);
+                              if (e.target.value) setGiftCardInput("");
+                            }}
+                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900"
+                          >
+                            <option value="">Select from My Gift Cards</option>
+                            {redeemableGiftCards.map((c) => (
+                              <option key={c.id} value={c.id}>
+                                {c.product_name || "Gift Card"} · {c.code_masked} · {formatMoney(Number(c.current_balance))}
+                              </option>
+                            ))}
+                          </select>
+                        )}
                         <div className="flex gap-2">
                           <input
                             type="text"
-                            value={promoInput}
-                            onChange={(e) => setPromoInput(e.target.value.toUpperCase())}
-                            placeholder="Enter promo code"
-                            className={`flex-1 px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs text-slate-900 uppercase placeholder:text-slate-400 focus:outline-none ${accentFocus}`}
+                            value={giftCardInput}
+                            onChange={(e) => {
+                              setGiftCardInput(e.target.value.toUpperCase());
+                              if (e.target.value) setSelectedGiftCardId("");
+                            }}
+                            placeholder="Or enter gift card code"
+                            className={`flex-1 px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs text-slate-900 font-mono uppercase placeholder:text-slate-400 focus:outline-none ${accentFocus}`}
                           />
                           <button
                             type="button"
-                            onClick={handleApplyPromo}
-                            disabled={validatingPromo || !promoInput.trim()}
-                            className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-800 border border-slate-200 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
+                            onClick={handleApplyGiftCard}
+                            disabled={
+                              validatingGiftCard ||
+                              (!selectedGiftCardId && !giftCardInput.trim()) ||
+                              orderTotal <= 0
+                            }
+                            className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-800 border border-slate-200 disabled:opacity-50 cursor-pointer"
                           >
-                            {validatingPromo ? <Loader2 className="size-3.5 animate-spin" /> : null}
-                            Apply
+                            {validatingGiftCard ? <Loader2 className="size-3.5 animate-spin" /> : "Apply"}
                           </button>
                         </div>
-                      )}
-                    </div>
-
-                    <div className="space-y-2 pt-1">
-                      <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Gift card</p>
-                      {appliedGiftCard ? (
-                        <div className="flex items-center justify-between gap-2 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2">
-                          <div className="min-w-0">
-                            <p className="text-xs font-bold text-slate-900 truncate">
-                              {appliedGiftCard.product_name} · {appliedGiftCard.code_masked}
-                            </p>
-                            <p className="text-[11px] text-rose-700">
-                              Applying {formatMoney(appliedGiftCard.amount_applicable)}
-                              {appliedGiftCard.balance_after > 0
-                                ? ` · ${formatMoney(appliedGiftCard.balance_after)} left after`
-                                : " · balance will be zero"}
-                            </p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={handleRemoveGiftCard}
-                            className="text-xs font-semibold text-rose-600 hover:underline shrink-0 cursor-pointer"
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="space-y-2">
-                          {redeemableGiftCards.length > 0 && (
-                            <select
-                              value={selectedGiftCardId}
-                              onChange={(e) => {
-                                setSelectedGiftCardId(e.target.value);
-                                if (e.target.value) setGiftCardInput("");
-                              }}
-                              className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900"
-                            >
-                              <option value="">Select from My Gift Cards</option>
-                              {redeemableGiftCards.map((c) => (
-                                <option key={c.id} value={c.id}>
-                                  {c.product_name || "Gift Card"} · {c.code_masked} · {formatMoney(Number(c.current_balance))}
-                                </option>
-                              ))}
-                            </select>
-                          )}
-                          <div className="flex gap-2">
-                            <input
-                              type="text"
-                              value={giftCardInput}
-                              onChange={(e) => {
-                                setGiftCardInput(e.target.value.toUpperCase());
-                                if (e.target.value) setSelectedGiftCardId("");
-                              }}
-                              placeholder="Or enter gift card code"
-                              className={`flex-1 px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs text-slate-900 font-mono uppercase placeholder:text-slate-400 focus:outline-none ${accentFocus}`}
-                            />
-                            <button
-                              type="button"
-                              onClick={handleApplyGiftCard}
-                              disabled={
-                                validatingGiftCard ||
-                                (!selectedGiftCardId && !giftCardInput.trim()) ||
-                                orderTotal <= 0
-                              }
-                              className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-800 border border-slate-200 disabled:opacity-50 cursor-pointer"
-                            >
-                              {validatingGiftCard ? <Loader2 className="size-3.5 animate-spin" /> : "Apply"}
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <aside className="lg:col-span-5 space-y-4 lg:sticky lg:top-4">
-                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                  <h2 className="text-base font-bold text-slate-900">Payment summary</h2>
-                  <div className="mt-4 space-y-3 text-sm">
-                    <details className="group">
-                      <summary className="flex cursor-pointer list-none items-center justify-between text-slate-700 [&::-webkit-details-marker]:hidden">
-                        <span className="inline-flex items-center gap-1">
-                          Order amount
-                          <ChevronDown className="size-3.5 text-slate-400 transition-transform group-open:rotate-180" />
-                        </span>
-                        <span className="font-semibold text-slate-900">{formatMoney(ticketAmount)}</span>
-                      </summary>
-                      <div className="mt-2 space-y-1.5 text-xs leading-snug text-slate-500">
-                        {selectedLines.map((line) => (
-                          <p key={`${line.ticket_type}-${line.unit}`}>
-                            {line.qty} × {line.ticket_type} ticket{line.qty === 1 ? "" : "s"} @ {formatMoney(line.unit)}
-                            <span className="block">each</span>
-                          </p>
-                        ))}
                       </div>
-                    </details>
-                    <details className="group">
-                      <summary className="flex cursor-pointer list-none items-center justify-between text-slate-700 [&::-webkit-details-marker]:hidden">
-                        <span className="inline-flex items-center gap-1">
-                          Convenience fees
-                          <ChevronDown className="size-3.5 text-slate-400 transition-transform group-open:rotate-180" />
-                        </span>
-                        <span className="font-semibold text-slate-900">{formatMoney(convenienceFee)}</span>
-                      </summary>
-                      <div className="mt-2 space-y-1.5 text-xs text-slate-500">
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <aside className="lg:col-span-5 space-y-4 lg:sticky lg:top-4">
+              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <h2 className="text-base font-bold text-slate-900">Payment summary</h2>
+                <div className="mt-4 space-y-3 text-sm">
+                  <details className="group">
+                    <summary className="flex cursor-pointer list-none items-center justify-between text-slate-700 [&::-webkit-details-marker]:hidden">
+                      <span className="inline-flex items-center gap-1">
+                        Order amount
+                        <ChevronDown className="size-3.5 text-slate-400 transition-transform group-open:rotate-180" />
+                      </span>
+                      <span className="font-semibold text-slate-900">{formatMoney(ticketAmount)}</span>
+                    </summary>
+                    <div className="mt-2 space-y-1.5 text-xs leading-snug text-slate-500">
+                      {selectedLines.map((line) => (
+                        <p key={`${line.ticket_type}-${line.unit}`}>
+                          {line.qty} × {line.ticket_type} ticket{line.qty === 1 ? "" : "s"} @ {formatMoney(line.unit)}
+                          <span className="block">each</span>
+                        </p>
+                      ))}
+                    </div>
+                  </details>
+                  <details className="group">
+                    <summary className="flex cursor-pointer list-none items-center justify-between text-slate-700 [&::-webkit-details-marker]:hidden">
+                      <span className="inline-flex items-center gap-1">
+                        Convenience fees
+                        <ChevronDown className="size-3.5 text-slate-400 transition-transform group-open:rotate-180" />
+                      </span>
+                      <span className="font-semibold text-slate-900">{formatMoney(convenienceFee)}</span>
+                    </summary>
+                    <div className="mt-2 space-y-1.5 text-xs text-slate-500">
+                      <div className="flex justify-between gap-4">
+                        <span>Base Amount</span>
+                        <span>{formatMoney(convenienceFeeBase)}</span>
+                      </div>
+                      {convenienceFeeTax > 0 ? (
                         <div className="flex justify-between gap-4">
-                          <span>Base Amount</span>
-                          <span>{formatMoney(convenienceFeeBase)}</span>
+                          <span>VAT @ {convenienceVatPct}%</span>
+                          <span>{formatMoney(convenienceFeeTax)}</span>
                         </div>
-                        {convenienceFeeTax > 0 ? (
-                          <div className="flex justify-between gap-4">
-                            <span>VAT @ {convenienceVatPct}%</span>
-                            <span>{formatMoney(convenienceFeeTax)}</span>
-                          </div>
-                        ) : null}
-                      </div>
-                    </details>
-                    {discountAmount > 0 ? (
-                      <div className="flex justify-between text-emerald-700">
-                        <span>Promo discount</span>
-                        <span className="font-semibold">−{formatMoney(discountAmount)}</span>
-                      </div>
-                    ) : null}
-                    {giftCardAmount > 0 ? (
-                      <div className="flex justify-between text-emerald-700">
-                        <span>Gift card</span>
-                        <span className="font-semibold">−{formatMoney(giftCardAmount)}</span>
-                      </div>
-                    ) : null}
-                    <div className="flex items-center justify-between border-t border-slate-100 pt-3 text-base font-bold text-slate-900">
-                      <span>{giftCardAmount > 0 ? "Amount due" : "To be paid"}</span>
-                      <span>{formatMoney(grandTotal)}</span>
+                      ) : null}
                     </div>
+                  </details>
+                  {discountAmount > 0 ? (
+                    <div className="flex justify-between text-emerald-700">
+                      <span>Promo discount</span>
+                      <span className="font-semibold">−{formatMoney(discountAmount)}</span>
+                    </div>
+                  ) : null}
+                  {giftCardAmount > 0 ? (
+                    <div className="flex justify-between text-emerald-700">
+                      <span>Gift card</span>
+                      <span className="font-semibold">−{formatMoney(giftCardAmount)}</span>
+                    </div>
+                  ) : null}
+                  <div className="flex items-center justify-between border-t border-slate-100 pt-3 text-base font-bold text-slate-900">
+                    <span>{giftCardAmount > 0 ? "Amount due" : "To be paid"}</span>
+                    <span>{formatMoney(grandTotal)}</span>
                   </div>
                 </div>
-
-                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                  <div className="flex items-center justify-between gap-3">
-                    <h2 className="text-base font-bold text-slate-900">Your details</h2>
-                    <button
-                      type="button"
-                      onClick={openContactModal}
-                      className="text-sm font-semibold text-slate-900 hover:underline cursor-pointer"
-                    >
-                      Edit
-                    </button>
-                  </div>
-                  <div className="mt-3 flex items-start gap-3">
-                    <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500">
-                      <User className="size-4" />
-                    </span>
-                    <div className="min-w-0 text-sm leading-5">
-                      <p className="font-semibold text-slate-900">{name.trim() || "Add your name"}</p>
-                      <p className="text-slate-500">{phone ? `+251 ${phone}` : "Add your phone number"}</p>
-                      <p className="truncate text-slate-500">{email.trim() || "Add your email"}</p>
-                    </div>
-                  </div>
-                </div>
-
-                {!isOrganizer && (
-                  <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm">
-                    <Banknote className="size-4 shrink-0 text-slate-500" />
-                    <div className="min-w-0">
-                      <p className="font-semibold text-slate-900">Cash</p>
-                      <p className="text-xs text-slate-500">Pay at the venue</p>
-                    </div>
-                    <CheckCircle2 className="ml-auto size-4 shrink-0 text-emerald-600" />
-                  </div>
-                )}
-
-                <button
-                  type="submit"
-                  disabled={!canConfirm || submitting}
-                  aria-busy={submitting || undefined}
-                  className="flex w-full items-center justify-between rounded-xl bg-black px-5 py-3.5 text-white disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
-                >
-                  <span className="text-left">
-                    <span className="block text-sm font-bold">{formatMoney(grandTotal)}</span>
-                    <span className="block text-[10px] font-semibold tracking-wide text-white/70">TOTAL</span>
-                  </span>
-                  <span className="text-sm font-bold inline-flex items-center gap-2">
-                    {submitting ? <Loader2 size={16} className="animate-spin" /> : null}
-                    {submitting ? "Confirming…" : isOrganizer ? "Confirm & Send" : "Pay now"}
-                  </span>
-                </button>
-              </aside>
-            </form>
-          )}
               </div>
 
-        {step !== 1 && (
+              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <h2 className="text-base font-bold text-slate-900">Your details</h2>
+                  <button
+                    type="button"
+                    onClick={openContactModal}
+                    className="text-sm font-semibold text-slate-900 hover:underline cursor-pointer"
+                  >
+                    Edit
+                  </button>
+                </div>
+                <div className="mt-3 flex items-start gap-3">
+                  <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500">
+                    <User className="size-4" />
+                  </span>
+                  <div className="min-w-0 text-sm leading-5">
+                    <p className="font-semibold text-slate-900">{name.trim() || "Add your name"}</p>
+                    <p className="text-slate-500">{phone ? `+251 ${phone}` : "Add your phone number"}</p>
+                    <p className="truncate text-slate-500">{email.trim() || "Add your email"}</p>
+                  </div>
+                </div>
+              </div>
+
+              {!isOrganizer && (
+                <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm">
+                  <Banknote className="size-4 shrink-0 text-slate-500" />
+                  <div className="min-w-0">
+                    <p className="font-semibold text-slate-900">Cash</p>
+                    <p className="text-xs text-slate-500">Pay at the venue</p>
+                  </div>
+                  <CheckCircle2 className="ml-auto size-4 shrink-0 text-emerald-600" />
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={!canConfirm || submitting}
+                aria-busy={submitting || undefined}
+                className="flex w-full items-center justify-between rounded-xl bg-black px-5 py-3.5 text-white disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+              >
+                <span className="text-left">
+                  <span className="block text-sm font-bold">{formatMoney(grandTotal)}</span>
+                  <span className="block text-[10px] font-semibold tracking-wide text-white/70">TOTAL</span>
+                </span>
+                <span className="text-sm font-bold inline-flex items-center gap-2">
+                  {submitting ? <Loader2 size={16} className="animate-spin" /> : null}
+                  {submitting ? "Confirming…" : isOrganizer ? "Confirm & Send" : "Pay now"}
+                </span>
+              </button>
+            </aside>
+          </form>
+        )}
+      </div>
+
+      {step !== 1 && (
         <div
           className={
             isPage
@@ -2672,158 +2702,155 @@ export default function EventCheckout({
           }
         >
           <div className={isPage ? (step === 4 ? "max-w-6xl mx-auto" : "max-w-[36rem] mx-auto") : ""}>
-          {step === 2 && (
-            <>
-              {isPage && (hasReservedSeats ? seatsReady : ticketQty > 0) ? (
-                <div className="flex items-end gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setStep(1)}
-                    className="shrink-0 px-4 py-3 rounded-[0.5rem] border border-slate-300 bg-white text-slate-700 font-semibold text-[1rem] inline-flex items-center gap-1 cursor-pointer"
-                  >
-                    <ArrowLeft size={14} /> Back
-                  </button>
-                  <div className="min-w-0 flex-1">
-                    <div className="mb-2 text-right">
-                      <p className="text-[0.9375rem] text-slate-500">
-                        {ticketQty} Ticket{ticketQty === 1 ? "" : "s"}
-                        {hasReservedSeats && desiredSeatQty != null
-                          ? ` · ${selectedSeats.length}/${desiredSeatQty} seats`
-                          : ""}
-                      </p>
-                      <p className="text-[1.25rem] font-extrabold text-slate-900 leading-tight">
-                        {formatMoney(ticketAmount, { compact: true })}
-                      </p>
+            {step === 2 && (
+              <>
+                {isPage && (hasReservedSeats ? seatsReady : ticketQty > 0) ? (
+                  <div className="flex items-end gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setStep(1)}
+                      className="shrink-0 px-4 py-3 rounded-[0.5rem] border border-slate-300 bg-white text-slate-700 font-semibold text-[1rem] inline-flex items-center gap-1 cursor-pointer"
+                    >
+                      <ArrowLeft size={14} /> Back
+                    </button>
+                    <div className="min-w-0 flex-1">
+                      <div className="mb-2 text-right">
+                        <p className="text-[0.9375rem] text-slate-500">
+                          {ticketQty} Ticket{ticketQty === 1 ? "" : "s"}
+                          {hasReservedSeats && desiredSeatQty != null
+                            ? ` · ${selectedSeats.length}/${desiredSeatQty} seats`
+                            : ""}
+                        </p>
+                        <p className="text-[1.25rem] font-extrabold text-slate-900 leading-tight">
+                          {formatMoney(ticketAmount, { compact: true })}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        disabled={!seatsReady}
+                        onClick={proceedFromTickets}
+                        className={`w-full py-3 rounded-[0.5rem] ${accentBtn} disabled:bg-slate-300 disabled:text-white disabled:hover:bg-slate-300 text-white font-semibold text-[1.0625rem] cursor-pointer disabled:cursor-not-allowed`}
+                      >
+                        Continue
+                      </button>
                     </div>
+                  </div>
+                ) : isPage ? (
+                  null
+                  /* Back + Choose seat count footer (commented out — UI only)
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setStep(1)}
+                      className="px-4 py-3 rounded-[0.5rem] border border-slate-300 bg-white text-slate-700 font-semibold text-[1rem] inline-flex items-center gap-1 cursor-pointer"
+                    >
+                      <ArrowLeft size={14} /> Back
+                    </button>
                     <button
                       type="button"
                       disabled={!seatsReady}
                       onClick={proceedFromTickets}
-                      className={`w-full py-3 rounded-[0.5rem] ${accentBtn} disabled:bg-slate-300 disabled:text-white disabled:hover:bg-slate-300 text-white font-semibold text-[1.0625rem] cursor-pointer disabled:cursor-not-allowed`}
+                      className={`flex-1 py-3 rounded-[0.5rem] ${accentBtn} disabled:bg-slate-300 disabled:text-white disabled:hover:bg-slate-300 text-white font-semibold text-[1.0625rem] cursor-pointer disabled:cursor-not-allowed`}
                     >
-                      Continue
+                      {hasReservedSeats && desiredSeatQty == null
+                        ? "Choose seat count"
+                        : hasReservedSeats
+                          ? `Select ${desiredSeatQty} seat${desiredSeatQty === 1 ? "" : "s"}`
+                          : "Continue"}
                     </button>
                   </div>
-                </div>
-              ) : isPage ? (
-                null
-                /* Back + Choose seat count footer (commented out — UI only)
-                <div className="flex gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setStep(1)}
-                    className="px-4 py-3 rounded-[0.5rem] border border-slate-300 bg-white text-slate-700 font-semibold text-[1rem] inline-flex items-center gap-1 cursor-pointer"
-                  >
-                    <ArrowLeft size={14} /> Back
-                  </button>
-                  <button
-                    type="button"
-                    disabled={!seatsReady}
-                    onClick={proceedFromTickets}
-                    className={`flex-1 py-3 rounded-[0.5rem] ${accentBtn} disabled:bg-slate-300 disabled:text-white disabled:hover:bg-slate-300 text-white font-semibold text-[1.0625rem] cursor-pointer disabled:cursor-not-allowed`}
-                  >
-                    {hasReservedSeats && desiredSeatQty == null
-                      ? "Choose seat count"
-                      : hasReservedSeats
-                        ? `Select ${desiredSeatQty} seat${desiredSeatQty === 1 ? "" : "s"}`
-                        : "Continue"}
-                  </button>
-                </div>
-                */
-              ) : (
-              <>
-              {ticketQty > 0 && (
-                <div className="mb-2.5 flex items-end justify-end gap-3">
-                  <div className="min-w-0 text-right">
-                    <p className="text-[0.9375rem] text-slate-500">
-                      {ticketQty} Ticket{ticketQty === 1 ? "" : "s"}
-                    </p>
-                    <p className="text-[1.25rem] font-extrabold text-slate-900">
-                      {formatMoney(ticketAmount, { compact: true })}
-                    </p>
-                  </div>
-                </div>
-              )}
+                  */
+                ) : (
+                  <>
+                    {ticketQty > 0 && (
+                      <div className="mb-2.5 flex items-end justify-end gap-3">
+                        <div className="min-w-0 text-right">
+                          <p className="text-[0.9375rem] text-slate-500">
+                            {ticketQty} Ticket{ticketQty === 1 ? "" : "s"}
+                          </p>
+                          <p className="text-[1.25rem] font-extrabold text-slate-900">
+                            {formatMoney(ticketAmount, { compact: true })}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                    <div className="flex gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setStep(1)}
+                        className="px-4 py-3 rounded-xl border border-slate-200 text-slate-700 font-semibold text-[1rem] inline-flex items-center gap-1 cursor-pointer"
+                      >
+                        <ArrowLeft size={14} /> Back
+                      </button>
+                      <button
+                        type="button"
+                        disabled={!seatsReady}
+                        onClick={proceedFromTickets}
+                        className={`flex-1 py-3 rounded-xl ${accentBtn} disabled:bg-slate-300 disabled:text-white disabled:hover:bg-slate-300 text-white font-semibold text-[1.0625rem] inline-flex items-center justify-center gap-1 cursor-pointer disabled:cursor-not-allowed`}
+                      >
+                        Continue
+                        <ChevronRight size={16} />
+                      </button>
+                    </div>
+                  </>
+                )}
+              </>
+            )}
+            {step === 3 && (
               <div className="flex gap-3">
                 <button
                   type="button"
-                  onClick={() => setStep(1)}
-                  className="px-4 py-3 rounded-xl border border-slate-200 text-slate-700 font-semibold text-[1rem] inline-flex items-center gap-1 cursor-pointer"
+                  onClick={() => setStep(2)}
+                  className={`px-4 py-3 border text-slate-700 font-semibold text-[1rem] inline-flex items-center gap-1 cursor-pointer ${isPage
+                      ? "rounded-[0.5rem] border-slate-300 bg-white"
+                      : "rounded-xl border-slate-200"
+                    }`}
                 >
                   <ArrowLeft size={14} /> Back
                 </button>
                 <button
                   type="button"
-                  disabled={!seatsReady}
-                  onClick={proceedFromTickets}
-                  className={`flex-1 py-3 rounded-xl ${accentBtn} disabled:bg-slate-300 disabled:text-white disabled:hover:bg-slate-300 text-white font-semibold text-[1.0625rem] inline-flex items-center justify-center gap-1 cursor-pointer disabled:cursor-not-allowed`}
+                  onClick={() => void proceedToReview()}
+                  disabled={!canProceedFromTicketMode || holding}
+                  className={`flex-1 py-3 ${accentBtn} disabled:bg-slate-300 disabled:text-white disabled:hover:bg-slate-300 text-white font-semibold text-[1.0625rem] cursor-pointer disabled:cursor-not-allowed inline-flex items-center justify-center gap-2 ${isPage ? "rounded-[0.5rem]" : "rounded-xl disabled:bg-[#E3BCFF] disabled:hover:bg-[#E3BCFF]"
+                    }`}
                 >
-                  Continue
-                  <ChevronRight size={16} />
+                  {holding ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" /> Holding seats…
+                    </>
+                  ) : (
+                    "Continue to review"
+                  )}
                 </button>
               </div>
-              </>
-              )}
-            </>
-          )}
-          {step === 3 && (
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={() => setStep(2)}
-                className={`px-4 py-3 border text-slate-700 font-semibold text-[1rem] inline-flex items-center gap-1 cursor-pointer ${
-                  isPage
-                    ? "rounded-[0.5rem] border-slate-300 bg-white"
-                    : "rounded-xl border-slate-200"
-                }`}
-              >
-                <ArrowLeft size={14} /> Back
-              </button>
-              <button
-                type="button"
-                onClick={() => void proceedToReview()}
-                disabled={!canProceedFromTicketMode || holding}
-                className={`flex-1 py-3 ${accentBtn} disabled:bg-slate-300 disabled:text-white disabled:hover:bg-slate-300 text-white font-semibold text-[1.0625rem] cursor-pointer disabled:cursor-not-allowed inline-flex items-center justify-center gap-2 ${
-                  isPage ? "rounded-[0.5rem]" : "rounded-xl disabled:bg-[#E3BCFF] disabled:hover:bg-[#E3BCFF]"
-                }`}
-              >
-                {holding ? (
-                  <>
-                    <Loader2 size={16} className="animate-spin" /> Holding seats…
-                  </>
-                ) : (
-                  "Continue to review"
-                )}
-              </button>
-            </div>
-          )}
-          {step === 4 && (
-            <div className="flex">
-              <button
-                type="button"
-                disabled={submitting}
-                onClick={() => setStep(3)}
-                className={`px-4 py-3 border text-slate-700 font-semibold text-[1rem] inline-flex items-center gap-1 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
-                  isPage
-                    ? "rounded-[0.5rem] border-slate-300 bg-white"
-                    : "rounded-xl border-slate-200"
-                }`}
-              >
-                <ArrowLeft size={14} /> Back
-              </button>
-            </div>
-          )}
+            )}
+            {step === 4 && (
+              <div className="flex">
+                <button
+                  type="button"
+                  disabled={submitting}
+                  onClick={() => setStep(3)}
+                  className={`px-4 py-3 border text-slate-700 font-semibold text-[1rem] inline-flex items-center gap-1 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${isPage
+                      ? "rounded-[0.5rem] border-slate-300 bg-white"
+                      : "rounded-xl border-slate-200"
+                    }`}
+                >
+                  <ArrowLeft size={14} /> Back
+                </button>
+              </div>
+            )}
           </div>
         </div>
-        )}
-      </div>
+      )}
+    </div>
   );
 
   const ticketModeSubtitle =
     selectedLines.length > 0
       ? selectedLines
-          .map((l) => `${String(l.ticket_type || "Ticket").toUpperCase()} (${l.qty} ticket(s))`)
-          .join(", ")
+        .map((l) => `${String(l.ticket_type || "Ticket").toUpperCase()} (${l.qty} ticket(s))`)
+        .join(", ")
       : `ENTRY FOR ${ticketQty} (${ticketQty} ticket(s))`;
 
   const saveContactDetails = handleContactModalSubmit((values) => {
@@ -2878,11 +2905,10 @@ export default function EventCheckout({
                     <button
                       type="button"
                       onClick={() => setSeatViewMode("canvas")}
-                      className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] md:max-lg:text-[12px] lg:text-[10px] font-bold transition-all cursor-pointer ${
-                        seatViewMode === "canvas"
+                      className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] md:max-lg:text-[12px] lg:text-[10px] font-bold transition-all cursor-pointer ${seatViewMode === "canvas"
                           ? "bg-[#6900AA] text-white shadow-sm"
                           : "text-slate-500 hover:text-slate-900"
-                      }`}
+                        }`}
                     >
                       <MapIcon className="size-3" />
                       <span className="hidden sm:inline">Map</span>
@@ -2890,11 +2916,10 @@ export default function EventCheckout({
                     <button
                       type="button"
                       onClick={() => setSeatViewMode("grid")}
-                      className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] md:max-lg:text-[12px] lg:text-[10px] font-bold transition-all cursor-pointer ${
-                        seatViewMode === "grid"
+                      className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] md:max-lg:text-[12px] lg:text-[10px] font-bold transition-all cursor-pointer ${seatViewMode === "grid"
                           ? "bg-[#6900AA] text-white shadow-sm"
                           : "text-slate-500 hover:text-slate-900"
-                      }`}
+                        }`}
                     >
                       <LayoutGrid className="size-3" />
                       <span className="hidden sm:inline">Grid</span>
@@ -2903,11 +2928,10 @@ export default function EventCheckout({
                 )}
                 {holdId && secondsLeft !== null && secondsLeft > 0 && !timeOutOpen && (
                   <span
-                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border ${
-                      secondsLeft <= 60
+                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border ${secondsLeft <= 60
                         ? "bg-rose-50 border-rose-200 text-rose-700"
                         : "bg-[#F3E8FF] border-[#E9D5FF] text-[#6B21A8]"
-                    }`}
+                      }`}
                   >
                     <Timer className="size-3.5" />
                     {formatHoldCountdown(secondsLeft)}
@@ -2965,8 +2989,8 @@ export default function EventCheckout({
                             ] as const;
                           })
                           .filter(Boolean) as Array<
-                          readonly [string, { id: string; name: string; price: number }]
-                        >
+                            readonly [string, { id: string; name: string; price: number }]
+                          >
                       ).values()
                     )}
                     onSeatsSelected={handleMapSeatsSelected}
@@ -3034,13 +3058,12 @@ export default function EventCheckout({
                     {eventGridLayout.bands.map((band, bandIdx) => (
                       <div
                         key={`band-${bandIdx}`}
-                        className={`grid gap-4 ${
-                          band.sections.length === 1
+                        className={`grid gap-4 ${band.sections.length === 1
                             ? "grid-cols-1"
                             : band.sections.length === 2
                               ? "grid-cols-1 md:grid-cols-2"
                               : "grid-cols-1 md:grid-cols-2 xl:grid-cols-3"
-                        }`}
+                          }`}
                       >
                         {band.sections.map((section) => (
                           <section
@@ -3086,13 +3109,12 @@ export default function EventCheckout({
                                             type="button"
                                             disabled={seat.isBooked}
                                             onClick={() => toggleGridSeat(seat)}
-                                            className={`size-7 sm:size-8 rounded-md text-[10px] sm:text-[11px] font-bold transition-all duration-150 flex items-center justify-center select-none ${
-                                              seat.isBooked
+                                            className={`size-7 sm:size-8 rounded-md text-[10px] sm:text-[11px] font-bold transition-all duration-150 flex items-center justify-center select-none ${seat.isBooked
                                                 ? "bg-slate-200 border border-slate-300 text-slate-400 cursor-not-allowed"
                                                 : isSelected
                                                   ? "bg-[#6900AA] text-white border border-[#6900AA]/40 shadow-md scale-105 z-10"
                                                   : "bg-white border border-slate-300 text-slate-700 hover:bg-[#F7E9FF] hover:border-[#6900AA]/40 cursor-pointer"
-                                            }`}
+                                              }`}
                                             title={`${section.sectionName} · ${seat.row}${seat.number}`}
                                           >
                                             {seat.number}
@@ -3367,7 +3389,7 @@ export default function EventCheckout({
                 : "Your ticket selection may not be available later if you cancel."}
             </p>
             <div className="mt-6 grid grid-cols-2 gap-3">
-            <button
+              <button
                 type="button"
                 disabled={releasingHold}
                 onClick={() => void confirmCancelTransaction()}
@@ -3380,7 +3402,7 @@ export default function EventCheckout({
                 ) : (
                   "Yes, Cancel"
                 )}
-            </button>
+              </button>
               <button
                 type="button"
                 disabled={releasingHold}
@@ -3389,9 +3411,9 @@ export default function EventCheckout({
               >
                 No
               </button>
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
       )}
 
       {timeOutOpen && (

@@ -443,7 +443,13 @@ const generateSlotsForMeal = (
   options?: { graceMinutes?: number; dayCloseHm?: string | null; slotIntervalMinutes?: 15 | 30 | 60 }
 ): string[] => {
   const slots: string[] = [];
-  const now = new Date();
+  // Use Ethiopian wall-clock time (UTC+03:00) so slots strictly match venue timezone
+  const getEthiopianNow = () => {
+    const d = new Date();
+    const utc = d.getTime() + d.getTimezoneOffset() * 60000;
+    return new Date(utc + 3 * 3600000);
+  };
+  const now = getEthiopianNow();
   const [openH, openM] = mealOpen.split(':').map(Number);
   const [closeH, closeM] = mealClose.split(':').map(Number);
   const openVal = openH * 60 + openM;
@@ -451,30 +457,39 @@ const generateSlotsForMeal = (
   const grace = Math.max(0, options?.graceMinutes ?? 0);
   const step = options?.slotIntervalMinutes ?? 30;
   const dayClose = (options?.dayCloseHm || '').slice(0, 5);
-  const dayCloseVal =
-    dayClose && dayClose > mealOpen.slice(0, 5) ? (() => {
-      const [h, m] = dayClose.split(':').map(Number);
-      return h * 60 + m;
-    })() : null;
+  const sameDayClose = Boolean(dayClose && dayClose > mealOpen.slice(0, 5));
+  const dayCloseVal = sameDayClose ? (() => {
+    const [h, m] = dayClose.split(':').map(Number);
+    return h * 60 + m;
+  })() : null;
 
-  const pushIfValid = (slotVal: number) => {
-    if (dayCloseVal != null && slotVal + grace > dayCloseVal) return;
+  const pushIfValid = (slotVal: number, isPostMidnight: boolean) => {
+    // Standard Zomato/Swiggy minimum dining duration: 45 minutes before venue/meal close
+    const MIN_DINING_MINUTES = 45;
+    if (dayCloseVal != null && slotVal + MIN_DINING_MINUTES > dayCloseVal) return;
+    if (isPostMidnight && slotVal + MIN_DINING_MINUTES > closeVal) return;
+    if (!isPostMidnight && closeVal >= openVal && slotVal + MIN_DINING_MINUTES > closeVal) return;
+
     const h = Math.floor(slotVal / 60) % 24;
     const m = slotVal % 60;
     if (isToday) {
-      const slotDate = new Date();
+      const slotDate = new Date(now);
+      if (isPostMidnight) {
+        slotDate.setDate(slotDate.getDate() + 1);
+      }
       slotDate.setHours(h, m, 0, 0);
-      const bufferNow = new Date(now.getTime() + 30 * 60 * 1000);
-      if (slotDate <= bufferNow) return;
+      // For today, only include slots that are strictly in the future (after current Ethiopian time)
+      if (slotDate.getTime() <= now.getTime()) return;
     }
     slots.push(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`);
   };
 
   if (closeVal >= openVal) {
-    for (let mins = openVal; mins <= closeVal; mins += step) pushIfValid(mins);
+    for (let mins = openVal; mins <= closeVal; mins += step) pushIfValid(mins, false);
   } else {
-    for (let mins = openVal; mins < 24 * 60; mins += step) pushIfValid(mins);
-    for (let mins = 0; mins <= closeVal; mins += step) pushIfValid(mins);
+    // Overnight meal window (e.g. 19:00 to 01:00)
+    for (let mins = openVal; mins < 24 * 60; mins += step) pushIfValid(mins, false);
+    for (let mins = 0; mins <= closeVal; mins += step) pushIfValid(mins, true);
   }
   return slots;
 };
@@ -579,6 +594,121 @@ const DETAIL_SECTION_TABS = [
 ] as const;
 
 // ─── Component ────────────────────────────────────────────────────────────────
+
+/**
+ * Universal Shiny & Tactile Black Button with:
+ * 1. Immediate shining light beam sweep animation once on page render
+ * 2. Premium top bevel line & hover glow
+ * 3. Tactile click sensation with active scale depression + interactive ripple fill effect
+ */
+function ShinyBlackButton({
+  type = "button",
+  disabled = false,
+  onClick,
+  className = "",
+  children,
+  ariaBusy,
+}: {
+  type?: "button" | "submit" | "reset";
+  disabled?: boolean;
+  onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void;
+  className?: string;
+  children: React.ReactNode;
+  ariaBusy?: boolean;
+}) {
+  const [ripples, setRipples] = useState<{ id: number; x: number; y: number; size: number }[]>([]);
+
+  const handlePointerDown = (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (disabled) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const size = Math.max(rect.width, rect.height) * 2.2;
+    const x = e.clientX ? e.clientX - rect.left - size / 2 : rect.width / 2 - size / 2;
+    const y = e.clientY ? e.clientY - rect.top - size / 2 : rect.height / 2 - size / 2;
+    const id = Date.now() + Math.random();
+
+    setRipples((prev) => [...prev, { id, x, y, size }]);
+    setTimeout(() => {
+      setRipples((prev) => prev.filter((r) => r.id !== id));
+    }, 650);
+  };
+
+  return (
+    <button
+      type={type}
+      disabled={disabled}
+      aria-busy={ariaBusy}
+      onMouseDown={handlePointerDown}
+      onClick={onClick}
+      className={`bmb-shiny-btn group relative overflow-hidden rounded-xl font-bold transition-all duration-200 select-none ${disabled
+          ? "cursor-not-allowed opacity-60"
+          : "active:scale-[0.98] active:brightness-90 hover:bg-black hover:shadow-lg hover:shadow-black/25 cursor-pointer"
+        } ${className}`}
+    >
+      {/* Shining beam of light sweeping across the button once on page render */}
+      {!disabled && (
+        <span
+          className="pointer-events-none absolute inset-0 -translate-x-full animate-bmb-shine bg-gradient-to-r from-transparent via-white/35 to-transparent skew-x-[-20deg]"
+          aria-hidden="true"
+        />
+      )}
+
+      {/* Top bevel edge line for premium physical depth */}
+      {!disabled && (
+        <span
+          className="pointer-events-none absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/25 to-transparent"
+          aria-hidden="true"
+        />
+      )}
+
+      {/* Hover background sheen */}
+      {!disabled && (
+        <span
+          className="pointer-events-none absolute inset-0 bg-white/0 group-hover:bg-white/[0.06] transition-colors duration-200"
+          aria-hidden="true"
+        />
+      )}
+
+      {/* Click Ripple Fill Effect */}
+      {ripples.map((ripple) => (
+        <span
+          key={ripple.id}
+          className="bmb-shiny-ripple"
+          style={{
+            left: ripple.x,
+            top: ripple.y,
+            width: ripple.size,
+            height: ripple.size,
+          }}
+          aria-hidden="true"
+        />
+      ))}
+
+      {/* Button Content */}
+      <span className="relative z-10 flex items-center justify-center gap-2 tracking-wide w-full">
+        {children}
+      </span>
+    </button>
+  );
+}
+
+function ShinyBookTableCTAButton({
+  onClick,
+  className = "",
+  label = "Book a Table",
+}: {
+  onClick: () => void;
+  className?: string;
+  label?: string;
+}) {
+  return (
+    <ShinyBlackButton
+      onClick={onClick}
+      className={`w-full bg-[#111111] text-white py-3 px-4 ${className}`}
+    >
+      {label}
+    </ShinyBlackButton>
+  );
+}
 
 export default function RestaurantPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
@@ -1340,6 +1470,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
   const {
     data: availableSlotsData,
     isLoading: availableSlotsLoading,
+    isFetching: availableSlotsFetching,
     refetch: refetchAvailableSlots,
   } = useGetAvailableDiningSlotsQuery(
     {
@@ -1401,7 +1532,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
       if (!data.available) {
         toast.error(
           (data as { reason?: string }).reason ||
-            'This time slot is not available. Please choose another time.'
+          'This time slot is not available. Please choose another time.'
         );
         setAvailabilityStatus('unavailable');
         setSelectedTime('');
@@ -1740,10 +1871,10 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
     const dayHours =
       weekly && (weekly.closed || (weekly.open && weekly.close))
         ? {
-            closed: !!weekly.closed,
-            open: (weekly.open || "").slice(0, 5),
-            close: (weekly.close || "").slice(0, 5),
-          }
+          closed: !!weekly.closed,
+          open: (weekly.open || "").slice(0, 5),
+          close: (weekly.close || "").slice(0, 5),
+        }
         : fromCalendar;
     let hoursLabel = "Hours not set";
     if (dayHours?.closed) {
@@ -1803,10 +1934,10 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
     isBookTableFlow && isLgViewport
       ? Math.max(restaurantStickyHeight, 72) + 8
       : (showRestaurantSticky
-          ? Math.max(restaurantStickyHeight, 64)
-          : siteHeaderHeight > 0
-            ? siteHeaderHeight
-            : 72) + 12;
+        ? Math.max(restaurantStickyHeight, 64)
+        : siteHeaderHeight > 0
+          ? siteHeaderHeight
+          : 72) + 12;
   const stickyThumb =
     photos[0] || resolveMediaUrl(profile.cover_image_url) || "";
   const stickyMetaLine = [infoCostText, profile.address?.trim()]
@@ -1840,17 +1971,15 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
       </div> */}
 
       <div
-        className={`bmb-section-container pb-24 md:pb-16 ${
-          isBookTableFlow
+        className={`bmb-section-container pb-24 md:pb-16 ${isBookTableFlow
             ? "max-lg:px-0 max-lg:pt-0 max-lg:pb-0 py-0 lg:pt-0 lg:pb-16"
             : "max-md:px-0 max-md:pt-0 pt-7"
-        }`}
+          }`}
       >
         {/* ── Header: title + icon actions + rating (hidden on book flow + success) ── */}
         <div
-          className={`bg-white  mb-4 ${
-            isBookingSuccess || isBookTableFlow ? "hidden" : "hidden md:block"
-          }`}
+          className={`bg-white  mb-4 ${isBookingSuccess || isBookTableFlow ? "hidden" : "hidden md:block"
+            }`}
         >
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
             <div className="min-w-0 flex-1">
@@ -1920,20 +2049,17 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
 
         {/* ── Gallery + sticky table reservation ── */}
         <div
-          className={`${
-            isBookTableFlow
+          className={`${isBookTableFlow
               ? ""
-              : `grid items-start gap-x-5 gap-y-2 sm:gap-x-6 lg:gap-x-7 2xl:gap-x-12 ${
-                  hideBookingSidebar
-                    ? ""
-                    : "md:grid-cols-[minmax(0,1fr)_280px] lg:grid-cols-[minmax(0,1fr)_320px] 2xl:grid-cols-[minmax(0,1fr)_360px]"
-                }`
-          }`}
+              : `grid items-start gap-x-5 gap-y-2 sm:gap-x-6 lg:gap-x-7 2xl:gap-x-12 ${hideBookingSidebar
+                ? ""
+                : "md:grid-cols-[minmax(0,1fr)_280px] lg:grid-cols-[minmax(0,1fr)_320px] 2xl:grid-cols-[minmax(0,1fr)_360px]"
+              }`
+            }`}
         >
           <div
-            className={`min-w-0 order-1 ${
-              isBookingSuccess || isBookTableFlow ? "hidden" : ""
-            }`}
+            className={`min-w-0 order-1 ${isBookingSuccess || isBookTableFlow ? "hidden" : ""
+              }`}
           >
             <div ref={titleSentinelRef} className="h-px w-full" aria-hidden />
             {/* Mobile full-bleed hero — taller, edge-to-edge, no top gap */}
@@ -2000,68 +2126,68 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                   <Utensils size={40} strokeWidth={1.5} />
                 </div>
               ) : (
-              photos.slice(0, 5).map((photoUrl, idx) => {
-                const total = Math.min(photos.length, 5);
-                const isLastVisible = idx === total - 1;
+                photos.slice(0, 5).map((photoUrl, idx) => {
+                  const total = Math.min(photos.length, 5);
+                  const isLastVisible = idx === total - 1;
 
-                let itemClass = "relative overflow-hidden cursor-pointer group";
+                  let itemClass = "relative overflow-hidden cursor-pointer group";
 
-                if (total === 1) {
-                  itemClass += " col-span-4 row-span-2";
-                } else if (total === 2) {
-                  if (idx === 0) itemClass += " col-span-4 md:col-span-2 row-span-2";
-                  else itemClass += " hidden md:block col-span-2 row-span-2";
-                } else if (total === 3) {
-                  if (idx === 0) itemClass += " col-span-4 md:col-span-2 row-span-2";
-                  else itemClass += " hidden md:block col-span-2 row-span-1";
-                } else if (total === 4) {
-                  if (idx === 0) itemClass += " col-span-4 md:col-span-2 row-span-2";
-                  else if (idx === 1) itemClass += " hidden md:block col-span-2 row-span-1";
-                  else itemClass += " hidden md:block col-span-1 row-span-1";
-                } else {
-                  if (idx === 0) itemClass += " col-span-4 md:col-span-2 row-span-2";
-                  else itemClass += " hidden md:block col-span-1 row-span-1";
-                }
+                  if (total === 1) {
+                    itemClass += " col-span-4 row-span-2";
+                  } else if (total === 2) {
+                    if (idx === 0) itemClass += " col-span-4 md:col-span-2 row-span-2";
+                    else itemClass += " hidden md:block col-span-2 row-span-2";
+                  } else if (total === 3) {
+                    if (idx === 0) itemClass += " col-span-4 md:col-span-2 row-span-2";
+                    else itemClass += " hidden md:block col-span-2 row-span-1";
+                  } else if (total === 4) {
+                    if (idx === 0) itemClass += " col-span-4 md:col-span-2 row-span-2";
+                    else if (idx === 1) itemClass += " hidden md:block col-span-2 row-span-1";
+                    else itemClass += " hidden md:block col-span-1 row-span-1";
+                  } else {
+                    if (idx === 0) itemClass += " col-span-4 md:col-span-2 row-span-2";
+                    else itemClass += " hidden md:block col-span-1 row-span-1";
+                  }
 
-                return (
-                  <div
-                    key={idx}
-                    onClick={() => openLightbox(isLastVisible ? 0 : idx)}
-                    className={itemClass}
-                  >
-                    <SafeCoverImage
-                      src={photoUrl}
-                      alt={`gallery item ${idx}`}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                      fallbackClassName="flex h-full w-full items-center justify-center bg-[#F3F4F6] text-slate-300"
-                      fallback={<DiningImageFallback size={28} />}
-                    />
+                  return (
+                    <div
+                      key={idx}
+                      onClick={() => openLightbox(isLastVisible ? 0 : idx)}
+                      className={itemClass}
+                    >
+                      <SafeCoverImage
+                        src={photoUrl}
+                        alt={`gallery item ${idx}`}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        fallbackClassName="flex h-full w-full items-center justify-center bg-[#F3F4F6] text-slate-300"
+                        fallback={<DiningImageFallback size={28} />}
+                      />
 
-                    {idx === 0 && (
-                      <div className="absolute bottom-3 right-3 md:hidden bg-black/60 backdrop-blur-[2px] text-white text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 z-10 shadow-md">
-                        <ImageIcon size={14} className="text-white" />
-                        <span>View Gallery</span>
-                        <span className="text-[0.625rem] text-white/70">({photos.length})</span>
-                      </div>
-                    )}
+                      {idx === 0 && (
+                        <div className="absolute bottom-3 right-3 md:hidden bg-black/60 backdrop-blur-[2px] text-white text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 z-10 shadow-md">
+                          <ImageIcon size={14} className="text-white" />
+                          <span>View Gallery</span>
+                          <span className="text-[0.625rem] text-white/70">({photos.length})</span>
+                        </div>
+                      )}
 
-                    {total === 1 && idx === 0 && (
-                      <div className="hidden md:flex absolute bottom-4 right-4 bg-white/90 backdrop-blur-sm text-slate-900 font-semibold px-4 py-2 rounded-xl items-center gap-2 shadow-lg hover:bg-white transition-colors z-20">
-                        <ImageIcon size={18} />
-                        <span>View Gallery ({photos.length})</span>
-                      </div>
-                    )}
+                      {total === 1 && idx === 0 && (
+                        <div className="hidden md:flex absolute bottom-4 right-4 bg-white/90 backdrop-blur-sm text-slate-900 font-semibold px-4 py-2 rounded-xl items-center gap-2 shadow-lg hover:bg-white transition-colors z-20">
+                          <ImageIcon size={18} />
+                          <span>View Gallery ({photos.length})</span>
+                        </div>
+                      )}
 
-                    {total > 1 && isLastVisible && (
-                      <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center text-white transition-opacity group-hover:bg-black/75">
-                        <ImageIcon size={22} className="mb-1" />
-                        <span className="font-bold text-sm tracking-wide">View Gallery</span>
-                        <span className="text-[0.625rem] text-white/70">{photos.length > 5 ? '5+' : photos.length} Photos</span>
-                      </div>
-                    )}
-                  </div>
-                );
-              })
+                      {total > 1 && isLastVisible && (
+                        <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center text-white transition-opacity group-hover:bg-black/75">
+                          <ImageIcon size={22} className="mb-1" />
+                          <span className="font-bold text-sm tracking-wide">View Gallery</span>
+                          <span className="text-[0.625rem] text-white/70">{photos.length > 5 ? '5+' : photos.length} Photos</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
               )}
             </div>
 
@@ -2084,9 +2210,8 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                   aria-label="Show opening hours"
                 >
                   <span
-                    className={`font-semibold shrink-0 ${
-                      isOpenNow ? "text-emerald-600" : "text-[#C2410C]"
-                    }`}
+                    className={`font-semibold shrink-0 ${isOpenNow ? "text-emerald-600" : "text-[#C2410C]"
+                      }`}
                   >
                     {openStatusLabel}
                   </span>
@@ -2180,8 +2305,8 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
 
               <div className="flex flex-wrap gap-2.5 pt-1">
                 {profile.address?.trim() ||
-                (Number.isFinite(Number(profile.latitude)) &&
-                  Number.isFinite(Number(profile.longitude))) ? (
+                  (Number.isFinite(Number(profile.latitude)) &&
+                    Number.isFinite(Number(profile.longitude))) ? (
                   <button
                     type="button"
                     onClick={() => {
@@ -2290,11 +2415,10 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                                       handleDateSelect(idx);
                                       setReserveWidgetDropdown(null);
                                     }}
-                                    className={`w-full text-left px-3 py-2 text-sm font-medium cursor-pointer ${
-                                      selected
+                                    className={`w-full text-left px-3 py-2 text-sm font-medium cursor-pointer ${selected
                                         ? "bg-[#2563EB] text-white"
                                         : "bg-white text-[#292929] hover:bg-slate-50"
-                                    }`}
+                                      }`}
                                   >
                                     {label}
                                   </button>
@@ -2341,11 +2465,10 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                                       setAvailabilityStatus(null);
                                       setReserveWidgetDropdown(null);
                                     }}
-                                    className={`w-full text-left px-3 py-2 text-sm font-medium cursor-pointer ${
-                                      selected
+                                    className={`w-full text-left px-3 py-2 text-sm font-medium cursor-pointer ${selected
                                         ? "bg-[#2563EB] text-white"
                                         : "bg-white text-[#292929] hover:bg-slate-50"
-                                    }`}
+                                      }`}
                                   >
                                     {num} {num === 1 ? "Guest" : "Guests"}
                                   </button>
@@ -2357,13 +2480,11 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                       </div>
                     </div>
 
-                    <button
-                      type="button"
+                    <ShinyBookTableCTAButton
                       onClick={() => handleQuickBook()}
-                      className="w-full rounded-xl bg-[#111111] text-white py-3 px-4 text-sm sm:text-[1rem] font-bold transition-colors cursor-pointer hover:bg-black"
-                    >
-                      Book a Table
-                    </button>
+                      className="w-full text-sm sm:text-[1rem]"
+                      label="Book a Table"
+                    />
                   </div>
                 </div>
               </div>
@@ -2371,590 +2492,582 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
           ) : null}
 
           <div
-            className={`min-w-0 ${
-              isBookTableFlow && !hideBookingSidebar ? "lg:order-2" : "order-3"
-            }`}
+            className={`min-w-0 ${isBookTableFlow && !hideBookingSidebar ? "lg:order-2" : "order-3"
+              }`}
           >
             <div
               id="tab-panel-start"
-              className={`space-y-4 scroll-mt-[7.5rem] md:scroll-mt-[8rem] lg:scroll-mt-[9rem] xl:scroll-mt-[9.25rem] ${
-                isBookTableFlow ? "pt-0" : "pt-4 max-md:px-5"
-              }`}
+              className={`space-y-4 scroll-mt-[7.5rem] md:scroll-mt-[8rem] lg:scroll-mt-[9rem] xl:scroll-mt-[9.25rem] ${isBookTableFlow ? "pt-0" : "pt-4 max-md:px-5"
+                }`}
             >
 
-            {/* Single-page Overview with scroll-spy sections (District-style) */}
-            {activeTab !== "Book a Table" && (
-              <div className="space-y-4">
+              {/* Single-page Overview with scroll-spy sections (District-style) */}
+              {activeTab !== "Book a Table" && (
+                <div className="space-y-4">
 
-                {/* Overview — Dining Offers + About (Overview tab highlights for both) */}
-                <div id="section-overview" className="scroll-mt-[7.5rem] md:scroll-mt-[8rem] lg:scroll-mt-[9rem] xl:scroll-mt-[9.25rem] space-y-4 pb-5">
-                  {visibleOffers.length > 0 ? (
-                    <section className="bg-white p-0 sm:p-0">
-                      <h3 className="text-2xl sm:text-3xl lg:text-xl font-bold text-zinc-800">
-                        Dining Offers
+                  {/* Overview — Dining Offers + About (Overview tab highlights for both) */}
+                  <div id="section-overview" className="scroll-mt-[7.5rem] md:scroll-mt-[8rem] lg:scroll-mt-[9rem] xl:scroll-mt-[9.25rem] space-y-4 pb-5">
+                    {visibleOffers.length > 0 ? (
+                      <section className="bg-white p-0 sm:p-0">
+                        <h3 className="text-2xl sm:text-3xl lg:text-xl font-bold text-zinc-800">
+                          Dining Offers
+                        </h3>
+                        {visibleOffers.length > 1 && (
+                          <p className="hidden md:block text-base sm:text-lg lg:text-sm text-zinc-500 mt-0.5 mb-3">
+                            Tap on any offer to know more
+                          </p>
+                        )}
+                        {visibleOffers.length <= 1 && <div className="hidden md:block mb-3" />}
+                        {/* Mobile — same blue dining-offer cards as desktop */}
+                        <div className="md:hidden mt-3 space-y-3">
+                          {visibleOffers.map((offer, idx) => {
+                            const scheduled = getEffectiveDiningOfferStatus(offer) === "SCHEDULED";
+                            return (
+                              <button
+                                key={`m-offer-${offer.id || offer.title}-${idx}`}
+                                type="button"
+                                onClick={() => handleQuickBook(offer)}
+                                className="relative overflow-hidden w-full rounded-xl text-left cursor-pointer min-h-[120px] p-3.5 bg-[#2563eb] text-white shadow-sm"
+                              >
+                                {scheduled && (
+                                  <span className="absolute top-3 right-3 text-[0.625rem] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-white/20 text-white">
+                                    Coming soon
+                                  </span>
+                                )}
+                                <p className="text-[0.625rem] font-extrabold uppercase tracking-wider text-white/85">
+                                  {offer.type || "Offer"}
+                                </p>
+                                <p className="font-extrabold mt-1.5 leading-snug text-xl text-white">
+                                  {offer.title}
+                                </p>
+                                <p className="mt-2 leading-snug font-semibold text-sm text-white/90">
+                                  {formatDiningOfferDiscount(offer)}
+                                  {offer.promo_code ? ` · Code ${offer.promo_code}` : ""}
+                                </p>
+                                <span
+                                  className="pointer-events-none absolute font-black leading-none select-none -bottom-3 -right-1 text-7xl text-white/15"
+                                  aria-hidden
+                                >
+                                  %
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                        {/* Tablet/desktop — existing card grid (unchanged) */}
+                        <div className="hidden md:grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 mt-0">
+                          {visibleOffers.map((offer, idx) => {
+                            const isFeatured = idx === 0;
+                            const scheduled = getEffectiveDiningOfferStatus(offer) === "SCHEDULED";
+                            return (
+                              <button
+                                key={`${offer.id || offer.title}-${idx}`}
+                                type="button"
+                                onClick={() => handleQuickBook(offer)}
+                                className={`relative overflow-hidden rounded-xl text-left transition-all cursor-pointer h-full min-h-[120px] p-3.5 sm:p-4 ${isFeatured
+                                    ? "bg-[#2563eb] text-white hover:bg-[#1d4ed8] shadow-sm"
+                                    : "bg-white text-zinc-900 border border-[#d7e6ff] hover:border-[#93c5fd]"
+                                  }`}
+                              >
+                                {scheduled && (
+                                  <span className="absolute top-3 right-3 text-[0.625rem] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-white/20 text-white">
+                                    Coming soon
+                                  </span>
+                                )}
+                                <p
+                                  className={`text-[1rem] lg:text-[0.625rem] font-extrabold uppercase tracking-wider ${isFeatured ? "text-white/85" : "text-[#2563eb]"
+                                    }`}
+                                >
+                                  {offer.type || "Offer"}
+                                </p>
+                                <p
+                                  className={`font-extrabold mt-1.5 leading-snug text-xl sm:text-xl lg:text-base ${isFeatured ? "text-white" : "text-zinc-900"
+                                    }`}
+                                >
+                                  {offer.title}
+                                </p>
+                                <p
+                                  className={`mt-2 leading-snug font-semibold text-[1rem] lg:text-xs ${isFeatured ? "text-white/90" : "text-[#2563eb]"
+                                    }`}
+                                >
+                                  {formatDiningOfferDiscount(offer)}
+                                  {offer.promo_code ? ` · Code ${offer.promo_code}` : ""}
+                                </p>
+                                <span
+                                  className={`pointer-events-none absolute font-black leading-none select-none -bottom-3 -right-1 text-7xl ${isFeatured ? "text-white/15" : "text-[#2563eb]/10"
+                                    }`}
+                                  aria-hidden
+                                >
+                                  %
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </section>
+                    ) : null}
+
+                    {/* About Venue — Cost + Cuisines */}
+                    <section className="bg-white p-0 sm:py-7">
+                      <h3 className="text-2xl sm:text-3xl lg:text-xl font-bold text-zinc-800 mb-2">
+                        About the restaurant
                       </h3>
-                      {visibleOffers.length > 1 && (
-                        <p className="hidden md:block text-base sm:text-lg lg:text-sm text-zinc-500 mt-0.5 mb-3">
-                          Tap on any offer to know more
+                      <div className="min-w-0">
+                        <p
+                          ref={aboutDescRef}
+                          className="text-slate-500 text-base sm:text-lg lg:text-sm leading-relaxed whitespace-pre-wrap line-clamp-2"
+                        >
+                          {aboutDescription}
                         </p>
-                      )}
-                      {visibleOffers.length <= 1 && <div className="hidden md:block mb-3" />}
-                      {/* Mobile — same blue dining-offer cards as desktop */}
-                      <div className="md:hidden mt-3 space-y-3">
-                        {visibleOffers.map((offer, idx) => {
-                          const scheduled = getEffectiveDiningOfferStatus(offer) === "SCHEDULED";
-                          return (
-                            <button
-                              key={`m-offer-${offer.id || offer.title}-${idx}`}
-                              type="button"
-                              onClick={() => handleQuickBook(offer)}
-                              className="relative overflow-hidden w-full rounded-xl text-left cursor-pointer min-h-[120px] p-3.5 bg-[#2563eb] text-white shadow-sm"
-                            >
-                              {scheduled && (
-                                <span className="absolute top-3 right-3 text-[0.625rem] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-white/20 text-white">
-                                  Coming soon
-                                </span>
-                              )}
-                              <p className="text-[0.625rem] font-extrabold uppercase tracking-wider text-white/85">
-                                {offer.type || "Offer"}
-                              </p>
-                              <p className="font-extrabold mt-1.5 leading-snug text-xl text-white">
-                                {offer.title}
-                              </p>
-                              <p className="mt-2 leading-snug font-semibold text-sm text-white/90">
-                                {formatDiningOfferDiscount(offer)}
-                                {offer.promo_code ? ` · Code ${offer.promo_code}` : ""}
-                              </p>
-                              <span
-                                className="pointer-events-none absolute font-black leading-none select-none -bottom-3 -right-1 text-7xl text-white/15"
-                                aria-hidden
-                              >
-                                %
-                              </span>
-                            </button>
-                          );
-                        })}
+                        {aboutDescOverflows ? (
+                          <button
+                            type="button"
+                            onClick={() => setVenueInfoModal("about")}
+                            className="mt-1.5 inline-flex items-center text-sm font-bold text-[#111111] cursor-pointer hover:underline"
+                          >
+                            See more
+                          </button>
+                        ) : null}
                       </div>
-                      {/* Tablet/desktop — existing card grid (unchanged) */}
-                      <div className="hidden md:grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 mt-0">
-                        {visibleOffers.map((offer, idx) => {
-                          const isFeatured = idx === 0;
-                          const scheduled = getEffectiveDiningOfferStatus(offer) === "SCHEDULED";
-                          return (
-                            <button
-                              key={`${offer.id || offer.title}-${idx}`}
-                              type="button"
-                              onClick={() => handleQuickBook(offer)}
-                              className={`relative overflow-hidden rounded-xl text-left transition-all cursor-pointer h-full min-h-[120px] p-3.5 sm:p-4 ${
-                                isFeatured
-                                  ? "bg-[#2563eb] text-white hover:bg-[#1d4ed8] shadow-sm"
-                                  : "bg-white text-zinc-900 border border-[#d7e6ff] hover:border-[#93c5fd]"
-                              }`}
-                            >
-                              {scheduled && (
-                                <span className="absolute top-3 right-3 text-[0.625rem] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-white/20 text-white">
-                                  Coming soon
-                                </span>
-                              )}
-                              <p
-                                className={`text-[1rem] lg:text-[0.625rem] font-extrabold uppercase tracking-wider ${
-                                  isFeatured ? "text-white/85" : "text-[#2563eb]"
-                                }`}
-                              >
-                                {offer.type || "Offer"}
-                              </p>
-                              <p
-                                className={`font-extrabold mt-1.5 leading-snug text-xl sm:text-xl lg:text-base ${
-                                  isFeatured ? "text-white" : "text-zinc-900"
-                                }`}
-                              >
-                                {offer.title}
-                              </p>
-                              <p
-                                className={`mt-2 leading-snug font-semibold text-[1rem] lg:text-xs ${
-                                  isFeatured ? "text-white/90" : "text-[#2563eb]"
-                                }`}
-                              >
-                                {formatDiningOfferDiscount(offer)}
-                                {offer.promo_code ? ` · Code ${offer.promo_code}` : ""}
-                              </p>
-                              <span
-                                className={`pointer-events-none absolute font-black leading-none select-none -bottom-3 -right-1 text-7xl ${
-                                  isFeatured ? "text-white/15" : "text-[#2563eb]/10"
-                                }`}
-                                aria-hidden
-                              >
-                                %
-                              </span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </section>
-                  ) : null}
 
-                  {/* About Venue — Cost + Cuisines */}
-                  <section className="bg-white p-0 sm:py-7">
-                    <h3 className="text-2xl sm:text-3xl lg:text-xl font-bold text-zinc-800 mb-2">
-                      About the restaurant
-                    </h3>
-                    <div className="min-w-0">
-                      <p
-                        ref={aboutDescRef}
-                        className="text-slate-500 text-base sm:text-lg lg:text-sm leading-relaxed whitespace-pre-wrap line-clamp-2"
-                      >
-                        {aboutDescription}
-                      </p>
-                      {aboutDescOverflows ? (
+                      {aboutCostDisplay ? (
+                        <div className="mt-5">
+                          <h4 className="text-base sm:text-lg lg:text-base font-bold text-zinc-800">Cost</h4>
+                          <p className="mt-1 text-base sm:text-lg lg:text-sm text-slate-500">{aboutCostDisplay}</p>
+                        </div>
+                      ) : null}
+
+                      {cuisineDisplay ? (
+                        <div className="mt-5">
+                          <h4 className="text-base sm:text-lg lg:text-base font-bold text-zinc-800">Cuisines</h4>
+                          <p className="mt-1 text-base sm:text-lg lg:text-sm text-slate-500">{cuisineDisplay}</p>
+                        </div>
+                      ) : null}
+
+                      {profile.amenities && profile.amenities.length > 0 && (
+                        <>
+                          <h4 className="text-lg sm:text-xl lg:text-base font-bold text-zinc-800 mt-5 mb-3">
+                            Available Facilities
+                          </h4>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 space-y-2 ">
+                            {profile.amenities.map((info: string) => (
+                              <div
+                                key={info}
+                                className="flex items-center gap-2 text-base sm:text-lg lg:text-sm text-slate-600"
+                              >
+                                <FacilityDiamondIcon className="text-[#292929] shrink-0" />
+                                <span>{info}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                    </section>
+                  </div>
+
+                  {/* Menu — stack preview → lightbox */}
+                  <section
+                    id="section-menu"
+                    className="bg-white p-0 sm:p-0 scroll-mt-[7.5rem] md:scroll-mt-[8rem] lg:scroll-mt-[9rem] xl:scroll-mt-[9.25rem] py-7"
+                  >
+                    <div className="flex items-center justify-between gap-3 mb-3">
+                      <h3 className="text-2xl sm:text-3xl lg:text-xl font-bold text-zinc-800">Menu</h3>
+                      {venueMenuImages.length > 0 && (
                         <button
                           type="button"
-                          onClick={() => setVenueInfoModal("about")}
-                          className="mt-1.5 inline-flex items-center text-sm font-bold text-[#111111] cursor-pointer hover:underline"
+                          onClick={() => openLightbox(0, venueMenuImages)}
+                          className="inline-flex items-center gap-0.5 text-sm font-semibold text-rose-600 hover:text-rose-700 transition-colors cursor-pointer whitespace-nowrap"
                         >
-                          See more
+                          See all menus <ChevronRight size={16} />
                         </button>
-                      ) : null}
-                    </div>
-
-                    {aboutCostDisplay ? (
-                      <div className="mt-5">
-                        <h4 className="text-base sm:text-lg lg:text-base font-bold text-zinc-800">Cost</h4>
-                        <p className="mt-1 text-base sm:text-lg lg:text-sm text-slate-500">{aboutCostDisplay}</p>
-                      </div>
-                    ) : null}
-
-                    {cuisineDisplay ? (
-                      <div className="mt-5">
-                        <h4 className="text-base sm:text-lg lg:text-base font-bold text-zinc-800">Cuisines</h4>
-                        <p className="mt-1 text-base sm:text-lg lg:text-sm text-slate-500">{cuisineDisplay}</p>
-                      </div>
-                    ) : null}
-
-                    {profile.amenities && profile.amenities.length > 0 && (
-                      <>
-                        <h4 className="text-lg sm:text-xl lg:text-base font-bold text-zinc-800 mt-5 mb-3">
-                          Available Facilities
-                        </h4>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 space-y-2 ">
-                          {profile.amenities.map((info: string) => (
-                            <div
-                              key={info}
-                              className="flex items-center gap-2 text-base sm:text-lg lg:text-sm text-slate-600"
-                            >
-                              <FacilityDiamondIcon className="text-[#292929] shrink-0" />
-                              <span>{info}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </>
-                    )}
-                  </section>
-                </div>
-
-                {/* Menu — stack preview → lightbox */}
-                <section
-                  id="section-menu"
-                  className="bg-white p-0 sm:p-0 scroll-mt-[7.5rem] md:scroll-mt-[8rem] lg:scroll-mt-[9rem] xl:scroll-mt-[9.25rem] py-7"
-                >
-                  <div className="flex items-center justify-between gap-3 mb-3">
-                    <h3 className="text-2xl sm:text-3xl lg:text-xl font-bold text-zinc-800">Menu</h3>
-                    {venueMenuImages.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => openLightbox(0, venueMenuImages)}
-                        className="inline-flex items-center gap-0.5 text-sm font-semibold text-rose-600 hover:text-rose-700 transition-colors cursor-pointer whitespace-nowrap"
-                      >
-                        See all menus <ChevronRight size={16} />
-                      </button>
-                    )}
-                  </div>
-
-                  {venueMenuImages.length > 0 ? (
-                    <VenueMenuGallery
-                      urls={venueMenuImages}
-                      onOpen={(index, items) => openLightbox(index, items)}
-                    />
-                  ) : (
-                    <MediaEmptyState
-                      icon={BookOpen}
-                      message="No menu available at the moment."
-                    />
-                  )}
-                </section>
-
-                {/* Photos Gallery — max 3; 3rd gets “View all photos” overlay when more exist */}
-                <section
-                  id="section-photos"
-                  className="bg-white  scroll-mt-[7.5rem] md:scroll-mt-[8rem] lg:scroll-mt-[9rem] xl:scroll-mt-[9.25rem] py-7"
-                >
-                  <h3 className="text-xl sm:text-2xl lg:text-lg font-bold text-slate-800 mb-3">Photos Gallery</h3>
-                  <VenuePhotosGallery
-                    urls={venueGalleryPhotos}
-                    onOpen={(index, items) => openLightbox(index, items)}
-                  />
-              </section>
-
-                {/* Reviews — same UI as before, shown in Overview scroll */}
-                <div
-                  id="section-reviews"
-                  className="space-y-4 scroll-mt-[7.5rem] md:scroll-mt-[8rem] lg:scroll-mt-[9rem] xl:scroll-mt-[9.25rem] py-7"
-                >
-                {/* Write Review Form — gated like movies: login + booking + visit ended */}
-                <section className="bg-white  py-7">
-                  <h3 className="text-lg sm:text-xl lg:text-base font-bold text-slate-800 mb-3">Write a Review</h3>
-                  {!isCustomerLoggedIn ? (
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <p className="text-sm text-slate-600">
-                        Log in to rate this place after your visit on BookMyBota.
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => setAuthModalOpen(true)}
-                        className="rounded-xl px-4 py-2.5 text-sm font-bold text-white bg-rose-600 hover:bg-rose-700 cursor-pointer"
-                      >
-                        Log in to review
-                      </button>
-                    </div>
-                  ) : reviewEligibility?.already_reviewed ? (
-                    <p className="text-sm text-slate-600">
-                      Thanks — you have already reviewed this place.
-                    </p>
-                  ) : !reviewEligibility?.has_booking ? (
-                    <p className="text-sm text-slate-600">
-                      Book a table here on BookMyBota to leave a review.
-                    </p>
-                  ) : !reviewEligibility?.visit_ended ? (
-                    <p className="text-sm text-slate-600">
-                      You can review this place after your visit ends.
-                    </p>
-                  ) : canWriteReview ? (
-                  <form onSubmit={handleReviewSubmit(onAddReview)} className="space-y-4" noValidate>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-base sm:text-lg lg:text-sm font-medium text-slate-400 mb-1">
-                          Your Name <span className="text-rose-500">*</span>
-                        </label>
-                        <input
-                          type="text"
-                          {...registerReview("user_name")}
-                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm sm:text-base lg:text-xs focus:outline-none focus:border-rose-500"
-                          placeholder="E.g., Priya R."
-                        />
-                        {reviewErrors.user_name && (
-                          <p className="mt-1.5 text-xs font-medium text-rose-500">{reviewErrors.user_name.message}</p>
-                        )}
-                      </div>
-                      <div>
-                        <label className="block text-base lg:text-xs font-medium text-slate-400 mb-2">
-                          Rating <span className="text-rose-500">*</span>
-                        </label>
-                        <div className="h-9 flex items-center">
-                          <Controller
-                            name="rating"
-                            control={reviewControl}
-                            render={({ field }) => (
-                              <StarRatingInput value={field.value} onChange={field.onChange} />
-                            )}
-                          />
-                        </div>
-                        {reviewErrors.rating && (
-                          <p className="mt-1.5 text-xs font-medium text-rose-500">{reviewErrors.rating.message}</p>
-                        )}
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-base lg:text-xs font-medium text-slate-400 mb-1">
-                        Comment <span className="text-rose-500">*</span>
-                      </label>
-                      <textarea
-                        rows={3}
-                        {...registerReview("text")}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm lg:text-xs focus:outline-none focus:border-rose-500"
-                        placeholder="Write details about food, staff, service..."
-                      />
-                      {reviewErrors.text && (
-                        <p className="mt-1.5 text-xs font-medium text-rose-500">{reviewErrors.text.message}</p>
                       )}
                     </div>
-                    <button
-                      type="submit"
-                      disabled={submittingReview}
-                      className="inline-flex items-center gap-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl px-4 py-2 text-base lg:text-xs font-bold transition-all shadow-sm disabled:opacity-50"
-                    >
-                      {submittingReview && <Loader2 size={14} className="animate-spin" />}
-                      Submit Review
-                    </button>
-                  </form>
-                  ) : null}
-                </section>
 
-                {/* Ratings & reviews — review carousel */}
-                <section className="bg-white p-0 sm:p-0">
-                  <div className="flex items-center justify-between gap-3 mb-3">
-                    <h3 className="text-lg sm:text-xl lg:text-lg font-bold text-[#111111]">
-                      Ratings &amp; reviews
-                    </h3>
-                    {reviews.length > 0 ? (
-                      <button
-                        type="button"
-                        onClick={() => setReviewsModalOpen(true)}
-                        className="inline-flex items-center gap-0.5 text-sm font-semibold text-[#6900AA] hover:underline cursor-pointer shrink-0"
-                      >
-                        View Review
-                        <ChevronRight size={16} />
-                      </button>
-                    ) : null}
-                  </div>
+                    {venueMenuImages.length > 0 ? (
+                      <VenueMenuGallery
+                        urls={venueMenuImages}
+                        onOpen={(index, items) => openLightbox(index, items)}
+                      />
+                    ) : (
+                      <MediaEmptyState
+                        icon={BookOpen}
+                        message="No menu available at the moment."
+                      />
+                    )}
+                  </section>
 
-                  {reviews.length === 0 ? (
-                    <p className="text-sm text-slate-500 py-4">
-                      No reviews yet. Be the first to leave one after your visit!
-                    </p>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
-                      {reviews.map((rev: any) => {
-                        const ratingNum = Number(rev.rating) || 0;
-                        const name = rev.user_name || "Guest";
-                        const booked = Boolean(rev.booked_on_platform);
-                        return (
-                          <CustomerReviewCard
-                            key={rev.id}
-                            name={name}
-                            rating={ratingNum}
-                            text={rev.text}
-                            timeLabel={reviewTimeAgo(rev.created_at)}
-                            bookedOnPlatform={booked}
-                            accentColor="#6900AA"
-                            className="rounded-xl p-4 sm:p-5"
-                          />
-                        );
-                      })}
-                    </div>
-                  )}
-                </section>
-                </div>
-              </div>
-            )}
-
-                  {/* Book a Table Tab Content — booking flow portals into this slot */}
-                  {activeTab === "Book a Table" && (
-                    <div
-                      ref={setBookTableSlot}
-                      className="bg-white min-h-[360px]"
+                  {/* Photos Gallery — max 3; 3rd gets “View all photos” overlay when more exist */}
+                  <section
+                    id="section-photos"
+                    className="bg-white  scroll-mt-[7.5rem] md:scroll-mt-[8rem] lg:scroll-mt-[9rem] xl:scroll-mt-[9.25rem] py-7"
+                  >
+                    <h3 className="text-xl sm:text-2xl lg:text-lg font-bold text-slate-800 mb-3">Photos Gallery</h3>
+                    <VenuePhotosGallery
+                      urls={venueGalleryPhotos}
+                      onOpen={(index, items) => openLightbox(index, items)}
                     />
-                  )}
+                  </section>
+
+                  {/* Reviews — same UI as before, shown in Overview scroll */}
+                  <div
+                    id="section-reviews"
+                    className="space-y-4 scroll-mt-[7.5rem] md:scroll-mt-[8rem] lg:scroll-mt-[9rem] xl:scroll-mt-[9.25rem] py-7"
+                  >
+                    {/* Write Review Form — gated like movies: login + booking + visit ended */}
+                    <section className="bg-white  py-7">
+                      <h3 className="text-lg sm:text-xl lg:text-base font-bold text-slate-800 mb-3">Write a Review</h3>
+                      {!isCustomerLoggedIn ? (
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <p className="text-sm text-slate-600">
+                            Log in to rate this place after your visit on BookMyBota.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => setAuthModalOpen(true)}
+                            className="rounded-xl px-4 py-2.5 text-sm font-bold text-white bg-rose-600 hover:bg-rose-700 cursor-pointer"
+                          >
+                            Log in to review
+                          </button>
+                        </div>
+                      ) : reviewEligibility?.already_reviewed ? (
+                        <p className="text-sm text-slate-600">
+                          Thanks — you have already reviewed this place.
+                        </p>
+                      ) : !reviewEligibility?.has_booking ? (
+                        <p className="text-sm text-slate-600">
+                          Book a table here on BookMyBota to leave a review.
+                        </p>
+                      ) : !reviewEligibility?.visit_ended ? (
+                        <p className="text-sm text-slate-600">
+                          You can review this place after your visit ends.
+                        </p>
+                      ) : canWriteReview ? (
+                        <form onSubmit={handleReviewSubmit(onAddReview)} className="space-y-4" noValidate>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-base sm:text-lg lg:text-sm font-medium text-slate-400 mb-1">
+                                Your Name <span className="text-rose-500">*</span>
+                              </label>
+                              <input
+                                type="text"
+                                {...registerReview("user_name")}
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm sm:text-base lg:text-xs focus:outline-none focus:border-rose-500"
+                                placeholder="E.g., Priya R."
+                              />
+                              {reviewErrors.user_name && (
+                                <p className="mt-1.5 text-xs font-medium text-rose-500">{reviewErrors.user_name.message}</p>
+                              )}
+                            </div>
+                            <div>
+                              <label className="block text-base lg:text-xs font-medium text-slate-400 mb-2">
+                                Rating <span className="text-rose-500">*</span>
+                              </label>
+                              <div className="h-9 flex items-center">
+                                <Controller
+                                  name="rating"
+                                  control={reviewControl}
+                                  render={({ field }) => (
+                                    <StarRatingInput value={field.value} onChange={field.onChange} />
+                                  )}
+                                />
+                              </div>
+                              {reviewErrors.rating && (
+                                <p className="mt-1.5 text-xs font-medium text-rose-500">{reviewErrors.rating.message}</p>
+                              )}
+                            </div>
+                          </div>
+                          <div>
+                            <label className="block text-base lg:text-xs font-medium text-slate-400 mb-1">
+                              Comment <span className="text-rose-500">*</span>
+                            </label>
+                            <textarea
+                              rows={3}
+                              {...registerReview("text")}
+                              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm lg:text-xs focus:outline-none focus:border-rose-500"
+                              placeholder="Write details about food, staff, service..."
+                            />
+                            {reviewErrors.text && (
+                              <p className="mt-1.5 text-xs font-medium text-rose-500">{reviewErrors.text.message}</p>
+                            )}
+                          </div>
+                          <button
+                            type="submit"
+                            disabled={submittingReview}
+                            className="inline-flex items-center gap-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl px-4 py-2 text-base lg:text-xs font-bold transition-all shadow-sm disabled:opacity-50"
+                          >
+                            {submittingReview && <Loader2 size={14} className="animate-spin" />}
+                            Submit Review
+                          </button>
+                        </form>
+                      ) : null}
+                    </section>
+
+                    {/* Ratings & reviews — review carousel */}
+                    <section className="bg-white p-0 sm:p-0">
+                      <div className="flex items-center justify-between gap-3 mb-3">
+                        <h3 className="text-lg sm:text-xl lg:text-lg font-bold text-[#111111]">
+                          Ratings &amp; reviews
+                        </h3>
+                        {reviews.length > 0 ? (
+                          <button
+                            type="button"
+                            onClick={() => setReviewsModalOpen(true)}
+                            className="inline-flex items-center gap-0.5 text-sm font-semibold text-[#6900AA] hover:underline cursor-pointer shrink-0"
+                          >
+                            View Review
+                            <ChevronRight size={16} />
+                          </button>
+                        ) : null}
+                      </div>
+
+                      {reviews.length === 0 ? (
+                        <p className="text-sm text-slate-500 py-4">
+                          No reviews yet. Be the first to leave one after your visit!
+                        </p>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
+                          {reviews.map((rev: any) => {
+                            const ratingNum = Number(rev.rating) || 0;
+                            const name = rev.user_name || "Guest";
+                            const booked = Boolean(rev.booked_on_platform);
+                            return (
+                              <CustomerReviewCard
+                                key={rev.id}
+                                name={name}
+                                rating={ratingNum}
+                                text={rev.text}
+                                timeLabel={reviewTimeAgo(rev.created_at)}
+                                bookedOnPlatform={booked}
+                                accentColor="#6900AA"
+                                className="rounded-xl p-4 sm:p-5"
+                              />
+                            );
+                          })}
+                        </div>
+                      )}
+                    </section>
+                  </div>
+                </div>
+              )}
+
+              {/* Book a Table Tab Content — booking flow portals into this slot */}
+              {activeTab === "Book a Table" && (
+                <div
+                  ref={setBookTableSlot}
+                  className="bg-white min-h-[360px]"
+                />
+              )}
             </div>
           </div>
         </div>
 
-          {/* Similar Restaurants Horizontal Shelf */}
-          {similarRestaurants.length > 0 && (
-            <div className={`mt-8 pt-6 border-t border-slate-200 animate-fadeIn ${isBookTableFlow ? "hidden" : ""}`}>
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h3 className="text-2xl sm:text-3xl lg:text-xl font-extrabold text-slate-800 tracking-tight">
-                    {(() => {
-                      const rawType = profile?.type_name || "Restaurant";
-                      const plural = rawType.toLowerCase().endsWith('s') ? rawType : `${rawType}s`;
-                      return `Similar ${plural}`;
-                    })()}
-                  </h3>
-                  <p className="text-slate-500 text-sm sm:text-base lg:text-xs mt-1 font-semibold">
-                    Handpicked recommendations you might also like
-                  </p>
-                </div>
-                
-                {/* Prev / Next navigation arrow buttons */}
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => scrollSimilar('left')}
-                    className="w-9 h-9 rounded-full border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 flex items-center justify-center shadow-sm hover:scale-105 active:scale-95 transition-all cursor-pointer"
-                    aria-label="Scroll left"
-                  >
-                    <ChevronLeft size={18} />
-                  </button>
-                  <button
-                    onClick={() => scrollSimilar('right')}
-                    className="w-9 h-9 rounded-full border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 flex items-center justify-center shadow-sm hover:scale-105 active:scale-95 transition-all cursor-pointer"
-                    aria-label="Scroll right"
-                  >
-                    <ChevronRight size={18} />
-                  </button>
-                </div>
+        {/* Similar Restaurants Horizontal Shelf */}
+        {similarRestaurants.length > 0 && (
+          <div className={`mt-8 pt-6 border-t border-slate-200 animate-fadeIn ${isBookTableFlow ? "hidden" : ""}`}>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-2xl sm:text-3xl lg:text-xl font-extrabold text-slate-800 tracking-tight">
+                  {(() => {
+                    const rawType = profile?.type_name || "Restaurant";
+                    const plural = rawType.toLowerCase().endsWith('s') ? rawType : `${rawType}s`;
+                    return `Similar ${plural}`;
+                  })()}
+                </h3>
+                <p className="text-slate-500 text-sm sm:text-base lg:text-xs mt-1 font-semibold">
+                  Handpicked recommendations you might also like
+                </p>
               </div>
 
-              <div 
-                ref={similarScrollerRef}
-                className="flex gap-6 overflow-x-auto pb-6 pt-1 -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-hide snap-x scroll-smooth"
-              >
-                {similarRestaurants.map((restaurant) => {
-                  const reviewsCount = Number(restaurant.reviews_count) || 0;
-                  const parsedRating = Number(restaurant.rating);
-                  const hasRating =
-                    reviewsCount > 0 && Number.isFinite(parsedRating) && parsedRating > 0;
-                  const rating = hasRating ? parsedRating.toFixed(1) : null;
-                  const cuisine = restaurant.cuisine || "Italian, Chinese, Continental";
-                  const coverImg = resolveMediaUrl(restaurant.cover_image_url) || "";
-                  const locality = restaurant.address ? restaurant.address.split(",")[0].trim() : "";
-                  const priceForTwo = restaurant.average_cost
-                    ? `${formatMoney(restaurant.average_cost, { compact: true })} for two`
-                    : `${formatMoney(1200, { compact: true })} for two`;
-
-                  return (
-                    <Link
-                      key={restaurant.id}
-                      href={restaurantHref(restaurant)}
-                      className="group block bg-white hover:shadow-lg rounded-2xl p-3 border border-slate-100 hover:border-slate-200 transition-all duration-300 w-[280px] shrink-0 snap-start"
-                    >
-                      <div className="relative mb-3">
-                        <div className="relative h-44 rounded-xl overflow-hidden bg-[#F3F4F6]">
-                          <SafeCoverImage
-                            src={coverImg}
-                            alt={restaurant.name}
-                            className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500"
-                            fallbackClassName="flex h-full w-full items-center justify-center bg-[#F3F4F6] text-slate-300"
-                            fallback={<DiningImageFallback size={28} />}
-                          />
-                          {coverImg ? (
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-transparent" />
-                          ) : null}
-                        </div>
-                        <DiningWishlistButton
-                          businessId={restaurant.id}
-                          className="absolute top-3 right-3 z-[3] w-9 h-9 rounded-full bg-white border border-[#6900AA]/30 shadow-md flex items-center justify-center hover:bg-slate-50 transition-colors cursor-pointer disabled:opacity-70"
-                        />
-                      </div>
-
-                      <div className="px-1 pb-1">
-                        <h4 className="font-extrabold text-slate-800 text-base leading-tight truncate group-hover:text-rose-600 transition-colors">
-                          {restaurant.name}
-                        </h4>
-
-                        <div className="flex items-center gap-1.5 mt-1.5">
-                          {rating ? (
-                            <span className="bg-emerald-700 text-white text-[0.625rem] font-black px-1.5 py-0.5 rounded flex items-center gap-0.5">
-                              <span>{rating}</span>
-                              <span className="text-[0.5rem]">★</span>
-                            </span>
-                          ) : (
-                            <span className="bg-slate-100 text-slate-600 text-[0.625rem] font-black px-1.5 py-0.5 rounded">
-                              New
-                            </span>
-                          )}
-                          <span className="text-[0.5625rem] text-slate-400 font-bold tracking-wider uppercase">DINING</span>
-                        </div>
-
-                        <div className="flex justify-between items-center gap-2 mt-2.5 text-xs text-slate-500 font-medium">
-                          <span className="truncate flex-1">{cuisine}</span>
-                          <span className="shrink-0 inline-flex items-center gap-1 text-slate-700 font-semibold">
-                            <EqualApproximately size={14} strokeWidth={2} className="text-slate-500" aria-hidden />
-                            {priceForTwo}
-                          </span>
-                        </div>
-
-                        <div className="text-xs text-slate-400 mt-1 font-medium">
-                          {locality}
-                        </div>
-                      </div>
-                    </Link>
-                  );
-                })}
+              {/* Prev / Next navigation arrow buttons */}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => scrollSimilar('left')}
+                  className="w-9 h-9 rounded-full border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 flex items-center justify-center shadow-sm hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                  aria-label="Scroll left"
+                >
+                  <ChevronLeft size={18} />
+                </button>
+                <button
+                  onClick={() => scrollSimilar('right')}
+                  className="w-9 h-9 rounded-full border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 flex items-center justify-center shadow-sm hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                  aria-label="Scroll right"
+                >
+                  <ChevronRight size={18} />
+                </button>
               </div>
             </div>
-          )}
 
-        </div>
-
-        {/* ── 7. Lightbox / Image Slider Modal ── */}
-        {isLightboxOpen && lightboxItems.length > 0 && (
-          <div className="fixed inset-0 z-[110] bg-black flex flex-col select-none animate-fadeIn">
-            {/* Close — top right on all breakpoints (menu / gallery) */}
-            <button
-              type="button"
-              onClick={closeLightbox}
-              className="absolute top-3 right-3 sm:top-5 sm:right-5 z-20 w-10 h-10 rounded-full bg-white/15 border border-white/25 flex items-center justify-center cursor-pointer hover:bg-white/25 active:scale-95"
-              aria-label="Close gallery"
+            <div
+              ref={similarScrollerRef}
+              className="flex gap-6 overflow-x-auto pb-6 pt-1 -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-hide snap-x scroll-smooth"
             >
-              <X size={22} className="text-white" strokeWidth={2.25} />
-            </button>
+              {similarRestaurants.map((restaurant) => {
+                const reviewsCount = Number(restaurant.reviews_count) || 0;
+                const parsedRating = Number(restaurant.rating);
+                const hasRating =
+                  reviewsCount > 0 && Number.isFinite(parsedRating) && parsedRating > 0;
+                const rating = hasRating ? parsedRating.toFixed(1) : null;
+                const cuisine = restaurant.cuisine || "Italian, Chinese, Continental";
+                const coverImg = resolveMediaUrl(restaurant.cover_image_url) || "";
+                const locality = restaurant.address ? restaurant.address.split(",")[0].trim() : "";
+                const priceForTwo = restaurant.average_cost
+                  ? `${formatMoney(restaurant.average_cost, { compact: true })} for two`
+                  : `${formatMoney(1200, { compact: true })} for two`;
 
-            {/* Image stage */}
-            <div className="flex-1 flex flex-col items-center justify-center min-h-0 px-0 sm:px-5 md:px-6 relative">
-              {lightboxItems.length > 1 ? (
-                <button
-                  type="button"
-                  onClick={prevPhoto}
-                  className="hidden sm:flex absolute left-4 z-10 p-2.5 bg-white/10 hover:bg-white/20 text-white rounded-full cursor-pointer"
-                  aria-label="Previous image"
-                >
-                  <ChevronLeft size={22} />
-                </button>
-              ) : null}
-
-              <div className="w-full flex-1 flex items-center justify-center overflow-hidden">
-                <img
-                  key={lightboxItems[currentPhotoIdx] + "-" + currentPhotoIdx}
-                  src={lightboxItems[currentPhotoIdx]}
-                  alt={`Gallery image ${currentPhotoIdx + 1}`}
-                  className="max-h-[78vh] w-full sm:w-auto sm:max-w-[min(920px,90vw)] object-contain select-none animate-diningLightboxSlideUp"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (lightboxItems.length > 1) nextPhoto();
-                  }}
-                />
-              </div>
-
-              {lightboxItems.length > 1 ? (
-                <button
-                  type="button"
-                  onClick={nextPhoto}
-                  className="hidden sm:flex absolute right-4 z-10 p-2.5 bg-white/10 hover:bg-white/20 text-white rounded-full cursor-pointer"
-                  aria-label="Next image"
-                >
-                  <ChevronRight size={22} />
-                </button>
-              ) : null}
-
-              <p className="shrink-0 text-white text-sm font-semibold tracking-wide py-4">
-                {currentPhotoIdx + 1} / {lightboxItems.length}
-              </p>
-            </div>
-
-            {/* Thumbnails — tablet/desktop only */}
-            {lightboxItems.length > 1 && (
-              <div className="hidden md:flex max-w-4xl mx-auto w-full overflow-x-auto py-3 justify-center gap-2.5 px-4 scrollbar-hide">
-                {lightboxItems.map((url, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() => setCurrentPhotoIdx(idx)}
-                    className={`w-16 h-12 rounded-lg overflow-hidden shrink-0 transition-all border-2 cursor-pointer ${
-                      currentPhotoIdx === idx
-                        ? "border-white scale-105 opacity-100"
-                        : "border-transparent opacity-50 hover:opacity-80"
-                    }`}
+                return (
+                  <Link
+                    key={restaurant.id}
+                    href={restaurantHref(restaurant)}
+                    className="group block bg-white hover:shadow-lg rounded-2xl p-3 border border-slate-100 hover:border-slate-200 transition-all duration-300 w-[280px] shrink-0 snap-start"
                   >
-                    <img src={url} alt={`thumb ${idx}`} className="w-full h-full object-cover" />
-                  </button>
-                ))}
-              </div>
-            )}
+                    <div className="relative mb-3">
+                      <div className="relative h-44 rounded-xl overflow-hidden bg-[#F3F4F6]">
+                        <SafeCoverImage
+                          src={coverImg}
+                          alt={restaurant.name}
+                          className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500"
+                          fallbackClassName="flex h-full w-full items-center justify-center bg-[#F3F4F6] text-slate-300"
+                          fallback={<DiningImageFallback size={28} />}
+                        />
+                        {coverImg ? (
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-transparent" />
+                        ) : null}
+                      </div>
+                      <DiningWishlistButton
+                        businessId={restaurant.id}
+                        className="absolute top-3 right-3 z-[3] w-9 h-9 rounded-full bg-white border border-[#6900AA]/30 shadow-md flex items-center justify-center hover:bg-slate-50 transition-colors cursor-pointer disabled:opacity-70"
+                      />
+                    </div>
+
+                    <div className="px-1 pb-1">
+                      <h4 className="font-extrabold text-slate-800 text-base leading-tight truncate group-hover:text-rose-600 transition-colors">
+                        {restaurant.name}
+                      </h4>
+
+                      <div className="flex items-center gap-1.5 mt-1.5">
+                        {rating ? (
+                          <span className="bg-emerald-700 text-white text-[0.625rem] font-black px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                            <span>{rating}</span>
+                            <span className="text-[0.5rem]">★</span>
+                          </span>
+                        ) : (
+                          <span className="bg-slate-100 text-slate-600 text-[0.625rem] font-black px-1.5 py-0.5 rounded">
+                            New
+                          </span>
+                        )}
+                        <span className="text-[0.5625rem] text-slate-400 font-bold tracking-wider uppercase">DINING</span>
+                      </div>
+
+                      <div className="flex justify-between items-center gap-2 mt-2.5 text-xs text-slate-500 font-medium">
+                        <span className="truncate flex-1">{cuisine}</span>
+                        <span className="shrink-0 inline-flex items-center gap-1 text-slate-700 font-semibold">
+                          <EqualApproximately size={14} strokeWidth={2} className="text-slate-500" aria-hidden />
+                          {priceForTwo}
+                        </span>
+                      </div>
+
+                      <div className="text-xs text-slate-400 mt-1 font-medium">
+                        {locality}
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
           </div>
         )}
 
-        {/* ── 8. Book a Table flow (inline in Book a Table tab via portal) ── */}
-        {activeTab === "Book a Table" && bookTableSlot && createPortal(
-          <div
-            className="w-full bg-white flex flex-col pb-12 sm:pb-16"
-            style={
-              isBookTableFlow && isLgViewport
-                ? { paddingTop: (restaurantStickyHeight || 96) + 12 }
-                : undefined
-            }
-          >
+      </div>
 
-            {/* Immersive book header (mobile + tablet; hidden on success) */}
-            {!isBookingSuccess ? (
+      {/* ── 7. Lightbox / Image Slider Modal ── */}
+      {isLightboxOpen && lightboxItems.length > 0 && (
+        <div className="fixed inset-0 z-[110] bg-black flex flex-col select-none animate-fadeIn">
+          {/* Close — top right on all breakpoints (menu / gallery) */}
+          <button
+            type="button"
+            onClick={closeLightbox}
+            className="absolute top-3 right-3 sm:top-5 sm:right-5 z-20 w-10 h-10 rounded-full bg-white/15 border border-white/25 flex items-center justify-center cursor-pointer hover:bg-white/25 active:scale-95"
+            aria-label="Close gallery"
+          >
+            <X size={22} className="text-white" strokeWidth={2.25} />
+          </button>
+
+          {/* Image stage */}
+          <div className="flex-1 flex flex-col items-center justify-center min-h-0 px-0 sm:px-5 md:px-6 relative">
+            {lightboxItems.length > 1 ? (
+              <button
+                type="button"
+                onClick={prevPhoto}
+                className="hidden sm:flex absolute left-4 z-10 p-2.5 bg-white/10 hover:bg-white/20 text-white rounded-full cursor-pointer"
+                aria-label="Previous image"
+              >
+                <ChevronLeft size={22} />
+              </button>
+            ) : null}
+
+            <div className="w-full flex-1 flex items-center justify-center overflow-hidden">
+              <img
+                key={lightboxItems[currentPhotoIdx] + "-" + currentPhotoIdx}
+                src={lightboxItems[currentPhotoIdx]}
+                alt={`Gallery image ${currentPhotoIdx + 1}`}
+                className="max-h-[78vh] w-full sm:w-auto sm:max-w-[min(920px,90vw)] object-contain select-none animate-diningLightboxSlideUp"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (lightboxItems.length > 1) nextPhoto();
+                }}
+              />
+            </div>
+
+            {lightboxItems.length > 1 ? (
+              <button
+                type="button"
+                onClick={nextPhoto}
+                className="hidden sm:flex absolute right-4 z-10 p-2.5 bg-white/10 hover:bg-white/20 text-white rounded-full cursor-pointer"
+                aria-label="Next image"
+              >
+                <ChevronRight size={22} />
+              </button>
+            ) : null}
+
+            <p className="shrink-0 text-white text-sm font-semibold tracking-wide py-4">
+              {currentPhotoIdx + 1} / {lightboxItems.length}
+            </p>
+          </div>
+
+          {/* Thumbnails — tablet/desktop only */}
+          {lightboxItems.length > 1 && (
+            <div className="hidden md:flex max-w-4xl mx-auto w-full overflow-x-auto py-3 justify-center gap-2.5 px-4 scrollbar-hide">
+              {lightboxItems.map((url, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => setCurrentPhotoIdx(idx)}
+                  className={`w-16 h-12 rounded-lg overflow-hidden shrink-0 transition-all border-2 cursor-pointer ${currentPhotoIdx === idx
+                      ? "border-white scale-105 opacity-100"
+                      : "border-transparent opacity-50 hover:opacity-80"
+                    }`}
+                >
+                  <img src={url} alt={`thumb ${idx}`} className="w-full h-full object-cover" />
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── 8. Book a Table flow (inline in Book a Table tab via portal) ── */}
+      {activeTab === "Book a Table" && bookTableSlot && createPortal(
+        <div
+          className="w-full bg-white flex flex-col pb-12 sm:pb-16"
+          style={
+            isBookTableFlow && isLgViewport
+              ? { paddingTop: (restaurantStickyHeight || 96) + 12 }
+              : undefined
+          }
+        >
+
+          {/* Immersive book header (mobile + tablet; hidden on success) */}
+          {!isBookingSuccess ? (
             <div className="lg:hidden sticky top-0 z-40 bg-white border-b border-slate-100 px-4 sm:px-5 py-3 flex items-start gap-2.5">
               <button
                 type="button"
@@ -2971,568 +3084,577 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                 <p className="text-sm text-slate-500 font-medium truncate mt-0.5">{profile.name}</p>
               </div>
             </div>
-            ) : null}
+          ) : null}
 
-            {/* Panel Content */}
-            <div className={`${drawerStep === 4 ? '' : drawerStep === 3 ? 'p-4 sm:p-6 bg-white lg:pt-0' : drawerStep === 1 ? 'pt-0 pb-2 bg-white px-4 sm:px-5 lg:px-0' : 'p-5 bg-white'}`}>
-              {drawerStep === 1 && (() => {
-                const mealsConfig: DiningMealsConfig = selectedOpDay?.meals || {
-                  breakfast: { open: '08:00', close: '11:00', active: true },
-                  lunch: { open: '11:30', close: '16:00', active: true },
-                  dinner: { open: '17:00', close: '23:00', active: true }
+          {/* Panel Content */}
+          <div className={`${drawerStep === 4 ? '' : drawerStep === 3 ? 'p-4 sm:p-6 bg-white lg:pt-0' : drawerStep === 1 ? 'pt-0 pb-2 bg-white px-4 sm:px-5 lg:px-0' : 'p-5 bg-white'}`}>
+            {drawerStep === 1 && (() => {
+              const mealsConfig: DiningMealsConfig = selectedOpDay?.meals || {
+                breakfast: { open: '08:00', close: '11:00', active: true },
+                lunch: { open: '11:30', close: '16:00', active: true },
+                dinner: { open: '17:00', close: '23:00', active: true }
+              };
+
+              const dayOpenHm = (selectedOpDay?.open_time || '00:00').slice(0, 5);
+              const dayCloseHm = (selectedOpDay?.close_time || '23:59').slice(0, 5);
+              const clipMeal = (open: string, close: string) => {
+                if (!dayCloseHm || dayCloseHm <= dayOpenHm) return { open, close };
+                const toM = (t: string) => {
+                  const [h, m] = t.split(':').map(Number);
+                  return h * 60 + m;
                 };
+                const fromM = (n: number) =>
+                  `${String(Math.floor(n / 60)).padStart(2, '0')}:${String(n % 60).padStart(2, '0')}`;
+                const lo = toM(dayOpenHm);
+                const hi = toM(dayCloseHm);
+                const a = Math.max(lo, toM(open));
+                const b = Math.min(hi, toM(close));
+                if (a >= b) return null;
+                return { open: fromM(a), close: fromM(b) };
+              };
 
-                const dayOpenHm = (selectedOpDay?.open_time || '00:00').slice(0, 5);
-                const dayCloseHm = (selectedOpDay?.close_time || '23:59').slice(0, 5);
-                const clipMeal = (open: string, close: string) => {
-                  if (!dayCloseHm || dayCloseHm <= dayOpenHm) return { open, close };
-                  const toM = (t: string) => {
-                    const [h, m] = t.split(':').map(Number);
-                    return h * 60 + m;
-                  };
-                  const fromM = (n: number) =>
-                    `${String(Math.floor(n / 60)).padStart(2, '0')}:${String(n % 60).padStart(2, '0')}`;
-                  const lo = toM(dayOpenHm);
-                  const hi = toM(dayCloseHm);
-                  const a = Math.max(lo, toM(open));
-                  const b = Math.min(hi, toM(close));
-                  if (a >= b) return null;
-                  return { open: fromM(a), close: fromM(b) };
-                };
-
-                const isToday = selectedDateIndex === 0;
-                const dayClosed = isSelectedDayClosed;
-                const breakfastWindow = mealsConfig.breakfast?.active
-                  ? clipMeal(mealsConfig.breakfast.open, mealsConfig.breakfast.close)
-                  : null;
-                const lunchWindow = mealsConfig.lunch?.active
-                  ? clipMeal(mealsConfig.lunch.open, mealsConfig.lunch.close)
-                  : null;
-                const dinnerWindow = mealsConfig.dinner?.active
-                  ? clipMeal(mealsConfig.dinner.open, mealsConfig.dinner.close)
-                  : null;
-                const breakfastSlotsRaw =
-                  !dayClosed && breakfastWindow
+              const isToday = selectedDateIndex === 0;
+              const dayClosed = isSelectedDayClosed;
+              const breakfastWindow = mealsConfig.breakfast?.active
+                ? clipMeal(mealsConfig.breakfast.open, mealsConfig.breakfast.close)
+                : null;
+              const lunchWindow = mealsConfig.lunch?.active
+                ? clipMeal(mealsConfig.lunch.open, mealsConfig.lunch.close)
+                : null;
+              const dinnerWindow = mealsConfig.dinner?.active
+                ? clipMeal(mealsConfig.dinner.open, mealsConfig.dinner.close)
+                : null;
+              const breakfastSlotsRaw =
+                !dayClosed && breakfastWindow
                   ? generateSlotsForMeal(breakfastWindow.open, breakfastWindow.close, isToday, {
-                      graceMinutes: Number(profile?.grace_time_minutes) || 0,
-                      dayCloseHm: dayCloseHm,
-                      slotIntervalMinutes: slotInterval,
-                    })
+                    graceMinutes: Number(profile?.grace_time_minutes) || 0,
+                    dayCloseHm: dayCloseHm,
+                    slotIntervalMinutes: slotInterval,
+                  })
                   : [];
-                const lunchSlotsRaw =
-                  !dayClosed && lunchWindow
+              const lunchSlotsRaw =
+                !dayClosed && lunchWindow
                   ? generateSlotsForMeal(lunchWindow.open, lunchWindow.close, isToday, {
-                      graceMinutes: Number(profile?.grace_time_minutes) || 0,
-                      dayCloseHm: dayCloseHm,
-                      slotIntervalMinutes: slotInterval,
-                    })
+                    graceMinutes: Number(profile?.grace_time_minutes) || 0,
+                    dayCloseHm: dayCloseHm,
+                    slotIntervalMinutes: slotInterval,
+                  })
                   : [];
-                const dinnerSlotsRaw =
-                  !dayClosed && dinnerWindow
+              const dinnerSlotsRaw =
+                !dayClosed && dinnerWindow
                   ? generateSlotsForMeal(dinnerWindow.open, dinnerWindow.close, isToday, {
-                      graceMinutes: Number(profile?.grace_time_minutes) || 0,
-                      dayCloseHm: dayCloseHm,
-                      slotIntervalMinutes: slotInterval,
-                    })
+                    graceMinutes: Number(profile?.grace_time_minutes) || 0,
+                    dayCloseHm: dayCloseHm,
+                    slotIntervalMinutes: slotInterval,
+                  })
                   : [];
 
-                // Keep full meal grids visible; mark each slot available/unavailable.
-                // Until the availability API returns, treat slots as unavailable (disabled).
-                const withAvailability = (raw: string[], mealKey: 'breakfast' | 'lunch' | 'dinner') => {
-                  const apiMeal = availableByMeal?.[mealKey];
-                  const apiReady = Boolean(availableSlotsData);
-                  return raw.map((slot) => {
-                    let available = false;
-                    if (apiReady) {
-                      if (apiMeal) available = apiMeal.includes(slot);
-                      else available = availableSlotSet.has(slot);
-                    }
-                    return { slot, available };
-                  });
-                };
-
-                const mealOptions = (
-                  [
-                    {
-                      id: 'breakfast' as const,
-                      label: 'Breakfast',
-                      slots: withAvailability(breakfastSlotsRaw, 'breakfast'),
-                      active: !!mealsConfig.breakfast?.active && breakfastSlotsRaw.length > 0,
-                    },
-                    {
-                      id: 'lunch' as const,
-                      label: 'Lunch',
-                      slots: withAvailability(lunchSlotsRaw, 'lunch'),
-                      active: !!mealsConfig.lunch?.active && lunchSlotsRaw.length > 0,
-                    },
-                    {
-                      id: 'dinner' as const,
-                      label: 'Dinner',
-                      slots: withAvailability(dinnerSlotsRaw, 'dinner'),
-                      active: !!mealsConfig.dinner?.active && dinnerSlotsRaw.length > 0,
-                    },
-                  ]
-                ).filter((m) => m.active);
-
-                const mealIcon = (id: 'breakfast' | 'lunch' | 'dinner') => {
-                  if (id === 'breakfast') return <Sunrise size={18} className="text-amber-500 shrink-0" />;
-                  if (id === 'lunch') return <Sun size={18} className="text-amber-500 shrink-0" />;
-                  return <Moon size={18} className="text-slate-500 shrink-0" />;
-                };
-
-                const mealRangeLabel = (id: 'breakfast' | 'lunch' | 'dinner') => {
-                  const cfg = mealsConfig[id];
-                  if (!cfg?.open || !cfg?.close) return '';
-                  return `${formatSlotLabel(cfg.open)} to ${formatSlotLabel(cfg.close)}`;
-                };
-
-                const renderSlotButton = (
-                  slot: string,
-                  available: boolean,
-                  mealId: 'breakfast' | 'lunch' | 'dinner',
-                  variant: 'mobile' | 'desktop'
-                ) => {
-                  const isSelected = selectedTime === slot && available;
-                  const promoText = available ? offerChipLabel : 'Unavailable';
-                  const base =
-                    variant === 'mobile'
-                      ? 'min-h-[56px] px-2 py-2.5 rounded-xl border text-center transition-all flex flex-col items-center justify-center'
-                      : 'min-h-[52px] px-2 py-2 rounded-xl border text-center transition-all flex flex-col items-center justify-center';
-                  if (!available) {
-                    return (
-                      <button
-                        key={slot}
-                        type="button"
-                        disabled
-                        aria-disabled="true"
-                        title="This time is not available"
-                        className={`${base} border-slate-100 bg-slate-50 text-slate-400 cursor-not-allowed opacity-70`}
-                      >
-                        <span className="text-sm font-semibold leading-none line-through decoration-slate-300">
-                          {formatSlotLabel(slot)}
-                        </span>
-                        <span className="text-[0.625rem] font-bold text-slate-400 mt-1.5 leading-none">
-                          {promoText}
-                        </span>
-                      </button>
-                    );
+              // Keep full meal grids visible; mark each slot available/unavailable.
+              // Avoid flashing "Unavailable" while background fetching by showing smooth checking state
+              const withAvailability = (raw: string[], mealKey: 'breakfast' | 'lunch' | 'dinner') => {
+                const apiMeal = availableByMeal?.[mealKey];
+                const apiReady = Boolean(availableSlotsData);
+                const isPending = availableSlotsLoading || availableSlotsFetching;
+                return raw.map((slot) => {
+                  let available = false;
+                  if (apiReady) {
+                    if (apiMeal) available = apiMeal.includes(slot);
+                    else available = availableSlotSet.has(slot);
                   }
+                  return { slot, available, isPending };
+                });
+              };
+
+              const mealOptions = (
+                [
+                  {
+                    id: 'breakfast' as const,
+                    label: 'Breakfast',
+                    slots: withAvailability(breakfastSlotsRaw, 'breakfast'),
+                    active: !!mealsConfig.breakfast?.active && breakfastSlotsRaw.length > 0,
+                  },
+                  {
+                    id: 'lunch' as const,
+                    label: 'Lunch',
+                    slots: withAvailability(lunchSlotsRaw, 'lunch'),
+                    active: !!mealsConfig.lunch?.active && lunchSlotsRaw.length > 0,
+                  },
+                  {
+                    id: 'dinner' as const,
+                    label: 'Dinner',
+                    slots: withAvailability(dinnerSlotsRaw, 'dinner'),
+                    active: !!mealsConfig.dinner?.active && dinnerSlotsRaw.length > 0,
+                  },
+                ]
+              ).filter((m) => m.active);
+
+              const mealIcon = (id: 'breakfast' | 'lunch' | 'dinner') => {
+                if (id === 'breakfast') return <Sunrise size={18} className="text-amber-500 shrink-0" />;
+                if (id === 'lunch') return <Sun size={18} className="text-amber-500 shrink-0" />;
+                return <Moon size={18} className="text-slate-500 shrink-0" />;
+              };
+
+              const mealRangeLabel = (id: 'breakfast' | 'lunch' | 'dinner') => {
+                const cfg = mealsConfig[id];
+                if (!cfg?.open || !cfg?.close) return '';
+                return `${formatSlotLabel(cfg.open)} to ${formatSlotLabel(cfg.close)}`;
+              };
+
+              const renderSlotButton = (
+                slot: string,
+                available: boolean,
+                mealId: 'breakfast' | 'lunch' | 'dinner',
+                variant: 'mobile' | 'desktop',
+                isPending?: boolean
+              ) => {
+                const isSelected = selectedTime === slot && available;
+                const promoText = isPending ? 'Checking…' : available ? offerChipLabel : 'Unavailable';
+                const base =
+                  variant === 'mobile'
+                    ? 'min-h-[56px] px-2 py-2.5 rounded-xl border text-center transition-all flex flex-col items-center justify-center'
+                    : 'min-h-[52px] px-2 py-2 rounded-xl border text-center transition-all flex flex-col items-center justify-center';
+
+                if (isPending) {
+                  return (
+                    <div
+                      key={slot}
+                      className={`${base} border-slate-200 bg-slate-50/70 text-slate-400 select-none animate-pulse`}
+                    >
+                      <span className="text-sm font-semibold leading-none text-slate-600">
+                        {formatSlotLabel(slot)}
+                      </span>
+                      <span className="text-[0.625rem] font-medium text-slate-400 mt-1.5 leading-none">
+                        Checking…
+                      </span>
+                    </div>
+                  );
+                }
+
+                if (!available) {
                   return (
                     <button
                       key={slot}
                       type="button"
-                      onClick={() => {
-                        setActiveMealSection(mealId);
-                        handleTimeSelect(slot);
-                      }}
-                      className={`${base} cursor-pointer ${
-                        isSelected
-                          ? variant === 'mobile'
-                            ? 'border-slate-900 bg-slate-900 text-white'
-                            : 'border border-[#6900AA] bg-[#f7e9ff] text-slate-900'
-                          : 'border border-slate-200 bg-white text-slate-800 hover:border-slate-300'
-                      }`}
+                      disabled
+                      aria-disabled="true"
+                      title="This time is not available"
+                      className={`${base} border-slate-100 bg-slate-50 text-slate-400 cursor-not-allowed opacity-70`}
                     >
-                      <span
-                        className={`text-sm ${variant === 'mobile' ? 'font-bold' : 'font-semibold'} leading-none`}
-                      >
+                      <span className="text-sm font-semibold leading-none line-through decoration-slate-300">
                         {formatSlotLabel(slot)}
                       </span>
-                      {promoText ? (
-                        <span
-                          className={`text-[0.625rem] font-bold mt-1.5 leading-none ${
-                            isSelected && variant === 'mobile'
-                              ? 'text-white/80'
-                              : variant === 'mobile'
-                                ? 'text-[#6900AA]'
-                                : 'text-[#2563EB]'
-                          }`}
-                        >
-                          {promoText}
-                        </span>
-                      ) : null}
+                      <span className="text-[0.625rem] font-bold text-slate-400 mt-1.5 leading-none">
+                        {promoText}
+                      </span>
                     </button>
                   );
-                };
-
-                // Keep accordion open on a valid meal; null means all collapsed
-                const openMealId =
-                  activeMealSection === null
-                    ? null
-                    : mealOptions.find((m) => m.id === activeMealSection)?.id ||
-                      mealOptions[0]?.id ||
-                      null;
-
+                }
                 return (
-                  <div className="space-y-4 lg:space-y-3">
-                    {/* Desktop book intro (mobile/tablet use immersive header above) */}
-                    <h4 className="hidden lg:block text-xl font-semibold text-slate-900 tracking-tight">
-                      Select your booking details
-                    </h4>
+                  <button
+                    key={slot}
+                    type="button"
+                    onClick={() => {
+                      setActiveMealSection(mealId);
+                      handleTimeSelect(slot);
+                    }}
+                    className={`${base} cursor-pointer ${isSelected
+                        ? variant === 'mobile'
+                          ? 'border-slate-900 bg-slate-900 text-white'
+                          : 'border border-[#6900AA] bg-[#f7e9ff] text-slate-900'
+                        : 'border border-slate-200 bg-white text-slate-800 hover:border-slate-300'
+                      }`}
+                  >
+                    <span
+                      className={`text-sm ${variant === 'mobile' ? 'font-bold' : 'font-semibold'} leading-none`}
+                    >
+                      {formatSlotLabel(slot)}
+                    </span>
+                    {promoText ? (
+                      <span
+                        className={`text-[0.625rem] font-bold mt-1.5 leading-none ${isSelected && variant === 'mobile'
+                            ? 'text-white/80'
+                            : variant === 'mobile'
+                              ? 'text-[#6900AA]'
+                              : 'text-[#2563EB]'
+                          }`}
+                      >
+                        {promoText}
+                      </span>
+                    ) : null}
+                  </button>
+                );
+              };
 
-                    <div className="grid items-start gap-6 lg:gap-8 xl:gap-10 lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_360px]">
+              // Keep accordion open on a valid meal; null means all collapsed
+              const openMealId =
+                activeMealSection === null
+                  ? null
+                  : mealOptions.find((m) => m.id === activeMealSection)?.id ||
+                  mealOptions[0]?.id ||
+                  null;
+
+              return (
+                <div className="space-y-4 lg:space-y-3">
+                  {/* Desktop book intro (mobile/tablet use immersive header above) */}
+                  <h4 className="hidden lg:block text-xl font-semibold text-slate-900 tracking-tight">
+                    Select your booking details
+                  </h4>
+
+                  <div className="grid items-start gap-6 lg:gap-8 xl:gap-10 lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_360px]">
                     <div className="min-w-0 space-y-5 bg-white rounded-none border-0 px-0 md:rounded-xl md:border md:border-slate-200 md:p-5 p-0">
-                    {/* Guests — dropdown on mobile, chips on tablet/desktop */}
-                    <div>
-                      <p className="md:hidden text-sm text-slate-500 mb-2">Select number of guests</p>
-                      <p className="hidden md:block text-sm font-semibold text-slate-800 mb-3">Number of guest(s)</p>
+                      {/* Guests — dropdown on mobile, chips on tablet/desktop */}
+                      <div>
+                        <p className="md:hidden text-sm text-slate-500 mb-2">Select number of guests</p>
+                        <p className="hidden md:block text-sm font-semibold text-slate-800 mb-3">Number of guest(s)</p>
 
-                      <div className="md:hidden relative">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setReserveWidgetDropdown((prev) => (prev === "guests" ? null : "guests"))
-                          }
-                          className="w-full bg-white border border-slate-200 rounded-xl pl-4 pr-10 py-3 text-sm font-semibold text-[#292929] text-left cursor-pointer"
-                          aria-haspopup="listbox"
-                          aria-expanded={reserveWidgetDropdown === "guests"}
-                        >
-                          {Number(guests)} {Number(guests) === 1 ? "guest" : "guests"}
-                        </button>
-                        <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
-                        {reserveWidgetDropdown === "guests" ? (
-                          <ul
-                            role="listbox"
-                            className="absolute left-0 right-0 top-[calc(100%+4px)] z-50 max-h-56 overflow-y-auto border border-slate-300 bg-white shadow-md rounded-xl"
+                        <div className="md:hidden relative">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setReserveWidgetDropdown((prev) => (prev === "guests" ? null : "guests"))
+                            }
+                            className="w-full bg-white border border-slate-200 rounded-xl pl-4 pr-10 py-3 text-sm font-semibold text-[#292929] text-left cursor-pointer"
+                            aria-haspopup="listbox"
+                            aria-expanded={reserveWidgetDropdown === "guests"}
                           >
-                            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => {
-                              const selected = Number(guests) === num;
-                              return (
-                                <li key={num} role="option" aria-selected={selected}>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setGuests(String(num));
-                                      setAvailabilityStatus(null);
-                                      setReserveWidgetDropdown(null);
-                                    }}
-                                    className={`w-full text-left px-4 py-2.5 text-sm font-medium cursor-pointer ${
-                                      selected ? "bg-slate-900 text-white" : "bg-white text-slate-800 hover:bg-slate-50"
-                                    }`}
-                                  >
-                                    {num} {num === 1 ? "guest" : "guests"}
-                                  </button>
-                                </li>
-                              );
-                            })}
-                          </ul>
-                        ) : null}
-                      </div>
-
-                      <div className="hidden md:flex flex-wrap gap-2.5">
-                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => {
-                              const selected = Number(guests) === num;
-                          return (
-                            <button
-                              key={num}
-                              type="button"
-                                  onClick={() => {
-                                    setGuests(num.toString());
-                                    setAvailabilityStatus(null);
-                                  }}
-                              className={`w-11 h-11 sm:w-12 sm:h-12 rounded-xl text-sm font-semibold transition-all cursor-pointer flex items-center justify-center ${
-                                    selected
-                                  ? 'border border-[#6900AA] text-[#6900AA] bg-[#f7e9ff]'
-                                  : 'border border-slate-200 text-slate-700 bg-white hover:border-slate-300'
-                                  }`}
-                                >
-                              {num}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* Dates */}
-                    <div>
-                      <p className="md:hidden text-base font-bold text-slate-900 mb-3">Select day and time</p>
-                      <p className="hidden md:block text-sm font-semibold text-slate-800 mb-3">When are you visiting?</p>
-                      <div className="flex gap-0 md:gap-2.5 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-hide items-stretch">
-                        <div className="md:hidden shrink-0 flex items-center pr-2 mr-1 border-r border-slate-200">
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 [writing-mode:vertical-rl] rotate-180">
-                            {bookingDates[selectedDateIndex]?.toLocaleDateString("en-US", { month: "long" })}
-                          </span>
-                        </div>
-                        {bookingDates.map((d, idx) => {
-                          const labels = formatDateLabel(d, idx);
-                          const selected = selectedDateIndex === idx;
-                          return (
-                            <button
-                              key={idx}
-                              type="button"
-                              onClick={() => handleDateSelect(idx)}
-                              className={`min-w-[72px] sm:min-w-[88px] md:min-w-[96px] shrink-0 rounded-xl px-2.5 py-2.5 text-center transition-all cursor-pointer ${
-                                    selected
-                                  ? 'md:border md:border-[#6900AA] md:bg-[#f7e9ff] bg-slate-900 text-white border-transparent'
-                                  : 'md:border md:border-slate-200 md:bg-white md:hover:border-slate-300 border-transparent bg-transparent'
-                              }`}
+                            {Number(guests)} {Number(guests) === 1 ? "guest" : "guests"}
+                          </button>
+                          <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+                          {reserveWidgetDropdown === "guests" ? (
+                            <ul
+                              role="listbox"
+                              className="absolute left-0 right-0 top-[calc(100%+4px)] z-50 max-h-56 overflow-y-auto border border-slate-300 bg-white shadow-md rounded-xl"
                             >
-                              <p className={`text-sm font-semibold leading-tight ${selected ? 'md:text-[#6900AA] text-white' : 'text-slate-700'}`}>
-                                {labels.top}
-                              </p>
-                              <p className={`text-[0.8rem] font-medium mt-0.5 leading-tight ${selected ? 'md:text-[#6900AA] text-white/80' : 'text-slate-500'}`}>
-                                {labels.bottom}
-                              </p>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* Meal period accordions + time slots */}
-                    <div className="space-y-3 pt-1">
-                      <p className="hidden md:block text-sm font-semibold text-slate-800">
-                        Select the time of day to see the offers
-                      </p>
-
-                      {slotsInitialLoading ? (
-                        <div className="flex items-center gap-2 text-sm text-slate-500 py-3">
-                          <Loader2 size={16} className="animate-spin shrink-0" />
-                          Checking available times…
+                              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => {
+                                const selected = Number(guests) === num;
+                                return (
+                                  <li key={num} role="option" aria-selected={selected}>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setGuests(String(num));
+                                        setAvailabilityStatus(null);
+                                        setReserveWidgetDropdown(null);
+                                      }}
+                                      className={`w-full text-left px-4 py-2.5 text-sm font-medium cursor-pointer ${selected ? "bg-slate-900 text-white" : "bg-white text-slate-800 hover:bg-slate-50"
+                                        }`}
+                                    >
+                                      {num} {num === 1 ? "guest" : "guests"}
+                                    </button>
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          ) : null}
                         </div>
-                      ) : null}
 
-                      {!slotsInitialLoading && !isSelectedDayClosed && mealOptions.length === 0 ? (
-                        <p className="text-xs text-slate-400 font-medium py-2">
-                          No time slots for this date.
-                        </p>
-                      ) : null}
-
-                      {/* Mobile meal chips */}
-                      {!isSelectedDayClosed && mealOptions.length > 0 ? (
-                        <div className="md:hidden flex flex-wrap gap-2 mb-1">
-                          {mealOptions.map((meal) => {
-                            const selected = openMealId === meal.id;
+                        <div className="hidden md:flex flex-wrap gap-2.5">
+                          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => {
+                            const selected = Number(guests) === num;
                             return (
                               <button
-                                key={`chip-${meal.id}`}
+                                key={num}
                                 type="button"
                                 onClick={() => {
-                                  setActiveMealSection(meal.id);
-                                  setSelectedTime('');
+                                  setGuests(num.toString());
                                   setAvailabilityStatus(null);
                                 }}
-                                className={`rounded-full px-4 py-2 text-sm font-semibold border cursor-pointer ${
-                                  selected
-                                    ? "bg-slate-100 border-slate-300 text-slate-900"
-                                    : "bg-white border-slate-200 text-slate-700"
-                                }`}
+                                className={`w-11 h-11 sm:w-12 sm:h-12 rounded-xl text-sm font-semibold transition-all cursor-pointer flex items-center justify-center ${selected
+                                    ? 'border border-[#6900AA] text-[#6900AA] bg-[#f7e9ff]'
+                                    : 'border border-slate-200 text-slate-700 bg-white hover:border-slate-300'
+                                  }`}
                               >
-                                {meal.label}
+                                {num}
                               </button>
                             );
                           })}
                         </div>
-                      ) : null}
+                      </div>
 
-                      {isSelectedDayClosed ? (
-                        <div className="text-center py-8 bg-white border border-slate-200 rounded-2xl">
-                          <p className="text-xs text-rose-500 font-bold">Closed on this day</p>
-                          <p className="text-[0.625rem] text-slate-400 mt-0.5">Please select another date above.</p>
-                        </div>
-                      ) : mealOptions.length === 0 ? (
-                        <div className="text-center py-8 bg-white border border-slate-200 rounded-2xl">
-                          <p className="text-xs text-slate-400 font-medium">No slots available for this selection.</p>
-                          <p className="text-[0.625rem] text-slate-400 mt-0.5">Try another date or meal time.</p>
-                        </div>
-                      ) : (
-                        <div className="space-y-3">
-                          {/* Mobile: show slots for active meal only as flat grid */}
-                          {openMealId ? (
-                            <div className="md:hidden">
-                              {(() => {
-                                const meal = mealOptions.find((m) => m.id === openMealId);
-                                if (!meal) return null;
-                                if (meal.slots.length === 0) {
-                                  return (
-                                    <p className="text-xs text-slate-400 font-medium py-3 text-center">
-                                      No slots in this period.
-                                    </p>
-                                  );
-                                }
-                                return (
-                                  <div className="grid grid-cols-2 gap-2.5">
-                                    {meal.slots.map(({ slot, available }) =>
-                                      renderSlotButton(slot, available, meal.id, 'mobile')
-                                    )}
-                                  </div>
-                                );
-                              })()}
-                            </div>
-                          ) : null}
-
-                          <div className="hidden md:block space-y-3">
-                          {mealOptions.map((meal) => {
-                            const isOpen = openMealId === meal.id;
-                            const cfg = mealsConfig[meal.id];
+                      {/* Dates */}
+                      <div>
+                        <p className="md:hidden text-base font-bold text-slate-900 mb-3">Select day and time</p>
+                        <p className="hidden md:block text-sm font-semibold text-slate-800 mb-3">When are you visiting?</p>
+                        <div className="flex gap-0 md:gap-2.5 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-hide items-stretch">
+                          <div className="md:hidden shrink-0 flex items-center pr-2 mr-1 border-r border-slate-200">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 [writing-mode:vertical-rl] rotate-180">
+                              {bookingDates[selectedDateIndex]?.toLocaleDateString("en-US", { month: "long" })}
+                            </span>
+                          </div>
+                          {bookingDates.map((d, idx) => {
+                            const labels = formatDateLabel(d, idx);
+                            const selected = selectedDateIndex === idx;
                             return (
-                              <div
-                                key={meal.id}
-                                className="rounded-2xl border border-slate-200 bg-white overflow-hidden"
+                              <button
+                                key={idx}
+                                type="button"
+                                onClick={() => handleDateSelect(idx)}
+                                className={`min-w-[72px] sm:min-w-[88px] md:min-w-[96px] shrink-0 rounded-xl px-2.5 py-2.5 text-center transition-all cursor-pointer ${selected
+                                    ? 'md:border md:border-[#6900AA] md:bg-[#f7e9ff] bg-slate-900 text-white border-transparent'
+                                    : 'md:border md:border-slate-200 md:bg-white md:hover:border-slate-300 border-transparent bg-transparent'
+                                  }`}
                               >
+                                <p className={`text-sm font-semibold leading-tight ${selected ? 'md:text-[#6900AA] text-white' : 'text-slate-700'}`}>
+                                  {labels.top}
+                                </p>
+                                <p className={`text-[0.8rem] font-medium mt-0.5 leading-tight ${selected ? 'md:text-[#6900AA] text-white/80' : 'text-slate-500'}`}>
+                                  {labels.bottom}
+                                </p>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Meal period accordions + time slots */}
+                      <div className="space-y-3 pt-1">
+                        <p className="hidden md:block text-sm font-semibold text-slate-800">
+                          Select the time of day to see the offers
+                        </p>
+
+                        {slotsInitialLoading ? (
+                          <div className="flex items-center gap-2 text-sm text-slate-500 py-3">
+                            <Loader2 size={16} className="animate-spin shrink-0" />
+                            Checking available times…
+                          </div>
+                        ) : null}
+
+                        {!slotsInitialLoading && !isSelectedDayClosed && mealOptions.length === 0 ? (
+                          <p className="text-xs text-slate-400 font-medium py-2">
+                            No time slots for this date.
+                          </p>
+                        ) : null}
+
+                        {/* Mobile meal chips */}
+                        {!isSelectedDayClosed && mealOptions.length > 0 ? (
+                          <div className="md:hidden flex flex-wrap gap-2 mb-1">
+                            {mealOptions.map((meal) => {
+                              const selected = openMealId === meal.id;
+                              return (
                                 <button
+                                  key={`chip-${meal.id}`}
                                   type="button"
                                   onClick={() => {
-                                    if (isOpen) {
-                                      setActiveMealSection(null);
-                                    } else {
-                                      setActiveMealSection(meal.id);
-                                      setSelectedTime('');
-                                      setAvailabilityStatus(null);
-                                    }
+                                    setActiveMealSection(meal.id);
+                                    setSelectedTime('');
+                                    setAvailabilityStatus(null);
                                   }}
-                                  className="w-full flex items-center gap-3 px-4 py-3.5 text-left cursor-pointer hover:bg-slate-50/80 transition-colors"
+                                  className={`rounded-full px-4 py-2 text-sm font-semibold border cursor-pointer ${selected
+                                      ? "bg-slate-100 border-slate-300 text-slate-900"
+                                      : "bg-white border-slate-200 text-slate-700"
+                                    }`}
                                 >
-                                  {mealIcon(meal.id)}
-                                  <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-semibold text-slate-800">{meal.label}</p>
-                                    {cfg?.open && cfg?.close && (
-                                      <p className="text-xs text-slate-500 mt-0.5">
-                                        {mealRangeLabel(meal.id)}
-                                      </p>
-                                    )}
-                                  </div>
-                                  <ChevronDown
-                                    size={18}
-                                    className={`text-slate-400 shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`}
-                                  />
+                                  {meal.label}
                                 </button>
+                              );
+                            })}
+                          </div>
+                        ) : null}
 
-                                {isOpen && (
-                                  <div className="px-4 pb-4">
-                                    {meal.slots.length === 0 ? (
+                        {isSelectedDayClosed ? (
+                          <div className="text-center py-8 bg-white border border-slate-200 rounded-2xl">
+                            <p className="text-xs text-rose-500 font-bold">Closed on this day</p>
+                            <p className="text-[0.625rem] text-slate-400 mt-0.5">Please select another date above.</p>
+                          </div>
+                        ) : mealOptions.length === 0 ? (
+                          <div className="text-center py-8 bg-white border border-slate-200 rounded-2xl">
+                            <p className="text-xs text-slate-400 font-medium">No slots available for this selection.</p>
+                            <p className="text-[0.625rem] text-slate-400 mt-0.5">Try another date or meal time.</p>
+                          </div>
+                        ) : (
+                          <div className="space-y-3">
+                            {/* Mobile: show slots for active meal only as flat grid */}
+                            {openMealId ? (
+                              <div className="md:hidden">
+                                {(() => {
+                                  const meal = mealOptions.find((m) => m.id === openMealId);
+                                  if (!meal) return null;
+                                  if (meal.slots.length === 0) {
+                                    return (
                                       <p className="text-xs text-slate-400 font-medium py-3 text-center">
                                         No slots in this period.
                                       </p>
-                                    ) : (
-                                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                                        {meal.slots.map(({ slot, available }) =>
-                                          renderSlotButton(slot, available, meal.id, 'desktop')
+                                    );
+                                  }
+                                  return (
+                                    <div className="grid grid-cols-2 gap-2.5">
+                                      {meal.slots.map(({ slot, available, isPending }) =>
+                                        renderSlotButton(slot, available, meal.id, 'mobile', isPending)
+                                      )}
+                                    </div>
+                                  );
+                                })()}
+                              </div>
+                            ) : null}
+
+                            <div className="hidden md:block space-y-3">
+                              {mealOptions.map((meal) => {
+                                const isOpen = openMealId === meal.id;
+                                const cfg = mealsConfig[meal.id];
+                                return (
+                                  <div
+                                    key={meal.id}
+                                    className="rounded-2xl border border-slate-200 bg-white overflow-hidden"
+                                  >
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (isOpen) {
+                                          setActiveMealSection(null);
+                                        } else {
+                                          setActiveMealSection(meal.id);
+                                          setSelectedTime('');
+                                          setAvailabilityStatus(null);
+                                        }
+                                      }}
+                                      className="w-full flex items-center gap-3 px-4 py-3.5 text-left cursor-pointer hover:bg-slate-50/80 transition-colors"
+                                    >
+                                      {mealIcon(meal.id)}
+                                      <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-semibold text-slate-800">{meal.label}</p>
+                                        {cfg?.open && cfg?.close && (
+                                          <p className="text-xs text-slate-500 mt-0.5">
+                                            {mealRangeLabel(meal.id)}
+                                          </p>
+                                        )}
+                                      </div>
+                                      <ChevronDown
+                                        size={18}
+                                        className={`text-slate-400 shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+                                      />
+                                    </button>
+
+                                    {isOpen && (
+                                      <div className="px-4 pb-4">
+                                        {meal.slots.length === 0 ? (
+                                          <p className="text-xs text-slate-400 font-medium py-3 text-center">
+                                            No slots in this period.
+                                          </p>
+                                        ) : (
+                                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                                            {meal.slots.map(({ slot, available, isPending }) =>
+                                              renderSlotButton(slot, available, meal.id, 'desktop', isPending)
+                                            )}
+                                          </div>
                                         )}
                                       </div>
                                     )}
                                   </div>
-                                )}
-                              </div>
-                                    );
-                                  })}
+                                );
+                              })}
+                            </div>
                           </div>
-                                </div>
-                              )}
-                            </div>
+                        )}
+                      </div>
 
-                    {/* Choose an offer — restaurant partner offers only (platform on Special Offers / checkout) */}
-                    {hasAnyBookableOffer && (
-                      <div className="space-y-3 pt-2">
+                      {/* Choose an offer — restaurant partner offers only (platform on Special Offers / checkout) */}
+                      {hasAnyBookableOffer && (
+                        <div className="space-y-3 pt-2">
+                          <button
+                            type="button"
+                            onClick={() => setOffersSectionOpen((v) => !v)}
+                            className="w-full flex items-center gap-3 cursor-pointer"
+                          >
+                            <h4 className="text-base font-semibold text-slate-900 shrink-0">
+                              Choose an offer
+                            </h4>
+                            <div className="h-px flex-1 bg-slate-200" />
+                            <ChevronDown
+                              size={16}
+                              className={`text-slate-400 shrink-0 transition-transform ${offersSectionOpen ? "rotate-180" : ""}`}
+                            />
+                          </button>
+
+                          {offersSectionOpen && (
+                            <div className="flex flex-wrap gap-3 pt-3 pl-2">
+                              {bookableOffers.map((offer, idx) => {
+                                const isActive =
+                                  !noOfferSelected &&
+                                  ((selectedOffer?.id && selectedOffer.id === offer.id) ||
+                                    (selectedOffer?.title === offer.title && selectedOffer?.promo_code === offer.promo_code));
+                                const badgeColors = [
+                                  "#2563EB",
+                                  "#6900AA",
+                                  "#059669",
+                                  "#D97706",
+                                ];
+                                const badgeBg = badgeColors[idx % badgeColors.length];
+                                return (
+                                  <button
+                                    key={`${offer.id || offer.title}-${idx}`}
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedOffer(offer);
+                                      setNoOfferSelected(false);
+                                    }}
+                                    className={`relative w-[220px] sm:w-[240px] text-left rounded-xl border bg-white px-4 py-3.5 pt-4 transition-all cursor-pointer overflow-visible ${isActive
+                                        ? "border-[#6900AA] shadow-sm"
+                                        : "border-slate-200 hover:border-slate-300"
+                                      }`}
+                                  >
+                                    <span
+                                      className="absolute top-2 left-2 z-10 w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-sm"
+                                      style={{ backgroundColor: badgeBg }}
+                                    >
+                                      %
+                                    </span>
+                                    <span
+                                      className={`absolute top-3 right-3 w-4 h-4 rounded-full border-2 flex items-center justify-center ${isActive ? "border-[#6900AA]" : "border-slate-300"
+                                        }`}
+                                    >
+                                      {isActive && (
+                                        <span className="w-2 h-2 rounded-full bg-[#6900AA]" />
+                                      )}
+                                    </span>
+                                    <p className="text-[0.625rem] font-semibold uppercase tracking-wider text-slate-400 pl-8 pr-5">
+                                      {(offer.type || "Offer").toString()}
+                                    </p>
+                                    <p className="text-base font-bold text-slate-900 mt-0.5 pl-8 pr-5 leading-snug">
+                                      {offer.title}
+                                    </p>
+                                    <p className="text-xs font-medium text-[#2563EB] mt-1 pl-8 pr-5">
+                                      {formatDiningOfferDiscount(offer)}
+                                      {offer.promo_code ? ` · ${offer.promo_code}` : ""}
+                                    </p>
+                                  </button>
+                                );
+                              })}
+
                               <button
                                 type="button"
-                          onClick={() => setOffersSectionOpen((v) => !v)}
-                          className="w-full flex items-center gap-3 cursor-pointer"
-                        >
-                          <h4 className="text-base font-semibold text-slate-900 shrink-0">
-                            Choose an offer
-                          </h4>
-                          <div className="h-px flex-1 bg-slate-200" />
-                          <ChevronDown
-                            size={16}
-                            className={`text-slate-400 shrink-0 transition-transform ${offersSectionOpen ? "rotate-180" : ""}`}
-                          />
-                              </button>
-
-                        {offersSectionOpen && (
-                          <div className="flex flex-wrap gap-3 pt-3 pl-2">
-                            {bookableOffers.map((offer, idx) => {
-                              const isActive =
-                                !noOfferSelected &&
-                                ((selectedOffer?.id && selectedOffer.id === offer.id) ||
-                                  (selectedOffer?.title === offer.title && selectedOffer?.promo_code === offer.promo_code));
-                              const badgeColors = [
-                                "#2563EB",
-                                "#6900AA",
-                                "#059669",
-                                "#D97706",
-                              ];
-                              const badgeBg = badgeColors[idx % badgeColors.length];
-                                    return (
-                                      <button
-                                  key={`${offer.id || offer.title}-${idx}`}
-                                        type="button"
-                                  onClick={() => {
-                                    setSelectedOffer(offer);
-                                    setNoOfferSelected(false);
-                                  }}
-                                  className={`relative w-[220px] sm:w-[240px] text-left rounded-xl border bg-white px-4 py-3.5 pt-4 transition-all cursor-pointer overflow-visible ${
-                                    isActive
-                                      ? "border-[#6900AA] shadow-sm"
-                                      : "border-slate-200 hover:border-slate-300"
+                                onClick={() => {
+                                  setSelectedOffer(null);
+                                  setNoOfferSelected(true);
+                                }}
+                                className={`relative w-[220px] sm:w-[240px] text-left rounded-xl border bg-white px-4 py-3.5 pt-4 transition-all cursor-pointer overflow-visible ${noOfferSelected
+                                    ? "border-[#6900AA] shadow-sm"
+                                    : "border-slate-200 hover:border-slate-300"
                                   }`}
-                                >
-                                  <span
-                                    className="absolute top-2 left-2 z-10 w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-sm"
-                                    style={{ backgroundColor: badgeBg }}
-                                  >
-                                    %
-                                  </span>
-                                  <span
-                                    className={`absolute top-3 right-3 w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                                      isActive ? "border-[#6900AA]" : "border-slate-300"
-                                    }`}
-                                  >
-                                    {isActive && (
-                                      <span className="w-2 h-2 rounded-full bg-[#6900AA]" />
-                                    )}
-                                  </span>
-                                  <p className="text-[0.625rem] font-semibold uppercase tracking-wider text-slate-400 pl-8 pr-5">
-                                    {(offer.type || "Offer").toString()}
-                                  </p>
-                                  <p className="text-base font-bold text-slate-900 mt-0.5 pl-8 pr-5 leading-snug">
-                                    {offer.title}
-                                  </p>
-                                  <p className="text-xs font-medium text-[#2563EB] mt-1 pl-8 pr-5">
-                                    {formatDiningOfferDiscount(offer)}
-                                    {offer.promo_code ? ` · ${offer.promo_code}` : ""}
-                                  </p>
-                                      </button>
-                                    );
-                                  })}
-
-                              <button
-                                type="button"
-                              onClick={() => {
-                                setSelectedOffer(null);
-                                setNoOfferSelected(true);
-                              }}
-                              className={`relative w-[220px] sm:w-[240px] text-left rounded-xl border bg-white px-4 py-3.5 pt-4 transition-all cursor-pointer overflow-visible ${
-                                noOfferSelected
-                                  ? "border-[#6900AA] shadow-sm"
-                                  : "border-slate-200 hover:border-slate-300"
-                              }`}
-                            >
-                              <span className="absolute top-2 left-2 z-10 w-7 h-7 rounded-full bg-[#6900AA] flex items-center justify-center text-white text-xs font-bold shadow-sm">
-                                ✓
-                              </span>
-                              <span
-                                className={`absolute top-3 right-3 w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                                  noOfferSelected ? "border-[#6900AA]" : "border-slate-300"
-                                }`}
                               >
-                                {noOfferSelected && (
-                                  <span className="w-2 h-2 rounded-full bg-[#6900AA]" />
-                                )}
-                              </span>
-                              <p className="text-[0.625rem] font-semibold uppercase tracking-wider text-slate-400 pl-8 pr-5">
-                                No offer
-                              </p>
-                              <p className="text-base font-bold text-slate-900 mt-0.5 pl-8 pr-5 leading-snug">
-                                Regular table reservation
-                              </p>
-                              <p className="text-xs font-medium text-[#2563EB] mt-1 pl-8 pr-5">
-                                Book without applying a dining offer
-                              </p>
-                                      </button>
-                                </div>
-                              )}
+                                <span className="absolute top-2 left-2 z-10 w-7 h-7 rounded-full bg-[#6900AA] flex items-center justify-center text-white text-xs font-bold shadow-sm">
+                                  ✓
+                                </span>
+                                <span
+                                  className={`absolute top-3 right-3 w-4 h-4 rounded-full border-2 flex items-center justify-center ${noOfferSelected ? "border-[#6900AA]" : "border-slate-300"
+                                    }`}
+                                >
+                                  {noOfferSelected && (
+                                    <span className="w-2 h-2 rounded-full bg-[#6900AA]" />
+                                  )}
+                                </span>
+                                <p className="text-[0.625rem] font-semibold uppercase tracking-wider text-slate-400 pl-8 pr-5">
+                                  No offer
+                                </p>
+                                <p className="text-base font-bold text-slate-900 mt-0.5 pl-8 pr-5 leading-snug">
+                                  Regular table reservation
+                                </p>
+                                <p className="text-xs font-medium text-[#2563EB] mt-1 pl-8 pr-5">
+                                  Book without applying a dining offer
+                                </p>
+                              </button>
                             </div>
+                          )}
+                        </div>
                       )}
                     </div>
 
@@ -3545,723 +3667,719 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                         <GuestTableAnimation count={Number(guests)} />
                       </div>
                     </aside>
-                    </div>
                   </div>
-                );
-              })()}
-
-              {drawerStep === 2 && (
-                <div className="space-y-6 max-w-sm sm:max-w-md bg-white rounded-xl border border-slate-200 p-4 sm:p-5">
-                  {loginStep !== 3 ? (
-                    // Unified phone + OTP login
-                    <div>
-                      <h4 className="text-lg font-black text-slate-800 mb-1 tracking-tight">Sign in to book</h4>
-                      <p className="text-xs text-slate-400 mb-6 font-semibold">Verify your mobile number to continue.</p>
-
-                      {loginError && (
-                        <div className="bg-rose-500/10 border border-rose-500/20 text-rose-600 text-xs font-semibold p-3.5 rounded-2xl text-center mb-5">
-                          {loginError}
-                        </div>
-                      )}
-
-                      <form onSubmit={handlePhoneLoginSubmit} className="space-y-5">
-                        {loginStep === 1 ? (
-                          <div>
-                            <label className="text-[0.625rem] font-bold text-slate-400 uppercase tracking-wider mb-2 block">Phone Number</label>
-                            <div className="relative">
-                              <span className="absolute left-4 top-3.5 text-slate-400 font-bold text-xs">+251</span>
-                              <input
-                                type="tel"
-                                required
-                                value={loginPhone}
-                                onChange={(e) => setLoginPhone(sanitizePhoneInput(e.target.value))}
-                                inputMode="numeric"
-                                maxLength={12}
-                                className="w-full bg-white border border-slate-200 rounded-2xl pl-12 pr-4 py-3.5 text-xs focus:outline-none focus:border-rose-500 text-slate-800 font-semibold"
-                                placeholder="99000-00000"
-                              />
-                            </div>
-                            <button
-                              type="submit"
-                              disabled={isSendingOtp}
-                              className="w-full bg-rose-600 hover:bg-rose-700 text-white rounded-2xl py-3.5 text-xs font-bold transition-all shadow-md shadow-rose-200 cursor-pointer mt-6 flex justify-center items-center gap-1.5"
-                            >
-                              Send OTP
-                            </button>
-                          </div>
-                        ) : (
-                          <div>
-                            <div className="p-3.5 bg-indigo-50 border border-indigo-100 rounded-2xl text-xs text-indigo-700 font-bold mb-5 flex flex-col gap-1">
-                              <span className="flex items-center gap-1.5">
-                                <Sparkles size={14} className="text-indigo-600" />
-                                <span>Demo Assistant</span>
-                              </span>
-                              <span className="font-medium text-slate-500">OTP sent to +251 {loginPhone}. Demo code <strong>123456</strong>.</span>
-                            </div>
-
-                            <label className="text-[0.625rem] font-bold text-slate-400 uppercase tracking-wider mb-2 block">Enter OTP</label>
-                            <input
-                              type="text"
-                              required
-                              maxLength={6}
-                              value={loginOtp}
-                              onChange={(e) => setLoginOtp(e.target.value)}
-                              className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3.5 text-center text-sm tracking-widest font-extrabold focus:outline-none focus:border-rose-500 text-slate-850"
-                              placeholder="••••••"
-                            />
-                            <button
-                              type="submit"
-                              disabled={isVerifyingOtp}
-                              className="w-full bg-rose-600 hover:bg-rose-700 text-white rounded-2xl py-3.5 text-xs font-bold transition-all shadow-md shadow-rose-200 cursor-pointer mt-6 flex justify-center items-center gap-1.5"
-                            >
-                              {isVerifyingOtp ? <Loader2 size={14} className="animate-spin" /> : null}
-                              Verify & Continue
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => { setLoginStep(1); setLoginError(null); }}
-                              className="w-full text-center text-xs text-rose-500 font-bold hover:underline mt-4 cursor-pointer"
-                            >
-                              Change phone number
-                            </button>
-                          </div>
-                        )}
-                      </form>
-                    </div>
-                  ) : (
-                    // REGISTRATION FORM
-                    <div>
-                      <h4 className="text-lg font-black text-slate-800 mb-1 tracking-tight">Create Account</h4>
-                      <p className="text-xs text-slate-400 mb-6 font-semibold">
-                        Phone verified: <span className="font-bold text-slate-600">+251 {loginPhone}</span>
-                      </p>
-
-                      {loginError && (
-                        <div className="bg-rose-500/10 border border-rose-500/20 text-rose-600 text-xs font-semibold p-3.5 rounded-2xl text-center mb-5">
-                          {loginError}
-                        </div>
-                      )}
-
-                      <form onSubmit={handleRegisterSubmit} className="space-y-4">
-                        <div>
-                          <label className="text-[0.625rem] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">Full Name</label>
-                          <input
-                            type="text"
-                            required
-                            value={regName}
-                            onChange={(e) => setRegName(e.target.value)}
-                            className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3 text-xs focus:outline-none focus:border-rose-500 text-slate-800 font-semibold"
-                            placeholder="John Doe"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-[0.625rem] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">Email Address</label>
-                          <input
-                            type="email"
-                            required
-                            value={regEmail}
-                            onChange={(e) => setRegEmail(e.target.value)}
-                            className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3 text-xs focus:outline-none focus:border-rose-500 text-slate-800 font-semibold"
-                            placeholder="john@example.com"
-                          />
-                        </div>
-
-                        <button
-                          type="submit"
-                          disabled={isRegistering}
-                          className="w-full bg-rose-600 hover:bg-rose-700 text-white rounded-2xl py-3.5 text-xs font-bold transition-all shadow-md shadow-rose-200 cursor-pointer mt-6 flex justify-center items-center gap-1.5"
-                        >
-                          {isRegistering ? <Loader2 size={14} className="animate-spin" /> : null}
-                          Register & Log In
-                        </button>
-                      </form>
-
-                      <p className="mt-8 text-center text-xs text-slate-400 font-semibold">
-                        <button
-                          type="button"
-                          onClick={() => { setLoginStep(2); setLoginError(null); }}
-                          className="text-rose-600 font-extrabold hover:underline cursor-pointer"
-                        >
-                          Back to OTP
-                        </button>
-                      </p>
-                    </div>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => setDrawerStep(1)}
-                    className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-600 hover:text-[#6900AA] transition-colors cursor-pointer mt-4"
-                  >
-                    <ChevronLeft size={18} />
-                    Back
-                  </button>
                 </div>
-              )}
+              );
+            })()}
 
-              {drawerStep === 3 && (
-                <div className="space-y-5">
-                  {availabilityStatus === 'unavailable' ? (
-                    <div className="p-4 bg-rose-50 border border-rose-100 rounded-xl text-center space-y-3 max-w-xl mx-auto">
-                      <p className="text-xs text-rose-600 font-bold">Sorry, no tables are available for this slot.</p>
-                      <button
-                        type="button"
-                        onClick={() => setDrawerStep(1)}
-                        className="bg-rose-600 hover:bg-rose-700 text-white rounded-xl px-4 py-2 text-xs font-bold transition-all cursor-pointer"
-                      >
-                        Choose another time
-                      </button>
-                    </div>
-                  ) : (
-                    <form
-                      onSubmit={handleConfirmSubmit(onConfirmBooking, (formErrors) => {
-                        if (formErrors.name) setConfirmFocus('name');
-                        else if (formErrors.phone) setConfirmFocus('phone');
-                        else if (formErrors.arrivalTime) {
-                          arrivalFieldRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                        }
-                      })}
-                      noValidate
-                      className="space-y-5"
-                    >
-                      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(260px,300px)] gap-5 lg:gap-6 items-start">
-                        {/* Left — review booking details */}
-                        <div>
-                          <h3 className="text-base font-bold text-zinc-900 mb-3">Review booking details</h3>
-                          <div className="rounded-xl border border-zinc-200 bg-white px-4 py-1">
-                            <div className="flex items-start gap-3 py-3.5 border-b border-zinc-100">
-                              <Calendar size={18} className="text-zinc-500 shrink-0 mt-0.5" strokeWidth={1.75} />
-                              <p className="text-sm font-semibold text-zinc-900 leading-snug">
-                                {selectedDateIndex === 0 ? 'Today' : selectedDateIndex === 1 ? 'Tomorrow' : bookingDates[selectedDateIndex].toLocaleDateString('en-IN', { weekday: 'short' })}{' '}
-                                {formatDateCustomer(bookingDates[selectedDateIndex])}{' '}
-                                at {formatSlotLabel(selectedTime)}
-                        </p>
-                      </div>
-                            <div className="flex items-start gap-3 py-3.5 border-b border-zinc-100">
-                              <Users size={18} className="text-zinc-500 shrink-0 mt-0.5" strokeWidth={1.75} />
-                              <p className="text-sm font-semibold text-zinc-900">
-                                {guests} {Number(guests) === 1 ? 'guest' : 'guests'}
-                              </p>
-                      </div>
-                            <div className="flex items-start gap-3 py-3.5 border-b border-zinc-100">
-                              <MapPin size={18} className="text-zinc-500 shrink-0 mt-0.5" strokeWidth={1.75} />
-                              <div className="min-w-0">
-                                <p className="text-sm font-bold text-zinc-900 leading-snug">{profile.name}</p>
-                                {(profile.address || city) && (
-                                  <p className="text-xs text-zinc-500 mt-0.5 leading-snug">
-                                    {city || profile.address}
-                                  </p>
-                                )}
-                      </div>
-                      </div>
-                            {appliedOffer && (
-                              <div className="flex items-start gap-3 py-3.5">
-                                <Tag size={18} className="text-[#2563eb] shrink-0 mt-0.5" strokeWidth={1.75} />
-                                <div className="min-w-0">
-                                  <p className="text-sm font-bold text-zinc-900 leading-snug">
-                                    {appliedOffer.type ? `${appliedOffer.type}` : 'Offer applied'}
-                                    {appliedOffer.title ? ` · ${appliedOffer.title}` : ''}
-                                  </p>
-                                  {appliedOffer.validity && (
-                                    <p className="text-xs text-zinc-500 mt-0.5 leading-snug">{appliedOffer.validity}</p>
-                                  )}
-                    </div>
-                  </div>
-                            )}
-                            {!appliedOffer && noOfferSelected && (
-                              <div className="flex items-start gap-3 py-3.5">
-                                <Tag size={18} className="text-zinc-400 shrink-0 mt-0.5" strokeWidth={1.75} />
-                                <p className="text-sm font-semibold text-zinc-600">No offer selected</p>
-                    </div>
-                  )}
-                          </div>
-                          <div className="mt-3">
-                            {!specialRequestOpen ? (
-                      <button
-                        type="button"
-                                onClick={() => setSpecialRequestOpen(true)}
-                                className="text-sm font-semibold text-rose-600 hover:text-rose-700 transition-colors cursor-pointer"
-                              >
-                                + Add special request
-                              </button>
-                            ) : (
-                              <div className="space-y-2">
-                                <div className="flex items-center justify-between gap-2">
-                                  <label htmlFor="special-request" className="text-sm font-semibold text-zinc-900">
-                                    Special request
-                                  </label>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setSpecialRequestOpen(false);
-                                      setSpecialRequest('');
-                                    }}
-                                    className="text-xs font-semibold text-zinc-400 hover:text-zinc-600 cursor-pointer"
-                                  >
-                                    Remove
-                      </button>
-                                </div>
-                                <textarea
-                                  id="special-request"
-                                  value={specialRequest}
-                                  onChange={(e) => setSpecialRequest(e.target.value)}
-                                  rows={3}
-                                  maxLength={500}
-                                  placeholder="e.g. Window seat, birthday celebration, high chair…"
-                                  className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-900 placeholder:text-zinc-400 outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/10 resize-y min-h-[84px]"
-                                />
-                                {specialRequest.trim().length > 0 && (
-                                  <p className="text-[0.625rem] text-zinc-400 text-right">
-                                    {specialRequest.trim().length}/500
-                                  </p>
-                                )}
-                    </div>
-                  )}
-                          </div>
-                          <p className="text-xs text-zinc-400 mt-3 leading-relaxed">
-                            The restaurant will try to allot the seats for the selected preference but availability of preferred seating is subject to restaurant discretion and no refunds/cancellations are possible.
-                          </p>
-                      </div>
+            {drawerStep === 2 && (
+              <div className="space-y-6 max-w-sm sm:max-w-md bg-white rounded-xl border border-slate-200 p-4 sm:p-5">
+                {loginStep !== 3 ? (
+                  // Unified phone + OTP login
+                  <div>
+                    <h4 className="text-lg font-black text-slate-800 mb-1 tracking-tight">Sign in to book</h4>
+                    <p className="text-xs text-slate-400 mb-6 font-semibold">Verify your mobile number to continue.</p>
 
-                        {/* Right — editable guest form */}
-                        <div>
-                          <h3 className="text-base font-bold text-zinc-900 mb-3">Your details</h3>
-                          <div className="rounded-xl bg-zinc-50 p-3.5 space-y-3">
-                            <div>
-                              <label className={`rounded-none border-b border-zinc-200 px-3 py-2 flex items-center gap-2.5 cursor-text transition-colors ${confirmErrors.name ? 'border-red-400' : 'border-zinc-200'} focus-within:border-[#6900AA]`}>
-                                <User size={16} className="text-primary shrink-0" />
-                                <Controller
-                                  name="name"
-                                  control={control}
-                                  render={({ field }) => (
-                          <input
-                                      {...field}
-                            type="text"
-                                      autoComplete="name"
-                                      aria-label="Full Name"
-                                      aria-invalid={!!confirmErrors.name}
-                                      className="flex-1 min-w-0 bg-transparent border-none outline-none text-sm font-semibold text-zinc-900 placeholder:text-zinc-400 placeholder:font-medium cursor-text"
-                                      placeholder="Your Name"
-                                      onChange={(e) => {
-                                        const cleaned = e.target.value.replace(/[^\p{L}\s']/gu, '');
-                                        field.onChange(cleaned);
-                                        setName(cleaned);
-                                      }}
-                                    />
-                                  )}
-                                />
-                              </label>
-                              {confirmErrors.name && (
-                                <p className="text-red-500 text-xs font-semibold mt-1.5 px-0.5">{confirmErrors.name.message}</p>
-                              )}
-                        </div>
-
-                        <div>
-                              <label className={`rounded-none border-b border-zinc-200 px-3 py-2 flex items-center gap-2.5 cursor-text transition-colors ${confirmErrors.phone ? 'border-red-400' : 'border-zinc-200'} focus-within:border-[#6900AA]`}>
-                                <Phone size={16} className="text-primary shrink-0" />
-                                <Controller
-                                  name="phone"
-                                  control={control}
-                                  render={({ field }) => (
-                          <input
-                                      {...field}
-                            type="tel"
-                            inputMode="numeric"
-                            maxLength={12}
-                                      autoComplete="tel"
-                                      aria-label="Phone Number"
-                                      aria-invalid={!!confirmErrors.phone}
-                                      className="flex-1 min-w-0 bg-transparent border-none outline-none text-sm font-semibold text-zinc-900 placeholder:text-zinc-400 placeholder:font-medium tracking-wide cursor-text"
-                                      placeholder="Phone Number"
-                                      onChange={(e) => {
-                                        const cleaned = sanitizePhoneInput(e.target.value);
-                                        field.onChange(cleaned);
-                                        setPhone(cleaned);
-                                      }}
-                                    />
-                                  )}
-                                />
-                              </label>
-                              {confirmErrors.phone && (
-                                <p className="text-red-500 text-xs font-semibold mt-1.5 px-0.5">{confirmErrors.phone.message}</p>
-                              )}
-                        </div>
-
-                            <div ref={arrivalFieldRef} className="relative">
-                              <div className={`rounded-none border-b border-zinc-200 px-3 py-2 flex items-center gap-2.5 transition-colors ${confirmErrors.arrivalTime ? 'border-red-400' : 'border-zinc-200'} focus-within:border-[#6900AA]`}>
-                                <Clock size={16} className="text-primary shrink-0" />
-                                <button
-                                  type="button"
-                                  aria-label="Approx. Arrival"
-                                  aria-expanded={arrivalDropdownOpen}
-                                  onClick={() => setArrivalDropdownOpen((open) => !open)}
-                                  className="flex-1 min-w-0 flex items-center justify-between gap-2 bg-transparent p-0 text-left cursor-pointer"
-                                >
-                                  <span className="text-sm font-semibold text-zinc-900 truncate">
-                                    {arrivalTime === '10 min late' ? 'Up to 10 min late' : arrivalTime === '15 min late' ? 'Up to 15 min late' : arrivalTime}
-                                  </span>
-                                  <ChevronDown
-                                    size={16}
-                                    className={`shrink-0 text-zinc-500 transition-transform duration-200 ${arrivalDropdownOpen ? 'rotate-180' : ''}`}
-                                  />
-                                </button>
-                        </div>
-
-                              {arrivalDropdownOpen && (
-                                <ul
-                                  role="listbox"
-                                  aria-label="Approx. Arrival"
-                                  className="absolute left-0 right-0 top-full mt-1.5 z-30 bg-white border border-zinc-200 rounded-xl shadow-[0_8px_24px_rgba(15,23,42,0.12)] p-1.5"
-                                >
-                                  {[
-                                    { value: 'On time', label: 'On time' },
-                                    { value: '15 min early', label: '15 min early' },
-                                    { value: '10 min late', label: 'Up to 10 min late' },
-                                    { value: '15 min late', label: 'Up to 15 min late' },
-                                  ].map((opt) => {
-                                    const selected = arrivalTime === opt.value;
-                                    return (
-                                      <li key={opt.value} role="option" aria-selected={selected}>
-                                        <button
-                                          type="button"
-                                          onClick={() => {
-                                            setArrivalTime(opt.value);
-                                            setConfirmValue('arrivalTime', opt.value, { shouldValidate: true, shouldDirty: true });
-                                            setArrivalDropdownOpen(false);
-                                          }}
-                                          className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors cursor-pointer ${
-                                            selected
-                                              ? 'bg-primary text-white font-semibold'
-                                              : 'text-zinc-700 font-medium hover:bg-primary/5'
-                                          }`}
-                                        >
-                                          {opt.label}
-                                        </button>
-                                      </li>
-                                    );
-                                  })}
-                                </ul>
-                              )}
-                              {confirmErrors.arrivalTime && (
-                                <p className="text-red-500 text-xs font-semibold mt-1.5 px-0.5">{confirmErrors.arrivalTime.message}</p>
-                              )}
-                            </div>
-
-                            <p className="text-xs text-primary font-medium leading-snug pt-0.5">
-                              Confirm your name and phone so the restaurant can reach you.
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-
-                        <div className="flex flex-col items-start gap-3">
-                          <button
-                            type="submit"
-                            disabled={isSubmittingBooking || isCreatingBooking}
-                            aria-busy={isSubmittingBooking || isCreatingBooking || undefined}
-                            className={`w-full max-w-sm sm:max-w-md py-3.5 rounded-xl text-white text-sm font-bold transition-all shadow-sm inline-flex items-center justify-center gap-2 ${
-                              isSubmittingBooking || isCreatingBooking
-                                ? "bg-zinc-700 opacity-60 cursor-not-allowed"
-                                : "bg-[#111111] hover:bg-black cursor-pointer"
-                            }`}
-                          >
-                            {isSubmittingBooking || isCreatingBooking ? (
-                              <>
-                                <Loader2 size={16} className="animate-spin" />
-                                Confirming…
-                              </>
-                            ) : (
-                              "Confirm Booking"
-                            )}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setDrawerStep(1)}
-                            className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-600 hover:text-[#6900AA] transition-colors cursor-pointer"
-                          >
-                            <ChevronLeft size={18} />
-                            Back
-                          </button>
-                        </div>
-                    </form>
-                  )}
-                </div>
-              )}
-
-              {drawerStep === 4 && (
-                <div className="w-full max-w-[960px] mx-auto lg:mt-2 px-4 sm:px-0">
-                  <div
-                    className="rounded-[22px] bg-white px-5 py-5 sm:px-8 sm:py-7"
-                    style={{
-                      border: 'none',
-                      boxShadow:
-                        '0 4px 6px rgba(80,40,120,0.04), 0 18px 48px rgba(80,40,120,0.12), 0 32px 64px rgba(40,20,80,0.06)',
-                    }}
-                  >
-                    {/* Header: success + booking id */}
-                    <div className="flex items-start justify-between gap-3 mb-6">
-                      <div className="flex items-start gap-3 min-w-0">
-                        <BookingSuccessCheckAnimation
-                          playKey={lastBookingId || `success-${drawerStep}`}
-                        />
-                        <div className="min-w-0 pt-0.5">
-                          <h3 className="text-[22px] sm:text-[24px] font-bold text-[#1f9d55] tracking-wide leading-none">
-                            Table Booked Successfully!
-                          </h3>
-                          <p className="text-[13px] sm:text-sm text-[#8a8a98] font-medium mt-1.5 leading-snug">
-                            Your table is confirmed. We look forward to serving you!
-                          </p>
-                        </div>
-                      </div>
-
-                      {lastBookingId && (
-                        <button
-                          type="button"
-                          title={lastBookingId}
-                          aria-label="Copy booking ID"
-                          onClick={async () => {
-                            try {
-                              await navigator.clipboard.writeText(lastBookingId);
-                              setBookingIdCopied(true);
-                              toast.success('Booking ID copied');
-                              setTimeout(() => setBookingIdCopied(false), 1600);
-                            } catch {
-                              toast.error('Could not copy Booking ID');
-                            }
-                          }}
-                          className="shrink-0 inline-flex items-center gap-2 rounded-xl bg-[#f1e9ff] px-3 py-2 hover:bg-[#e8dcff] transition-colors cursor-pointer"
-                        >
-                          <Calendar size={15} className="text-[#6900AA] shrink-0" strokeWidth={2} />
-                          <span className="text-left leading-tight">
-                            <span className="block text-[10px] font-semibold text-[#6900AA]/80">Booking ID</span>
-                            <span className="block text-[12px] font-bold text-[#2b1848]">
-                              {bookingIdCopied
-                                ? 'Copied!'
-                                : `#${lastBookingId.replace(/-/g, '').slice(0, 8).toUpperCase()}`}
-                            </span>
-                          </span>
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Row: photo | details | QR — fixed sizes so layout never blows up */}
-                    <div className="flex flex-col lg:flex-row gap-5 lg:gap-6 items-start">
-                      <div
-                        className="relative shrink-0 rounded-2xl overflow-hidden bg-zinc-100 mx-auto lg:mx-0"
-                        style={{ width: 200, height: 200 }}
-                      >
-                        <SafeCoverImage
-                          src={
-                            photos[0] ||
-                            resolveMediaUrl(profile.cover_image_url) ||
-                            ''
-                          }
-                          alt={profile.name}
-                          className="absolute inset-0 w-full h-full object-cover"
-                          fallbackClassName="absolute inset-0 flex items-center justify-center bg-[#F3F4F6] text-slate-300"
-                          fallback={<DiningImageFallback size={32} />}
-                        />
-                        <span className="absolute bottom-2.5 left-2.5 max-w-[calc(100%-1.25rem)] truncate rounded-full bg-black/80 text-white text-[10px] font-semibold px-2.5 py-1">
-                          {profile.name}
-                        </span>
-                      </div>
-
-                      <div className="flex-1 min-w-0 w-full">
-                        <span className="inline-flex items-center rounded-md bg-[#f1e9ff] text-[#6900AA] text-[11px] font-bold px-2 py-0.5">
-                          {profile.type_name || 'Restaurant'}
-                        </span>
-                        <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
-                          <h4 className="text-[20px] sm:text-[22px] font-bold text-[#1a1a1a] tracking-tight leading-tight">
-                            {profile.name}
-                          </h4>
-                        
-                        </div>
-                        <p className="text-[13px] text-[#8a8a98] font-medium mt-0.5">
-                          {cuisineList.length > 0 ? cuisineList.join(' • ') : cuisines}
-                        </p>
-
-                        <div className="mt-4 space-y-2.5">
-                          <div className="flex items-start gap-2.5">
-                            <MapPin size={16} className="text-[#6900AA] shrink-0 mt-0.5" strokeWidth={1.75} />
-                            <div className="min-w-0">
-                              <p className="text-[13px] font-semibold text-[#2b2b35] leading-snug">
-                                {profile.address || [city, country].filter(Boolean).join(', ')}
-                              </p>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const opened = openRestaurantDirections({
-                                    latitude: profile.latitude,
-                                    longitude: profile.longitude,
-                                    address: profile.address,
-                                    name: profile.name,
-                                  });
-                                  if (!opened) toast.error("Location not available");
-                                }}
-                                className="mt-0.5 text-[13px] font-semibold text-[#6900AA] hover:underline cursor-pointer"
-                              >
-                                Get Direction →
-                              </button>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-2.5">
-                            <Clock size={16} className="text-[#6900AA] shrink-0" strokeWidth={1.75} />
-                            <p className="text-[13px] text-[#2b2b35]">
-                              <span className="font-semibold text-[#8a8a98]">Table Time </span>
-                              <span className="font-bold">
-                                {formatSlotLabel(selectedTime)}
-                                {' • '}
-                                {formatDateCustomer(bookingDates[selectedDateIndex])}
-                              </span>
-                            </p>
-                          </div>
-
-                          <div className="flex items-center gap-2.5">
-                            <Users size={16} className="text-[#6900AA] shrink-0" strokeWidth={1.75} />
-                            <p className="text-[13px] text-[#2b2b35]">
-                              <span className="font-semibold text-[#8a8a98]">For </span>
-                              <span className="font-bold">
-                                {guests} {Number(guests) === 1 ? 'Person' : 'People'}
-                              </span>
-                            </p>
-                          </div>
-
-                          <div className="flex items-center gap-2.5">
-                            <Clock size={16} className="text-[#6900AA] shrink-0" strokeWidth={1.75} />
-                            <p className="text-[13px] text-[#2b2b35]">
-                              <span className="font-semibold text-[#8a8a98]">Arrival </span>
-                              <span className="font-bold">{arrivalTime}</span>
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="shrink-0 mx-auto lg:mx-0 text-center" style={{ width: 168 }}>
-                        <div className="rounded-2xl bg-[#f1e9ff] p-3">
-                          {lastQrToken ? (
-                            <img
-                              src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(lastQrToken)}`}
-                              alt="Booking check-in QR code"
-                              width={142}
-                              height={142}
-                              className="w-[142px] h-[142px] mx-auto rounded-lg bg-white object-contain p-1"
-                            />
-                          ) : (
-                            <div className="w-[142px] h-[142px] mx-auto rounded-lg bg-white/80 flex items-center justify-center text-[#9a9aa8] text-[11px] font-medium px-2">
-                              QR will appear once available for this booking.
-                            </div>
-                          )}
-                        </div>
-                        <p className="mt-2.5 text-[13px] font-bold text-[#2b2b35] leading-tight">Scan this QR code</p>
-                        <p className="text-[11px] text-[#9a9aa8] font-medium">at the restaurant</p>
-                      </div>
-                    </div>
-
-                    {/* Offer 3D card — no border, elevated shadow */}
-                    {appliedOffer?.title && (
-                      <div
-                        className="mt-6 rounded-[20px] overflow-hidden flex items-stretch"
-                        style={{
-                          border: 'none',
-                          background:
-                            'linear-gradient(105deg, #f4edff 0%, #ebe0ff 42%, #e0d0ff 100%)',
-                          boxShadow:
-                            '0 8px 24px rgba(105,0,170,0.14), 0 2px 6px rgba(80,40,120,0.08)',
-                        }}
-                      >
-                        <div className="flex-1 min-w-0 px-4 py-4 sm:px-6 sm:py-5 flex flex-col justify-center">
-                          <div className="flex items-center gap-1.5 text-[#6900AA] mb-1.5">
-                            <Tag size={15} strokeWidth={2.25} />
-                            <span className="text-[12px] font-bold">Special Offer</span>
-                          </div>
-                          <p className="text-[17px] sm:text-[19px] font-bold text-[#1a1a1a] leading-snug">
-                            {appliedOffer.title}
-                          </p>
-                          <span className="mt-2.5 inline-flex w-fit items-center rounded-full bg-white/90 text-[#6900AA] text-[10px] font-bold px-2.5 py-1 shadow-sm">
-                            Provided by BookMyBota
-                          </span>
-                          <p className="mt-2.5 text-[11px] text-[#8a8a98] font-medium">
-                            {appliedOffer.validity || 'Valid only for this booking • T&C apply'}
-                          </p>
-                        </div>
-                        <div
-                          className="relative shrink-0 flex items-center justify-center self-stretch pr-2 sm:pr-4 pl-1 py-2"
-                          style={{ width: 190, minHeight: 132 }}
-                        >
-                          <span className="absolute top-3 right-4 h-1.5 w-1.5 rotate-45 bg-[#6900AA]/55 rounded-[1px]" />
-                          <span className="absolute top-7 right-2 h-1 w-1 rotate-45 bg-[#6900AA]/40 rounded-[1px]" />
-                          <span className="absolute bottom-4 right-6 h-1 w-1 rotate-45 bg-[#6900AA]/35 rounded-[1px]" />
-                          {/* Offer food — natural cutout, no circle mask */}
-                          <img
-                            src="/images/booking-offer-food.png"
-                            alt=""
-                            width={168}
-                            height={140}
-                            className="relative z-[1] w-[150px] h-auto sm:w-[168px] object-contain drop-shadow-[0_10px_18px_rgba(60,20,100,0.28)]"
-                            style={{ border: 'none', borderRadius: 0 }}
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).src = '/images/booking-offer-food.jpg';
-                            }}
-                          />
-                        </div>
+                    {loginError && (
+                      <div className="bg-rose-500/10 border border-rose-500/20 text-rose-600 text-xs font-semibold p-3.5 rounded-2xl text-center mb-5">
+                        {loginError}
                       </div>
                     )}
 
-                    {/* Actions — same destinations as before */}
-                    <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-5">
+                    <form onSubmit={handlePhoneLoginSubmit} className="space-y-5">
+                      {loginStep === 1 ? (
+                        <div>
+                          <label className="text-[0.625rem] font-bold text-slate-400 uppercase tracking-wider mb-2 block">Phone Number</label>
+                          <div className="relative">
+                            <span className="absolute left-4 top-3.5 text-slate-400 font-bold text-xs">+251</span>
+                            <input
+                              type="tel"
+                              required
+                              value={loginPhone}
+                              onChange={(e) => setLoginPhone(sanitizePhoneInput(e.target.value))}
+                              inputMode="numeric"
+                              maxLength={12}
+                              className="w-full bg-white border border-slate-200 rounded-2xl pl-12 pr-4 py-3.5 text-xs focus:outline-none focus:border-rose-500 text-slate-800 font-semibold"
+                              placeholder="99000-00000"
+                            />
+                          </div>
+                          <button
+                            type="submit"
+                            disabled={isSendingOtp}
+                            className="w-full bg-rose-600 hover:bg-rose-700 text-white rounded-2xl py-3.5 text-xs font-bold transition-all shadow-md shadow-rose-200 cursor-pointer mt-6 flex justify-center items-center gap-1.5"
+                          >
+                            Send OTP
+                          </button>
+                        </div>
+                      ) : (
+                        <div>
+                          <div className="p-3.5 bg-indigo-50 border border-indigo-100 rounded-2xl text-xs text-indigo-700 font-bold mb-5 flex flex-col gap-1">
+                            <span className="flex items-center gap-1.5">
+                              <Sparkles size={14} className="text-indigo-600" />
+                              <span>Demo Assistant</span>
+                            </span>
+                            <span className="font-medium text-slate-500">OTP sent to +251 {loginPhone}. Demo code <strong>123456</strong>.</span>
+                          </div>
+
+                          <label className="text-[0.625rem] font-bold text-slate-400 uppercase tracking-wider mb-2 block">Enter OTP</label>
+                          <input
+                            type="text"
+                            required
+                            maxLength={6}
+                            value={loginOtp}
+                            onChange={(e) => setLoginOtp(e.target.value)}
+                            className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3.5 text-center text-sm tracking-widest font-extrabold focus:outline-none focus:border-rose-500 text-slate-850"
+                            placeholder="••••••"
+                          />
+                          <button
+                            type="submit"
+                            disabled={isVerifyingOtp}
+                            className="w-full bg-rose-600 hover:bg-rose-700 text-white rounded-2xl py-3.5 text-xs font-bold transition-all shadow-md shadow-rose-200 cursor-pointer mt-6 flex justify-center items-center gap-1.5"
+                          >
+                            {isVerifyingOtp ? <Loader2 size={14} className="animate-spin" /> : null}
+                            Verify & Continue
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setLoginStep(1); setLoginError(null); }}
+                            className="w-full text-center text-xs text-rose-500 font-bold hover:underline mt-4 cursor-pointer"
+                          >
+                            Change phone number
+                          </button>
+                        </div>
+                      )}
+                    </form>
+                  </div>
+                ) : (
+                  // REGISTRATION FORM
+                  <div>
+                    <h4 className="text-lg font-black text-slate-800 mb-1 tracking-tight">Create Account</h4>
+                    <p className="text-xs text-slate-400 mb-6 font-semibold">
+                      Phone verified: <span className="font-bold text-slate-600">+251 {loginPhone}</span>
+                    </p>
+
+                    {loginError && (
+                      <div className="bg-rose-500/10 border border-rose-500/20 text-rose-600 text-xs font-semibold p-3.5 rounded-2xl text-center mb-5">
+                        {loginError}
+                      </div>
+                    )}
+
+                    <form onSubmit={handleRegisterSubmit} className="space-y-4">
+                      <div>
+                        <label className="text-[0.625rem] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">Full Name</label>
+                        <input
+                          type="text"
+                          required
+                          value={regName}
+                          onChange={(e) => setRegName(e.target.value)}
+                          className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3 text-xs focus:outline-none focus:border-rose-500 text-slate-800 font-semibold"
+                          placeholder="John Doe"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[0.625rem] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">Email Address</label>
+                        <input
+                          type="email"
+                          required
+                          value={regEmail}
+                          onChange={(e) => setRegEmail(e.target.value)}
+                          className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3 text-xs focus:outline-none focus:border-rose-500 text-slate-800 font-semibold"
+                          placeholder="john@example.com"
+                        />
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={isRegistering}
+                        className="w-full bg-rose-600 hover:bg-rose-700 text-white rounded-2xl py-3.5 text-xs font-bold transition-all shadow-md shadow-rose-200 cursor-pointer mt-6 flex justify-center items-center gap-1.5"
+                      >
+                        {isRegistering ? <Loader2 size={14} className="animate-spin" /> : null}
+                        Register & Log In
+                      </button>
+                    </form>
+
+                    <p className="mt-8 text-center text-xs text-slate-400 font-semibold">
                       <button
                         type="button"
-                        disabled={!lastBookingId}
-                        onClick={() => {
-                          if (!lastBookingId) return;
-                          closeBookingPanel();
-                          router.push(`/customer/bookings/${lastBookingId}`);
-                        }}
-                        className="flex-1 inline-flex items-center justify-center gap-2 max-w-xs rounded-xl bg-[#111111] hover:bg-black disabled:opacity-50 text-white text-[14px] font-bold px-4 py-3.5 transition-colors cursor-pointer"
+                        onClick={() => { setLoginStep(2); setLoginError(null); }}
+                        className="text-rose-600 font-extrabold hover:underline cursor-pointer"
                       >
-                        <FileText size={16} strokeWidth={2} />
-                        View Booking Details
-                        <ArrowRight size={16} strokeWidth={2.25} />
+                        Back to OTP
                       </button>
+                    </p>
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setDrawerStep(1)}
+                  className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-600 hover:text-[#6900AA] transition-colors cursor-pointer mt-4"
+                >
+                  <ChevronLeft size={18} />
+                  Back
+                </button>
+              </div>
+            )}
+
+            {drawerStep === 3 && (
+              <div className="space-y-5">
+                {availabilityStatus === 'unavailable' ? (
+                  <div className="p-4 bg-rose-50 border border-rose-100 rounded-xl text-center space-y-3 max-w-xl mx-auto">
+                    <p className="text-xs text-rose-600 font-bold">Sorry, no tables are available for this slot.</p>
+                    <button
+                      type="button"
+                      onClick={() => setDrawerStep(1)}
+                      className="bg-rose-600 hover:bg-rose-700 text-white rounded-xl px-4 py-2 text-xs font-bold transition-all cursor-pointer"
+                    >
+                      Choose another time
+                    </button>
+                  </div>
+                ) : (
+                  <form
+                    onSubmit={handleConfirmSubmit(onConfirmBooking, (formErrors) => {
+                      if (formErrors.name) setConfirmFocus('name');
+                      else if (formErrors.phone) setConfirmFocus('phone');
+                      else if (formErrors.arrivalTime) {
+                        arrivalFieldRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      }
+                    })}
+                    noValidate
+                    className="space-y-5"
+                  >
+                    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(260px,300px)] gap-5 lg:gap-6 items-start">
+                      {/* Left — review booking details */}
+                      <div>
+                        <h3 className="text-base font-bold text-zinc-900 mb-3">Review booking details</h3>
+                        <div className="rounded-xl border border-zinc-200 bg-white px-4 py-1">
+                          <div className="flex items-start gap-3 py-3.5 border-b border-zinc-100">
+                            <Calendar size={18} className="text-zinc-500 shrink-0 mt-0.5" strokeWidth={1.75} />
+                            <p className="text-sm font-semibold text-zinc-900 leading-snug">
+                              {selectedDateIndex === 0 ? 'Today' : selectedDateIndex === 1 ? 'Tomorrow' : bookingDates[selectedDateIndex].toLocaleDateString('en-IN', { weekday: 'short' })}{' '}
+                              {formatDateCustomer(bookingDates[selectedDateIndex])}{' '}
+                              at {formatSlotLabel(selectedTime)}
+                            </p>
+                          </div>
+                          <div className="flex items-start gap-3 py-3.5 border-b border-zinc-100">
+                            <Users size={18} className="text-zinc-500 shrink-0 mt-0.5" strokeWidth={1.75} />
+                            <p className="text-sm font-semibold text-zinc-900">
+                              {guests} {Number(guests) === 1 ? 'guest' : 'guests'}
+                            </p>
+                          </div>
+                          <div className="flex items-start gap-3 py-3.5 border-b border-zinc-100">
+                            <MapPin size={18} className="text-zinc-500 shrink-0 mt-0.5" strokeWidth={1.75} />
+                            <div className="min-w-0">
+                              <p className="text-sm font-bold text-zinc-900 leading-snug">{profile.name}</p>
+                              {(profile.address || city) && (
+                                <p className="text-xs text-zinc-500 mt-0.5 leading-snug">
+                                  {city || profile.address}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          {appliedOffer && (
+                            <div className="flex items-start gap-3 py-3.5">
+                              <Tag size={18} className="text-[#2563eb] shrink-0 mt-0.5" strokeWidth={1.75} />
+                              <div className="min-w-0">
+                                <p className="text-sm font-bold text-zinc-900 leading-snug">
+                                  {appliedOffer.type ? `${appliedOffer.type}` : 'Offer applied'}
+                                  {appliedOffer.title ? ` · ${appliedOffer.title}` : ''}
+                                </p>
+                                {appliedOffer.validity && (
+                                  <p className="text-xs text-zinc-500 mt-0.5 leading-snug">{appliedOffer.validity}</p>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                          {!appliedOffer && noOfferSelected && (
+                            <div className="flex items-start gap-3 py-3.5">
+                              <Tag size={18} className="text-zinc-400 shrink-0 mt-0.5" strokeWidth={1.75} />
+                              <p className="text-sm font-semibold text-zinc-600">No offer selected</p>
+                            </div>
+                          )}
+                        </div>
+                        <div className="mt-3">
+                          {!specialRequestOpen ? (
+                            <button
+                              type="button"
+                              onClick={() => setSpecialRequestOpen(true)}
+                              className="text-sm font-semibold text-rose-600 hover:text-rose-700 transition-colors cursor-pointer"
+                            >
+                              + Add special request
+                            </button>
+                          ) : (
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between gap-2">
+                                <label htmlFor="special-request" className="text-sm font-semibold text-zinc-900">
+                                  Special request
+                                </label>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSpecialRequestOpen(false);
+                                    setSpecialRequest('');
+                                  }}
+                                  className="text-xs font-semibold text-zinc-400 hover:text-zinc-600 cursor-pointer"
+                                >
+                                  Remove
+                                </button>
+                              </div>
+                              <textarea
+                                id="special-request"
+                                value={specialRequest}
+                                onChange={(e) => setSpecialRequest(e.target.value)}
+                                rows={3}
+                                maxLength={500}
+                                placeholder="e.g. Window seat, birthday celebration, high chair…"
+                                className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-900 placeholder:text-zinc-400 outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/10 resize-y min-h-[84px]"
+                              />
+                              {specialRequest.trim().length > 0 && (
+                                <p className="text-[0.625rem] text-zinc-400 text-right">
+                                  {specialRequest.trim().length}/500
+                                </p>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                        <p className="text-xs text-zinc-400 mt-3 leading-relaxed">
+                          The restaurant will try to allot the seats for the selected preference but availability of preferred seating is subject to restaurant discretion and no refunds/cancellations are possible.
+                        </p>
+                      </div>
+
+                      {/* Right — editable guest form */}
+                      <div>
+                        <h3 className="text-base font-bold text-zinc-900 mb-3">Your details</h3>
+                        <div className="rounded-xl bg-zinc-50 p-3.5 space-y-3">
+                          <div>
+                            <label className={`rounded-none border-b border-zinc-200 px-3 py-2 flex items-center gap-2.5 cursor-text transition-colors ${confirmErrors.name ? 'border-red-400' : 'border-zinc-200'} focus-within:border-[#6900AA]`}>
+                              <User size={16} className="text-primary shrink-0" />
+                              <Controller
+                                name="name"
+                                control={control}
+                                render={({ field }) => (
+                                  <input
+                                    {...field}
+                                    type="text"
+                                    autoComplete="name"
+                                    aria-label="Full Name"
+                                    aria-invalid={!!confirmErrors.name}
+                                    className="flex-1 min-w-0 bg-transparent border-none outline-none text-sm font-semibold text-zinc-900 placeholder:text-zinc-400 placeholder:font-medium cursor-text"
+                                    placeholder="Your Name"
+                                    onChange={(e) => {
+                                      const cleaned = e.target.value.replace(/[^\p{L}\s']/gu, '');
+                                      field.onChange(cleaned);
+                                      setName(cleaned);
+                                    }}
+                                  />
+                                )}
+                              />
+                            </label>
+                            {confirmErrors.name && (
+                              <p className="text-red-500 text-xs font-semibold mt-1.5 px-0.5">{confirmErrors.name.message}</p>
+                            )}
+                          </div>
+
+                          <div>
+                            <label className={`rounded-none border-b border-zinc-200 px-3 py-2 flex items-center gap-2.5 cursor-text transition-colors ${confirmErrors.phone ? 'border-red-400' : 'border-zinc-200'} focus-within:border-[#6900AA]`}>
+                              <Phone size={16} className="text-primary shrink-0" />
+                              <Controller
+                                name="phone"
+                                control={control}
+                                render={({ field }) => (
+                                  <input
+                                    {...field}
+                                    type="tel"
+                                    inputMode="numeric"
+                                    maxLength={12}
+                                    autoComplete="tel"
+                                    aria-label="Phone Number"
+                                    aria-invalid={!!confirmErrors.phone}
+                                    className="flex-1 min-w-0 bg-transparent border-none outline-none text-sm font-semibold text-zinc-900 placeholder:text-zinc-400 placeholder:font-medium tracking-wide cursor-text"
+                                    placeholder="Phone Number"
+                                    onChange={(e) => {
+                                      const cleaned = sanitizePhoneInput(e.target.value);
+                                      field.onChange(cleaned);
+                                      setPhone(cleaned);
+                                    }}
+                                  />
+                                )}
+                              />
+                            </label>
+                            {confirmErrors.phone && (
+                              <p className="text-red-500 text-xs font-semibold mt-1.5 px-0.5">{confirmErrors.phone.message}</p>
+                            )}
+                          </div>
+
+                          <div ref={arrivalFieldRef} className="relative">
+                            <div className={`rounded-none border-b border-zinc-200 px-3 py-2 flex items-center gap-2.5 transition-colors ${confirmErrors.arrivalTime ? 'border-red-400' : 'border-zinc-200'} focus-within:border-[#6900AA]`}>
+                              <Clock size={16} className="text-primary shrink-0" />
+                              <button
+                                type="button"
+                                aria-label="Approx. Arrival"
+                                aria-expanded={arrivalDropdownOpen}
+                                onClick={() => setArrivalDropdownOpen((open) => !open)}
+                                className="flex-1 min-w-0 flex items-center justify-between gap-2 bg-transparent p-0 text-left cursor-pointer"
+                              >
+                                <span className="text-sm font-semibold text-zinc-900 truncate">
+                                  {arrivalTime === '10 min late' ? 'Up to 10 min late' : arrivalTime === '15 min late' ? 'Up to 15 min late' : arrivalTime}
+                                </span>
+                                <ChevronDown
+                                  size={16}
+                                  className={`shrink-0 text-zinc-500 transition-transform duration-200 ${arrivalDropdownOpen ? 'rotate-180' : ''}`}
+                                />
+                              </button>
+                            </div>
+
+                            {arrivalDropdownOpen && (
+                              <ul
+                                role="listbox"
+                                aria-label="Approx. Arrival"
+                                className="absolute left-0 right-0 top-full mt-1.5 z-30 bg-white border border-zinc-200 rounded-xl shadow-[0_8px_24px_rgba(15,23,42,0.12)] p-1.5"
+                              >
+                                {[
+                                  { value: 'On time', label: 'On time' },
+                                  { value: '15 min early', label: '15 min early' },
+                                  { value: '10 min late', label: 'Up to 10 min late' },
+                                  { value: '15 min late', label: 'Up to 15 min late' },
+                                ].map((opt) => {
+                                  const selected = arrivalTime === opt.value;
+                                  return (
+                                    <li key={opt.value} role="option" aria-selected={selected}>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setArrivalTime(opt.value);
+                                          setConfirmValue('arrivalTime', opt.value, { shouldValidate: true, shouldDirty: true });
+                                          setArrivalDropdownOpen(false);
+                                        }}
+                                        className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors cursor-pointer ${selected
+                                            ? 'bg-primary text-white font-semibold'
+                                            : 'text-zinc-700 font-medium hover:bg-primary/5'
+                                          }`}
+                                      >
+                                        {opt.label}
+                                      </button>
+                                    </li>
+                                  );
+                                })}
+                              </ul>
+                            )}
+                            {confirmErrors.arrivalTime && (
+                              <p className="text-red-500 text-xs font-semibold mt-1.5 px-0.5">{confirmErrors.arrivalTime.message}</p>
+                            )}
+                          </div>
+
+                          <p className="text-xs text-primary font-medium leading-snug pt-0.5">
+                            Confirm your name and phone so the restaurant can reach you.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col items-start gap-3">
+                      <ShinyBlackButton
+                        type="submit"
+                        disabled={isSubmittingBooking || isCreatingBooking}
+                        ariaBusy={isSubmittingBooking || isCreatingBooking || undefined}
+                        className={`w-full max-w-sm sm:max-w-md py-3.5 rounded-xl text-white text-sm shadow-sm ${isSubmittingBooking || isCreatingBooking
+                            ? "bg-zinc-700"
+                            : "bg-[#111111]"
+                          }`}
+                      >
+                        {isSubmittingBooking || isCreatingBooking ? (
+                          <>
+                            <Loader2 size={16} className="animate-spin" />
+                            Confirming…
+                          </>
+                        ) : (
+                          "Confirm Booking"
+                        )}
+                      </ShinyBlackButton>
                       <button
                         type="button"
-                        onClick={() => {
-                          closeBookingPanel();
-                          router.push('/dining');
-                        }}
-                        className="flex-1 inline-flex items-center justify-center gap-2 max-w-xs rounded-xl border-[1.5px] border-[#111111] bg-white text-[#111111] text-[14px] font-bold px-4 py-3.5 hover:bg-slate-50 transition-colors cursor-pointer"
+                        onClick={() => setDrawerStep(1)}
+                        className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-600 hover:text-[#6900AA] transition-colors cursor-pointer"
                       >
-                        <Compass size={16} strokeWidth={2} />
-                        Explore More Restaurants
+                        <ChevronLeft size={18} />
+                        Back
                       </button>
+                    </div>
+                  </form>
+                )}
+              </div>
+            )}
+
+            {drawerStep === 4 && (
+              <div className="w-full max-w-[960px] mx-auto lg:mt-2 px-4 sm:px-0">
+                <div
+                  className="rounded-[22px] bg-white px-5 py-5 sm:px-8 sm:py-7"
+                  style={{
+                    border: 'none',
+                    boxShadow:
+                      '0 4px 6px rgba(80,40,120,0.04), 0 18px 48px rgba(80,40,120,0.12), 0 32px 64px rgba(40,20,80,0.06)',
+                  }}
+                >
+                  {/* Header: success + booking id */}
+                  <div className="flex items-start justify-between gap-3 mb-6">
+                    <div className="flex items-start gap-3 min-w-0">
+                      <BookingSuccessCheckAnimation
+                        playKey={lastBookingId || `success-${drawerStep}`}
+                      />
+                      <div className="min-w-0 pt-0.5">
+                        <h3 className="text-[22px] sm:text-[24px] font-bold text-[#1f9d55] tracking-wide leading-none">
+                          Table Booked Successfully!
+                        </h3>
+                        <p className="text-[13px] sm:text-sm text-[#8a8a98] font-medium mt-1.5 leading-snug">
+                          Your table is confirmed. We look forward to serving you!
+                        </p>
+                      </div>
+                    </div>
+
+                    {lastBookingId && (
+                      <button
+                        type="button"
+                        title={lastBookingId}
+                        aria-label="Copy booking ID"
+                        onClick={async () => {
+                          try {
+                            await navigator.clipboard.writeText(lastBookingId);
+                            setBookingIdCopied(true);
+                            toast.success('Booking ID copied');
+                            setTimeout(() => setBookingIdCopied(false), 1600);
+                          } catch {
+                            toast.error('Could not copy Booking ID');
+                          }
+                        }}
+                        className="shrink-0 inline-flex items-center gap-2 rounded-xl bg-[#f1e9ff] px-3 py-2 hover:bg-[#e8dcff] transition-colors cursor-pointer"
+                      >
+                        <Calendar size={15} className="text-[#6900AA] shrink-0" strokeWidth={2} />
+                        <span className="text-left leading-tight">
+                          <span className="block text-[10px] font-semibold text-[#6900AA]/80">Booking ID</span>
+                          <span className="block text-[12px] font-bold text-[#2b1848]">
+                            {bookingIdCopied
+                              ? 'Copied!'
+                              : `#${lastBookingId.replace(/-/g, '').slice(0, 8).toUpperCase()}`}
+                          </span>
+                        </span>
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Row: photo | details | QR — fixed sizes so layout never blows up */}
+                  <div className="flex flex-col lg:flex-row gap-5 lg:gap-6 items-start">
+                    <div
+                      className="relative shrink-0 rounded-2xl overflow-hidden bg-zinc-100 mx-auto lg:mx-0"
+                      style={{ width: 200, height: 200 }}
+                    >
+                      <SafeCoverImage
+                        src={
+                          photos[0] ||
+                          resolveMediaUrl(profile.cover_image_url) ||
+                          ''
+                        }
+                        alt={profile.name}
+                        className="absolute inset-0 w-full h-full object-cover"
+                        fallbackClassName="absolute inset-0 flex items-center justify-center bg-[#F3F4F6] text-slate-300"
+                        fallback={<DiningImageFallback size={32} />}
+                      />
+                      <span className="absolute bottom-2.5 left-2.5 max-w-[calc(100%-1.25rem)] truncate rounded-full bg-black/80 text-white text-[10px] font-semibold px-2.5 py-1">
+                        {profile.name}
+                      </span>
+                    </div>
+
+                    <div className="flex-1 min-w-0 w-full">
+                      <span className="inline-flex items-center rounded-md bg-[#f1e9ff] text-[#6900AA] text-[11px] font-bold px-2 py-0.5">
+                        {profile.type_name || 'Restaurant'}
+                      </span>
+                      <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
+                        <h4 className="text-[20px] sm:text-[22px] font-bold text-[#1a1a1a] tracking-tight leading-tight">
+                          {profile.name}
+                        </h4>
+
+                      </div>
+                      <p className="text-[13px] text-[#8a8a98] font-medium mt-0.5">
+                        {cuisineList.length > 0 ? cuisineList.join(' • ') : cuisines}
+                      </p>
+
+                      <div className="mt-4 space-y-2.5">
+                        <div className="flex items-start gap-2.5">
+                          <MapPin size={16} className="text-[#6900AA] shrink-0 mt-0.5" strokeWidth={1.75} />
+                          <div className="min-w-0">
+                            <p className="text-[13px] font-semibold text-[#2b2b35] leading-snug">
+                              {profile.address || [city, country].filter(Boolean).join(', ')}
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const opened = openRestaurantDirections({
+                                  latitude: profile.latitude,
+                                  longitude: profile.longitude,
+                                  address: profile.address,
+                                  name: profile.name,
+                                });
+                                if (!opened) toast.error("Location not available");
+                              }}
+                              className="mt-0.5 text-[13px] font-semibold text-[#6900AA] hover:underline cursor-pointer"
+                            >
+                              Get Direction →
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2.5">
+                          <Clock size={16} className="text-[#6900AA] shrink-0" strokeWidth={1.75} />
+                          <p className="text-[13px] text-[#2b2b35]">
+                            <span className="font-semibold text-[#8a8a98]">Table Time </span>
+                            <span className="font-bold">
+                              {formatSlotLabel(selectedTime)}
+                              {' • '}
+                              {formatDateCustomer(bookingDates[selectedDateIndex])}
+                            </span>
+                          </p>
+                        </div>
+
+                        <div className="flex items-center gap-2.5">
+                          <Users size={16} className="text-[#6900AA] shrink-0" strokeWidth={1.75} />
+                          <p className="text-[13px] text-[#2b2b35]">
+                            <span className="font-semibold text-[#8a8a98]">For </span>
+                            <span className="font-bold">
+                              {guests} {Number(guests) === 1 ? 'Person' : 'People'}
+                            </span>
+                          </p>
+                        </div>
+
+                        <div className="flex items-center gap-2.5">
+                          <Clock size={16} className="text-[#6900AA] shrink-0" strokeWidth={1.75} />
+                          <p className="text-[13px] text-[#2b2b35]">
+                            <span className="font-semibold text-[#8a8a98]">Arrival </span>
+                            <span className="font-bold">{arrivalTime}</span>
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="shrink-0 mx-auto lg:mx-0 text-center" style={{ width: 168 }}>
+                      <div className="rounded-2xl bg-[#f1e9ff] p-3">
+                        {lastQrToken ? (
+                          <img
+                            src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(lastQrToken)}`}
+                            alt="Booking check-in QR code"
+                            width={142}
+                            height={142}
+                            className="w-[142px] h-[142px] mx-auto rounded-lg bg-white object-contain p-1"
+                          />
+                        ) : (
+                          <div className="w-[142px] h-[142px] mx-auto rounded-lg bg-white/80 flex items-center justify-center text-[#9a9aa8] text-[11px] font-medium px-2">
+                            QR will appear once available for this booking.
+                          </div>
+                        )}
+                      </div>
+                      <p className="mt-2.5 text-[13px] font-bold text-[#2b2b35] leading-tight">Scan this QR code</p>
+                      <p className="text-[11px] text-[#9a9aa8] font-medium">at the restaurant</p>
                     </div>
                   </div>
 
-                  <div className="mt-5 text-center space-y-1">
-                   
-                    <p className="text-[13px] text-[#9a9aa8] font-medium">
-                      Thank you for choosing <span className="text-[#6900AA] font-bold">BookMyBota</span>
-                    </p>
+                  {/* Offer 3D card — no border, elevated shadow */}
+                  {appliedOffer?.title && (
+                    <div
+                      className="mt-6 rounded-[20px] overflow-hidden flex items-stretch"
+                      style={{
+                        border: 'none',
+                        background:
+                          'linear-gradient(105deg, #f4edff 0%, #ebe0ff 42%, #e0d0ff 100%)',
+                        boxShadow:
+                          '0 8px 24px rgba(105,0,170,0.14), 0 2px 6px rgba(80,40,120,0.08)',
+                      }}
+                    >
+                      <div className="flex-1 min-w-0 px-4 py-4 sm:px-6 sm:py-5 flex flex-col justify-center">
+                        <div className="flex items-center gap-1.5 text-[#6900AA] mb-1.5">
+                          <Tag size={15} strokeWidth={2.25} />
+                          <span className="text-[12px] font-bold">Special Offer</span>
+                        </div>
+                        <p className="text-[17px] sm:text-[19px] font-bold text-[#1a1a1a] leading-snug">
+                          {appliedOffer.title}
+                        </p>
+                        <span className="mt-2.5 inline-flex w-fit items-center rounded-full bg-white/90 text-[#6900AA] text-[10px] font-bold px-2.5 py-1 shadow-sm">
+                          Provided by BookMyBota
+                        </span>
+                        <p className="mt-2.5 text-[11px] text-[#8a8a98] font-medium">
+                          {appliedOffer.validity || 'Valid only for this booking • T&C apply'}
+                        </p>
+                      </div>
+                      <div
+                        className="relative shrink-0 flex items-center justify-center self-stretch pr-2 sm:pr-4 pl-1 py-2"
+                        style={{ width: 190, minHeight: 132 }}
+                      >
+                        <span className="absolute top-3 right-4 h-1.5 w-1.5 rotate-45 bg-[#6900AA]/55 rounded-[1px]" />
+                        <span className="absolute top-7 right-2 h-1 w-1 rotate-45 bg-[#6900AA]/40 rounded-[1px]" />
+                        <span className="absolute bottom-4 right-6 h-1 w-1 rotate-45 bg-[#6900AA]/35 rounded-[1px]" />
+                        {/* Offer food — natural cutout, no circle mask */}
+                        <img
+                          src="/images/booking-offer-food.png"
+                          alt=""
+                          width={168}
+                          height={140}
+                          className="relative z-[1] w-[150px] h-auto sm:w-[168px] object-contain drop-shadow-[0_10px_18px_rgba(60,20,100,0.28)]"
+                          style={{ border: 'none', borderRadius: 0 }}
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = '/images/booking-offer-food.jpg';
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Actions — same destinations as before */}
+                  <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-5">
+                    <ShinyBlackButton
+                      type="button"
+                      disabled={!lastBookingId}
+                      onClick={() => {
+                        if (!lastBookingId) return;
+                        closeBookingPanel();
+                        router.push(`/customer/bookings/${lastBookingId}`);
+                      }}
+                      className="flex-1 max-w-xs rounded-xl bg-[#111111] text-white text-[14px] px-4 py-3.5"
+                    >
+                      <FileText size={16} strokeWidth={2} />
+                      View Booking Details
+                      <ArrowRight size={16} strokeWidth={2.25} />
+                    </ShinyBlackButton>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        closeBookingPanel();
+                        router.push('/dining');
+                      }}
+                      className="flex-1 inline-flex items-center justify-center gap-2 max-w-xs rounded-xl border-[1.5px] border-[#111111] bg-white text-[#111111] text-[14px] font-bold px-4 py-3.5 hover:bg-slate-50 transition-colors cursor-pointer"
+                    >
+                      <Compass size={16} strokeWidth={2} />
+                      Explore More Restaurants
+                    </button>
                   </div>
                 </div>
-              )}
+
+                <div className="mt-5 text-center space-y-1">
+
+                  <p className="text-[13px] text-[#9a9aa8] font-medium">
+                    Thank you for choosing <span className="text-[#6900AA] font-bold">BookMyBota</span>
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* Step 1 footer — terms row + proceed */}
             {drawerStep === 1 && (
-              <div className="mt-8 md:mt-8 max-md:sticky max-md:bottom-0 max-md:z-40 max-md:-mx-5 max-md:px-5 max-md:pt-3 max-md:pb-[max(0.75rem,env(safe-area-inset-bottom))] max-md:bg-white max-md:border-t max-md:border-slate-200 space-y-3 md:space-y-4 md:max-w-sm lg:max-w-md">
-                <div className="flex flex-col sm:flex-row gap-2.5 sm:gap-3">
+              <div className="mt-4 md:mt-4 max-md:sticky max-md:bottom-0 max-md:z-40 max-md:-mx-5 max-md:px-5 max-md:pt-3 max-md:pb-[max(0.75rem,env(safe-area-inset-bottom))] max-md:bg-white max-md:border-t max-md:border-slate-200 space-y-3 md:space-y-4 md:max-w-sm lg:max-w-md">
+                <div className="flex flex-wrap items-center gap-2 pt-1">
                   <button
                     type="button"
                     onClick={() => {
                       setBookingPolicyFocus("terms");
                       setBookingPolicyOpen(true);
                     }}
-                    className="flex-1 min-w-0 flex items-center justify-between gap-2 rounded-xl border border-black bg-white px-3 sm:px-4 py-3.5 text-left cursor-pointer hover:bg-slate-50 transition-colors"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-black/80 bg-white px-2.5 py-1.5 text-xs font-semibold text-black hover:bg-slate-50 transition-colors cursor-pointer"
                   >
-                    <span className="text-xs sm:text-sm font-bold text-black leading-snug">
-                      Terms &amp; Conditions
-                    </span>
-                    <ChevronRight size={16} strokeWidth={2.25} className="text-black shrink-0" />
+                    <span>Terms &amp; Conditions</span>
+                    <ChevronRight size={13} strokeWidth={2.25} className="text-black shrink-0" />
                   </button>
                   <button
                     type="button"
@@ -4269,12 +4387,10 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                       setBookingPolicyFocus("cancellation");
                       setBookingPolicyOpen(true);
                     }}
-                    className="flex-1 min-w-0 flex items-center justify-between gap-2 rounded-xl border border-black bg-white px-3 sm:px-4 py-3.5 text-left cursor-pointer hover:bg-slate-50 transition-colors"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-black/80 bg-white px-2.5 py-1.5 text-xs font-semibold text-black hover:bg-slate-50 transition-colors cursor-pointer"
                   >
-                    <span className="text-xs sm:text-sm font-bold text-black leading-snug">
-                      Cancellation Policy
-                    </span>
-                    <ChevronRight size={16} strokeWidth={2.25} className="text-black shrink-0" />
+                    <span>Cancellation Policy</span>
+                    <ChevronRight size={13} strokeWidth={2.25} className="text-black shrink-0" />
                   </button>
                 </div>
 
@@ -4314,7 +4430,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                 </label>
                 */}
 
-                <button
+                <ShinyBlackButton
                   type="button"
                   disabled={
                     !selectedTime ||
@@ -4323,14 +4439,13 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                     proceedChecking
                   }
                   onClick={() => void proceedToBooking()}
-                  className={`w-full px-6 sm:px-8 py-3.5 rounded-xl text-base font-semibold transition-all flex items-center justify-center gap-2 ${
-                    selectedTime &&
-                    selectedSlotIsAvailable &&
-                    !slotsInitialLoading &&
-                    !proceedChecking
-                      ? "bg-[#111111] hover:bg-black text-white cursor-pointer"
-                      : "bg-[#cfcfcf] text-white cursor-not-allowed"
-                  }`}
+                  className={`w-full px-6 sm:px-8 py-3.5 rounded-xl text-base ${selectedTime &&
+                      selectedSlotIsAvailable &&
+                      !slotsInitialLoading &&
+                      !proceedChecking
+                      ? "bg-[#111111] text-white"
+                      : "bg-[#cfcfcf] text-white"
+                    }`}
                 >
                   {proceedChecking ? (
                     <>
@@ -4340,286 +4455,277 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                   ) : (
                     "Proceed to book"
                   )}
-                </button>
+                </ShinyBlackButton>
               </div>
             )}
-            </div>
           </div>
+        </div>
         , bookTableSlot)}
 
-        {/* Mobile sticky Book a table CTA (overview) */}
-        {!hideBookingSidebar && activeTab !== "Book a Table" && !isLightboxOpen ? (
-          <div className="md:hidden fixed bottom-0 inset-x-0 z-50 border-t border-slate-200 bg-white px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+      {/* Mobile sticky Book a table CTA (overview) */}
+      {!hideBookingSidebar && activeTab !== "Book a Table" && !isLightboxOpen ? (
+        <div className="md:hidden fixed bottom-0 inset-x-0 z-50 border-t border-slate-200 bg-white px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          <ShinyBookTableCTAButton
+            onClick={() => handleQuickBook()}
+            className="w-full text-base py-3.5"
+            label="Book a table"
+          />
+        </div>
+      ) : null}
+
+      <CustomerAuthModal
+        open={authModalOpen}
+        onClose={() => setAuthModalOpen(false)}
+        onSuccess={() => {
+          dispatch(loadFromStorage());
+          setAuthModalOpen(false);
+          if (pendingProceedAfterAuth.current) {
+            pendingProceedAfterAuth.current = false;
+            void proceedToBooking();
+          }
+        }}
+      />
+
+      {typeof document !== "undefined" &&
+        createPortal(
+          <div
+            id="dining-restaurant-sticky"
+            ref={restaurantStickyRef}
+            className={`fixed top-0 left-0 right-0 z-[60] transition-all duration-300 ease-out ${isBookTableFlow && !isLgViewport ? "hidden" : "hidden md:block"
+              } ${restaurantStickyVisible && !isLightboxOpen
+                ? "translate-y-0 opacity-100"
+                : "-translate-y-full opacity-0 pointer-events-none"
+              }`}
+            aria-hidden={!restaurantStickyVisible || isLightboxOpen}
+          >
+            <div className="bg-white/90 backdrop-blur-md border-b border-slate-200/80 shadow-[0_4px_18px_rgba(15,23,42,0.06)]">
+              <div className="bmb-section-container py-1.5">
+                <div className="flex items-center gap-3 py-1.5 min-w-0">
+                  <div className="h-11 w-11 sm:h-12 sm:w-12 rounded-lg overflow-hidden bg-slate-100 shrink-0">
+                    {stickyThumb ? (
+                      <SafeCoverImage
+                        src={stickyThumb}
+                        alt={profile.name}
+                        className="h-full w-full object-cover"
+                        fallbackClassName="flex h-full w-full items-center justify-center bg-slate-100 text-slate-300"
+                        fallback={<DiningImageFallback size={18} />}
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-slate-300">
+                        <Utensils size={18} strokeWidth={1.5} />
+                      </div>
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm sm:text-base font-bold text-slate-900 truncate leading-tight">
+                      {profile.name}
+                    </p>
+                    {stickyMetaLine ? (
+                      <p className="mt-0.5 text-xs sm:text-sm text-slate-500 truncate leading-snug">
+                        {stickyMetaLine}
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div
+                  id="restaurant-tabs"
+                  className={`overflow-hidden transition-[max-height,opacity] duration-300 ease-out ${showSectionTabs
+                      ? "max-h-16 opacity-100"
+                      : "max-h-0 opacity-0 pointer-events-none"
+                    }`}
+                >
+                  <div className="flex gap-6 overflow-x-auto scrollbar-hide pt-0.5 pb-0.5">
+                    {DETAIL_SECTION_TABS.map((tab) => (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => scrollToDetailSection(tab.sectionId, tab.id)}
+                        className={`py-2.5 text-sm sm:text-base lg:text-sm font-semibold tracking-wide border-b-2 transition-all whitespace-nowrap cursor-pointer ${activeTab === tab.id
+                            ? "border-slate-900 text-slate-900 font-bold"
+                            : "border-transparent text-slate-400 hover:text-slate-900"
+                          }`}
+                      >
+                        {tab.id}
+                      </button>
+                    ))}
+                    {isBookTableFlow && isLgViewport ? (
+                      <button
+                        type="button"
+                        className="py-2.5 text-sm sm:text-base lg:text-sm font-bold tracking-wide border-b-2 border-slate-900 text-slate-900 whitespace-nowrap cursor-default"
+                        aria-current="page"
+                      >
+                        Book a Table
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
+
+      {/* Mobile section tab bar (District-style; replaces restaurant sticky on mobile) */}
+      {typeof document !== "undefined" &&
+        createPortal(
+          <div
+            ref={mobileTabsRef}
+            id="dining-mobile-section-tabs"
+            className={`md:hidden fixed top-0 left-0 right-0 z-[60] bg-white border-b border-slate-200 transition-all duration-300 ease-out ${showMobileSectionTabs && !isLightboxOpen
+                ? "translate-y-0 opacity-100"
+                : "-translate-y-full opacity-0 pointer-events-none"
+              }`}
+            aria-hidden={!showMobileSectionTabs || isLightboxOpen}
+          >
+            <div className="px-5 flex gap-5 overflow-x-auto scrollbar-hide">
+              {DETAIL_SECTION_TABS.map((tab) => (
+                <button
+                  key={`mobile-tab-${tab.id}`}
+                  type="button"
+                  onClick={() => scrollToDetailSection(tab.sectionId, tab.id)}
+                  className={`py-3 text-sm font-semibold tracking-wide border-b-2 transition-all whitespace-nowrap cursor-pointer ${activeTab === tab.id
+                      ? "border-slate-900 text-slate-900 font-bold"
+                      : "border-transparent text-slate-400"
+                    }`}
+                >
+                  {tab.id}
+                </button>
+              ))}
+            </div>
+          </div>,
+          document.body
+        )}
+
+      {typeof document !== "undefined" &&
+        reviewsModalOpen &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center p-0 sm:p-4"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="dining-reviews-modal-title"
+          >
             <button
               type="button"
-              onClick={() => handleQuickBook()}
-              className="w-full rounded-xl border border-slate-900 bg-white text-slate-900 py-3.5 text-base font-bold cursor-pointer hover:bg-slate-50"
-            >
-              Book a table
-            </button>
-          </div>
-        ) : null}
-
-        <CustomerAuthModal
-          open={authModalOpen}
-          onClose={() => setAuthModalOpen(false)}
-          onSuccess={() => {
-            dispatch(loadFromStorage());
-            setAuthModalOpen(false);
-            if (pendingProceedAfterAuth.current) {
-              pendingProceedAfterAuth.current = false;
-              void proceedToBooking();
-            }
-          }}
-        />
-
-        {typeof document !== "undefined" &&
-          createPortal(
-            <div
-              id="dining-restaurant-sticky"
-              ref={restaurantStickyRef}
-              className={`fixed top-0 left-0 right-0 z-[60] transition-all duration-300 ease-out ${
-                isBookTableFlow && !isLgViewport ? "hidden" : "hidden md:block"
-              } ${
-                restaurantStickyVisible && !isLightboxOpen
-                  ? "translate-y-0 opacity-100"
-                  : "-translate-y-full opacity-0 pointer-events-none"
-              }`}
-              aria-hidden={!restaurantStickyVisible || isLightboxOpen}
-            >
-              <div className="bg-white/90 backdrop-blur-md border-b border-slate-200/80 shadow-[0_4px_18px_rgba(15,23,42,0.06)]">
-                <div className="bmb-section-container py-1.5">
-                  <div className="flex items-center gap-3 py-1.5 min-w-0">
-                    <div className="h-11 w-11 sm:h-12 sm:w-12 rounded-lg overflow-hidden bg-slate-100 shrink-0">
-                      {stickyThumb ? (
-                        <SafeCoverImage
-                          src={stickyThumb}
-                          alt={profile.name}
-                          className="h-full w-full object-cover"
-                          fallbackClassName="flex h-full w-full items-center justify-center bg-slate-100 text-slate-300"
-                          fallback={<DiningImageFallback size={18} />}
-                        />
-                      ) : (
-                        <div className="flex h-full w-full items-center justify-center text-slate-300">
-                          <Utensils size={18} strokeWidth={1.5} />
-                        </div>
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm sm:text-base font-bold text-slate-900 truncate leading-tight">
-                        {profile.name}
-                      </p>
-                      {stickyMetaLine ? (
-                        <p className="mt-0.5 text-xs sm:text-sm text-slate-500 truncate leading-snug">
-                          {stickyMetaLine}
-                        </p>
-                      ) : null}
-                    </div>
-                  </div>
-
-                  <div
-                    id="restaurant-tabs"
-                    className={`overflow-hidden transition-[max-height,opacity] duration-300 ease-out ${
-                      showSectionTabs
-                        ? "max-h-16 opacity-100"
-                        : "max-h-0 opacity-0 pointer-events-none"
-                    }`}
-                  >
-                    <div className="flex gap-6 overflow-x-auto scrollbar-hide pt-0.5 pb-0.5">
-                      {DETAIL_SECTION_TABS.map((tab) => (
-                        <button
-                          key={tab.id}
-                          type="button"
-                          onClick={() => scrollToDetailSection(tab.sectionId, tab.id)}
-                          className={`py-2.5 text-sm sm:text-base lg:text-sm font-semibold tracking-wide border-b-2 transition-all whitespace-nowrap cursor-pointer ${
-                            activeTab === tab.id
-                              ? "border-slate-900 text-slate-900 font-bold"
-                              : "border-transparent text-slate-400 hover:text-slate-900"
-                          }`}
-                        >
-                          {tab.id}
-                        </button>
-                      ))}
-                      {isBookTableFlow && isLgViewport ? (
-                        <button
-                          type="button"
-                          className="py-2.5 text-sm sm:text-base lg:text-sm font-bold tracking-wide border-b-2 border-slate-900 text-slate-900 whitespace-nowrap cursor-default"
-                          aria-current="page"
-                        >
-                          Book a Table
-                        </button>
-                      ) : null}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>,
-            document.body
-          )}
-
-        {/* Mobile section tab bar (District-style; replaces restaurant sticky on mobile) */}
-        {typeof document !== "undefined" &&
-          createPortal(
-            <div
-              ref={mobileTabsRef}
-              id="dining-mobile-section-tabs"
-              className={`md:hidden fixed top-0 left-0 right-0 z-[60] bg-white border-b border-slate-200 transition-all duration-300 ease-out ${
-                showMobileSectionTabs && !isLightboxOpen
-                  ? "translate-y-0 opacity-100"
-                  : "-translate-y-full opacity-0 pointer-events-none"
-              }`}
-              aria-hidden={!showMobileSectionTabs || isLightboxOpen}
-            >
-              <div className="px-5 flex gap-5 overflow-x-auto scrollbar-hide">
-                {DETAIL_SECTION_TABS.map((tab) => (
-                  <button
-                    key={`mobile-tab-${tab.id}`}
-                    type="button"
-                    onClick={() => scrollToDetailSection(tab.sectionId, tab.id)}
-                    className={`py-3 text-sm font-semibold tracking-wide border-b-2 transition-all whitespace-nowrap cursor-pointer ${
-                      activeTab === tab.id
-                        ? "border-slate-900 text-slate-900 font-bold"
-                        : "border-transparent text-slate-400"
-                    }`}
-                  >
-                    {tab.id}
-                  </button>
-                ))}
-              </div>
-            </div>,
-            document.body
-          )}
-
-        {typeof document !== "undefined" &&
-          reviewsModalOpen &&
-          createPortal(
-            <div
-              className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center p-0 sm:p-4"
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="dining-reviews-modal-title"
-            >
-              <button
-                type="button"
-                className="absolute inset-0 bg-black/45 cursor-pointer"
-                aria-label="Close reviews"
-                onClick={() => {
-                  setReviewsModalOpen(false);
-                  setExpandedReviewId(null);
-                }}
-              />
-              <div className="relative w-full sm:max-w-lg max-h-[85vh] sm:max-h-[80vh] bg-white rounded-t-2xl sm:rounded-2xl shadow-xl flex flex-col overflow-hidden">
-                <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-slate-100 shrink-0">
-                  <h2
-                    id="dining-reviews-modal-title"
-                    className="text-lg font-bold text-[#111111]"
-                  >
-                    Reviews and Rating
-                  </h2>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setReviewsModalOpen(false);
-                      setExpandedReviewId(null);
-                    }}
-                    className="w-9 h-9 rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-100 cursor-pointer"
-                    aria-label="Close"
-                  >
-                    <X size={20} />
-                  </button>
-                </div>
-                <div
-                  data-scroll-lock-container
-                  className="overflow-y-auto flex-1 px-5 sm:px-6 py-2 pr-6 sm:pr-7 overscroll-contain"
+              className="absolute inset-0 bg-black/45 cursor-pointer"
+              aria-label="Close reviews"
+              onClick={() => {
+                setReviewsModalOpen(false);
+                setExpandedReviewId(null);
+              }}
+            />
+            <div className="relative w-full sm:max-w-lg max-h-[85vh] sm:max-h-[80vh] bg-white rounded-t-2xl sm:rounded-2xl shadow-xl flex flex-col overflow-hidden">
+              <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-slate-100 shrink-0">
+                <h2
+                  id="dining-reviews-modal-title"
+                  className="text-lg font-bold text-[#111111]"
                 >
-                  {reviews.map((rev: any) => {
-                    const ratingNum = Number(rev.rating) || 0;
-                    const name = rev.user_name || "Guest";
-                    const text = (rev.text || "").trim();
-                    const timeLabel = reviewTimeAgo(rev.created_at);
-                    const expanded = expandedReviewId === String(rev.id);
-                    const needsMore = text.length > 180;
-                    return (
-                      <article
-                        key={rev.id}
-                        className="py-4 border-b border-slate-100 last:border-b-0"
-                      >
-                        <div className="flex items-start gap-2.5 pr-1">
-                          <span className="inline-flex size-9 items-center justify-center rounded-full bg-slate-100 text-sm font-bold text-slate-600 shrink-0">
-                            {String(name).slice(0, 1).toUpperCase()}
-                          </span>
-                          <div className="min-w-0 flex-1 flex items-start justify-between gap-2">
-                            <div className="min-w-0">
-                              <p className="text-sm font-semibold text-[#111111] truncate leading-snug">
-                                {name}
-                              </p>
-                              {timeLabel ? (
-                                <p className="mt-0.5 text-xs text-slate-400 leading-snug">
-                                  {timeLabel}
-                                </p>
-                              ) : null}
-                            </div>
-                            <span className="shrink-0 inline-flex items-center gap-1 rounded-md bg-[#1B7A3D] px-2.5 py-1 text-xs font-bold text-white leading-none mt-0.5">
-                              <Star size={10} className="fill-white text-white" />
-                              {Math.round(ratingNum)}
-                            </span>
-                          </div>
-                        </div>
-                        {text ? (
-                          <div className="mt-2.5 relative pl-0">
-                            <p
-                              className={`text-sm text-[#111111] leading-relaxed whitespace-pre-wrap ${
-                                expanded || !needsMore ? "" : "line-clamp-4"
-                              }`}
-                            >
-                              {text}
+                  Reviews and Rating
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setReviewsModalOpen(false);
+                    setExpandedReviewId(null);
+                  }}
+                  className="w-9 h-9 rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-100 cursor-pointer"
+                  aria-label="Close"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+              <div
+                data-scroll-lock-container
+                className="overflow-y-auto flex-1 px-5 sm:px-6 py-2 pr-6 sm:pr-7 overscroll-contain"
+              >
+                {reviews.map((rev: any) => {
+                  const ratingNum = Number(rev.rating) || 0;
+                  const name = rev.user_name || "Guest";
+                  const text = (rev.text || "").trim();
+                  const timeLabel = reviewTimeAgo(rev.created_at);
+                  const expanded = expandedReviewId === String(rev.id);
+                  const needsMore = text.length > 180;
+                  return (
+                    <article
+                      key={rev.id}
+                      className="py-4 border-b border-slate-100 last:border-b-0"
+                    >
+                      <div className="flex items-start gap-2.5 pr-1">
+                        <span className="inline-flex size-9 items-center justify-center rounded-full bg-slate-100 text-sm font-bold text-slate-600 shrink-0">
+                          {String(name).slice(0, 1).toUpperCase()}
+                        </span>
+                        <div className="min-w-0 flex-1 flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold text-[#111111] truncate leading-snug">
+                              {name}
                             </p>
-                            {needsMore && !expanded ? (
-                              <button
-                                type="button"
-                                onClick={() => setExpandedReviewId(String(rev.id))}
-                                className="absolute bottom-0 right-0 pl-8 bg-gradient-to-l from-white via-white to-transparent text-sm font-semibold text-rose-600 cursor-pointer"
-                              >
-                                Read More
-                              </button>
+                            {timeLabel ? (
+                              <p className="mt-0.5 text-xs text-slate-400 leading-snug">
+                                {timeLabel}
+                              </p>
                             ) : null}
                           </div>
-                        ) : null}
-                      </article>
-                    );
-                  })}
-                </div>
+                          <span className="shrink-0 inline-flex items-center gap-1 rounded-md bg-[#1B7A3D] px-2.5 py-1 text-xs font-bold text-white leading-none mt-0.5">
+                            <Star size={10} className="fill-white text-white" />
+                            {Math.round(ratingNum)}
+                          </span>
+                        </div>
+                      </div>
+                      {text ? (
+                        <div className="mt-2.5 relative pl-0">
+                          <p
+                            className={`text-sm text-[#111111] leading-relaxed whitespace-pre-wrap ${expanded || !needsMore ? "" : "line-clamp-4"
+                              }`}
+                          >
+                            {text}
+                          </p>
+                          {needsMore && !expanded ? (
+                            <button
+                              type="button"
+                              onClick={() => setExpandedReviewId(String(rev.id))}
+                              className="absolute bottom-0 right-0 pl-8 bg-gradient-to-l from-white via-white to-transparent text-sm font-semibold text-rose-600 cursor-pointer"
+                            >
+                              Read More
+                            </button>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </article>
+                  );
+                })}
               </div>
-            </div>,
-            document.body
-          )}
+            </div>
+          </div>,
+          document.body
+        )}
 
-        <DiningBookingPolicyModal
-          open={bookingPolicyOpen}
-          focusSection={bookingPolicyFocus}
-          onClose={() => setBookingPolicyOpen(false)}
+      <DiningBookingPolicyModal
+        open={bookingPolicyOpen}
+        focusSection={bookingPolicyFocus}
+        onClose={() => setBookingPolicyOpen(false)}
+      />
+
+      {bookingSuccess && lastBookingId ? (
+        <PaymentSuccessView
+          presentation="modal"
+          module="dining"
+          bookingId={lastBookingId}
+          nextHref={`/customer/bookings/confirmation?id=${lastBookingId}`}
         />
+      ) : null}
 
-        {bookingSuccess && lastBookingId ? (
-          <PaymentSuccessView
-            presentation="modal"
-            module="dining"
-            bookingId={lastBookingId}
-            nextHref={`/customer/bookings/confirmation?id=${lastBookingId}`}
-          />
-        ) : null}
-
-        <AboutVenueModal
-          open={venueInfoModal != null}
-          mode={venueInfoModal || "about"}
-          onClose={() => setVenueInfoModal(null)}
-          name={profile.name}
-          coverSrc={photos[0] || resolveMediaUrl(profile.cover_image_url) || ""}
-          description={aboutDescription}
-          address={profile.address}
-          phone={profile.phone}
-          openingHours={openingHourRows}
-        />
-      </div>
-      );
+      <AboutVenueModal
+        open={venueInfoModal != null}
+        mode={venueInfoModal || "about"}
+        onClose={() => setVenueInfoModal(null)}
+        name={profile.name}
+        coverSrc={photos[0] || resolveMediaUrl(profile.cover_image_url) || ""}
+        description={aboutDescription}
+        address={profile.address}
+        phone={profile.phone}
+        openingHours={openingHourRows}
+      />
+    </div>
+  );
 }

@@ -28,6 +28,7 @@ import {
   formatInstantLocalDateTime,
   formatTime12h,
   formatWeekdayCustomer,
+  getVenueDateTimeParts,
 } from "@/lib/dateFormat";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import BookingTicketPerforation, {
@@ -238,16 +239,41 @@ function ConfirmationContent() {
 
   const addToCalendar = () => {
     if (!booking.booking_time) return;
-    const start = new Date(booking.booking_time);
-    const end = booking.end_time
-      ? new Date(booking.end_time)
-      : new Date(start.getTime() + 90 * 60000);
-    const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+    const startParts = getVenueDateTimeParts(booking.booking_time);
+    if (!startParts) return;
+
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const formatCalDate = (p: { y: number; m: number; d: number; hour: number; minute: number }) =>
+      `${p.y}${pad(p.m)}${pad(p.d)}T${pad(p.hour)}${pad(p.minute)}00`;
+
+    const startStr = formatCalDate(startParts);
+
+    let endStr: string;
+    const endParts = booking.end_time ? getVenueDateTimeParts(booking.end_time) : null;
+    if (endParts) {
+      endStr = formatCalDate(endParts);
+    } else {
+      const startDate = new Date(Date.UTC(startParts.y, startParts.m - 1, startParts.d, startParts.hour, startParts.minute));
+      startDate.setUTCMinutes(startDate.getUTCMinutes() + 90);
+      endStr = `${startDate.getUTCFullYear()}${pad(startDate.getUTCMonth() + 1)}${pad(startDate.getUTCDate())}T${pad(startDate.getUTCHours())}${pad(startDate.getUTCMinutes())}00`;
+    }
+
+    const description = [
+      `Table Reservation at ${booking.business_name || "Restaurant"}`,
+      booking.id ? `Booking ID: ${booking.id.slice(0, 8).toUpperCase()}` : "",
+      guestName && guestName !== "—" ? `Guest: ${guestName}` : "",
+      booking.guests ? `Guests: ${booking.guests} Guest(s)` : "",
+      tableArrivalNote ? `Note: ${tableArrivalNote}` : "",
+      booking.business_address ? `Address: ${booking.business_address}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+
     const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(
       `Table at ${booking.business_name || "Restaurant"}`
-    )}&dates=${fmt(start)}/${fmt(end)}&location=${encodeURIComponent(
-      booking.business_address || ""
-    )}`;
+    )}&dates=${startStr}/${endStr}&details=${encodeURIComponent(
+      description
+    )}&location=${encodeURIComponent(booking.business_address || "")}`;
     window.open(url, "_blank");
   };
 

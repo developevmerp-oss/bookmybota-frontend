@@ -3,13 +3,12 @@
 import ContentRail from "./ContentRail";
 import { EventPosterCard, ShowcaseEventPosterCard } from "./PosterCard";
 import { SHOWCASE_EVENT_CARDS } from "@/data/showcaseEventCards";
-import { shouldShowShowcaseCards } from "./homeUtils";
+import { prioritizeEvents, shouldShowShowcaseCards } from "./homeUtils";
 import { useHomeCatalog } from "./useHomeCatalog";
 
 export default function PopularEventsRail({ city }: { city: string }) {
   const { events, cityEvents, isLoadingEvents, hasCity } = useHomeCatalog(city);
-  const rated = [...events].sort((a, b) => Number(b.rating || 0) - Number(a.rating || 0));
-  const items = (rated.some((e) => Number(e.rating) > 0) ? rated : events).slice(0, 12);
+  const items = prioritizeEvents(events).slice(0, 12);
   const isEmpty = !isLoadingEvents && items.length === 0;
   // City → global (via useHomeCatalog) → showcase when both empty (even with city selected)
   const useStatic = shouldShowShowcaseCards(isEmpty);

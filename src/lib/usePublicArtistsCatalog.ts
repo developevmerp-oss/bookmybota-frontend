@@ -359,7 +359,24 @@ export function usePublicArtistsCatalog(opts?: { q?: string; city?: string }) {
       if (cityFiltered.length > 0) list = cityFiltered;
     }
 
+    const priorityPatterns = [
+      /teddy\s*afro/i,
+      /50\s*cent/i,
+      /veronica\s*adane/i,
+      /aster\s*(aweke|awake)/i,
+    ];
+    const getPriority = (name: string) => {
+      for (let i = 0; i < priorityPatterns.length; i++) {
+        if (priorityPatterns[i].test(name)) return i;
+      }
+      return priorityPatterns.length;
+    };
+
     list.sort((a, b) => {
+      const pa = getPriority(a.name);
+      const pb = getPriority(b.name);
+      if (pa !== pb) return pa - pb;
+
       const ar = isRegisteredDirectoryArtist(a) ? 0 : 1;
       const br = isRegisteredDirectoryArtist(b) ? 0 : 1;
       if (ar !== br) return ar - br;

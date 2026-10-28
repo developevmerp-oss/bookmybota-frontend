@@ -25,6 +25,30 @@ export function shouldShowShowcaseCards(isEmpty: boolean) {
   return isEmpty;
 }
 
+export const PRIORITY_EVENT_PATTERNS = [
+  /sound\s*of\s*ethiopia/i,
+  /addis\s*soul\s*night|50\s*cent/i,
+  /veronica\s*adane|\bsost\b/i,
+  /rhythm\s*(&|and)\s*revolution/i,
+];
+
+export function prioritizeEvents<T extends { name: string; about_event?: string }>(list: T[]): T[] {
+  const remaining = [...list];
+  const prioritized: T[] = [];
+
+  for (const pattern of PRIORITY_EVENT_PATTERNS) {
+    const idx = remaining.findIndex((item) =>
+      pattern.test(item.name || "") || pattern.test(item.about_event || "")
+    );
+    if (idx !== -1) {
+      const [matched] = remaining.splice(idx, 1);
+      prioritized.push(matched);
+    }
+  }
+
+  return [...prioritized, ...remaining];
+}
+
 export function eventPortrait(event: PublicEvent) {
   return resolveMediaUrl(event.poster_vertical_url || event.poster_horizontal_url || "");
 }

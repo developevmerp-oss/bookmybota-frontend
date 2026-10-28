@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useMemo, useRef } from "react";
 import Link from "next/link";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { artistHref } from "@/lib/businessPublicPath";
@@ -35,6 +35,28 @@ function mapApiArtist(artist: DirectoryArtist): RailArtistCard {
   };
 }
 
+const PRIORITY_ARTIST_PATTERNS = [
+  /teddy\s*afro/i,
+  /50\s*cent/i,
+  /veronica\s*adane/i,
+  /aster\s*(aweke|awake)/i,
+];
+
+function prioritizeArtists(list: RailArtistCard[]): RailArtistCard[] {
+  const remaining = [...list];
+  const prioritized: RailArtistCard[] = [];
+
+  for (const pattern of PRIORITY_ARTIST_PATTERNS) {
+    const idx = remaining.findIndex((item) => pattern.test(item.name));
+    if (idx !== -1) {
+      const [matched] = remaining.splice(idx, 1);
+      prioritized.push(matched);
+    }
+  }
+
+  return [...prioritized, ...remaining];
+}
+
 function ArtistCard({ artist }: { artist: RailArtistCard }) {
   return (
     <Link
@@ -51,7 +73,7 @@ function ArtistCard({ artist }: { artist: RailArtistCard }) {
           fallback={<ArtistImageFallback size={40} />}
         />
       </div>
-      <p className="top-artists-name text-sm sm:text-base lg:text-lg font-bold text-[#1C1C1C] truncate min-w-0 leading-snug transition-colors">
+      <p className="top-artists-name capitalize text-sm sm:text-base lg:text-lg font-bold text-[#1C1C1C] truncate min-w-0 leading-snug transition-colors">
         {artist.name}
       </p>
     </Link>
@@ -61,7 +83,10 @@ function ArtistCard({ artist }: { artist: RailArtistCard }) {
 export default function TopArtistsRail() {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const { artists, isLoading } = usePublicArtistsCatalog();
-  const items = artists.slice(0, 12).map(mapApiArtist);
+  const items = useMemo(() => {
+    const mapped = artists.map(mapApiArtist);
+    return prioritizeArtists(mapped).slice(0, 12);
+  }, [artists]);
   const edges = useHorizontalScrollEdges(scrollerRef, [items.length, isLoading]);
 
   const scrollBy = (dir: "left" | "right") => {

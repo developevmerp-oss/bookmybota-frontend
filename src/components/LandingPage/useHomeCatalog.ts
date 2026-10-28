@@ -4,7 +4,7 @@ import {
   useGetPublicEventFiltersQuery,
   useGetPublicEventsQuery,
 } from "@/services/api";
-import { eventsWithImage, hasCityFilter, preferCityOrAll } from "./homeUtils";
+import { eventsWithImage, hasCityFilter, preferCityOrAll, prioritizeEvents } from "./homeUtils";
 
 /**
  * Landing catalog cascade for cards:
@@ -58,7 +58,8 @@ export function useHomeCatalog(city: string) {
   const allDining = hasCity ? allDiningRaw : cityDining;
 
   // Prefer city data; only use global lists when the city has none.
-  const events = preferCityOrAll(cityEvents, fallbackEvents, hasCity);
+  const rawEvents = preferCityOrAll(cityEvents, fallbackEvents, hasCity);
+  const events = useMemo(() => prioritizeEvents(rawEvents), [rawEvents]);
   const dining = preferCityOrAll(cityDining, allDining, hasCity);
 
   const bannerEvents = useMemo(() => {

@@ -31,7 +31,7 @@ import { BOOKING_CONFIRM_PAGE_BG } from "@/components/Shared/BookingTicketPerfor
 import ConfirmationPageUI1Shell from "@/components/Shared/Confirmation/ConfirmationPageUI1Shell";
 import EventConfirmationReviewAside from "@/components/Shared/Confirmation/EventConfirmationReviewAside";
 import { CONFIRMATION_UI_VERSION } from "@/components/Shared/Confirmation/confirmationUiVersion";
-import { formatDateCustomer, formatTime12h } from "@/lib/dateFormat";
+import { formatDateCustomer, formatTime12h, getVenueDateTimeParts } from "@/lib/dateFormat";
 import { formatMoney } from "@/lib/currencyFormat";
 import { eventBookingQrValue } from "@/lib/eventScanToken";
 
@@ -161,14 +161,38 @@ function ConfirmationContent() {
 
   const addToCalendar = () => {
     if (!booking?.starts_at) return;
-    const start = new Date(booking.starts_at);
-    const end = booking.ends_at
-      ? new Date(booking.ends_at)
-      : new Date(start.getTime() + 60 * 60000);
-    const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+    const startParts = getVenueDateTimeParts(booking.starts_at);
+    if (!startParts) return;
+
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const formatCalDate = (p: { y: number; m: number; d: number; hour: number; minute: number }) =>
+      `${p.y}${pad(p.m)}${pad(p.d)}T${pad(p.hour)}${pad(p.minute)}00`;
+
+    const startStr = formatCalDate(startParts);
+
+    let endStr: string;
+    const endParts = booking.ends_at ? getVenueDateTimeParts(booking.ends_at) : null;
+    if (endParts) {
+      endStr = formatCalDate(endParts);
+    } else {
+      const startDate = new Date(Date.UTC(startParts.y, startParts.m - 1, startParts.d, startParts.hour, startParts.minute));
+      startDate.setUTCMinutes(startDate.getUTCMinutes() + 60);
+      endStr = `${startDate.getUTCFullYear()}${pad(startDate.getUTCMonth() + 1)}${pad(startDate.getUTCDate())}T${pad(startDate.getUTCHours())}${pad(startDate.getUTCMinutes())}00`;
+    }
+
+    const description = [
+      booking.event_name || "Event",
+      displayCode ? `Booking Code: ${displayCode}` : "",
+      venue ? `Venue: ${venue}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+
     const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(
       booking.event_name || "Event"
-    )}&dates=${fmt(start)}/${fmt(end)}&location=${encodeURIComponent(venue)}`;
+    )}&dates=${startStr}/${endStr}&details=${encodeURIComponent(
+      description
+    )}&location=${encodeURIComponent(venue)}`;
     window.open(url, "_blank");
   };
 

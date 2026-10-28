@@ -3387,8 +3387,8 @@ export default function StadiumBlockBuilder({
       track = "#030712";
     } else if (type === "festival_t_stage") {
       label = "FESTIVAL T-STAGE & ARENA";
-      color = "#090d16";
-      track = "#020617";
+      color = "#ffffff";
+      track = "#ffffff";
     } else if (type === "custom") {
       label = "MULTI-PURPOSE FIELD";
       color = "#334155";
@@ -4465,11 +4465,13 @@ export default function StadiumBlockBuilder({
                         ? "#0f172a"
                         : groundConfig.sport_type === "tennis"
                           ? "#0c4a6e"
-                          : groundConfig.sport_type === "concert" || groundConfig.sport_type === "festival_t_stage"
-                            ? "#020617"
-                            : "#7f1d1d")
+                          : groundConfig.sport_type === "festival_t_stage"
+                            ? (groundConfig.turf_color || "#ffffff")
+                            : groundConfig.sport_type === "concert"
+                              ? "#020617"
+                              : "#7f1d1d")
                   }
-                  stroke={isPitchSelected ? "#38bdf8" : "rgba(255,255,255,0.15)"}
+                  stroke={isPitchSelected ? "#38bdf8" : (groundConfig.sport_type === "festival_t_stage" && (groundConfig.turf_color === "#ffffff" || !groundConfig.turf_color)) ? "#e2e8f0" : "rgba(255,255,255,0.15)"}
                   strokeWidth={isPitchSelected ? 3.5 : 1.5}
                   cornerRadius={groundConfig.sport_type === "cricket" ? (pitchW + 100) / 2 : 40}
                   perfectDrawEnabled={false}
@@ -4702,15 +4704,15 @@ export default function StadiumBlockBuilder({
                 ) : groundConfig.sport_type === "festival_t_stage" ? (
                   // 🎸 5. FESTIVAL T-STAGE & PERFORMANCE ARENA
                   <>
-                    {/* Dark Arena Base */}
+                    {/* Arena Base Floor */}
                     <Rect
                       x={0}
                       y={0}
                       width={pitchW}
                       height={pitchH}
-                      fill={groundConfig.turf_color || "#090d16"}
-                      stroke="#6366f1"
-                      strokeWidth={2.5}
+                      fill={groundConfig.turf_color || "#ffffff"}
+                      stroke={groundConfig.turf_color === "#ffffff" || !groundConfig.turf_color ? "#e2e8f0" : "#6366f1"}
+                      strokeWidth={2}
                       cornerRadius={16}
                     />
 
@@ -4721,10 +4723,10 @@ export default function StadiumBlockBuilder({
                       width={pitchW * 0.80}
                       height={pitchH * 0.18}
                       fill="#4c1d95"
-                      opacity={0.35}
+                      opacity={groundConfig.turf_color === "#ffffff" || !groundConfig.turf_color ? 0.12 : 0.35}
                       cornerRadius={12}
                       shadowColor="#a855f7"
-                      shadowBlur={26}
+                      shadowBlur={20}
                     />
 
                     {/* 1. Main Stage (Top Wide Rectangle) */}
@@ -6080,8 +6082,8 @@ export default function StadiumBlockBuilder({
                           pitch_label: "FESTIVAL T-STAGE & ARENA",
                           stage_label: "MAIN STAGE",
                           catwalk_label: "",
-                          turf_color: "#090d16",
-                          track_color: "#020617",
+                          turf_color: "#ffffff",
+                          track_color: "#ffffff",
                           shape: "rectangle",
                           x: CANVAS_W * 0.22,
                           y: CANVAS_H * 0.16,
@@ -8724,8 +8726,52 @@ export default function StadiumBlockBuilder({
                     </div>
                   )}
 
+                  {groundConfig.sport_type === "festival_t_stage" && (
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 block mb-1">Arena Floor Theme</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setGroundConfig((prev) => ({
+                              ...prev,
+                              turf_color: "#ffffff",
+                              track_color: "#ffffff",
+                            }))
+                          }
+                          className={`p-2 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+                            groundConfig.turf_color === "#ffffff" || !groundConfig.turf_color
+                              ? "bg-sky-50 border-sky-500 text-sky-700 shadow-sm"
+                              : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
+                          }`}
+                        >
+                          <span>⚪</span>
+                          <span>Clean White Arena</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setGroundConfig((prev) => ({
+                              ...prev,
+                              turf_color: "#090d16",
+                              track_color: "#020617",
+                            }))
+                          }
+                          className={`p-2 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+                            groundConfig.turf_color === "#090d16"
+                              ? "bg-slate-900 border-slate-900 text-white shadow-sm"
+                              : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
+                          }`}
+                        >
+                          <span>⚫</span>
+                          <span>Dark Night Arena</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   <div>
-                    <label className="text-xs font-bold text-slate-700 block mb-1">Turf / Court Color</label>
+                    <label className="text-xs font-bold text-slate-700 block mb-1">Turf / Floor Color</label>
                     <div className="flex items-center gap-3">
                       <input
                         type="color"
@@ -8739,13 +8785,14 @@ export default function StadiumBlockBuilder({
                         }
                       />
                       <div className="flex flex-wrap gap-1.5 flex-1">
-                        {["#14532d", "#064e3b", "#b45309", "#1d4ed8", "#b91c1c", "#1e293b", "#090d16"].map((c) => (
+                        {["#ffffff", "#f8fafc", "#090d16", "#14532d", "#064e3b", "#b45309", "#1d4ed8", "#1e293b"].map((c) => (
                           <button
                             key={c}
                             type="button"
                             onClick={() => setGroundConfig((p) => ({ ...p, turf_color: c }))}
-                            className="w-6 h-6 rounded-md border border-slate-300 shadow-sm hover:scale-110 transition-transform"
+                            className={`w-6 h-6 rounded-md border shadow-sm hover:scale-110 transition-transform ${groundConfig.turf_color === c ? "border-sky-500 ring-2 ring-sky-300" : "border-slate-300"}`}
                             style={{ backgroundColor: c }}
+                            title={c}
                           />
                         ))}
                       </div>
@@ -8753,7 +8800,7 @@ export default function StadiumBlockBuilder({
                   </div>
 
                   <div>
-                    <label className="text-xs font-bold text-slate-700 block mb-1">Surround Track Color</label>
+                    <label className="text-xs font-bold text-slate-700 block mb-1">Surround Track / Outer Color</label>
                     <div className="flex items-center gap-3">
                       <input
                         type="color"
@@ -8767,13 +8814,14 @@ export default function StadiumBlockBuilder({
                         }
                       />
                       <div className="flex flex-wrap gap-1.5 flex-1">
-                        {["#7f1d1d", "#052e16", "#0f172a", "#0c4a6e", "#030712", "#020617", "#334155"].map((c) => (
+                        {["#ffffff", "#f1f5f9", "#020617", "#7f1d1d", "#052e16", "#0f172a", "#0c4a6e", "#334155"].map((c) => (
                           <button
                             key={c}
                             type="button"
                             onClick={() => setGroundConfig((p) => ({ ...p, track_color: c }))}
-                            className="w-6 h-6 rounded-md border border-slate-300 shadow-sm hover:scale-110 transition-transform"
+                            className={`w-6 h-6 rounded-md border shadow-sm hover:scale-110 transition-transform ${groundConfig.track_color === c ? "border-sky-500 ring-2 ring-sky-300" : "border-slate-300"}`}
                             style={{ backgroundColor: c }}
+                            title={c}
                           />
                         ))}
                       </div>

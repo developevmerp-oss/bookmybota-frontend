@@ -1601,38 +1601,39 @@ export default function StadiumLayoutViewer({
             />
 
             {/* ── Ground / Pitch Section (Positioned, Sized & Rotated from Admin) ── */}
-            <Group
-              x={pitchX + pitchW / 2}
-              y={pitchY + pitchH / 2}
-              offsetX={pitchW / 2}
-              offsetY={pitchH / 2}
-              rotation={pitchRot}
-              opacity={selectedBlockId ? 0.55 : 1}
-              listening={!selectedBlockId}
-            >
-              {/* Running Track / Arena Surround */}
-              <Rect
-                x={-50}
-                y={-50}
-                width={pitchW + 100}
-                height={pitchH + 100}
-                fill={
-                  (data as any)?.ground?.track_color ||
-                  ((data as any)?.ground?.sport_type === "cricket"
-                    ? "#052e16"
-                    : (data as any)?.ground?.sport_type === "basketball"
-                      ? "#0f172a"
-                      : (data as any)?.ground?.sport_type === "tennis"
-                        ? "#0c4a6e"
-                        : (data as any)?.ground?.sport_type === "concert"
-                          ? "#030712"
-                          : "#7f1d1d")
-                }
-                stroke="rgba(255,255,255,0.15)"
-                strokeWidth={1.5}
-                cornerRadius={(data as any)?.ground?.sport_type === "cricket" ? (pitchW + 100) / 2 : 40}
-                perfectDrawEnabled={false}
-              />
+            {(data as any)?.ground?.enabled !== false && (
+              <Group
+                x={pitchX + pitchW / 2}
+                y={pitchY + pitchH / 2}
+                offsetX={pitchW / 2}
+                offsetY={pitchH / 2}
+                rotation={pitchRot}
+                opacity={selectedBlockId ? 0.55 : 1}
+                listening={!selectedBlockId}
+              >
+                {/* Running Track / Arena Surround */}
+                <Rect
+                  x={-50}
+                  y={-50}
+                  width={pitchW + 100}
+                  height={pitchH + 100}
+                  fill={
+                    (data as any)?.ground?.track_color ||
+                    ((data as any)?.ground?.sport_type === "cricket"
+                      ? "#052e16"
+                      : (data as any)?.ground?.sport_type === "basketball"
+                        ? "#0f172a"
+                        : (data as any)?.ground?.sport_type === "tennis"
+                          ? "#0c4a6e"
+                          : ((data as any)?.ground?.sport_type === "concert" || (data as any)?.ground?.sport_type === "festival_t_stage")
+                            ? "#020617"
+                            : "#7f1d1d")
+                  }
+                  stroke="rgba(255,255,255,0.15)"
+                  strokeWidth={1.5}
+                  cornerRadius={(data as any)?.ground?.sport_type === "cricket" ? (pitchW + 100) / 2 : 40}
+                  perfectDrawEnabled={false}
+                />
 
               {/* ── Dynamic Sports Ground Pitch / Field ── */}
               {((data as any)?.ground?.sport_type === "cricket") ? (
@@ -1855,6 +1856,177 @@ export default function StadiumLayoutViewer({
                     fill="#94a3b8"
                   />
                 </>
+              ) : ((data as any)?.ground?.sport_type === "festival_t_stage") ? (
+                // 🎸 5. FESTIVAL T-STAGE & TIERED ZONES (Stage + Catwalk + Fan Pit L/R + Platinum + Gold + Silver)
+                <>
+                  {/* Dark Arena Base */}
+                  <Rect
+                    x={0}
+                    y={0}
+                    width={pitchW}
+                    height={pitchH}
+                    fill={(data as any)?.ground?.turf_color || "#090d16"}
+                    stroke="#818cf8"
+                    strokeWidth={3}
+                    cornerRadius={16}
+                  />
+
+                  {/* 1. Main Stage */}
+                  <Rect
+                    x={pitchW * 0.12}
+                    y={pitchH * 0.03}
+                    width={pitchW * 0.76}
+                    height={pitchH * 0.16}
+                    fill="#4c1d95"
+                    stroke="#c084fc"
+                    strokeWidth={3}
+                    cornerRadius={8}
+                    shadowColor="#a855f7"
+                    shadowBlur={16}
+                  />
+                  <Text
+                    text="🎤 MAIN STAGE"
+                    x={pitchW * 0.12}
+                    y={pitchH * 0.03 + pitchH * 0.05}
+                    width={pitchW * 0.76}
+                    align="center"
+                    fontSize={Math.max(14, pitchH * 0.04)}
+                    fontStyle="bold"
+                    fill="#ffffff"
+                  />
+
+                  {/* 2. Catwalk / T-Runway */}
+                  <Rect
+                    x={pitchW * 0.42}
+                    y={pitchH * 0.19}
+                    width={pitchW * 0.16}
+                    height={pitchH * 0.18}
+                    fill="#581c87"
+                    stroke="#d8b4fe"
+                    strokeWidth={2.5}
+                    cornerRadius={[0, 0, 8, 8]}
+                  />
+                  <Text
+                    text="CATWALK"
+                    x={pitchW * 0.42}
+                    y={pitchH * 0.19 + pitchH * 0.06}
+                    width={pitchW * 0.16}
+                    align="center"
+                    fontSize={Math.max(10, pitchH * 0.026)}
+                    fontStyle="bold"
+                    fill="#f3e8ff"
+                  />
+
+                  {/* 3. Fan Pit Left */}
+                  <Rect
+                    x={pitchW * 0.12}
+                    y={pitchH * 0.20}
+                    width={pitchW * 0.27}
+                    height={pitchH * 0.16}
+                    fill="#831843"
+                    stroke="#f472b6"
+                    strokeWidth={2}
+                    cornerRadius={8}
+                  />
+                  <Text
+                    text="🔥 FAN PIT (L)"
+                    x={pitchW * 0.12}
+                    y={pitchH * 0.20 + pitchH * 0.05}
+                    width={pitchW * 0.27}
+                    align="center"
+                    fontSize={Math.max(11, pitchH * 0.03)}
+                    fontStyle="bold"
+                    fill="#fdf2f8"
+                  />
+
+                  {/* 4. Fan Pit Right */}
+                  <Rect
+                    x={pitchW * 0.61}
+                    y={pitchH * 0.20}
+                    width={pitchW * 0.27}
+                    height={pitchH * 0.16}
+                    fill="#831843"
+                    stroke="#f472b6"
+                    strokeWidth={2}
+                    cornerRadius={8}
+                  />
+                  <Text
+                    text="🔥 FAN PIT (R)"
+                    x={pitchW * 0.61}
+                    y={pitchH * 0.20 + pitchH * 0.05}
+                    width={pitchW * 0.27}
+                    align="center"
+                    fontSize={Math.max(11, pitchH * 0.03)}
+                    fontStyle="bold"
+                    fill="#fdf2f8"
+                  />
+
+                  {/* 5. Platinum Tier */}
+                  <Rect
+                    x={pitchW * 0.10}
+                    y={pitchH * 0.39}
+                    width={pitchW * 0.80}
+                    height={pitchH * 0.17}
+                    fill="#0f172a"
+                    stroke="#38bdf8"
+                    strokeWidth={2.5}
+                    cornerRadius={8}
+                  />
+                  <Text
+                    text="💎 PLATINUM"
+                    x={pitchW * 0.10}
+                    y={pitchH * 0.39 + pitchH * 0.055}
+                    width={pitchW * 0.80}
+                    align="center"
+                    fontSize={Math.max(13, pitchH * 0.035)}
+                    fontStyle="bold"
+                    fill="#38bdf8"
+                  />
+
+                  {/* 6. Gold Tier */}
+                  <Rect
+                    x={pitchW * 0.10}
+                    y={pitchH * 0.58}
+                    width={pitchW * 0.80}
+                    height={pitchH * 0.17}
+                    fill="#1c1917"
+                    stroke="#eab308"
+                    strokeWidth={2.5}
+                    cornerRadius={8}
+                  />
+                  <Text
+                    text="⭐ GOLD"
+                    x={pitchW * 0.10}
+                    y={pitchH * 0.58 + pitchH * 0.055}
+                    width={pitchW * 0.80}
+                    align="center"
+                    fontSize={Math.max(13, pitchH * 0.035)}
+                    fontStyle="bold"
+                    fill="#eab308"
+                  />
+
+                  {/* 7. Silver Tier */}
+                  <Rect
+                    x={pitchW * 0.10}
+                    y={pitchH * 0.77}
+                    width={pitchW * 0.80}
+                    height={pitchH * 0.17}
+                    fill="#020617"
+                    stroke="#94a3b8"
+                    strokeWidth={2.5}
+                    cornerRadius={8}
+                  />
+                  <Text
+                    text="🪙 SILVER"
+                    x={pitchW * 0.10}
+                    y={pitchH * 0.77 + pitchH * 0.055}
+                    width={pitchW * 0.80}
+                    align="center"
+                    fontSize={Math.max(13, pitchH * 0.035)}
+                    fontStyle="bold"
+                    fill="#cbd5e1"
+                  />
+                </>
               ) : ((data as any)?.ground?.sport_type === "custom") ? (
                 // 🔲 5. CUSTOM / MULTI-PURPOSE PITCH
                 <>
@@ -2028,22 +2200,25 @@ export default function StadiumLayoutViewer({
               )}
 
               {/* Pitch Label */}
-              <Text
-                text={(data as any)?.ground?.pitch_label || data.pitch_label || "MAIN PITCH"}
-                x={0}
-                y={pitchH / 2 - 14}
-                width={pitchW}
-                align="center"
-                fontSize={Math.max(16, Math.min(pitchW, pitchH) * 0.05)}
-                fontStyle="bold"
-                fill="#ffffff"
-                opacity={0.85}
-                shadowColor="#000000"
-                shadowBlur={10}
-                listening={false}
-                perfectDrawEnabled={false}
-              />
+              {(data as any)?.ground?.sport_type !== "festival_t_stage" && (
+                <Text
+                  text={(data as any)?.ground?.pitch_label || data.pitch_label || "MAIN PITCH"}
+                  x={0}
+                  y={pitchH / 2 - 14}
+                  width={pitchW}
+                  align="center"
+                  fontSize={Math.max(16, Math.min(pitchW, pitchH) * 0.05)}
+                  fontStyle="bold"
+                  fill="#ffffff"
+                  opacity={0.85}
+                  shadowColor="#000000"
+                  shadowBlur={10}
+                  listening={false}
+                  perfectDrawEnabled={false}
+                />
+              )}
             </Group>
+          )}
 
             {/* ── Custom Elements (Stage, Jumbotron Screen, Gates, Lounges) ── */}
             {Array.isArray((data as any)?.elements) &&
@@ -2793,7 +2968,7 @@ export default function StadiumLayoutViewer({
                 const sportType = (data as any)?.ground?.sport_type || "football";
                 let pitchText = "⚽ PITCH THIS WAY";
                 if (sportType === "cricket") pitchText = "🏏 PITCH THIS WAY";
-                else if (sportType === "concert") pitchText = "🎤 STAGE THIS WAY";
+                else if (sportType === "concert" || sportType === "festival_t_stage") pitchText = "🎤 STAGE THIS WAY";
                 else if (sportType === "basketball") pitchText = "🏀 COURT THIS WAY";
 
                 if (selectedBlock.shape === "arc") {

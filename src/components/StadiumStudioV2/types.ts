@@ -74,7 +74,8 @@ export interface StadiumElementDefV2 {
 }
 
 export interface StadiumGroundConfigV2 {
-  sport_type: "football" | "cricket" | "basketball" | "tennis" | "concert" | "custom";
+  enabled?: boolean;
+  sport_type: "football" | "cricket" | "basketball" | "tennis" | "concert" | "festival_t_stage" | "custom";
   pitch_label: string;
   turf_color: string;
   track_color?: string;

@@ -133,7 +133,8 @@ export interface StadiumElementDef {
 }
 
 export interface StadiumGroundConfig {
-  sport_type: "football" | "cricket" | "basketball" | "tennis" | "concert" | "custom";
+  enabled?: boolean;
+  sport_type: "football" | "cricket" | "basketball" | "tennis" | "concert" | "festival_t_stage" | "custom";
   pitch_label: string;
   turf_color: string;
   track_color?: string;
@@ -3209,18 +3210,21 @@ export default function StadiumBlockBuilder({
 
   // Ground Configuration state (Editable Position, Size & Rotation)
   const [groundConfig, setGroundConfig] = useState<StadiumGroundConfig>(
-    initialConfig?.ground ?? {
-      sport_type: "football",
-      pitch_label: initialConfig?.pitch_label ?? "FOOTBALL PITCH",
-      turf_color: "#14532d",
-      track_color: "#7f1d1d",
-      shape: "rectangle",
-      x: PITCH_X,
-      y: PITCH_Y,
-      width: PITCH_W,
-      height: PITCH_H,
-      rotation: 0,
-    }
+    initialConfig?.ground
+      ? { ...initialConfig.ground, enabled: initialConfig.ground.enabled !== false }
+      : {
+          enabled: true,
+          sport_type: "football",
+          pitch_label: initialConfig?.pitch_label ?? "FOOTBALL PITCH",
+          turf_color: "#14532d",
+          track_color: "#7f1d1d",
+          shape: "rectangle",
+          x: PITCH_X,
+          y: PITCH_Y,
+          width: PITCH_W,
+          height: PITCH_H,
+          rotation: 0,
+        }
   );
 
   // Blocks (Stands) & Custom Elements State
@@ -3336,8 +3340,29 @@ export default function StadiumBlockBuilder({
     }
   }, [selectedId, selectedElementId, blocks, elements, groundConfig]);
 
+  // ── Delete / Remove Ground Handler ──
+  const deleteGround = useCallback(() => {
+    setGroundConfig((prev) => ({ ...prev, enabled: false }));
+    if (selectedId === "ground-pitch") setSelectedId(null);
+    toast.success("Ground section removed from layout!");
+  }, [selectedId]);
+
+  // ── Restore / Add Ground Handler ──
+  const restoreGround = useCallback(() => {
+    setGroundConfig((prev) => ({ ...prev, enabled: true }));
+    setSelectedId("ground-pitch");
+    setSelectedElementId(null);
+    setActiveSidebarTab("ground");
+    toast.success("Ground section added back to layout!");
+  }, []);
+
   // ── Switch Sport Ground Handler ──
-  const handleSportTypeChange = (type: StadiumGroundConfig["sport_type"]) => {
+  const handleSportTypeChange = (type: StadiumGroundConfig["sport_type"] | "none") => {
+    if (type === "none") {
+      deleteGround();
+      return;
+    }
+
     let label = "FOOTBALL PITCH";
     let color = "#14532d";
     let track = "#7f1d1d";
@@ -3358,6 +3383,10 @@ export default function StadiumBlockBuilder({
       label = "LIVE CONCERT ARENA";
       color = "#18181b";
       track = "#030712";
+    } else if (type === "festival_t_stage") {
+      label = "FESTIVAL T-STAGE & ARENA";
+      color = "#090d16";
+      track = "#020617";
     } else if (type === "custom") {
       label = "MULTI-PURPOSE FIELD";
       color = "#334155";
@@ -3366,6 +3395,7 @@ export default function StadiumBlockBuilder({
 
     setGroundConfig((prev) => ({
       ...prev,
+      enabled: true,
       sport_type: type,
       pitch_label: label,
       turf_color: color,
@@ -3373,7 +3403,7 @@ export default function StadiumBlockBuilder({
       shape: type === "cricket" ? "oval" : "rectangle",
     }));
     setPitchLabel(label);
-    toast.info(`Switched sport ground to ${type.toUpperCase()} layout!`);
+    toast.info(`Switched sport ground to ${type === "festival_t_stage" ? "FESTIVAL T-STAGE" : type.toUpperCase()} layout!`);
   };
 
   // ── Mouse Wheel Zoom at Cursor Pointer ──
@@ -4062,7 +4092,7 @@ export default function StadiumBlockBuilder({
               </label>
               <select
                 className="text-xs font-bold bg-slate-800 text-amber-400 border border-slate-600 rounded-lg px-2.5 py-1.5 focus:outline-none cursor-pointer"
-                value={groundConfig.sport_type}
+                value={groundConfig.enabled === false ? "none" : groundConfig.sport_type}
                 onChange={(e) => handleSportTypeChange(e.target.value as any)}
               >
                 <option value="football">⚽ Football / Soccer Pitch</option>
@@ -4070,35 +4100,62 @@ export default function StadiumBlockBuilder({
                 <option value="basketball">🏀 Basketball / Arena Court</option>
                 <option value="tennis">🎾 Tennis Court</option>
                 <option value="concert">🎤 Concert Arena & Stage</option>
+                <option value="festival_t_stage">🎸 Festival T-Stage (Stage, Fan Pit, Platinum, Gold, Silver)</option>
                 <option value="custom">🔲 Custom Pitch</option>
+                <option value="none">🚫 No Ground Section (Remove / Hide)</option>
               </select>
             </div>
 
-            {/* Quick Pitch Edit Toggle Button */}
+            {/* Quick Pitch Edit / Add / Delete Buttons */}
             <div>
               <label className="text-xs uppercase font-extrabold text-slate-300 block mb-1">
                 Ground Mode
               </label>
-              <button
-                type="button"
-                onClick={() => {
-                  if (isPitchSelected) {
-                    setSelectedId(null);
-                  } else {
-                    setSelectedId("ground-pitch");
-                    setSelectedElementId(null);
-                    setActiveSidebarTab("ground");
-                  }
-                }}
-                className={`flex items-center gap-1.5 text-xs font-extrabold px-3 py-1.5 rounded-lg border transition-all active:scale-95 ${isPitchSelected
-                  ? "bg-sky-500 text-slate-950 border-sky-400 shadow-md shadow-sky-500/20"
-                  : "bg-slate-800 hover:bg-slate-700 text-sky-400 border-slate-600"
-                  }`}
-                title="Click to select pitch and move/resize on canvas"
-              >
-                <Crosshair className="w-3.5 h-3.5" />
-                <span>{isPitchSelected ? "Pitch Active" : "Edit Pitch Section"}</span>
-              </button>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (groundConfig.enabled === false) {
+                      restoreGround();
+                    } else if (isPitchSelected) {
+                      setSelectedId(null);
+                    } else {
+                      setSelectedId("ground-pitch");
+                      setSelectedElementId(null);
+                      setActiveSidebarTab("ground");
+                    }
+                  }}
+                  className={`flex items-center gap-1.5 text-xs font-extrabold px-3 py-1.5 rounded-lg border transition-all active:scale-95 ${groundConfig.enabled === false
+                    ? "bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-500 shadow-md shadow-emerald-500/20"
+                    : isPitchSelected
+                    ? "bg-sky-500 text-slate-950 border-sky-400 shadow-md shadow-sky-500/20"
+                    : "bg-slate-800 hover:bg-slate-700 text-sky-400 border-slate-600"
+                    }`}
+                  title={groundConfig.enabled === false ? "Ground is deleted/hidden. Click to restore" : "Click to select pitch and move/resize on canvas"}
+                >
+                  {groundConfig.enabled === false ? (
+                    <>
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>+ Add Ground Section</span>
+                    </>
+                  ) : (
+                    <>
+                      <Crosshair className="w-3.5 h-3.5" />
+                      <span>{isPitchSelected ? "Pitch Active" : "Edit Pitch Section"}</span>
+                    </>
+                  )}
+                </button>
+                {groundConfig.enabled !== false && (
+                  <button
+                    type="button"
+                    onClick={deleteGround}
+                    className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-900/60 text-slate-400 hover:text-rose-400 border border-slate-600 hover:border-rose-700 transition-colors"
+                    title="Delete / Remove Ground Section"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Quick Add Element Dropdown */}
@@ -4343,20 +4400,21 @@ export default function StadiumBlockBuilder({
               />
 
               {/* ── Ground / Pitch Section (Fully Editable, Draggable & Resizable) ── */}
-              <Group
-                ref={isPitchSelected ? (n) => { groundRef.current = n; } : undefined}
-                x={pitchX + pitchW / 2}
-                y={pitchY + pitchH / 2}
-                offsetX={pitchW / 2}
-                offsetY={pitchH / 2}
-                rotation={pitchRot}
-                draggable
-                onClick={(e) => {
-                  e.cancelBubble = true;
-                  setSelectedId("ground-pitch");
-                  setSelectedElementId(null);
-                  setActiveSidebarTab("ground");
-                }}
+              {groundConfig.enabled !== false && (
+                <Group
+                  ref={isPitchSelected ? (n) => { groundRef.current = n; } : undefined}
+                  x={pitchX + pitchW / 2}
+                  y={pitchY + pitchH / 2}
+                  offsetX={pitchW / 2}
+                  offsetY={pitchH / 2}
+                  rotation={pitchRot}
+                  draggable
+                  onClick={(e) => {
+                    e.cancelBubble = true;
+                    setSelectedId("ground-pitch");
+                    setSelectedElementId(null);
+                    setActiveSidebarTab("ground");
+                  }}
                 onTap={(e) => {
                   e.cancelBubble = true;
                   setSelectedId("ground-pitch");
@@ -4403,8 +4461,8 @@ export default function StadiumBlockBuilder({
                         ? "#0f172a"
                         : groundConfig.sport_type === "tennis"
                           ? "#0c4a6e"
-                          : groundConfig.sport_type === "concert"
-                            ? "#030712"
+                          : groundConfig.sport_type === "concert" || groundConfig.sport_type === "festival_t_stage"
+                            ? "#020617"
                             : "#7f1d1d")
                   }
                   stroke={isPitchSelected ? "#38bdf8" : "rgba(255,255,255,0.15)"}
@@ -4637,6 +4695,177 @@ export default function StadiumBlockBuilder({
                       fill="#94a3b8"
                     />
                   </>
+                ) : groundConfig.sport_type === "festival_t_stage" ? (
+                  // 🎸 5. FESTIVAL T-STAGE & TIERED ZONES (Stage + Catwalk + Fan Pit L/R + Platinum + Gold + Silver)
+                  <>
+                    {/* Dark Arena Base */}
+                    <Rect
+                      x={0}
+                      y={0}
+                      width={pitchW}
+                      height={pitchH}
+                      fill={groundConfig.turf_color || "#090d16"}
+                      stroke="#818cf8"
+                      strokeWidth={3}
+                      cornerRadius={16}
+                    />
+
+                    {/* 1. Main Stage (Top Wide Rectangle) */}
+                    <Rect
+                      x={pitchW * 0.12}
+                      y={pitchH * 0.03}
+                      width={pitchW * 0.76}
+                      height={pitchH * 0.16}
+                      fill="#4c1d95"
+                      stroke="#c084fc"
+                      strokeWidth={3}
+                      cornerRadius={8}
+                      shadowColor="#a855f7"
+                      shadowBlur={16}
+                    />
+                    <Text
+                      text="🎤 MAIN STAGE"
+                      x={pitchW * 0.12}
+                      y={pitchH * 0.03 + pitchH * 0.05}
+                      width={pitchW * 0.76}
+                      align="center"
+                      fontSize={Math.max(14, pitchH * 0.04)}
+                      fontStyle="bold"
+                      fill="#ffffff"
+                    />
+
+                    {/* 2. Catwalk / T-Runway (Projecting Down into Audience) */}
+                    <Rect
+                      x={pitchW * 0.42}
+                      y={pitchH * 0.19}
+                      width={pitchW * 0.16}
+                      height={pitchH * 0.18}
+                      fill="#581c87"
+                      stroke="#d8b4fe"
+                      strokeWidth={2.5}
+                      cornerRadius={[0, 0, 8, 8]}
+                    />
+                    <Text
+                      text="CATWALK"
+                      x={pitchW * 0.42}
+                      y={pitchH * 0.19 + pitchH * 0.06}
+                      width={pitchW * 0.16}
+                      align="center"
+                      fontSize={Math.max(10, pitchH * 0.026)}
+                      fontStyle="bold"
+                      fill="#f3e8ff"
+                    />
+
+                    {/* 3. Fan Pit Left (Flanking Catwalk) */}
+                    <Rect
+                      x={pitchW * 0.12}
+                      y={pitchH * 0.20}
+                      width={pitchW * 0.27}
+                      height={pitchH * 0.16}
+                      fill="#831843"
+                      stroke="#f472b6"
+                      strokeWidth={2}
+                      cornerRadius={8}
+                    />
+                    <Text
+                      text="🔥 FAN PIT (L)"
+                      x={pitchW * 0.12}
+                      y={pitchH * 0.20 + pitchH * 0.05}
+                      width={pitchW * 0.27}
+                      align="center"
+                      fontSize={Math.max(11, pitchH * 0.03)}
+                      fontStyle="bold"
+                      fill="#fdf2f8"
+                    />
+
+                    {/* 4. Fan Pit Right (Flanking Catwalk) */}
+                    <Rect
+                      x={pitchW * 0.61}
+                      y={pitchH * 0.20}
+                      width={pitchW * 0.27}
+                      height={pitchH * 0.16}
+                      fill="#831843"
+                      stroke="#f472b6"
+                      strokeWidth={2}
+                      cornerRadius={8}
+                    />
+                    <Text
+                      text="🔥 FAN PIT (R)"
+                      x={pitchW * 0.61}
+                      y={pitchH * 0.20 + pitchH * 0.05}
+                      width={pitchW * 0.27}
+                      align="center"
+                      fontSize={Math.max(11, pitchH * 0.03)}
+                      fontStyle="bold"
+                      fill="#fdf2f8"
+                    />
+
+                    {/* 5. Platinum Tier */}
+                    <Rect
+                      x={pitchW * 0.10}
+                      y={pitchH * 0.39}
+                      width={pitchW * 0.80}
+                      height={pitchH * 0.17}
+                      fill="#0f172a"
+                      stroke="#38bdf8"
+                      strokeWidth={2.5}
+                      cornerRadius={8}
+                    />
+                    <Text
+                      text="💎 PLATINUM"
+                      x={pitchW * 0.10}
+                      y={pitchH * 0.39 + pitchH * 0.055}
+                      width={pitchW * 0.80}
+                      align="center"
+                      fontSize={Math.max(13, pitchH * 0.035)}
+                      fontStyle="bold"
+                      fill="#38bdf8"
+                    />
+
+                    {/* 6. Gold Tier */}
+                    <Rect
+                      x={pitchW * 0.10}
+                      y={pitchH * 0.58}
+                      width={pitchW * 0.80}
+                      height={pitchH * 0.17}
+                      fill="#1c1917"
+                      stroke="#eab308"
+                      strokeWidth={2.5}
+                      cornerRadius={8}
+                    />
+                    <Text
+                      text="⭐ GOLD"
+                      x={pitchW * 0.10}
+                      y={pitchH * 0.58 + pitchH * 0.055}
+                      width={pitchW * 0.80}
+                      align="center"
+                      fontSize={Math.max(13, pitchH * 0.035)}
+                      fontStyle="bold"
+                      fill="#eab308"
+                    />
+
+                    {/* 7. Silver Tier */}
+                    <Rect
+                      x={pitchW * 0.10}
+                      y={pitchH * 0.77}
+                      width={pitchW * 0.80}
+                      height={pitchH * 0.17}
+                      fill="#020617"
+                      stroke="#94a3b8"
+                      strokeWidth={2.5}
+                      cornerRadius={8}
+                    />
+                    <Text
+                      text="🪙 SILVER"
+                      x={pitchW * 0.10}
+                      y={pitchH * 0.77 + pitchH * 0.055}
+                      width={pitchW * 0.80}
+                      align="center"
+                      fontSize={Math.max(13, pitchH * 0.035)}
+                      fontStyle="bold"
+                      fill="#cbd5e1"
+                    />
+                  </>
                 ) : groundConfig.sport_type === "custom" ? (
                   // 🔲 5. CUSTOM / MULTI-PURPOSE PITCH
                   <>
@@ -4794,20 +5023,23 @@ export default function StadiumBlockBuilder({
                 )}
 
                 {/* Pitch Label */}
-                <Text
-                  text={groundConfig.pitch_label || pitchLabel}
-                  x={0}
-                  y={pitchH / 2 - 14}
-                  width={pitchW}
-                  align="center"
-                  fontSize={Math.max(16, Math.min(pitchW, pitchH) * 0.05)}
-                  fontStyle="bold"
-                  fill="#ffffff"
-                  opacity={0.9}
-                  listening={false}
-                  perfectDrawEnabled={false}
-                />
+                {groundConfig.sport_type !== "festival_t_stage" && (
+                  <Text
+                    text={groundConfig.pitch_label || pitchLabel}
+                    x={0}
+                    y={pitchH / 2 - 14}
+                    width={pitchW}
+                    align="center"
+                    fontSize={Math.max(16, Math.min(pitchW, pitchH) * 0.05)}
+                    fontStyle="bold"
+                    fill="#ffffff"
+                    opacity={0.9}
+                    listening={false}
+                    perfectDrawEnabled={false}
+                  />
+                )}
               </Group>
+            )}
 
               {/* ── Custom Elements (Stages, Screens, Gates, Lounges) ── */}
               {elements.map((el) => {
@@ -5622,44 +5854,76 @@ export default function StadiumBlockBuilder({
 
             {activeSidebarTab === "ground" && (
               <div className="space-y-4">
-                {/* 🎯 Pitch Active Selection Banner */}
-                <div
-                  className={`p-3.5 rounded-2xl border transition-all ${isPitchSelected
-                    ? "bg-sky-50 border-sky-300 ring-2 ring-sky-400/25 shadow-sm"
-                    : "bg-white border-slate-200 shadow-sm"
-                    }`}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2.5">
-                      <span className="text-base">🎯</span>
-                      <div>
-                        <h4 className="text-xs font-bold text-slate-900">
-                          {isPitchSelected ? "Pitch Selected (Handles Active)" : "Pitch Section"}
-                        </h4>
-                        <p className="text-[11px] text-slate-500">
-                          {isPitchSelected ? "Drag on canvas to position, pull handles to resize" : "Click to select pitch on canvas"}
-                        </p>
-                      </div>
+                {groundConfig.enabled === false ? (
+                  <div className="p-6 rounded-2xl bg-white border border-dashed border-slate-300 text-center space-y-3.5 shadow-sm">
+                    <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center mx-auto text-2xl shadow-inner">
+                      🏟️
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-extrabold text-slate-900">Ground Section is Deleted (Hidden)</h4>
+                      <p className="text-xs text-slate-500 mt-1 max-w-xs mx-auto">
+                        This venue layout currently has no center pitch/ground. Your stands, stages, and custom elements will render freely.
+                      </p>
                     </div>
                     <button
                       type="button"
-                      onClick={() => {
-                        if (isPitchSelected) {
-                          setSelectedId(null);
-                        } else {
-                          setSelectedId("ground-pitch");
-                          setSelectedElementId(null);
-                        }
-                      }}
-                      className={`text-xs font-bold px-3 py-1.5 rounded-xl transition-all shadow-sm active:scale-95 shrink-0 ${isPitchSelected
-                        ? "bg-sky-600 text-white hover:bg-sky-700"
-                        : "bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200"
-                        }`}
+                      onClick={restoreGround}
+                      className="px-4 py-2.5 rounded-xl text-xs font-extrabold bg-sky-600 hover:bg-sky-500 text-white shadow-md shadow-sky-600/20 inline-flex items-center gap-2 mx-auto transition-all active:scale-95"
                     >
-                      {isPitchSelected ? "Deselect" : "Select Pitch"}
+                      <Plus className="w-4 h-4" />
+                      <span>+ Add / Restore Ground Section</span>
                     </button>
                   </div>
-                </div>
+                ) : (
+                  <>
+                    {/* 🎯 Pitch Active Selection Banner */}
+                    <div
+                      className={`p-3.5 rounded-2xl border transition-all ${isPitchSelected
+                        ? "bg-sky-50 border-sky-300 ring-2 ring-sky-400/25 shadow-sm"
+                        : "bg-white border-slate-200 shadow-sm"
+                        }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <span className="text-base shrink-0">🎯</span>
+                          <div className="min-w-0">
+                            <h4 className="text-xs font-bold text-slate-900 truncate">
+                              {isPitchSelected ? "Pitch Selected (Handles Active)" : "Pitch Section"}
+                            </h4>
+                            <p className="text-[11px] text-slate-500 truncate">
+                              {isPitchSelected ? "Drag on canvas to position, pull handles to resize" : "Click to select pitch on canvas"}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (isPitchSelected) {
+                                setSelectedId(null);
+                              } else {
+                                setSelectedId("ground-pitch");
+                                setSelectedElementId(null);
+                              }
+                            }}
+                            className={`text-xs font-bold px-3 py-1.5 rounded-xl transition-all shadow-sm active:scale-95 ${isPitchSelected
+                              ? "bg-sky-600 text-white hover:bg-sky-700"
+                              : "bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200"
+                              }`}
+                          >
+                            {isPitchSelected ? "Deselect" : "Select Pitch"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={deleteGround}
+                            className="p-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 transition-colors shadow-sm"
+                            title="Delete / Remove Ground Section"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
 
                 {/* 📏 Numerical Position & Dimension Controls */}
                 <div className="p-4 rounded-2xl bg-white border border-slate-200 space-y-3.5 shadow-sm">
@@ -5817,6 +6081,139 @@ export default function StadiumBlockBuilder({
                     <span className="text-[11px] uppercase font-bold text-slate-600 tracking-wider block">
                       ⚡ Quick Stadium Architecture Presets
                     </span>
+                    {/* Hero Preset: Festival T-Stage Architecture (Stage + Catwalk + Fan Pit + Platinum + Gold + Silver) */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setGroundConfig({
+                          enabled: true,
+                          sport_type: "festival_t_stage",
+                          pitch_label: "FESTIVAL T-STAGE & ARENA",
+                          turf_color: "#090d16",
+                          track_color: "#020617",
+                          shape: "rectangle",
+                          x: CANVAS_W * 0.22,
+                          y: CANVAS_H * 0.16,
+                          width: CANVAS_W * 0.56,
+                          height: CANVAS_H * 0.68,
+                          rotation: 0,
+                        });
+                        setPitchLabel("FESTIVAL T-STAGE & ARENA");
+
+                        const defaultTicket = ticketTypes[0]?.id || "";
+                        const premiumTicket = ticketTypes[1]?.id || defaultTicket;
+                        const vipTicket = ticketTypes[2]?.id || premiumTicket;
+
+                        const festivalBlocks: StadiumBlockDef[] = [
+                          // 1. Fan Pit (Left)
+                          {
+                            id: "block-fan-pit-left",
+                            name: "Fan Pit (Left)",
+                            color: "#ec4899",
+                            stand_level: "lower",
+                            stand_type: "standing",
+                            shape: "rectangle",
+                            x: CANVAS_W * 0.29,
+                            y: CANVAS_H * 0.31,
+                            width: 140,
+                            height: 100,
+                            rotation: 0,
+                            capacity: 400,
+                            ticket_type_id: vipTicket,
+                            tiers: [
+                              { id: "fpl-1", name: "Fan Pit Left", color: "#ec4899", ticket_type_id: vipTicket, row_start: "A", row_end: "E", seats_per_row: 20 },
+                            ],
+                          },
+                          // 2. Fan Pit (Right)
+                          {
+                            id: "block-fan-pit-right",
+                            name: "Fan Pit (Right)",
+                            color: "#ec4899",
+                            stand_level: "lower",
+                            stand_type: "standing",
+                            shape: "rectangle",
+                            x: CANVAS_W * 0.57,
+                            y: CANVAS_H * 0.31,
+                            width: 140,
+                            height: 100,
+                            rotation: 0,
+                            capacity: 400,
+                            ticket_type_id: vipTicket,
+                            tiers: [
+                              { id: "fpr-1", name: "Fan Pit Right", color: "#ec4899", ticket_type_id: vipTicket, row_start: "A", row_end: "E", seats_per_row: 20 },
+                            ],
+                          },
+                          // 3. Platinum Stand
+                          {
+                            id: "block-platinum",
+                            name: "Platinum Stand",
+                            color: "#0284c7",
+                            stand_level: "lower",
+                            shape: "rectangle",
+                            x: CANVAS_W * 0.28,
+                            y: CANVAS_H * 0.44,
+                            width: CANVAS_W * 0.44,
+                            height: 90,
+                            rotation: 0,
+                            capacity: 800,
+                            ticket_type_id: premiumTicket,
+                            tiers: [
+                              { id: "plat-1", name: "Platinum Tier", color: "#38bdf8", ticket_type_id: premiumTicket, row_start: "A", row_end: "F", seats_per_row: 28 },
+                            ],
+                          },
+                          // 4. Gold Stand
+                          {
+                            id: "block-gold",
+                            name: "Gold Stand",
+                            color: "#d97706",
+                            stand_level: "multi",
+                            shape: "rectangle",
+                            x: CANVAS_W * 0.28,
+                            y: CANVAS_H * 0.55,
+                            width: CANVAS_W * 0.44,
+                            height: 90,
+                            rotation: 0,
+                            capacity: 1000,
+                            ticket_type_id: defaultTicket,
+                            tiers: [
+                              { id: "gold-1", name: "Gold Tier", color: "#f59e0b", ticket_type_id: defaultTicket, row_start: "G", row_end: "M", seats_per_row: 30 },
+                            ],
+                          },
+                          // 5. Silver Stand
+                          {
+                            id: "block-silver",
+                            name: "Silver Stand",
+                            color: "#64748b",
+                            stand_level: "upper",
+                            shape: "rectangle",
+                            x: CANVAS_W * 0.28,
+                            y: CANVAS_H * 0.66,
+                            width: CANVAS_W * 0.44,
+                            height: 90,
+                            rotation: 0,
+                            capacity: 1200,
+                            ticket_type_id: defaultTicket,
+                            tiers: [
+                              { id: "silver-1", name: "Silver Tier", color: "#94a3b8", ticket_type_id: defaultTicket, row_start: "N", row_end: "T", seats_per_row: 32 },
+                            ],
+                          },
+                        ];
+
+                        setBlocks(festivalBlocks);
+                        setSelectedId(festivalBlocks[0].id);
+                        toast.success("Applied Festival T-Stage Layout with Fan Pit, Platinum, Gold & Silver stands!");
+                      }}
+                      className="w-full p-2.5 rounded-xl bg-gradient-to-r from-purple-600 via-pink-600 to-rose-600 hover:from-purple-500 hover:to-rose-500 text-white font-extrabold text-xs shadow-md shadow-pink-600/20 flex items-center justify-between gap-2 transition-all active:scale-95 group"
+                    >
+                      <div className="flex items-center gap-2 text-left">
+                        <span className="text-base">🎸</span>
+                        <div>
+                          <div className="text-white font-black">⚡ Generate Festival T-Stage Architecture</div>
+                          <div className="text-[10px] text-pink-100 font-semibold">Stage + Catwalk + Fan Pit L/R + Platinum + Gold + Silver</div>
+                        </div>
+                      </div>
+                      <span className="text-[10px] bg-white/20 text-white px-2 py-0.5 rounded font-mono font-bold shrink-0">1-Click</span>
+                    </button>
                     {/* Hero Preset 0: Modern European Football Arena (4 Stands + 4 Corner Arcs as in photo) */}
                     <button
                       type="button"
@@ -8275,7 +8672,9 @@ export default function StadiumBlockBuilder({
                       <option value="basketball">🏀 Basketball / Indoor Court</option>
                       <option value="tennis">🎾 Tennis Court</option>
                       <option value="concert">🎤 Concert Arena Floor</option>
+                      <option value="festival_t_stage">🎸 Festival T-Stage (Stage, Fan Pit, Platinum, Gold, Silver)</option>
                       <option value="custom">🔲 Custom Rectangular Field</option>
+                      <option value="none">🚫 No Ground Section (Remove / Hide)</option>
                     </select>
                   </div>
 
@@ -8309,7 +8708,7 @@ export default function StadiumBlockBuilder({
                         }
                       />
                       <div className="flex flex-wrap gap-1.5 flex-1">
-                        {["#14532d", "#064e3b", "#b45309", "#1d4ed8", "#b91c1c", "#1e293b"].map((c) => (
+                        {["#14532d", "#064e3b", "#b45309", "#1d4ed8", "#b91c1c", "#1e293b", "#090d16"].map((c) => (
                           <button
                             key={c}
                             type="button"
@@ -8337,7 +8736,7 @@ export default function StadiumBlockBuilder({
                         }
                       />
                       <div className="flex flex-wrap gap-1.5 flex-1">
-                        {["#7f1d1d", "#052e16", "#0f172a", "#0c4a6e", "#030712", "#334155"].map((c) => (
+                        {["#7f1d1d", "#052e16", "#0f172a", "#0c4a6e", "#030712", "#020617", "#334155"].map((c) => (
                           <button
                             key={c}
                             type="button"
@@ -8349,7 +8748,20 @@ export default function StadiumBlockBuilder({
                       </div>
                     </div>
                   </div>
+
+                  {/* Remove / Delete Ground Button */}
+                  <div className="pt-2 border-t border-slate-200">
+                    <button
+                      type="button"
+                      onClick={deleteGround}
+                      className="w-full text-xs font-semibold text-rose-600 hover:text-rose-700 flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-rose-200 hover:border-rose-300 bg-rose-50/60 hover:bg-rose-100/80 transition-colors shadow-sm"
+                    >
+                      <Trash2 className="w-4 h-4" /> Remove / Delete Ground Section
+                    </button>
+                  </div>
                 </div>
+              </>
+            )}
               </div>
             )}
           </div>

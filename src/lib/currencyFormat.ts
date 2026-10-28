@@ -116,7 +116,7 @@ export function formatWholeNumber(amount: number | string | undefined | null): s
     return Math.round(n).toLocaleString(CURRENCY_LOCALE);
   }
   return n.toLocaleString(CURRENCY_LOCALE, {
-    minimumFractionDigits: 0,
+    minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
 }

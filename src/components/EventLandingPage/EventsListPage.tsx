@@ -1382,9 +1382,36 @@ export default function PublicEventsPage() {
     );
   }, [listingEvents, isCategoryBrowse, selectedEventGenres, activeCategoryKey]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const pageSafe = Math.min(page, totalPages);
-  const paged = filtered.slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE);
+  const visibleEvents = useMemo(() => {
+    return filtered.slice(0, page * PAGE_SIZE);
+  }, [filtered, page]);
+  const hasMore = visibleEvents.length < filtered.length;
+
+  const infiniteScrollSentinelRef = useRef<HTMLDivElement | null>(null);
+
+  const loadMore = useCallback(() => {
+    if (hasMore) {
+      setPage((prev) => prev + 1);
+    }
+  }, [hasMore]);
+
+  useEffect(() => {
+    const node = infiniteScrollSentinelRef.current;
+    if (!node || !hasMore) return;
+    if (typeof IntersectionObserver === "undefined") return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          loadMore();
+        }
+      },
+      { rootMargin: "450px 0px" }
+    );
+
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [hasMore, loadMore, visibleEvents.length]);
 
   useEffect(() => {
     if (!isCategoryBrowse) setSelectedEventGenres([]);
@@ -2386,7 +2413,7 @@ export default function PublicEventsPage() {
       <div className={`${CONTAINER} pt-5`}>
         {catalogPending ? (
           <EventListShimmer />
-        ) : paged.length === 0 ? (
+        ) : visibleEvents.length === 0 ? (
           hasNonCityFilters || Boolean(search.trim()) ? (
             <ListingNoResultsState
               kind="events"
@@ -2428,7 +2455,7 @@ export default function PublicEventsPage() {
           )
         ) : (
           <div className="  grid w-full  grid-cols-1 gap-5  md:grid-cols-2 md:gap-4 lg:grid-cols-4 lg:gap-5">
-            {paged.map((event) => (
+            {visibleEvents.map((event) => (
               <DistrictEventCard
                 key={event.id}
                 event={event}
@@ -2439,31 +2466,16 @@ export default function PublicEventsPage() {
           </div>
         )}
 
-        {filtered.length > PAGE_SIZE && (
-          <div className="mt-8 sm:mt-10 flex flex-wrap items-center justify-center gap-1.5 sm:gap-2">
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
-              <button
-                key={n}
-                type="button"
-                onClick={() => setPage(n)}
-                className={`w-9 h-9 rounded-full text-sm font-semibold cursor-pointer ${
-                  n === pageSafe
-                    ? "bg-[#6900AA] text-white"
-                    : "bg-white border border-slate-200 text-slate-700"
-                }`}
-              >
-                {n}
-              </button>
-            ))}
-            {pageSafe < totalPages && (
-              <button
-                type="button"
-                onClick={() => setPage(pageSafe + 1)}
-                className="inline-flex items-center gap-1 px-3 h-9 rounded-full bg-white border border-slate-200 text-sm font-semibold text-slate-700 cursor-pointer"
-              >
-                Next <FaChevronRight size={10} />
-              </button>
-            )}
+        {/* Infinite scroll sentinel + loader */}
+        {hasMore && (
+          <div
+            ref={infiniteScrollSentinelRef}
+            className="mt-8 mb-6 flex justify-center items-center py-4"
+          >
+            <div className="flex items-center gap-2.5 text-sm text-slate-500 font-medium">
+              <span className="size-4 rounded-full border-2 border-[#6900AA] border-t-transparent animate-spin" />
+              <span>Loading more events...</span>
+            </div>
           </div>
         )}
       </div>

@@ -821,7 +821,7 @@ function CinemaInfoModal({
   const mapQuery = cinemaMapsQuery(cinema);
   const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapQuery)}`;
   const embedUrl = `https://maps.google.com/maps?q=${encodeURIComponent(mapQuery)}&z=15&output=embed`;
-  const logoSrc = resolveMediaUrl(cinema.logo || "");
+  const logoSrc = resolveMediaUrl(cinema.logo || cinema.image || "");
 
   useEffect(() => {
     const prev = document.body.style.overflow;
@@ -2052,7 +2052,7 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
             <div className="space-y-3">
               {filteredCinemas.map((cinema) => {
                 const favorited = Boolean(favoritedIds[cinema.id]);
-                const logoSrc = resolveMediaUrl(cinema.logo || "");
+                const logoSrc = resolveMediaUrl(cinema.logo || cinema.image || "");
 
                 return (
                   <div
@@ -2144,12 +2144,6 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
                           />
                         </button>
                       </div>
-
-                      {/* Left-aligned with logo / showtimes (BMS), not indented under name column */}
-                      <CinemaAmenityBadges
-                        hasFnb={Boolean(cinema.has_fnb)}
-                        mTicket={cinema.m_ticket !== false}
-                      />
 
                       <div className="space-y-4">
                         {groupShowtimesByLangFormat(cinema.showtimes).map((group, groupIdx) => (

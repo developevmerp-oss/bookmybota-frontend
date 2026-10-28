@@ -318,10 +318,21 @@ export default function EventCheckout({
     return sessionToken ? { eventId: event.id, session_token: sessionToken } : event.id;
   }, [event.id, sessionToken]);
 
-  const { data: layoutData } = useGetEventLayoutQuery(layoutArg, { skip: !isOrganizer });
-  const { data: publicLayoutData } = useGetPublicEventLayoutQuery(layoutArg, { skip: isOrganizer });
+  const {
+    data: layoutData,
+    isLoading: layoutLoading,
+    isFetching: layoutFetching,
+  } = useGetEventLayoutQuery(layoutArg, { skip: !isOrganizer });
+  const {
+    data: publicLayoutData,
+    isLoading: publicLayoutLoading,
+    isFetching: publicLayoutFetching,
+  } = useGetPublicEventLayoutQuery(layoutArg, { skip: isOrganizer });
 
   const activeLayoutData = isOrganizer ? layoutData : publicLayoutData;
+  const isLayoutLoading = isOrganizer
+    ? layoutLoading || (!layoutData && layoutFetching)
+    : publicLayoutLoading || (!publicLayoutData && publicLayoutFetching);
 
   // Detect stadium mode: sports events with layout_mode = "stadium" in seating_config
   const seatingConfig = (activeLayoutData as any)?.data?.seating_config
@@ -989,6 +1000,22 @@ export default function EventCheckout({
   }, [expiresAt, holdId]);
 
   const hasReservedSeats = Boolean(activeLayoutData?.data?.seats?.length) || isStadiumLayout;
+  const showtimeHasSeatingLayout = useMemo(() => {
+    if (activeLayoutData) {
+      return Boolean(activeLayoutData?.data?.seats?.length) || isStadiumLayout;
+    }
+    const mode = (selectedShowtime as any)?.layout_mode;
+    if (mode === "standard" || mode === "custom") return true;
+    if ((selectedShowtime as any)?.venue_layout_template_id) return true;
+    if (isStadiumLayout) return true;
+    if (mode === "none") return false;
+    return showtimes.some(
+      (s: any) =>
+        s.layout_mode === "standard" ||
+        s.layout_mode === "custom" ||
+        Boolean(s.venue_layout_template_id)
+    );
+  }, [activeLayoutData, isStadiumLayout, selectedShowtime, showtimes]);
   const maxSeatQtyPick = useMemo(() => {
     if (!hasReservedSeats) return 10;
     const fromTickets = ticketTypes.map((t) =>
@@ -1225,6 +1252,7 @@ export default function EventCheckout({
   const accentFocus = "focus:border-[#6900AA]";
   const seatCountActiveGradient =
     "linear-gradient(180deg, #A78BFA 0%, #8B5CF6 38%, #6D28D9 72%, #4C1D95 100%)";
+  const isCustomerLoggedIn = authUser?.role === "customer";
   const stepTitle =
     step === 1
       ? "Select Venue"
@@ -1237,15 +1265,18 @@ export default function EventCheckout({
     step === 1
       ? "Choose a city and venue for your event."
       : step === 2
-        ? hasReservedSeats
+        ? hasReservedSeats || showtimeHasSeatingLayout
           ? "Choose how many seats, then pick them on the map or grid."
           : "You can add tickets based on availability."
         : step === 3
           ? availableTicketModes.length === 1
-            ? "Confirm ticket delivery and sign in to continue."
-            : "Choose how you want your tickets and sign in to continue."
+            ? isCustomerLoggedIn || isOrganizer
+              ? "Confirm your ticket delivery method to continue."
+              : "Confirm ticket delivery and sign in to continue."
+            : isCustomerLoggedIn || isOrganizer
+              ? "Choose how you want your tickets to continue."
+              : "Choose how you want your tickets and sign in to continue."
           : "Review your order and confirm your booking.";
-  const isCustomerLoggedIn = authUser?.role === "customer";
   const contactDetailsReady = eventCheckoutContactSchema.isValidSync({
     name,
     phone,
@@ -1985,7 +2016,40 @@ export default function EventCheckout({
               </div>
             )}
 
-            {hasReservedSeats ? (
+            {isLayoutLoading && !activeLayoutData ? (
+              showtimeHasSeatingLayout ? (
+                <div className="space-y-4">
+                  <div className="bg-white border border-slate-200 rounded-xl p-5 sm:p-6 space-y-5 animate-pulse">
+                    <div className="text-center space-y-2">
+                      <div className="h-5 w-44 bg-slate-200 rounded-lg mx-auto" />
+                      <div className="h-4 w-72 max-w-full bg-slate-100 rounded-lg mx-auto" />
+                    </div>
+                    <div className="grid grid-cols-5 gap-2.5 max-w-sm mx-auto">
+                      {Array.from({ length: 10 }).map((_, i) => (
+                        <div key={i} className="h-12 rounded-xl bg-slate-100" />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3 animate-pulse">
+                  <div className="h-4 w-72 max-w-full bg-slate-100 rounded mb-2" />
+                  {Array.from({ length: ticketTypes.length > 0 ? Math.min(ticketTypes.length, 4) : 3 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className="rounded-[0.75rem] px-4 py-3.5 flex items-center justify-between gap-3 bg-white shadow-[0_0.125rem_0.75rem_rgba(15,23,42,0.06)] border border-slate-100"
+                    >
+                      <div className="min-w-0 space-y-2">
+                        <div className="h-5 w-32 bg-slate-200 rounded" />
+                        <div className="h-4 w-20 bg-slate-100 rounded" />
+                        <div className="h-3 w-16 bg-slate-100 rounded" />
+                      </div>
+                      <div className="h-9 w-24 bg-slate-100 rounded-lg" />
+                    </div>
+                  ))}
+                </div>
+              )
+            ) : hasReservedSeats ? (
               <div className="space-y-4">
                 {desiredSeatQty == null ? (
                   <div className="bg-white border border-slate-200 rounded-xl p-5 sm:p-6 space-y-5">
@@ -2336,14 +2400,14 @@ export default function EventCheckout({
                   </button>
                 </>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-2">
                   <p className="text-[0.875rem] text-slate-500 leading-relaxed">
-                    Sign in with your phone number to book tickets and receive your M-Ticket.
+                    Sign in with your phone number to book tickets and receive your {ticketModeLabel(ticketMode)}.
                   </p>
                   <button
                     type="button"
                     onClick={() => setAuthModalOpen(true)}
-                    className={`w-full py-3 rounded-xl ${accentBtn} text-white font-semibold text-[1rem] cursor-pointer`}
+                    className="text-[0.875rem] font-semibold text-[#6900AA] hover:underline cursor-pointer"
                   >
                     Sign in with phone
                   </button>
@@ -2808,21 +2872,35 @@ export default function EventCheckout({
                 >
                   <ArrowLeft size={14} /> Back
                 </button>
-                <button
-                  type="button"
-                  onClick={() => void proceedToReview()}
-                  disabled={!canProceedFromTicketMode || holding}
-                  className={`flex-1 py-3 ${accentBtn} disabled:bg-slate-300 disabled:text-white disabled:hover:bg-slate-300 text-white font-semibold text-[1.0625rem] cursor-pointer disabled:cursor-not-allowed inline-flex items-center justify-center gap-2 ${isPage ? "rounded-[0.5rem]" : "rounded-xl disabled:bg-[#E3BCFF] disabled:hover:bg-[#E3BCFF]"
+                {!isOrganizer && !isCustomerLoggedIn ? (
+                  <button
+                    type="button"
+                    onClick={() => setAuthModalOpen(true)}
+                    disabled={!ticketMode || !deliveryDetailsReady}
+                    className={`flex-1 py-3 ${accentBtn} disabled:bg-slate-300 disabled:text-white text-white font-semibold text-[1.0625rem] cursor-pointer disabled:cursor-not-allowed inline-flex items-center justify-center gap-2 ${
+                      isPage ? "rounded-[0.5rem]" : "rounded-xl"
                     }`}
-                >
-                  {holding ? (
-                    <>
-                      <Loader2 size={16} className="animate-spin" /> Holding seats…
-                    </>
-                  ) : (
-                    "Continue to review"
-                  )}
-                </button>
+                  >
+                    Sign in with phone
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => void proceedToReview()}
+                    disabled={!canProceedFromTicketMode || holding}
+                    className={`flex-1 py-3 ${accentBtn} disabled:bg-slate-300 disabled:text-white disabled:hover:bg-slate-300 text-white font-semibold text-[1.0625rem] cursor-pointer disabled:cursor-not-allowed inline-flex items-center justify-center gap-2 ${
+                      isPage ? "rounded-[0.5rem]" : "rounded-xl disabled:bg-[#E3BCFF] disabled:hover:bg-[#E3BCFF]"
+                    }`}
+                  >
+                    {holding ? (
+                      <>
+                        <Loader2 size={16} className="animate-spin" /> Holding seats…
+                      </>
+                    ) : (
+                      "Continue to review"
+                    )}
+                  </button>
+                )}
               </div>
             )}
             {step === 4 && (

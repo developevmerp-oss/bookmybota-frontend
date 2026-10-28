@@ -390,7 +390,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
   const [viewMode] = useState<"canvas" | "grid" | "classic">("classic");
   // const [viewMode, setViewMode] = useState<"canvas" | "grid" | "classic">("classic");
   const [isMapFullscreen, setIsMapFullscreen] = useState(false);
-  const [classicZoom, setClassicZoom] = useState(1.45);
+  const [classicZoom, setClassicZoom] = useState(1.0);
   const [showClassicMinimap, setShowClassicMinimap] = useState(false);
   const [classicContentSize, setClassicContentSize] = useState({ w: 0, h: 0 });
   const [classicViewport, setClassicViewport] = useState({
@@ -418,7 +418,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
     pointerId: number;
   } | null>(null);
   const classicMinimapDragRef = useRef(false);
-  const classicZoomRef = useRef(1.45);
+  const classicZoomRef = useRef(1.0);
   const isTouchClassicRef = useRef(false);
   const lastClassicFitKeyRef = useRef("");
 
@@ -725,7 +725,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
           })
           .sort((a, b) => a.avgY - b.avgY);
 
-          for (const rowObj of sortedRows) {
+        for (const rowObj of sortedRows) {
           const rowSeats = rowObj.seats;
           const steps: number[] = [];
           for (let i = 0; i < rowSeats.length - 1; i++) {
@@ -742,7 +742,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
           const rowHasDuplicateLabels =
             rowSeatLabels.some((l) => l) &&
             new Set(rowSeatLabels.filter(Boolean)).size <
-              rowSeatLabels.filter(Boolean).length;
+            rowSeatLabels.filter(Boolean).length;
 
           const gridSeats: GridSeat[] = rowSeats.map((seat: any, seatIdx: number) => {
             const displayNum = seatIdx + 1;
@@ -1777,26 +1777,23 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
   }, [classicContentSize.h, classicContentSize.w]);
 
   /**
-   * Preferred open zoom: fill available width (wider / larger seats like reference),
-   * allow vertical scroll when the hall is tall — do not shrink to fit height.
+   * Preferred open zoom: default zoomed-out view (as in reference image 2),
+   * fitting width comfortably so multiple tiers & rows are visible at once.
    */
   const getClassicPreferredZoom = useCallback(() => {
     const viewport = classicViewportRef.current;
     const content = classicContentRef.current;
-    if (!viewport || !content) return 1.45;
-    const pad = 12;
+    if (!viewport || !content) return 1.0;
+    const pad = 24;
     const baseW = Math.max(content.offsetWidth, classicContentSize.w, 1);
     const zw = (viewport.clientWidth - pad * 2) / baseW;
-    return Math.min(1.55, Math.max(1.15, zw));
+    return Math.min(1.0, Math.max(0.65, Math.round(zw * 100) / 100));
   }, [classicContentSize.w]);
 
-  /** Desktop: allow full-hall fit. Mobile/tablet: keep previous section zoom. */
+  /** Desktop & mobile: allow full-hall fit as zoom-out floor. */
   const getClassicMinZoom = useCallback(() => {
     const fit = getClassicFitZoom();
-    if (typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches) {
-      return fit;
-    }
-    return Math.max(1.15, fit);
+    return Math.min(fit, 0.65);
   }, [getClassicFitZoom]);
 
   const updateClassicViewport = useCallback(() => {
@@ -2077,16 +2074,16 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
           scroller.scrollLeft = Math.max(
             0,
             anchorX * scroller.scrollWidth -
-              (focus
-                ? focus.clientX - scroller.getBoundingClientRect().left
-                : scroller.clientWidth / 2)
+            (focus
+              ? focus.clientX - scroller.getBoundingClientRect().left
+              : scroller.clientWidth / 2)
           );
           scroller.scrollTop = Math.max(
             0,
             anchorY * scroller.scrollHeight -
-              (focus
-                ? focus.clientY - scroller.getBoundingClientRect().top
-                : scroller.clientHeight / 2)
+            (focus
+              ? focus.clientY - scroller.getBoundingClientRect().top
+              : scroller.clientHeight / 2)
           );
           updateClassicViewport();
         }
@@ -2175,26 +2172,23 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                       }}
                       aria-pressed={active}
                       aria-current={active ? "true" : undefined}
-                      aria-label={`${formatSeatPageTime(st.starts_at)}${
-                        lateNight ? " — Late night" : ""
-                      }${active ? " — Selected" : ""}`}
+                      aria-label={`${formatSeatPageTime(st.starts_at)}${lateNight ? " — Late night" : ""
+                        }${active ? " — Selected" : ""}`}
                       title={[st.format, st.language, st.screen_name].filter(Boolean).join(" • ")}
-                      className={`relative min-w-[5.5rem] rounded-md border px-3.5 py-2.5 text-center transition-colors ${
-                        past || soldOut
-                          ? "border-slate-200 bg-white cursor-not-allowed opacity-50"
-                          : active
-                            ? "border-slate-900 bg-[#F0F0F0] cursor-default"
-                            : "border-slate-200 bg-white cursor-pointer hover:border-slate-400"
-                      }`}
+                      className={`relative min-w-[5.5rem] rounded-md border px-3.5 py-2.5 text-center transition-colors ${past || soldOut
+                        ? "border-slate-200 bg-white cursor-not-allowed opacity-50"
+                        : active
+                          ? "border-slate-900 bg-[#F0F0F0] cursor-default"
+                          : "border-slate-200 bg-white cursor-pointer hover:border-slate-400"
+                        }`}
                     >
                       <span
-                        className={`block text-[13px] font-semibold tabular-nums ${
-                          past
-                            ? "text-slate-400"
-                            : active
-                              ? "text-slate-900"
-                              : "text-slate-800"
-                        }`}
+                        className={`block text-[13px] font-semibold tabular-nums ${past
+                          ? "text-slate-400"
+                          : active
+                            ? "text-slate-900"
+                            : "text-slate-800"
+                          }`}
                       >
                         {formatSeatPageTime(st.starts_at)}
                       </span>
@@ -2245,211 +2239,210 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
         <>
           <div className="relative bg-white overflow-hidden lg:flex-1 lg:min-h-0 lg:flex lg:flex-col">
             <div className="relative h-[min(62vh,580px)] sm:h-[min(66vh,640px)] lg:flex-1 lg:min-h-0 lg:h-auto">
-            <div
-              ref={classicViewportRef}
-              onScroll={handleClassicScroll}
-              onPointerDown={handleClassicPointerDown}
-              onPointerMove={handleClassicPointerMove}
-              onPointerUp={handleClassicPointerUp}
-              onPointerCancel={handleClassicPointerUp}
-              className="absolute inset-0 overflow-auto overscroll-contain bg-white select-none [-webkit-overflow-scrolling:touch] touch-pan-x touch-pan-y scrollbar-hide [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-            >
-              {/* Shell: top-aligned so the screen starts in view; horizontally centered */}
-              <div className="min-h-full min-w-full w-max flex items-start justify-center">
               <div
-                style={{
-                  width: Math.max((classicContentSize.w || classicSeatTrackPx + 40) * classicZoom, 1),
-                  height: Math.max((classicContentSize.h || 400) * classicZoom, 1),
-                  position: "relative",
-                }}
+                ref={classicViewportRef}
+                onScroll={handleClassicScroll}
+                onPointerDown={handleClassicPointerDown}
+                onPointerMove={handleClassicPointerMove}
+                onPointerUp={handleClassicPointerUp}
+                onPointerCancel={handleClassicPointerUp}
+                className="absolute inset-0 overflow-auto overscroll-contain bg-white select-none [-webkit-overflow-scrolling:touch] touch-pan-x touch-pan-y scrollbar-hide [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
               >
-                <div
-                  ref={classicContentRef}
-                  className={`absolute top-0 left-0 px-2 sm:px-4 pt-4 sm:pt-5 w-max space-y-5 sm:space-y-5 lg:space-y-6 ${
-                    selectedSeats.length > 0
-                      ? "pb-24 sm:pb-20 lg:pb-10"
-                      : "pb-20 sm:pb-16 lg:pb-8"
-                  }`}
-                  style={{
-                    transform: `scale(${classicZoom})`,
-                    transformOrigin: "0 0",
-                  }}
-                >
-                {screenPosition === "top" && (
-                  <div className="pb-4 pt-0.5 space-y-1.5" style={{ width: classicRowOuterPx }}>
-                    <p
-                      className="text-center text-[11px] tracking-wide text-slate-500"
+                {/* Shell: top-aligned so the screen starts in view; horizontally centered */}
+                <div className="min-h-full min-w-full w-max flex items-start justify-center">
+                  <div
+                    style={{
+                      width: Math.max((classicContentSize.w || classicSeatTrackPx + 40) * classicZoom, 1),
+                      height: Math.max((classicContentSize.h || 400) * classicZoom, 1),
+                      position: "relative",
+                    }}
+                  >
+                    <div
+                      ref={classicContentRef}
+                      className={`absolute top-0 left-0 px-2 sm:px-4 pt-4 sm:pt-5 w-max space-y-5 sm:space-y-5 lg:space-y-6 ${selectedSeats.length > 0
+                        ? "pb-24 sm:pb-20 lg:pb-10"
+                        : "pb-20 sm:pb-16 lg:pb-8"
+                        }`}
                       style={{
-                        paddingLeft: classicRowLabelColPx + classicRowLabelGapPx,
+                        transform: `scale(${classicZoom})`,
+                        transformOrigin: "0 0",
                       }}
                     >
-                      All eyes this way please
-                    </p>
-                    <div className="flex items-center">
-                      <span
-                        className="shrink-0"
-                        style={{
-                          width: classicRowLabelColPx,
-                          marginRight: classicRowLabelGapPx,
-                        }}
-                        aria-hidden
-                      />
-                      <div
-                        className="flex justify-center"
-                        style={{ width: classicSeatTrackPx }}
-                      >
-                        {/* Above seats — reference shape as-is (wide rim toward top) */}
-                        <CinemaScreenArc className="h-9 sm:h-10 w-[62%]" />
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {gridRows.map((rowGroup, idx) => {
-                  const prevRow = gridRows[idx - 1];
-                  const isNewTier = !prevRow || prevRow.tierName !== rowGroup.tierName;
-
-                  return (
-                    <div
-                      key={`classic-row-${idx}-${rowGroup.tierName}-${rowGroup.rowLabel}`}
-                      className="space-y-3 sm:space-y-2.5"
-                    >
-                      {isNewTier && (
-                        <div
-                          className="flex items-center pt-4 sm:pt-3.5 pb-2 sm:pb-1.5"
-                          style={{ width: classicRowOuterPx }}
-                        >
-                          <span
-                            className="shrink-0"
-                            style={{ width: classicRowLabelColPx, marginRight: classicRowLabelGapPx }}
-                            aria-hidden
-                          />
-                          <div
-                            className="flex items-center gap-3"
-                            style={{ width: classicSeatTrackPx }}
+                      {screenPosition === "top" && (
+                        <div className="pb-4 pt-0.5 space-y-1.5" style={{ width: classicRowOuterPx }}>
+                          <p
+                            className="text-center text-[11px] tracking-wide text-slate-500"
+                            style={{
+                              paddingLeft: classicRowLabelColPx + classicRowLabelGapPx,
+                            }}
                           >
-                            <div className="h-px flex-1 bg-slate-100" />
-                            <span className="shrink-0 text-[10px] sm:text-[11px] font-medium uppercase tracking-[0.12em] text-slate-400">
-                              {formatMoney(rowGroup.price, { compact: true })} {rowGroup.tierName}{" "}
-                              ROWS
-                            </span>
-                            <div className="h-px flex-1 bg-slate-100" />
+                            All eyes this way please
+                          </p>
+                          <div className="flex items-center">
+                            <span
+                              className="shrink-0"
+                              style={{
+                                width: classicRowLabelColPx,
+                                marginRight: classicRowLabelGapPx,
+                              }}
+                              aria-hidden
+                            />
+                            <div
+                              className="flex justify-center"
+                              style={{ width: classicSeatTrackPx }}
+                            >
+                              {/* Above seats — reference shape as-is (wide rim toward top) */}
+                              <CinemaScreenArc className="h-9 sm:h-10 w-[62%]" />
+                            </div>
                           </div>
                         </div>
                       )}
 
-                      {/* Row letter from admin layout (sticky overlay mirrors these labels) */}
-                      <div className="flex items-center" style={{ width: classicRowOuterPx }}>
-                        <span
-                          data-classic-row-label={rowGroup.rowLabel}
-                          data-classic-row-key={`classic-${idx}-${rowGroup.tierName}-${rowGroup.rowLabel}`}
-                          className="shrink-0 text-center text-sm font-semibold text-transparent leading-none select-none"
-                          style={{ width: classicRowLabelColPx, marginRight: classicRowLabelGapPx }}
-                          aria-hidden
-                        >
-                          {rowGroup.rowLabel}
-                        </span>
-                        <div
-                          className="flex items-center justify-center"
-                          style={{ width: classicSeatTrackPx }}
-                        >
-                          <div className="flex items-center gap-2.5 sm:gap-3">
-                          {rowGroup.seats.map((seat, seatIdx) => {
-                            const isSelected = isSeatSelected(
-                              seat.id,
-                              rowGroup.rowLabel,
-                              seat.number
-                            );
-                            const isAisleGap =
-                              seat.isAisleGap ?? (seatIdx === 3 || seatIdx === 9);
-                            // Prefer admin seat_label / number; fall back to index
-                            const rawSeatNo = String(seat.number ?? seatIdx + 1).trim();
-                            const seatLabel = /^\d+$/.test(rawSeatNo)
-                              ? rawSeatNo.padStart(2, "0")
-                              : rawSeatNo || String(seatIdx + 1).padStart(2, "0");
+                      {gridRows.map((rowGroup, idx) => {
+                        const prevRow = gridRows[idx - 1];
+                        const isNewTier = !prevRow || prevRow.tierName !== rowGroup.tierName;
 
-                            return (
+                        return (
+                          <div
+                            key={`classic-row-${idx}-${rowGroup.tierName}-${rowGroup.rowLabel}`}
+                            className="space-y-3 sm:space-y-2.5"
+                          >
+                            {isNewTier && (
                               <div
-                                key={`classic-${idx}-${rowGroup.tierName}-${seat.id}-${seatIdx}`}
-                                className="flex items-center"
+                                className="flex items-center pt-5 sm:pt-4 pb-2 sm:pb-1.5"
+                                style={{ width: classicRowOuterPx }}
                               >
-                                <button
-                                  type="button"
-                                  data-classic-seat
-                                  disabled={seat.isBooked}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleSeatClick(seat);
-                                  }}
-                                  onPointerDown={(e) => e.stopPropagation()}
-                                  className={`size-9 sm:size-10 rounded-lg text-xs sm:text-[13px] font-semibold transition-[border-color,transform,background-color] duration-150 flex items-center justify-center select-none relative z-10 ${seat.isBooked
-                                      ? SEAT_BOOKED
-                                      : isSelected
-                                        ? SEAT_SELECTED
-                                        : availableSeatClass(seat.isBestseller)
-                                    }`}
-                                  title={`${rowGroup.tierName} • ${seat.id} (${seat.price} ETB)${
-                                    seat.isBestseller && !seat.isBooked ? " • Bestseller" : ""
-                                  }`}
+                                <span
+                                  className="shrink-0"
+                                  style={{ width: classicRowLabelColPx, marginRight: classicRowLabelGapPx }}
+                                  aria-hidden
+                                />
+                                <div
+                                  className="flex items-center gap-3.5"
+                                  style={{ width: classicSeatTrackPx }}
                                 >
-                                  {seat.isBooked ? (
-                                    <span className="text-sm leading-none font-medium text-[#C4C4C4]" aria-hidden>
-                                      ×
-                                    </span>
-                                  ) : seat.isAccessible ? (
-                                    <Accessibility className="size-4" aria-hidden />
-                                  ) : (
-                                    seatLabel
-                                  )}
-                                </button>
-                                {isAisleGap && (
-                                  <div className="w-6 sm:w-8" aria-hidden="true" />
-                                )}
+                                  <div className="h-px flex-1 bg-slate-200" />
+                                  <span className="shrink-0 text-xs sm:text-[13px] font-semibold uppercase tracking-[0.12em] text-slate-500 select-none">
+                                    {formatMoney(rowGroup.price, { compact: true })}{" "}
+                                    {rowGroup.tierName.toUpperCase().replace(/\s*ROWS?\s*$/i, "")}{" "}
+                                    ROWS
+                                  </span>
+                                  <div className="h-px flex-1 bg-slate-200" />
+                                </div>
                               </div>
-                            );
-                          })}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+                            )}
 
-                {screenPosition === "bottom" && (
-                  <div className="pt-6 pb-4 space-y-1.5" style={{ width: classicRowOuterPx }}>
-                    <div className="flex items-center">
-                      <span
-                        className="shrink-0"
-                        style={{
-                          width: classicRowLabelColPx,
-                          marginRight: classicRowLabelGapPx,
-                        }}
-                        aria-hidden
-                      />
-                      <div
-                        className="flex justify-center"
-                        style={{ width: classicSeatTrackPx }}
-                      >
-                        {/* Below seats — flip so wide curved edge faces seats above */}
-                        <CinemaScreenArc flip className="h-9 sm:h-10 w-[62%]" />
-                      </div>
+                            {/* Row letter from admin layout (sticky overlay mirrors these labels) */}
+                            <div className="flex items-center" style={{ width: classicRowOuterPx }}>
+                              <span
+                                data-classic-row-label={rowGroup.rowLabel}
+                                data-classic-row-key={`classic-${idx}-${rowGroup.tierName}-${rowGroup.rowLabel}`}
+                                className="shrink-0 text-center text-sm font-semibold text-transparent leading-none select-none"
+                                style={{ width: classicRowLabelColPx, marginRight: classicRowLabelGapPx }}
+                                aria-hidden
+                              >
+                                {rowGroup.rowLabel}
+                              </span>
+                              <div
+                                className="flex items-center justify-center"
+                                style={{ width: classicSeatTrackPx }}
+                              >
+                                <div className="flex items-center gap-2.5 sm:gap-3">
+                                  {rowGroup.seats.map((seat, seatIdx) => {
+                                    const isSelected = isSeatSelected(
+                                      seat.id,
+                                      rowGroup.rowLabel,
+                                      seat.number
+                                    );
+                                    const isAisleGap =
+                                      seat.isAisleGap ?? (seatIdx === 3 || seatIdx === 9);
+                                    // Prefer admin seat_label / number; fall back to index
+                                    const rawSeatNo = String(seat.number ?? seatIdx + 1).trim();
+                                    const seatLabel = /^\d+$/.test(rawSeatNo)
+                                      ? rawSeatNo.padStart(2, "0")
+                                      : rawSeatNo || String(seatIdx + 1).padStart(2, "0");
+
+                                    return (
+                                      <div
+                                        key={`classic-${idx}-${rowGroup.tierName}-${seat.id}-${seatIdx}`}
+                                        className="flex items-center"
+                                      >
+                                        <button
+                                          type="button"
+                                          data-classic-seat
+                                          disabled={seat.isBooked}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleSeatClick(seat);
+                                          }}
+                                          onPointerDown={(e) => e.stopPropagation()}
+                                          className={`size-9 sm:size-10 rounded-lg text-xs sm:text-[13px] font-semibold transition-[border-color,transform,background-color] duration-150 flex items-center justify-center select-none relative z-10 ${seat.isBooked
+                                            ? SEAT_BOOKED
+                                            : isSelected
+                                              ? SEAT_SELECTED
+                                              : availableSeatClass(seat.isBestseller)
+                                            }`}
+                                          title={`${rowGroup.tierName} • ${seat.id} (${seat.price} ETB)${seat.isBestseller && !seat.isBooked ? " • Bestseller" : ""
+                                            }`}
+                                        >
+                                          {seat.isBooked ? (
+                                            <span className="text-sm leading-none font-medium text-[#C4C4C4]" aria-hidden>
+                                              ×
+                                            </span>
+                                          ) : seat.isAccessible ? (
+                                            <Accessibility className="size-4" aria-hidden />
+                                          ) : (
+                                            seatLabel
+                                          )}
+                                        </button>
+                                        {isAisleGap && (
+                                          <div className="w-6 sm:w-8" aria-hidden="true" />
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+
+                      {screenPosition === "bottom" && (
+                        <div className="pt-6 pb-4 space-y-1.5" style={{ width: classicRowOuterPx }}>
+                          <div className="flex items-center">
+                            <span
+                              className="shrink-0"
+                              style={{
+                                width: classicRowLabelColPx,
+                                marginRight: classicRowLabelGapPx,
+                              }}
+                              aria-hidden
+                            />
+                            <div
+                              className="flex justify-center"
+                              style={{ width: classicSeatTrackPx }}
+                            >
+                              {/* Below seats — flip so wide curved edge faces seats above */}
+                              <CinemaScreenArc flip className="h-9 sm:h-10 w-[62%]" />
+                            </div>
+                          </div>
+                          <p
+                            className="text-center text-[11px] tracking-wide text-slate-500"
+                            style={{
+                              paddingLeft: classicRowLabelColPx + classicRowLabelGapPx,
+                            }}
+                          >
+                            All eyes this way please
+                          </p>
+                        </div>
+                      )}
+                      {/* Extra scroll room so last row clears zoom controls on mobile */}
+                      <div className="h-8 sm:h-4 lg:h-1" aria-hidden="true" />
                     </div>
-                    <p
-                      className="text-center text-[11px] tracking-wide text-slate-500"
-                      style={{
-                        paddingLeft: classicRowLabelColPx + classicRowLabelGapPx,
-                      }}
-                    >
-                      All eyes this way please
-                    </p>
                   </div>
-                )}
-                {/* Extra scroll room so last row clears zoom controls on mobile */}
-                <div className="h-8 sm:h-4 lg:h-1" aria-hidden="true" />
                 </div>
               </div>
-              </div>
-            </div>
 
               {/* Sticky alphabet bar — outside scroller so it stays put; translucent fade */}
               <div
@@ -2469,103 +2462,101 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
               </div>
             </div>
 
-              {/* Top-right navigator: shows on scroll & zoom, then hides */}
-              <div
-                className={`absolute top-2 right-0 sm:right-1 z-30 transition-opacity duration-200 ${
-                  showClassicMinimap ? "opacity-100" : "opacity-0 pointer-events-none"
+            {/* Top-right navigator: shows on scroll & zoom, then hides */}
+            <div
+              className={`absolute top-2 right-0 sm:right-1 z-30 transition-opacity duration-200 ${showClassicMinimap ? "opacity-100" : "opacity-0 pointer-events-none"
                 }`}
-                aria-hidden={!showClassicMinimap}
+              aria-hidden={!showClassicMinimap}
+            >
+              <div
+                data-classic-minimap
+                onPointerDown={handleMinimapPointerDown}
+                onPointerMove={handleMinimapPointerMove}
+                onPointerUp={handleMinimapPointerUp}
+                onPointerCancel={handleMinimapPointerUp}
+                className="pointer-events-auto relative w-[140px] h-[280px] sm:w-[160px] sm:h-[320px] lg:w-[180px] lg:h-[360px] rounded-lg bg-white border border-slate-200 shadow-[0_4px_20px_rgba(0,0,0,0.10)] overflow-hidden cursor-crosshair touch-none"
+                title="Current visible section"
               >
-                <div
-                  data-classic-minimap
-                  onPointerDown={handleMinimapPointerDown}
-                  onPointerMove={handleMinimapPointerMove}
-                  onPointerUp={handleMinimapPointerUp}
-                  onPointerCancel={handleMinimapPointerUp}
-                  className="pointer-events-auto relative w-[140px] h-[280px] sm:w-[160px] sm:h-[320px] lg:w-[180px] lg:h-[360px] rounded-lg bg-white border border-slate-200 shadow-[0_4px_20px_rgba(0,0,0,0.10)] overflow-hidden cursor-crosshair touch-none"
-                  title="Current visible section"
-                >
-                  <div className="absolute inset-[8px] flex flex-col">
-                    {screenPosition === "top" && (
-                      <div className="mb-1.5 flex flex-col items-center shrink-0 w-full px-2">
-                        <CinemaScreenArc className="h-3.5 w-[62%]" />
-                      </div>
-                    )}
-                    <div className="flex-1 min-h-0 flex flex-col justify-between relative">
-                      {gridRows.map((rowGroup, idx) => {
-                        const prevRow = gridRows[idx - 1];
-                        const isNewTier = !prevRow || prevRow.tierName !== rowGroup.tierName;
-                        return (
-                          <div
-                            key={`mini-${idx}-${rowGroup.rowLabel}`}
-                            className="w-full flex flex-col items-center"
-                          >
-                            {isNewTier && idx > 0 && (
-                              <div className="w-[80%] h-px bg-slate-200 mb-[1px]" />
-                            )}
-                            <div className="flex items-center justify-center gap-px">
-                              {rowGroup.seats.map((seat, seatIdx) => {
-                                const isSelected = isSeatSelected(
-                                  seat.id,
-                                  rowGroup.rowLabel,
-                                  seat.number
-                                );
-                                const isAisleGap =
-                                  seat.isAisleGap ?? (seatIdx === 3 || seatIdx === 9);
-                                return (
-                                  <div
-                                    key={`mini-seat-${idx}-${seatIdx}`}
-                                    className="flex items-center"
-                                  >
-                                    <span
-                                      className={`relative flex items-center justify-center size-[4px] sm:size-[4.5px] lg:size-[5px] rounded-[1px] box-border ${
-                                        seat.isBooked
-                                          ? "bg-white border border-[#E0E0E0]"
-                                          : isSelected
-                                            ? SEAT_SELECTED_MINI
-                                            : seat.isBestseller
-                                              ? "border border-[#5BA3D9] bg-[#C5E4F7]"
-                                              : "bg-white border border-[#4B5563]"
+                <div className="absolute inset-[8px] flex flex-col">
+                  {screenPosition === "top" && (
+                    <div className="mb-1.5 flex flex-col items-center shrink-0 w-full px-2">
+                      <CinemaScreenArc className="h-3.5 w-[62%]" />
+                    </div>
+                  )}
+                  <div className="flex-1 min-h-0 flex flex-col justify-between relative">
+                    {gridRows.map((rowGroup, idx) => {
+                      const prevRow = gridRows[idx - 1];
+                      const isNewTier = !prevRow || prevRow.tierName !== rowGroup.tierName;
+                      return (
+                        <div
+                          key={`mini-${idx}-${rowGroup.rowLabel}`}
+                          className="w-full flex flex-col items-center"
+                        >
+                          {isNewTier && idx > 0 && (
+                            <div className="w-[80%] h-px bg-slate-200 mb-[1px]" />
+                          )}
+                          <div className="flex items-center justify-center gap-px">
+                            {rowGroup.seats.map((seat, seatIdx) => {
+                              const isSelected = isSeatSelected(
+                                seat.id,
+                                rowGroup.rowLabel,
+                                seat.number
+                              );
+                              const isAisleGap =
+                                seat.isAisleGap ?? (seatIdx === 3 || seatIdx === 9);
+                              return (
+                                <div
+                                  key={`mini-seat-${idx}-${seatIdx}`}
+                                  className="flex items-center"
+                                >
+                                  <span
+                                    className={`relative flex items-center justify-center size-[4px] sm:size-[4.5px] lg:size-[5px] rounded-[1px] box-border ${seat.isBooked
+                                      ? "bg-white border border-[#E0E0E0]"
+                                      : isSelected
+                                        ? SEAT_SELECTED_MINI
+                                        : seat.isBestseller
+                                          ? "border border-[#5BA3D9] bg-[#C5E4F7]"
+                                          : "bg-white border border-[#4B5563]"
                                       }`}
-                                    >
-                                      {seat.isBooked && (
-                                        <span
-                                          className="absolute inset-0 flex items-center justify-center text-[5px] sm:text-[6px] leading-none font-medium text-[#C4C4C4]"
-                                          aria-hidden
-                                        >
-                                          ×
-                                        </span>
-                                      )}
-                                    </span>
-                                    {isAisleGap && <span className="w-[2px] sm:w-[3px]" />}
-                                  </div>
-                                );
-                              })}
-                            </div>
+                                  >
+                                    {seat.isBooked && (
+                                      <span
+                                        className="absolute inset-0 flex items-center justify-center text-[5px] sm:text-[6px] leading-none font-medium text-[#C4C4C4]"
+                                        aria-hidden
+                                      >
+                                        ×
+                                      </span>
+                                    )}
+                                  </span>
+                                  {isAisleGap && <span className="w-[2px] sm:w-[3px]" />}
+                                </div>
+                              );
+                            })}
                           </div>
-                        );
-                      })}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {screenPosition === "bottom" && (
+                    <div className="mt-1.5 flex flex-col items-center shrink-0 w-full">
+                      <CinemaScreenArc flip className="h-3 w-[62%]" />
                     </div>
-                    {screenPosition === "bottom" && (
-                      <div className="mt-1.5 flex flex-col items-center shrink-0 w-full">
-                        <CinemaScreenArc flip className="h-3 w-[62%]" />
-                      </div>
-                    )}
+                  )}
 
-                    <div className="pointer-events-none absolute inset-0" aria-hidden="true">
-                      <div
-                        className="absolute border-[1.5px] border-[#ff3b30] bg-[#ff3b30]/12"
-                        style={{
-                          top: `${classicViewport.top * 100}%`,
-                          left: `${classicViewport.left * 100}%`,
-                          width: `${classicViewport.width * 100}%`,
-                          height: `${classicViewport.height * 100}%`,
-                        }}
-                      />
-                    </div>
+                  <div className="pointer-events-none absolute inset-0" aria-hidden="true">
+                    <div
+                      className="absolute border-[1.5px] border-[#ff3b30] bg-[#ff3b30]/12"
+                      style={{
+                        top: `${classicViewport.top * 100}%`,
+                        left: `${classicViewport.left * 100}%`,
+                        width: `${classicViewport.width * 100}%`,
+                        height: `${classicViewport.height * 100}%`,
+                      }}
+                    />
                   </div>
                 </div>
               </div>
+            </div>
 
             <div
               data-classic-zoom
@@ -2709,46 +2700,45 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                     </span>
                     <div className="flex-1 flex items-center justify-center min-w-0">
                       <div className="flex items-center gap-1.5 sm:gap-2">
-                      {rowGroup.seats.map((seat, seatIdx) => {
-                        const isSelected = isSeatSelected(
-                          seat.id,
-                          rowGroup.rowLabel,
-                          seat.number
-                        );
-                        const isAisleGap = seat.isAisleGap ?? (seatIdx === 3 || seatIdx === 9);
-                        const seatLabel = String(seatIdx + 1).padStart(2, "0");
+                        {rowGroup.seats.map((seat, seatIdx) => {
+                          const isSelected = isSeatSelected(
+                            seat.id,
+                            rowGroup.rowLabel,
+                            seat.number
+                          );
+                          const isAisleGap = seat.isAisleGap ?? (seatIdx === 3 || seatIdx === 9);
+                          const seatLabel = String(seatIdx + 1).padStart(2, "0");
 
-                        return (
-                          <div
-                            key={`${idx}-${rowGroup.tierName}-${seat.id}-${seatIdx}`}
-                            className="flex items-center"
-                          >
-                            <button
-                              type="button"
-                              disabled={seat.isBooked}
-                              onClick={() => handleSeatClick(seat)}
-                              className={`size-7 sm:size-8 rounded-md text-[11px] font-bold transition-all duration-150 flex items-center justify-center select-none ${seat.isBooked
+                          return (
+                            <div
+                              key={`${idx}-${rowGroup.tierName}-${seat.id}-${seatIdx}`}
+                              className="flex items-center"
+                            >
+                              <button
+                                type="button"
+                                disabled={seat.isBooked}
+                                onClick={() => handleSeatClick(seat)}
+                                className={`size-7 sm:size-8 rounded-md text-[11px] font-bold transition-all duration-150 flex items-center justify-center select-none ${seat.isBooked
                                   ? SEAT_BOOKED
                                   : isSelected
                                     ? `${SEAT_SELECTED} z-10`
                                     : availableSeatClass(seat.isBestseller, true)
-                                }`}
-                              title={`${rowGroup.tierName} • ${seat.id} (${seat.price} ETB)${
-                                seat.isBestseller && !seat.isBooked ? " • Bestseller" : ""
-                              }`}
-                            >
-                              {seat.isBooked ? (
-                                <span className="text-[13px] leading-none font-medium text-[#C4C4C4]" aria-hidden>
-                                  ×
-                                </span>
-                              ) : (
-                                seatLabel
-                              )}
-                            </button>
-                            {isAisleGap && <div className="w-3 sm:w-5" aria-hidden="true" />}
-                          </div>
-                        );
-                      })}
+                                  }`}
+                                title={`${rowGroup.tierName} • ${seat.id} (${seat.price} ETB)${seat.isBestseller && !seat.isBooked ? " • Bestseller" : ""
+                                  }`}
+                              >
+                                {seat.isBooked ? (
+                                  <span className="text-[13px] leading-none font-medium text-[#C4C4C4]" aria-hidden>
+                                    ×
+                                  </span>
+                                ) : (
+                                  seatLabel
+                                )}
+                              </button>
+                              {isAisleGap && <div className="w-3 sm:w-5" aria-hidden="true" />}
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   </div>
@@ -2961,11 +2951,10 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
 
       {secondsLeft !== null && secondsLeft > 0 && (
         <div
-          className={`shrink-0 px-4 py-2 text-center text-[13px] font-medium border-b flex items-center justify-center gap-3 transition-colors ${
-            secondsLeft <= 60
-              ? "bg-rose-50 border-rose-200 text-rose-700 font-bold animate-pulse"
-              : "bg-[#F3E8FF] border-[#E9D5FF] text-[#6B21A8]"
-          }`}
+          className={`shrink-0 px-4 py-2 text-center text-[13px] font-medium border-b flex items-center justify-center gap-3 transition-colors ${secondsLeft <= 60
+            ? "bg-rose-50 border-rose-200 text-rose-700 font-bold animate-pulse"
+            : "bg-[#F3E8FF] border-[#E9D5FF] text-[#6B21A8]"
+            }`}
         >
           <span>
             {step === "seats"
@@ -3012,11 +3001,10 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                             key={cat}
                             type="button"
                             onClick={() => setBevCategoryFilter(cat)}
-                            className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                              bevCategoryFilter === cat
-                                ? "bg-gradient-to-r from-amber-400 to-orange-500 text-white shadow"
-                                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                            }`}
+                            className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${bevCategoryFilter === cat
+                              ? "bg-gradient-to-r from-amber-400 to-orange-500 text-white shadow"
+                              : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                              }`}
                           >
                             {cat === "ALL" ? "All" : cat.charAt(0) + cat.slice(1).toLowerCase()}
                           </button>
@@ -3035,11 +3023,10 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                         return (
                           <div
                             key={bev.id}
-                            className={`rounded-2xl border flex flex-col overflow-hidden transition-all ${
-                              qty > 0
-                                ? "border-amber-300 shadow-md shadow-amber-100"
-                                : "border-slate-200 hover:border-slate-300"
-                            } ${!bev.is_available ? "opacity-50 pointer-events-none" : ""}`}
+                            className={`rounded-2xl border flex flex-col overflow-hidden transition-all ${qty > 0
+                              ? "border-amber-300 shadow-md shadow-amber-100"
+                              : "border-slate-200 hover:border-slate-300"
+                              } ${!bev.is_available ? "opacity-50 pointer-events-none" : ""}`}
                           >
                             {/* Image */}
                             <div className="relative w-full aspect-[4/3] bg-slate-100 overflow-hidden">
@@ -3223,8 +3210,8 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                     {reviewPoster ? (
                       <img
                         src={reviewPoster}
-                        alt=""
-                        className="h-[4.5rem] w-12 shrink-0 rounded-md object-cover bg-slate-100 sm:h-20 sm:w-14"
+                        alt={movie?.title || "Movie poster"}
+                        className="w-20 h-28 sm:w-24 sm:h-36 shrink-0 rounded-xl object-cover bg-slate-100 shadow-sm border border-slate-200/80"
                       />
                     ) : null}
                   </div>
@@ -3266,8 +3253,8 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                   ) : null}
 
                   <div className="mt-4 flex items-center gap-2 border-t border-slate-100 pt-3 text-xs text-slate-500">
-                    <Info className="size-3.5 shrink-0" />
-                    Cancellation is unavailable. The cut-off is 20 minutes before showtime.
+                    <Info className="size-3.5 shrink-0 text-slate-400" />
+                    <span>Cancellation is unavailable.</span>
                   </div>
                 </div>
 
@@ -3275,120 +3262,120 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                   <h2 className="text-base font-bold text-slate-900">Offers for you</h2>
                   <div className="space-y-2">
                     <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Promo code</p>
-                  {promoApplied ? (
-                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-purple-50 border border-purple-200 text-xs">
-                      <div className="flex items-center gap-2">
-                        <CheckCircle2 className="size-4 text-emerald-500" />
-                        <span className="font-bold text-slate-900 font-mono">{promoCode}</span>
-                        <span className="text-emerald-600">
-                          (−{formatMoney(discountAmount)})
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={handleRemovePromo}
-                        className="text-xs text-rose-600 hover:underline font-semibold cursor-pointer"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={promoCode}
-                        onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
-                        placeholder="Enter promo code"
-                        className="flex-1 px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs text-slate-900 uppercase placeholder:text-slate-400 focus:outline-none focus:border-[#F84464] focus:ring-1 focus:ring-[#F84464]/20"
-                      />
-                      <button
-                        type="button"
-                        onClick={handleApplyPromo}
-                        disabled={validatingPromo || !promoCode.trim()}
-                        className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-800 border border-slate-200 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
-                      >
-                        {validatingPromo ? <Loader2 className="size-3.5 animate-spin" /> : null}
-                        Apply
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                  <div className="space-y-2 pt-1">
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Gift card</p>
-                  {appliedGiftCard ? (
-                    <div className="flex items-center justify-between gap-2 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2">
-                      <div className="min-w-0">
-                        <p className="text-xs font-bold text-slate-900 truncate">
-                          {appliedGiftCard.product_name} · {appliedGiftCard.code_masked}
-                        </p>
-                        <p className="text-[11px] text-rose-700">
-                          Applying {formatMoney(appliedGiftCard.amount_applicable)}
-                          {appliedGiftCard.balance_after > 0
-                            ? ` · ${formatMoney(appliedGiftCard.balance_after)} left after`
-                            : " · balance will be zero"}
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={handleRemoveGiftCard}
-                        className="text-xs font-semibold text-rose-600 hover:underline shrink-0 cursor-pointer"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {redeemableGiftCards.length > 0 && (
-                        <select
-                          value={selectedGiftCardId}
-                          onChange={(e) => {
-                            setSelectedGiftCardId(e.target.value);
-                            if (e.target.value) setGiftCardInput("");
-                          }}
-                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900"
+                    {promoApplied ? (
+                      <div className="flex items-center justify-between p-2.5 rounded-xl bg-purple-50 border border-purple-200 text-xs">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 className="size-4 text-emerald-500" />
+                          <span className="font-bold text-slate-900 font-mono">{promoCode}</span>
+                          <span className="text-emerald-600">
+                            (−{formatMoney(discountAmount)})
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleRemovePromo}
+                          className="text-xs text-rose-600 hover:underline font-semibold cursor-pointer"
                         >
-                          <option value="">
-                            Select from My Gift Cards
-                          </option>
-                          {redeemableGiftCards.map((c) => (
-                            <option key={c.id} value={c.id}>
-                              {c.product_name || "Gift Card"} · {c.code_masked} ·{" "}
-                              {formatMoney(Number(c.current_balance))}
-                            </option>
-                          ))}
-                        </select>
-                      )}
+                          Remove
+                        </button>
+                      </div>
+                    ) : (
                       <div className="flex gap-2">
                         <input
                           type="text"
-                          value={giftCardInput}
-                          onChange={(e) => {
-                            setGiftCardInput(e.target.value.toUpperCase());
-                            if (e.target.value) setSelectedGiftCardId("");
-                          }}
-                          placeholder="Or enter gift card code"
-                          className="flex-1 px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs text-slate-900 font-mono uppercase placeholder:text-slate-400 focus:outline-none focus:border-[#F84464] focus:ring-1 focus:ring-[#F84464]/20"
+                          value={promoCode}
+                          onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+                          placeholder="Enter promo code"
+                          className="flex-1 px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs text-slate-900 uppercase placeholder:text-slate-400 focus:outline-none focus:border-[#F84464] focus:ring-1 focus:ring-[#F84464]/20"
                         />
                         <button
                           type="button"
-                          onClick={handleApplyGiftCard}
-                          disabled={
-                            validatingGiftCard ||
-                            (!selectedGiftCardId && !giftCardInput.trim()) ||
-                            orderTotal <= 0
-                          }
-                          className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-800 border border-slate-200 disabled:opacity-50 cursor-pointer"
+                          onClick={handleApplyPromo}
+                          disabled={validatingPromo || !promoCode.trim()}
+                          className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-800 border border-slate-200 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
                         >
-                          {validatingGiftCard ? (
-                            <Loader2 className="size-3.5 animate-spin" />
-                          ) : (
-                            "Apply"
-                          )}
+                          {validatingPromo ? <Loader2 className="size-3.5 animate-spin" /> : null}
+                          Apply
                         </button>
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
+
+                  <div className="space-y-2 pt-1">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Gift card</p>
+                    {appliedGiftCard ? (
+                      <div className="flex items-center justify-between gap-2 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2">
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-slate-900 truncate">
+                            {appliedGiftCard.product_name} · {appliedGiftCard.code_masked}
+                          </p>
+                          <p className="text-[11px] text-rose-700">
+                            Applying {formatMoney(appliedGiftCard.amount_applicable)}
+                            {appliedGiftCard.balance_after > 0
+                              ? ` · ${formatMoney(appliedGiftCard.balance_after)} left after`
+                              : " · balance will be zero"}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleRemoveGiftCard}
+                          className="text-xs font-semibold text-rose-600 hover:underline shrink-0 cursor-pointer"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {redeemableGiftCards.length > 0 && (
+                          <select
+                            value={selectedGiftCardId}
+                            onChange={(e) => {
+                              setSelectedGiftCardId(e.target.value);
+                              if (e.target.value) setGiftCardInput("");
+                            }}
+                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900"
+                          >
+                            <option value="">
+                              Select from My Gift Cards
+                            </option>
+                            {redeemableGiftCards.map((c) => (
+                              <option key={c.id} value={c.id}>
+                                {c.product_name || "Gift Card"} · {c.code_masked} ·{" "}
+                                {formatMoney(Number(c.current_balance))}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={giftCardInput}
+                            onChange={(e) => {
+                              setGiftCardInput(e.target.value.toUpperCase());
+                              if (e.target.value) setSelectedGiftCardId("");
+                            }}
+                            placeholder="Or enter gift card code"
+                            className="flex-1 px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs text-slate-900 font-mono uppercase placeholder:text-slate-400 focus:outline-none focus:border-[#F84464] focus:ring-1 focus:ring-[#F84464]/20"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleApplyGiftCard}
+                            disabled={
+                              validatingGiftCard ||
+                              (!selectedGiftCardId && !giftCardInput.trim()) ||
+                              orderTotal <= 0
+                            }
+                            className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-800 border border-slate-200 disabled:opacity-50 cursor-pointer"
+                          >
+                            {validatingGiftCard ? (
+                              <Loader2 className="size-3.5 animate-spin" />
+                            ) : (
+                              "Apply"
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

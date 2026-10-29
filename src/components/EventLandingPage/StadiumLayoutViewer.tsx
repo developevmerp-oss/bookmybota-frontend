@@ -4,9 +4,6 @@ import { Stage, Layer, Rect, Text, Group, Circle, Line, Ellipse, Arc } from "rea
 import Konva from "konva";
 import {
   ArrowLeft,
-  ZoomIn,
-  ZoomOut,
-  RotateCcw,
   Check,
   Users,
   AlertCircle,
@@ -93,6 +90,342 @@ function availabilityBadge(available: number, total: number) {
   return { label: `${available} AVAIL`, color: "#22c55e", bg: "#052e16" };
 }
 
+// ─── Stadium Stand Thumbnail (Dynamic Vector Mini-Map) ──────────────────────
+
+function describeArcSector(
+  cx: number,
+  cy: number,
+  rInner: number,
+  rOuter: number,
+  startDeg: number,
+  endDeg: number
+): string {
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const a1 = toRad(startDeg);
+  const a2 = toRad(endDeg);
+
+  const x1Outer = cx + rOuter * Math.cos(a1);
+  const y1Outer = cy + rOuter * Math.sin(a1);
+  const x2Outer = cx + rOuter * Math.cos(a2);
+  const y2Outer = cy + rOuter * Math.sin(a2);
+
+  const x2Inner = cx + rInner * Math.cos(a2);
+  const y2Inner = cy + rInner * Math.sin(a2);
+  const x1Inner = cx + rInner * Math.cos(a1);
+  const y1Inner = cy + rInner * Math.sin(a1);
+
+  const diff = endDeg - startDeg;
+  const largeArcFlag = diff > 180 || diff < -180 ? 1 : 0;
+
+  return `M ${x1Outer.toFixed(2)} ${y1Outer.toFixed(2)} A ${rOuter.toFixed(2)} ${rOuter.toFixed(2)} 0 ${largeArcFlag} 1 ${x2Outer.toFixed(2)} ${y2Outer.toFixed(2)} L ${x2Inner.toFixed(2)} ${y2Inner.toFixed(2)} A ${rInner.toFixed(2)} ${rInner.toFixed(2)} 0 ${largeArcFlag} 0 ${x1Inner.toFixed(2)} ${y1Inner.toFixed(2)} Z`;
+}
+
+function describeArcLine(
+  cx: number,
+  cy: number,
+  r: number,
+  startDeg: number,
+  endDeg: number
+): string {
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const a1 = toRad(startDeg);
+  const a2 = toRad(endDeg);
+
+  const x1 = cx + r * Math.cos(a1);
+  const y1 = cy + r * Math.sin(a1);
+  const x2 = cx + r * Math.cos(a2);
+  const y2 = cy + r * Math.sin(a2);
+
+  const diff = endDeg - startDeg;
+  const largeArcFlag = diff > 180 || diff < -180 ? 1 : 0;
+
+  return `M ${x1.toFixed(2)} ${y1.toFixed(2)} A ${r.toFixed(2)} ${r.toFixed(2)} 0 ${largeArcFlag} 1 ${x2.toFixed(2)} ${y2.toFixed(2)}`;
+}
+
+function StandThumbnailSVG({
+  block,
+  isSoldOut,
+  data,
+  isHovered = false,
+}: {
+  block: StadiumBlock;
+  isSoldOut: boolean;
+  data?: {
+    canvas_width?: number;
+    canvas_height?: number;
+    ground?: any;
+    blocks?: StadiumBlock[];
+  } | null;
+  isHovered?: boolean;
+}) {
+  const canvasW = data?.canvas_width || 1600;
+  const canvasH = data?.canvas_height || 1200;
+  const allBlocks = data?.blocks || [];
+
+  // Compute bounding box around ground and all blocks on the map
+  let minX = canvasW;
+  let minY = canvasH;
+  let maxX = 0;
+  let maxY = 0;
+
+  const ground = data?.ground;
+  if (ground && ground.enabled !== false && Number(ground.width) > 0 && Number(ground.height) > 0) {
+    const gx = Number(ground.x) || canvasW * 0.22;
+    const gy = Number(ground.y) || canvasH * 0.16;
+    const gw = Number(ground.width) || canvasW * 0.56;
+    const gh = Number(ground.height) || canvasH * 0.68;
+    minX = Math.min(minX, gx);
+    minY = Math.min(minY, gy);
+    maxX = Math.max(maxX, gx + gw);
+    maxY = Math.max(maxY, gy + gh);
+  }
+
+  for (const b of allBlocks) {
+    if (b.shape === "arc") {
+      const cx = b.stadiumCenterX ?? canvasW / 2;
+      const cy = b.stadiumCenterY ?? canvasH / 2;
+      const r = (b.outerRadius ?? 350) + 15;
+      minX = Math.min(minX, cx - r);
+      minY = Math.min(minY, cy - r);
+      maxX = Math.max(maxX, cx + r);
+      maxY = Math.max(maxY, cy + r);
+    } else {
+      minX = Math.min(minX, b.x);
+      minY = Math.min(minY, b.y);
+      maxX = Math.max(maxX, b.x + b.width);
+      maxY = Math.max(maxY, b.y + b.height);
+    }
+  }
+
+  if (maxX <= minX || maxY <= minY) {
+    minX = canvasW * 0.15;
+    minY = canvasH * 0.15;
+    maxX = canvasW * 0.85;
+    maxY = canvasH * 0.85;
+  }
+
+  const padX = Math.max(30, (maxX - minX) * 0.08);
+  const padY = Math.max(30, (maxY - minY) * 0.08);
+  const vbX = minX - padX;
+  const vbY = minY - padY;
+  const vbW = (maxX - minX) + padX * 2;
+  const vbH = (maxY - minY) + padY * 2;
+
+  const strokeScale = vbW / 65;
+
+  const highlightFill = isSoldOut
+    ? "#FDA4AF"
+    : isHovered
+      ? "#E11D48"
+      : "#FB7185";
+  const highlightStroke = isSoldOut
+    ? "#F87171"
+    : isHovered
+      ? "#9F1239"
+      : "#F43F5E";
+
+  return (
+    <svg
+      viewBox={`${vbX.toFixed(1)} ${vbY.toFixed(1)} ${vbW.toFixed(1)} ${vbH.toFixed(1)}`}
+      className="w-full h-full"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      preserveAspectRatio="xMidYMid meet"
+    >
+      {/* 1. Venue Ground / Stage / Pitch */}
+      {ground && ground.enabled !== false && (
+        <>
+          <rect
+            x={Number(ground.x) || canvasW * 0.22}
+            y={Number(ground.y) || canvasH * 0.16}
+            width={Number(ground.width) || canvasW * 0.56}
+            height={Number(ground.height) || canvasH * 0.68}
+            rx={Math.min(18, strokeScale * 2.5)}
+            fill="#F8FAFC"
+            stroke="#E2E8F0"
+            strokeWidth={strokeScale * 0.8}
+          />
+
+          {ground.sport_type === "festival_t_stage" && (() => {
+            const gx = Number(ground.x) || canvasW * 0.22;
+            const gy = Number(ground.y) || canvasH * 0.16;
+            const gw = Number(ground.width) || canvasW * 0.56;
+            const gh = Number(ground.height) || canvasH * 0.68;
+
+            const sW = gw * 0.55;
+            const sH = gh * 0.15;
+            const sX = gx + (gw - sW) / 2;
+            const sY = gy + gh * 0.03;
+
+            const cW = sW * 0.22;
+            const cH = gh * 0.22;
+            const cX = gx + (gw - cW) / 2;
+            const cY = sY + sH;
+
+            return (
+              <g opacity={0.75}>
+                <rect x={sX} y={sY} width={sW} height={sH} rx={4} fill="#64748B" />
+                <rect x={cX} y={cY} width={cW} height={cH} rx={3} fill="#64748B" />
+              </g>
+            );
+          })()}
+
+          {(!ground.sport_type || ground.sport_type === "football" || ground.sport_type === "soccer") && (() => {
+            const gx = Number(ground.x) || canvasW * 0.25;
+            const gy = Number(ground.y) || canvasH * 0.25;
+            const gw = Number(ground.width) || canvasW * 0.5;
+            const gh = Number(ground.height) || canvasH * 0.5;
+            return (
+              <g opacity={0.5}>
+                <rect
+                  x={gx + 10}
+                  y={gy + 10}
+                  width={gw - 20}
+                  height={gh - 20}
+                  rx={4}
+                  stroke="#CBD5E1"
+                  strokeWidth={strokeScale * 0.6}
+                  fill="none"
+                />
+                <line
+                  x1={gx + gw / 2}
+                  y1={gy + 10}
+                  x2={gx + gw / 2}
+                  y2={gy + gh - 10}
+                  stroke="#CBD5E1"
+                  strokeWidth={strokeScale * 0.6}
+                />
+                <circle
+                  cx={gx + gw / 2}
+                  cy={gy + gh / 2}
+                  r={Math.min(gw, gh) * 0.15}
+                  stroke="#CBD5E1"
+                  strokeWidth={strokeScale * 0.6}
+                  fill="none"
+                />
+              </g>
+            );
+          })()}
+        </>
+      )}
+
+      {/* 2. All Map Blocks — Exact Miniature of Venue Map */}
+      {allBlocks.map((b) => {
+        const isTarget = b.block_id === block.block_id;
+        const fill = isTarget ? highlightFill : "#F1F5F9";
+        const stroke = isTarget ? highlightStroke : "#CBD5E1";
+        const strokeWidth = isTarget ? strokeScale * 1.5 : strokeScale * 0.8;
+
+        if (b.shape === "arc") {
+          const sCenterX = b.stadiumCenterX ?? canvasW / 2;
+          const sCenterY = b.stadiumCenterY ?? canvasH / 2;
+          const innerR = b.innerRadius ?? 260;
+          const outerR = b.outerRadius ?? 335;
+          const startA = b.startAngle ?? 0;
+          const sweepA = b.sweepAngle ?? 45;
+
+          return (
+            <g key={b.block_id}>
+              <path
+                d={describeArcSector(sCenterX, sCenterY, innerR, outerR, startA, startA + sweepA)}
+                fill={fill}
+                stroke={stroke}
+                strokeWidth={strokeWidth}
+              />
+              {isTarget && (
+                <path
+                  d={describeArcLine(sCenterX, sCenterY, (innerR + outerR) / 2, startA, startA + sweepA)}
+                  stroke="#FFFFFF"
+                  strokeWidth={strokeScale * 0.8}
+                  strokeDasharray={`${strokeScale * 2},${strokeScale * 2}`}
+                />
+              )}
+            </g>
+          );
+        }
+
+        // Ensure normalized minimum visual thickness so blocks don't render as hairline slivers
+        const minThick = Math.max(16, vbH * 0.095);
+        const renderH = Math.max(b.height, minThick);
+        const renderY = b.y - (renderH - b.height) / 2;
+        const rx = b.shape === "pill" ? renderH / 2 : Math.min(6, renderH * 0.22);
+        const cx = b.x + b.width / 2;
+        const cy = renderY + renderH / 2;
+
+        return (
+          <g key={b.block_id}>
+            <rect
+              x={b.x}
+              y={renderY}
+              width={b.width}
+              height={renderH}
+              rx={rx}
+              fill={fill}
+              stroke={stroke}
+              strokeWidth={strokeWidth}
+            />
+
+            {/* If target standing block, draw centered person silhouette */}
+            {isTarget && b.stand_type === "standing" && (
+              <g>
+                <circle
+                  cx={cx}
+                  cy={cy - renderH * 0.16}
+                  r={Math.min(b.width, renderH) * 0.15}
+                  fill="white"
+                />
+                <path
+                  d={`M ${cx - b.width * 0.14} ${cy + renderH * 0.25} C ${cx - b.width * 0.14} ${cy - renderH * 0.02}, ${cx + b.width * 0.14} ${cy - renderH * 0.02}, ${cx + b.width * 0.14} ${cy + renderH * 0.25}`}
+                  stroke="white"
+                  strokeWidth={strokeScale * 1.1}
+                  strokeLinecap="round"
+                  fill="none"
+                />
+              </g>
+            )}
+
+            {/* If target seated block, draw centered tier indicator line */}
+            {isTarget && b.stand_type !== "standing" && (
+              <line
+                x1={b.x + b.width * 0.18}
+                y1={cy}
+                x2={b.x + b.width * 0.82}
+                y2={cy}
+                stroke="white"
+                strokeWidth={strokeScale * 0.9}
+                strokeDasharray={`${strokeScale * 2.2},${strokeScale * 1.8}`}
+                strokeLinecap="round"
+              />
+            )}
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+function getBlockAccessDescription(block: StadiumBlock): string {
+  const isStanding = block.stand_type === "standing";
+  const name = (block.name || "").trim();
+
+  if (isStanding) {
+    if (/fan\s*pit.*left|\bleft\b/i.test(name)) {
+      return "Access to designated Fanpit Left standing zone";
+    }
+    if (/fan\s*pit.*right|\bright\b/i.test(name)) {
+      return "Access to designated Fanpit Right standing zone";
+    }
+    if (/fan\s*pit/i.test(name)) {
+      return `Access to designated ${name} standing zone`;
+    }
+    const clean = name.replace(/\s*(stand|standing|zone)\s*$/i, "").trim();
+    return `Access to ${clean || name} standing zone`;
+  }
+
+  // Seated block
+  return `Access to a designated seat in ${name}`;
+}
+
 // ─── Main Stadium Layout Viewer (BookMyShow Flow) ────────────────────────────
 
 export default function StadiumLayoutViewer({
@@ -134,6 +467,15 @@ export default function StadiumLayoutViewer({
   // Hover states
   const [hoveredBlockId, setHoveredBlockId] = useState<string | null>(null);
   const [hoveredSeat, setHoveredSeat] = useState<TierSeat | null>(null);
+
+  // Auto-scroll sidebar card into view when hovered on map
+  useEffect(() => {
+    if (!hoveredBlockId) return;
+    const cardEl = document.getElementById(`stand-card-${hoveredBlockId}`);
+    if (cardEl) {
+      cardEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  }, [hoveredBlockId]);
 
   // Canvas zoom & pan state
   const containerRef = useRef<HTMLDivElement>(null);
@@ -289,11 +631,16 @@ export default function StadiumLayoutViewer({
     !seatsError &&
     (seatsLoading || seatsFetching || !blockSeatsData);
 
-  //  const formatPrice = useCallback((val: number) => formatMoney(val, { compact: true }), []);
   const formatPrice = useCallback(
     (val: number) => {
-      const curr = String((ticketTypes[0] as any)?.currency || "ETB").trim() || "ETB";
-      return `${curr} ${val.toLocaleString()}`;
+      const rawCurr = String((ticketTypes[0] as any)?.currency || "").trim();
+      if (rawCurr && (rawCurr.toUpperCase() === "INR" || rawCurr === "₹")) {
+        return `₹${val.toLocaleString()}`;
+      }
+      if (rawCurr && (rawCurr.toUpperCase() === "USD" || rawCurr === "$")) {
+        return `$${val.toLocaleString()}`;
+      }
+      return formatMoney(val, { compact: true });
     },
     [ticketTypes]
   );
@@ -308,25 +655,90 @@ export default function StadiumLayoutViewer({
   }, [ticketTypes]);
 
   const lookupTicketPrice = useCallback(
-    (ticketTypeId: string | null | undefined) => {
+    (ticketTypeId: string | null | undefined, blockName?: string) => {
       const id = String(ticketTypeId ?? "").trim();
-      if (!id) return null;
-      if (!ticketPriceById.has(id)) return null;
-      const n = ticketPriceById.get(id)!;
-      return n > 0 ? n : null;
+      if (id && ticketPriceById.has(id)) {
+        const n = ticketPriceById.get(id)!;
+        if (n > 0) return n;
+      }
+
+      // Collect all ticket candidates from props and API data
+      const candidates = [
+        ...ticketTypes,
+        ...(((data as any)?.ticket_types || []).map((t: any) => ({
+          id: String(t.id || ""),
+          name: String(t.ticket_type || t.name || ""),
+          price: Number(t.price) || 0,
+        }))),
+      ].filter((t) => Number(t.price) > 0);
+
+      if (id) {
+        const byId = candidates.find((c) => String(c.id).trim() === id);
+        if (byId && byId.price > 0) return byId.price;
+      }
+
+      if (blockName && candidates.length > 0) {
+        const bLower = blockName.toLowerCase();
+        // 1. Direct or fuzzy name match
+        const matched = candidates.find((tt) => {
+          const tLower = tt.name.toLowerCase();
+          return (
+            bLower.includes(tLower) ||
+            tLower.includes(bLower.replace(/\s*(stand|pit|zone)\s*/gi, "").trim()) ||
+            bLower.replace(/[^a-z0-9]/g, "") === tLower.replace(/[^a-z0-9]/g, "")
+          );
+        });
+        if (matched && matched.price > 0) return matched.price;
+
+        // 2. Rank / Tier keyword mapping:
+        // Fan Pit / VIP -> highest price
+        if (/vip|fan\s*pit|pit|floor/i.test(bLower)) {
+          const vip = candidates.find((t) => /vip|fan|pit/i.test(t.name));
+          if (vip) return vip.price;
+          const sorted = [...candidates].sort((a, b) => b.price - a.price);
+          return sorted[0].price;
+        }
+
+        // Platinum Stand
+        if (/plat/i.test(bLower)) {
+          const plat = candidates.find((t) => /plat/i.test(t.name));
+          if (plat) return plat.price;
+          const sorted = [...candidates].sort((a, b) => b.price - a.price);
+          return sorted[Math.min(1, sorted.length - 1)].price;
+        }
+
+        // Gold Stand
+        if (/gold/i.test(bLower)) {
+          const gold = candidates.find((t) => /gold/i.test(t.name));
+          if (gold) return gold.price;
+          const sorted = [...candidates].sort((a, b) => b.price - a.price);
+          const midIdx = Math.floor(sorted.length / 2);
+          return sorted[midIdx].price;
+        }
+
+        // Silver Stand / General
+        if (/silver|general|std/i.test(bLower)) {
+          const silver = candidates.find((t) => /silver|general|standard/i.test(t.name));
+          if (silver) return silver.price;
+          const sorted = [...candidates].sort((a, b) => a.price - b.price);
+          return sorted[0].price;
+        }
+      }
+
+      // 3. Fallback: if candidates exist, return first available
+      return candidates[0]?.price || null;
     },
-    [ticketPriceById]
+    [ticketPriceById, ticketTypes, data]
   );
 
   // Same ticket price used when a seat is selected on the map
   const getTierPrice = useCallback(
     (tier: StadiumTier) => {
-      const fromTicket = lookupTicketPrice(tier.ticket_type_id);
-      if (fromTicket != null) return fromTicket;
-      if (tier.price != null && !Number.isNaN(Number(tier.price))) {
-        const n = Number(tier.price);
-        if (n > 0) return n;
+      if (tier.price != null && !Number.isNaN(Number(tier.price)) && Number(tier.price) > 0) {
+        return Number(tier.price);
       }
+      const fromTicket = lookupTicketPrice(tier.ticket_type_id, tier.name);
+      if (fromTicket != null) return fromTicket;
       return null;
     },
     [lookupTicketPrice]
@@ -708,31 +1120,34 @@ export default function StadiumLayoutViewer({
   // Price helper for a block (ticket type first, then tier/block price from seating config)
   const getBlockMinPrice = useCallback(
     (block: StadiumBlock) => {
+      // 1. Direct block price
+      if (block.price != null && !Number.isNaN(Number(block.price)) && Number(block.price) > 0) {
+        return Number(block.price);
+      }
+
+      // 2. Standing block check
       if (block.stand_type === "standing") {
         const fromTicket = lookupTicketPrice(
-          block.ticket_type_id || block.tiers?.[0]?.ticket_type_id
+          block.ticket_type_id || block.tiers?.[0]?.ticket_type_id,
+          block.name
         );
-        if (fromTicket != null) return fromTicket;
+        if (fromTicket != null && fromTicket > 0) return fromTicket;
         if (block.tiers?.[0]) {
           const fromTier = getTierPrice(block.tiers[0]);
-          if (fromTier != null) return fromTier;
+          if (fromTier != null && fromTier > 0) return fromTier;
         }
-        if (block.price != null && !Number.isNaN(Number(block.price))) {
-          const n = Number(block.price);
-          return n > 0 ? n : null;
-        }
-        return null;
       }
+
+      // 3. Tiers pricing
       const prices = (block.tiers || [])
         .map((t) => getTierPrice(t))
-        .filter((p): p is number => p !== null);
+        .filter((p): p is number => p !== null && p > 0);
       if (prices.length > 0) return Math.min(...prices);
-      const fromTicket = lookupTicketPrice(block.ticket_type_id);
-      if (fromTicket != null) return fromTicket;
-      if (block.price != null && !Number.isNaN(Number(block.price))) {
-        const n = Number(block.price);
-        return n > 0 ? n : null;
-      }
+
+      // 4. Lookup by block.ticket_type_id or name
+      const fromTicket = lookupTicketPrice(block.ticket_type_id, block.name);
+      if (fromTicket != null && fromTicket > 0) return fromTicket;
+
       return null;
     },
     [lookupTicketPrice, getTierPrice]
@@ -1506,31 +1921,48 @@ export default function StadiumLayoutViewer({
       </div>
 
       <div className="flex-1 min-h-0 flex flex-col lg:flex-row overflow-hidden">
-        {/* Stands list — horizontal strip on mobile/tablet; vertical left column on desktop (lg+) */}
+        {/* Stands list — left column on desktop (lg+) */}
         {!selectedBlockId && data.blocks.length > 0 && (
-          <aside className="shrink-0 flex flex-col bg-[#F1F5F9] overflow-hidden w-full border-b border-slate-200 lg:w-[320px] lg:min-w-[280px] lg:max-w-[340px] lg:border-b-0 lg:border-r lg:h-full">
-            <div className="flex flex-row lg:flex-col items-stretch gap-1.5 px-2 py-1.5 lg:px-2.5 lg:py-2 lg:pb-2.5 overflow-x-auto lg:overflow-x-hidden lg:overflow-y-auto lg:flex-1 lg:min-h-0 overscroll-contain scrollbar-none" style={{ scrollbarWidth: "none" }}>
-              <button
-                type="button"
-                onClick={() => setSelectedCategoryFilter(null)}
-                className={`shrink-0 self-center lg:self-auto lg:w-full px-2.5 py-1.5 lg:px-3 lg:py-2 rounded-full text-[11px] md:max-lg:text-[13px] lg:text-[12px] font-bold border transition-all whitespace-nowrap ${selectedCategoryFilter === null
-                  ? "bg-[#6900AA] text-white border-[#6900AA] shadow-sm"
-                  : "bg-white text-slate-600 border-slate-200 hover:border-[#6900AA]/40 hover:text-slate-900"
-                  }`}
-              >
-                All stands
-              </button>
+          <aside className="shrink-0 flex flex-col bg-[#F8FAFC] overflow-hidden w-full border-b border-slate-200 lg:w-[410px] lg:min-w-[380px] lg:max-w-[450px] lg:border-b-0 lg:border-r lg:h-full">
+            <div
+              className="flex flex-row lg:flex-col items-stretch gap-3.5 p-3.5 lg:p-4 overflow-x-auto lg:overflow-x-hidden lg:overflow-y-auto lg:flex-1 lg:min-h-0 overscroll-contain scrollbar-none"
+              style={{ scrollbarWidth: "none" }}
+            >
+              {/* Optional Filter Reset Indicator (Only shown if a category filter is active) */}
+              {selectedCategoryFilter != null && (
+                <div className="shrink-0 flex items-center justify-between pb-1 px-1">
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Filtered view</span>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCategoryFilter(null)}
+                    className="text-xs font-extrabold text-[#6900AA] hover:underline flex items-center gap-1"
+                  >
+                    Show all ({data.blocks.length})
+                  </button>
+                </div>
+              )}
+
               {data.blocks.map((block) => {
                 const isSoldOut = block.available === 0 && block.total > 0;
                 const minPrice = getBlockMinPrice(block);
+                const isHovered = hoveredBlockId === block.block_id;
                 const isActive =
                   selectedCategoryFilter != null &&
                   (block.ticket_type_id === selectedCategoryFilter ||
                     block.tiers.some((t) => t.ticket_type_id === selectedCategoryFilter));
+                const accessText = getBlockAccessDescription(block);
+
                 return (
                   <button
                     key={block.block_id}
+                    id={`stand-card-${block.block_id}`}
                     type="button"
+                    onMouseEnter={() => {
+                      if (!isSoldOut) setHoveredBlockId(block.block_id);
+                    }}
+                    onMouseLeave={() => {
+                      setHoveredBlockId(null);
+                    }}
                     onClick={() => {
                       const matchingTier = selectedCategoryFilter
                         ? block.tiers.find((t) => t.ticket_type_id === selectedCategoryFilter)
@@ -1541,27 +1973,88 @@ export default function StadiumLayoutViewer({
                       if (!isSoldOut) handleBlockClick(block, matchingTier?.tier_id);
                     }}
                     disabled={isSoldOut}
-                    title={isSoldOut ? `${block.name} — Sold Out` : `Open ${block.name}`}
-                    className={`shrink-0 w-[9.75rem] md:max-lg:w-[12rem] lg:w-full px-2.5 py-1.5 lg:px-3.5 lg:py-2.5 rounded-xl border transition-all text-left ${isSoldOut
-                      ? "bg-slate-50 border-slate-100 text-slate-300 cursor-not-allowed"
-                      : isActive
-                        ? "bg-[#F7E9FF] border-[#6900AA]/40 text-slate-900 shadow-sm"
-                        : "bg-white border-slate-200 text-slate-700 hover:border-[#6900AA]/40"
-                      }`}
+                    title={
+                      isSoldOut
+                        ? `${block.name} — Sold Out`
+                        : `${block.name}${minPrice ? ` · ${formatPrice(minPrice)}` : ""}`
+                    }
+                    className={`w-[300px] sm:w-[340px] lg:w-full shrink-0 flex items-center gap-4 p-3.5 lg:p-4 rounded-2xl border text-left transition-all duration-150 cursor-pointer ${
+                      isSoldOut
+                        ? "bg-white border-slate-200/70 opacity-60 cursor-not-allowed"
+                        : isActive || isHovered
+                          ? "bg-[#FAF5FF] border-[#6900AA] ring-2 ring-[#6900AA]/25 shadow-md -translate-y-0.5"
+                          : "bg-white border-slate-200 hover:border-slate-300 hover:shadow-sm"
+                    }`}
                   >
-                    <span className="block text-[11px] md:max-lg:text-[13px] lg:text-[12px] font-extrabold leading-snug text-slate-900 line-clamp-2 lg:line-clamp-none">
-                      {block.stand_type === "standing" ? `🧍 ${block.name}` : block.name}
-                    </span>
-                    {minPrice != null && minPrice > 0 && (
-                      <span className="block text-[11px] md:max-lg:text-[13px] lg:text-[12px] font-bold text-slate-800 leading-tight mt-0.5">
-                        {formatPrice(minPrice)}
-                      </span>
-                    )}
-                    <span className="block text-[10px] md:max-lg:text-[12px] lg:text-[11px] text-[#6900AA] font-semibold leading-tight mt-0.5">
-                      {isSoldOut
-                        ? "Sold out"
-                        : `${block.available} ${block.stand_type === "standing" ? "passes" : "left"}`}
-                    </span>
+                    {/* Stand Locator Thumbnail Graphic — Enriched 68px scale */}
+                    <div
+                      className={`w-[66px] h-[66px] min-w-[66px] rounded-2xl border flex items-center justify-center shrink-0 p-1.5 transition-all ${
+                        isSoldOut
+                          ? "bg-slate-50/70 border-slate-200/70 opacity-60"
+                          : isHovered || isActive
+                            ? "bg-purple-50/90 border-[#6900AA]/50 shadow-sm ring-1 ring-[#6900AA]/20"
+                            : "bg-slate-50/90 border-slate-200 shadow-[0_1px_3px_rgba(0,0,0,0.03)]"
+                      }`}
+                    >
+                      <StandThumbnailSVG block={block} isSoldOut={isSoldOut} data={data} isHovered={isHovered} />
+                    </div>
+
+                    {/* Stand Details: Name, Price, and Access bullet */}
+                    <div className="flex-1 min-w-0 flex flex-col justify-center">
+                      {/* Top Row: Name and Price / Sold Out */}
+                      <div className="flex items-baseline justify-between gap-2 min-w-0">
+                        <span
+                          className={`font-semibold text-[15px] sm:text-[16px] uppercase tracking-normal truncate max-w-[170px] sm:max-w-[210px] ${
+                            isSoldOut ? "text-slate-400" : "text-slate-900"
+                          }`}
+                          title={block.name}
+                        >
+                          {block.name}
+                        </span>
+
+                        <div className="shrink-0 flex items-baseline">
+                          {isSoldOut ? (
+                            <div className="flex items-baseline gap-1">
+                              {minPrice != null && minPrice > 0 && (
+                                <span className="text-[#93c5fd] font-medium text-[15px]">
+                                  {formatPrice(minPrice)}
+                                </span>
+                              )}
+                              <span className="text-[#fda4af] font-semibold text-[13px] whitespace-nowrap ml-1">
+                                Sold Out
+                              </span>
+                            </div>
+                          ) : minPrice != null && minPrice > 0 ? (
+                            <span className="text-[#1d4ed8] font-semibold text-[16px] sm:text-[17px] whitespace-nowrap tracking-tight">
+                              {formatPrice(minPrice)}
+                            </span>
+                          ) : (
+                            <span className="text-slate-500 font-medium text-[13px] whitespace-nowrap">
+                              {block.available} {block.stand_type === "standing" ? "passes" : "left"}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Bottom Row: Bullet and Access Description */}
+                      <div className="flex items-start gap-1.5 mt-1 text-[13px] sm:text-[13.5px] leading-snug text-slate-500">
+                        <span
+                          className={`shrink-0 select-none text-[13px] leading-none mt-0.5 ${
+                            isSoldOut ? "text-slate-300" : "text-slate-400"
+                          }`}
+                        >
+                          •
+                        </span>
+                        <span
+                          className={`line-clamp-2 leading-snug font-normal ${
+                            isSoldOut ? "text-slate-300" : "text-slate-500"
+                          }`}
+                          title={accessText}
+                        >
+                          {accessText}
+                        </span>
+                      </div>
+                    </div>
                   </button>
                 );
               })}
@@ -2874,7 +3367,7 @@ export default function StadiumLayoutViewer({
                         perfectDrawEnabled={false}
                       />
 
-                      {/* Stand Name & Price Header - Hidden when zoomed in and selected */}
+                      {/* Stand Name & Floating Pill Badge - Hidden when zoomed in and selected */}
                       {!isSelected && (
                         <>
                           <Text
@@ -2883,12 +3376,12 @@ export default function StadiumLayoutViewer({
                             y={Math.max(6, block.height * 0.12)}
                             width={block.width}
                             align="center"
-                            fontSize={Math.max(15, Math.min(block.width, block.height) * 0.16) * mapLabelScale}
+                            fontSize={Math.max(13, Math.min(block.width, block.height) * 0.15) * mapLabelScale}
                             fontStyle="bold"
                             fill={isSoldOut ? "#94a3b8" : "#ffffff"}
                             shadowColor="#000000"
                             shadowBlur={6}
-                            shadowOpacity={0.6}
+                            shadowOpacity={0.65}
                             listening={false}
                             wrap="none"
                             ellipsis={true}
@@ -2896,20 +3389,54 @@ export default function StadiumLayoutViewer({
                           />
 
                           {block.total > 0 && (
-                            <Text
-                              text={standPriceAndLeftLabel(block, minPrice)}
-                              x={0}
-                              y={Math.max(28, block.height * 0.52)}
-                              width={block.width}
-                              align="center"
-                              fontSize={Math.max(11, Math.min(block.width, block.height) * 0.11) * mapLabelScale}
-                              fontStyle="bold"
-                              fill={isSoldOut ? "#ef4444" : "#FEF08A"}
-                              shadowColor="#000000"
-                              shadowBlur={4}
-                              listening={false}
-                              perfectDrawEnabled={false}
-                            />
+                            <Group x={block.width / 2} y={Math.max(28, block.height * 0.54)}>
+                              {(() => {
+                                const pillText = minPrice != null && minPrice > 0 
+                                  ? `${formatPrice(minPrice)}${isStanding ? " · PASS" : ""}`
+                                  : `${block.available} left`;
+                                const pillW = Math.min(block.width - 20, Math.max(96, pillText.length * 8 + 26));
+                                const pillH = Math.min(26, Math.max(20, block.height * 0.34));
+                                return (
+                                  <>
+                                    <Rect
+                                      x={-pillW / 2}
+                                      y={-pillH / 2}
+                                      width={pillW}
+                                      height={pillH}
+                                      cornerRadius={pillH / 2}
+                                      fill="#FFFFFF"
+                                      opacity={0.96}
+                                      stroke={isHovered ? "#6900AA" : "rgba(15,23,42,0.12)"}
+                                      strokeWidth={isHovered ? 1.5 : 1}
+                                      shadowColor="#0f172a"
+                                      shadowBlur={isHovered ? 8 : 4}
+                                      shadowOpacity={isHovered ? 0.22 : 0.1}
+                                    />
+                                    {/* Green / status dot */}
+                                    <Circle
+                                      x={-pillW / 2 + 10}
+                                      y={0}
+                                      radius={3}
+                                      fill={isSoldOut ? "#EF4444" : "#10B981"}
+                                    />
+                                    {/* Price text */}
+                                    <Text
+                                      text={pillText}
+                                      x={-pillW / 2 + 18}
+                                      y={-pillH / 2 + (pillH - 11) / 2}
+                                      width={pillW - 22}
+                                      align="left"
+                                      fontSize={Math.max(10, Math.min(12, pillH * 0.52)) * mapLabelScale}
+                                      fontStyle="bold"
+                                      fill={isSoldOut ? "#DC2626" : "#111827"}
+                                      listening={false}
+                                      wrap="none"
+                                      ellipsis={true}
+                                    />
+                                  </>
+                                );
+                              })()}
+                            </Group>
                           )}
                         </>
                       )}
@@ -3623,33 +4150,7 @@ export default function StadiumLayoutViewer({
           </div>
         )}
 
-        {/* Floating Zoom Controls (+ / − / ⟲) — desktop only; mobile/tablet use bottom controls */}
-        <div className="hidden lg:flex absolute top-3 right-3 sm:top-4 sm:right-4 z-20 flex-col gap-1.5 bg-white/95 backdrop-blur-md p-1.5 rounded-2xl border border-slate-200 shadow-xl">
-          <button
-            type="button"
-            onClick={() => handleZoomChange(0.35)}
-            className="w-8 h-8 rounded-xl bg-slate-50 hover:bg-[#F7E9FF] hover:text-[#6900AA] text-slate-700 flex items-center justify-center transition-all active:scale-95 cursor-pointer font-extrabold shadow-xs"
-            title="Zoom In (+)"
-          >
-            <ZoomIn className="w-4 h-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => handleZoomChange(-0.35)}
-            className="w-8 h-8 rounded-xl bg-slate-50 hover:bg-[#F7E9FF] hover:text-[#6900AA] text-slate-700 flex items-center justify-center transition-all active:scale-95 cursor-pointer font-extrabold shadow-xs"
-            title="Zoom Out (−)"
-          >
-            <ZoomOut className="w-4 h-4" />
-          </button>
-          <button
-            type="button"
-            onClick={handleResetZoom}
-            className="w-8 h-8 rounded-xl bg-slate-50 hover:bg-[#F7E9FF] hover:text-[#6900AA] text-slate-700 flex items-center justify-center transition-all active:scale-95 cursor-pointer shadow-xs"
-            title={selectedBlock ? "Fit Block / Tier (⟲)" : "Fit Stadium (⟲)"}
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-          </button>
-        </div>
+
 
         {/* Row selection pills floating at top-left when zoomed into a seated block */}
         {selectedBlock && selectedBlock.stand_type !== "standing" && availableRows.length > 1 && (
@@ -3698,33 +4199,7 @@ export default function StadiumLayoutViewer({
           </div>
         )}
 
-        {/* Zoom controls — map bottom-right (primary on mobile/tablet) */}
-        <div className="absolute bottom-3 right-3 z-20 flex items-center gap-0.5 bg-white/95 p-1 rounded-xl border border-slate-200 shadow-md">
-          <button
-            type="button"
-            onClick={() => handleZoomChange(0.25)}
-            className="p-2 text-slate-600 hover:text-slate-900 rounded-lg hover:bg-slate-50 cursor-pointer"
-            title="Zoom In"
-          >
-            <ZoomIn className="w-5 h-5" />
-          </button>
-          <button
-            type="button"
-            onClick={() => handleZoomChange(-0.25)}
-            className="p-2 text-slate-600 hover:text-slate-900 rounded-lg hover:bg-slate-50 cursor-pointer"
-            title="Zoom Out"
-          >
-            <ZoomOut className="w-5 h-5" />
-          </button>
-          <button
-            type="button"
-            onClick={handleFitStadium}
-            className="p-2 text-slate-600 hover:text-slate-900 rounded-lg hover:bg-slate-50 cursor-pointer"
-            title="Fit stadium"
-          >
-            <RotateCcw className="w-5 h-5" />
-          </button>
-        </div>
+
         </div>
       </div>
 

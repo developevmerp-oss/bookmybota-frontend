@@ -58,11 +58,10 @@ export default function GiftCardsBrowsePage() {
                 key={tab.key}
                 type="button"
                 onClick={() => setCategory(tab.key)}
-                className={`h-9 sm:h-10 px-4 sm:px-5 rounded-full text-[13px] sm:text-sm font-semibold border transition-colors cursor-pointer ${
-                  active
-                    ? "bg-[#6900AA] border-[#6900AA] text-white shadow-[0_4px_14px_rgba(105,0,170,0.28)]"
-                    : "bg-white border-slate-300 text-slate-700 hover:border-[#6900AA]/50 hover:text-[#6900AA]"
-                }`}
+                className={`h-9 sm:h-10 px-4 sm:px-5 rounded-full text-[13px] sm:text-sm font-semibold border transition-colors cursor-pointer ${active
+                  ? "bg-[#6900AA] border-[#6900AA] text-white shadow-[0_4px_14px_rgba(105,0,170,0.28)]"
+                  : "bg-white border-slate-300 text-slate-700 hover:border-[#6900AA]/50 hover:text-[#6900AA]"
+                  }`}
               >
                 {tab.label}
               </button>
@@ -109,7 +108,7 @@ export default function GiftCardsBrowsePage() {
             </div>
           </div>
           <Link
-            href="/my-gift-cards"
+            href="/customer/gift-cards"
             className="shrink-0 inline-flex items-center justify-center h-10 px-5 rounded-full bg-[#6900AA] text-white text-sm font-semibold hover:bg-[#56008a] transition-colors"
           >
             My Gift Cards

@@ -62,13 +62,12 @@ function NavSearchBar({
       <Search
         size={isDesktop ? 18 : isMobile ? 18 : 20}
         strokeWidth={2}
-        className={`absolute top-1/2 -translate-y-1/2 pointer-events-none shrink-0 ${
-          isDesktop
-            ? "left-4 text-[#9A9A9A]"
-            : isMobile
-              ? "left-3.5 text-[#6900AA]"
-              : "left-3.5 text-[#666666]"
-        }`}
+        className={`absolute top-1/2 -translate-y-1/2 pointer-events-none shrink-0 ${isDesktop
+          ? "left-4 text-[#9A9A9A]"
+          : isMobile
+            ? "left-3.5 text-[#6900AA]"
+            : "left-3.5 text-[#666666]"
+          }`}
       />
       <span
         className={
@@ -384,11 +383,11 @@ export default function HomeHeader() {
   /** Detail pages — hide site header + subnav on mobile/tablet only */
   const hideChromeOnMobileTablet = Boolean(
     (pathname?.match(/^\/movies\/[^/]+\/?$/) && pathname !== "/movies/cinemas") ||
-      pathname?.match(/^\/movies\/[^/]+\/showtimes\/?$/) ||
-      pathname?.match(/^\/movies\/cinemas\/[^/]+\/?$/) ||
-      pathname?.match(/^\/events\/[^/]+(\/gallery)?\/?$/) ||
-      pathname?.match(/^\/artists\/[^/]+\/?$/) ||
-      pathname?.match(/^\/venues\/[^/]+\/?$/)
+    pathname?.match(/^\/movies\/[^/]+\/showtimes\/?$/) ||
+    pathname?.match(/^\/movies\/cinemas\/[^/]+\/?$/) ||
+    pathname?.match(/^\/events\/[^/]+(\/gallery)?\/?$/) ||
+    pathname?.match(/^\/artists\/[^/]+\/?$/) ||
+    pathname?.match(/^\/venues\/[^/]+\/?$/)
   );
 
   useEffect(() => {
@@ -416,7 +415,7 @@ export default function HomeHeader() {
   useLayoutEffect(() => {
     const mainHeader = document.querySelector<HTMLElement>("[data-site-main-header]");
     /** Compact chrome only after main header has fully scrolled away — avoids logo/profile doubling. */
-    const compactAfterY = () => Math.max(mainHeader?.offsetHeight ?? 88, 88);
+    const compactAfterY = () => Math.max(mainHeader?.offsetHeight ?? 60, 60);
     const expandBelowY = () => 12;
     // Sync from real scrollY — do not start local `compact` at false while React
     // state may still be true from the previous route (skips setState and leaves
@@ -517,19 +516,18 @@ export default function HomeHeader() {
       {/* Main header — scrolls away (not sticky). Logo/profile live here only until compact. */}
       <header
         data-site-main-header
-        className={`relative z-[60] w-full overflow-visible bg-white text-[#111111] border-b border-[#E8E8E8] transition-transform duration-300 ease-out ${
-          diningBookImmersive
-            ? "hidden"
-            : diningDetailNavHidden
-              ? "-translate-y-full pointer-events-none max-md:hidden"
-              : hideChromeOnMobileTablet
-                ? "max-lg:hidden"
-                : "translate-y-0"
-        }`}
+        className={`relative z-[60] w-full overflow-visible bg-white text-[#111111] border-b border-[#E8E8E8] transition-transform duration-300 ease-out ${diningBookImmersive
+          ? "hidden"
+          : diningDetailNavHidden
+            ? "-translate-y-full pointer-events-none max-md:hidden"
+            : hideChromeOnMobileTablet
+              ? "max-lg:hidden"
+              : "translate-y-0"
+          }`}
         aria-hidden={diningDetailNavHidden || undefined}
         data-header-compact={compactHeader ? "1" : "0"}
       >
-        <div className={`${NAV_CONTAINER} py-2 min-w-0`}>
+        <div className={`${NAV_CONTAINER} py-1.5 lg:py-1 min-w-0`}>
           {/* Mobile + tablet: city | search icon + profile */}
           <div className="flex flex-nowrap items-center justify-between gap-2 min-w-0 lg:hidden">
             <button
@@ -543,9 +541,8 @@ export default function HomeHeader() {
             </button>
 
             <div
-              className={`flex items-center gap-1.5 sm:gap-2 shrink-0 transition-opacity duration-200 ${
-                compactHeader ? "opacity-0 pointer-events-none" : "opacity-100"
-              }`}
+              className={`flex items-center gap-1.5 sm:gap-2 shrink-0 transition-opacity duration-200 ${compactHeader ? "opacity-0 pointer-events-none" : "opacity-100"
+                }`}
               aria-hidden={compactHeader || undefined}
             >
               <button
@@ -572,19 +569,18 @@ export default function HomeHeader() {
           </div>
 
           {/* Desktop: logo left | search dead-center | city | Login right */}
-          <div className="relative hidden lg:flex items-center justify-between min-w-0 py-2.5 min-h-[3.75rem]">
+          <div className="relative hidden lg:flex items-center justify-between min-w-0 py-0 min-h-[3.25rem]">
             <Link
               href="/"
-              className={`relative z-10 shrink-0 flex items-center transition-opacity duration-200 ${
-                compactHeader ? "opacity-0 pointer-events-none" : "opacity-100"
-              }`}
+              className={`relative z-10 shrink-0 flex items-center transition-opacity duration-200 pl-4 sm:pl-6 lg:pl-8 xl:pl-10 ${compactHeader ? "opacity-0 pointer-events-none" : "opacity-100"
+                }`}
               aria-hidden={compactHeader || undefined}
               tabIndex={compactHeader ? -1 : undefined}
             >
               <img
                 src={logoSrc}
                 alt="Book My Bota"
-                className="hh-12 lg:h-14 w-auto object-contain"
+                className="h-10 lg:h-12 w-auto object-contain"
               />
             </Link>
 
@@ -611,9 +607,8 @@ export default function HomeHeader() {
               <span className="w-px h-5 bg-[#D0D0D0] shrink-0" aria-hidden />
 
               <div
-                className={`transition-opacity duration-200 ${
-                  compactHeader ? "opacity-0 pointer-events-none" : "opacity-100"
-                }`}
+                className={`transition-opacity duration-200 ${compactHeader ? "opacity-0 pointer-events-none" : "opacity-100"
+                  }`}
                 aria-hidden={compactHeader || undefined}
               >
                 <AuthSection
@@ -634,19 +629,17 @@ export default function HomeHeader() {
       {/* Subheader — sticky */}
       <div
         data-site-sticky-subheader="1"
-        className={`sticky top-0 z-50 w-full overflow-x-clip border-b border-[#E8E8E8] bg-white transition-shadow duration-300 ${
-          diningBookImmersive
-            ? "hidden"
-            : diningDetailNavHidden
-              ? "-translate-y-full pointer-events-none max-md:hidden"
-              : hideChromeOnMobileTablet
-                ? "max-lg:hidden"
-                : ""
-        } ${
-          compactHeader
+        className={`sticky top-0 z-50 w-full overflow-x-clip border-b border-[#E8E8E8] bg-white transition-shadow duration-300 ${diningBookImmersive
+          ? "hidden"
+          : diningDetailNavHidden
+            ? "-translate-y-full pointer-events-none max-md:hidden"
+            : hideChromeOnMobileTablet
+              ? "max-lg:hidden"
+              : ""
+          } ${compactHeader
             ? "shadow-[0_2px_10px_rgba(0,0,0,0.08)] max-lg:border-t max-lg:border-[#E8E8E8]"
             : "shadow-none lg:shadow-none max-lg:shadow-[0_2px_8px_rgba(0,0,0,0.06)]"
-        }`}
+          }`}
         aria-hidden={diningDetailNavHidden || undefined}
       >
         {/* Mobile/tablet sticky only: search pill above categories */}
@@ -661,50 +654,46 @@ export default function HomeHeader() {
         ) : null}
 
         <div
-          className={`min-w-0 w-full items-center ${
-            compactHeader
-              ? // Desktop sticky: mx-auto w-full … lg:px-8 flex items-center lg:gap-5
-                "mx-auto w-full px-3 sm:px-4 md:px-5 max-lg:pt-1 max-lg:flex max-lg:flex-nowrap max-lg:gap-2 lg:px-8 lg:flex lg:items-center lg:gap-5"
-              : // Desktop non-sticky: padding comes from SubNavBar bmb-section-container
-                "mx-auto flex flex-nowrap gap-2 sm:gap-3 px-3 sm:px-4 md:px-5 lg:block lg:px-0"
-          }`}
+          className={`min-w-0 w-full items-center ${compactHeader
+            ? // Desktop sticky: mx-auto w-full … lg:px-8 flex items-center lg:gap-5
+            "mx-auto w-full px-3 sm:px-4 md:px-5 max-lg:pt-1 max-lg:flex max-lg:flex-nowrap max-lg:gap-2 lg:px-8 lg:flex lg:items-center lg:gap-5"
+            : // Desktop non-sticky: padding comes from SubNavBar bmb-section-container
+            "mx-auto flex flex-nowrap gap-2 sm:gap-3 px-3 sm:px-4 md:px-5 lg:block lg:px-0"
+            }`}
         >
           {/* Desktop sticky only — logo left (same size as main header logo) */}
           <Link
             href="/"
-            className={`shrink-0 items-center ${
-              compactHeader
-                ? "hidden lg:flex animate-bmb-sticky-chrome"
-                : "hidden"
-            }`}
+            className={`shrink-0 items-center pl-4 sm:pl-6 lg:pl-8 xl:pl-10 ${compactHeader
+              ? "hidden lg:flex animate-bmb-sticky-chrome"
+              : "hidden"
+              }`}
             aria-hidden={!compactHeader}
             tabIndex={compactHeader ? undefined : -1}
           >
             <img
               src={logoSrc}
               alt="Book My Bota"
-              className="hh-12 lg:h-14 w-auto object-contain"
+              className="h-10 lg:h-12 w-auto object-contain"
             />
           </Link>
 
           {/* Categories — full width when not sticky; flex-1 middle when sticky */}
           <div
-            className={`min-w-0 max-w-full overflow-hidden ${
-              compactHeader
-                ? "flex-1 lg:min-w-0"
-                : "flex-1 lg:w-full"
-            }`}
+            className={`min-w-0 max-w-full overflow-hidden ${compactHeader
+              ? "flex-1 lg:min-w-0"
+              : "flex-1 lg:w-full"
+              }`}
           >
             {subNav}
           </div>
 
           {/* Desktop sticky only — search + location + List Your Show + profile */}
           <div
-            className={`relative z-10 shrink-0 items-center ${
-              compactHeader
-                ? "hidden lg:flex gap-2.5 xl:gap-3.5 animate-bmb-sticky-chrome-delay"
-                : "hidden"
-            }`}
+            className={`relative z-10 shrink-0 items-center ${compactHeader
+              ? "hidden lg:flex gap-2.5 xl:gap-3.5 animate-bmb-sticky-chrome-delay"
+              : "hidden"
+              }`}
             aria-hidden={!compactHeader}
           >
             <button

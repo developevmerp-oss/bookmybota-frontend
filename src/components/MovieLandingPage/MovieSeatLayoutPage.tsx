@@ -155,7 +155,7 @@ function CinemaScreenArc({
     <svg
       viewBox="0 0 480 48"
       className={className}
-      preserveAspectRatio="xMidYMid meet"
+      preserveAspectRatio="none"
       aria-hidden
       style={flip ? { transform: "scaleY(-1)" } : undefined}
     >
@@ -170,6 +170,7 @@ function CinemaScreenArc({
         stroke="#B59AD9"
         strokeWidth="1.35"
         strokeLinejoin="round"
+        vectorEffect="non-scaling-stroke"
       />
       {/* Top rim / 3D thickness (darker purple) */}
       <path
@@ -182,6 +183,7 @@ function CinemaScreenArc({
         stroke="#A992D4"
         strokeWidth="1"
         strokeLinejoin="round"
+        vectorEffect="non-scaling-stroke"
       />
       {/* Soft highlight on top rim */}
       <path
@@ -191,6 +193,7 @@ function CinemaScreenArc({
         strokeWidth="1.4"
         strokeLinecap="round"
         opacity="0.9"
+        vectorEffect="non-scaling-stroke"
       />
     </svg>
   );
@@ -358,6 +361,12 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
       setQtyModalDismissible(false);
     }
   }, [searchParams, showtimeId]);
+
+  useEffect(() => {
+    setSelectedSeats([]);
+    isTouchClassicRef.current = false;
+    lastClassicFitKeyRef.current = "";
+  }, [showtimeId]);
 
   const [step, setStep] = useState<BookingStep>("seats");
   const [sessionToken, setSessionToken] = useState<string | undefined>(() =>
@@ -1777,23 +1786,28 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
   }, [classicContentSize.h, classicContentSize.w]);
 
   /**
-   * Preferred open zoom: default zoomed-out view (as in reference image 2),
-   * fitting width comfortably so multiple tiers & rows are visible at once.
+   * Preferred open zoom: default fitted view (as in reference image 1),
+   * fitting both width and height comfortably so all rows from screen down to Row H are visible at once.
    */
   const getClassicPreferredZoom = useCallback(() => {
     const viewport = classicViewportRef.current;
     const content = classicContentRef.current;
     if (!viewport || !content) return 1.0;
-    const pad = 24;
+    const padX = 24;
+    const padY = 28;
     const baseW = Math.max(content.offsetWidth, classicContentSize.w, 1);
-    const zw = (viewport.clientWidth - pad * 2) / baseW;
-    return Math.min(1.0, Math.max(0.65, Math.round(zw * 100) / 100));
-  }, [classicContentSize.w]);
+    const baseH = Math.max(content.offsetHeight, classicContentSize.h, 1);
+    const zw = (viewport.clientWidth - padX * 2) / baseW;
+    const zh = (viewport.clientHeight - padY * 2) / baseH;
+    // Fit both width and height so all rows and screen are fully visible without vertical clipping
+    const fit = Math.min(zw, zh);
+    return Math.min(1.0, Math.max(0.35, Math.round(fit * 100) / 100));
+  }, [classicContentSize.w, classicContentSize.h]);
 
   /** Desktop & mobile: allow full-hall fit as zoom-out floor. */
   const getClassicMinZoom = useCallback(() => {
     const fit = getClassicFitZoom();
-    return Math.min(fit, 0.65);
+    return Math.min(fit, 0.35);
   }, [getClassicFitZoom]);
 
   const updateClassicViewport = useCallback(() => {
@@ -1901,14 +1915,16 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
     }
     if (!classicContentSize.w || !classicContentSize.h) return;
 
-    // Fit once per classic session / row set (after content is measured)
-    const fitKey = `${gridRows.length}:${classicSeatTrackPx}`;
+    // Fit once per showtime & layout change (after content is measured)
+    const fitKey = `${showtimeId}:${gridRows.length}:${classicSeatTrackPx}:${classicContentSize.w}x${classicContentSize.h}`;
     if (lastClassicFitKeyRef.current === fitKey) return;
     lastClassicFitKeyRef.current = fitKey;
 
-    const initialZoom = getClassicPreferredZoom();
-    classicZoomRef.current = initialZoom;
-    setClassicZoom(initialZoom);
+    if (!isTouchClassicRef.current) {
+      const initialZoom = getClassicPreferredZoom();
+      classicZoomRef.current = initialZoom;
+      setClassicZoom(initialZoom);
+    }
     const id = requestAnimationFrame(() => {
       centerClassicScroll();
       updateClassicViewport();
@@ -1917,6 +1933,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
     return () => cancelAnimationFrame(id);
   }, [
     viewMode,
+    showtimeId,
     gridRows,
     classicSeatTrackPx,
     classicContentSize.w,
@@ -1926,6 +1943,23 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
     updateClassicViewport,
     syncStickyRowLabels,
   ]);
+
+  useEffect(() => {
+    if (viewMode !== "classic") return;
+    const handleResize = () => {
+      if (!isTouchClassicRef.current) {
+        const nextZoom = getClassicPreferredZoom();
+        classicZoomRef.current = nextZoom;
+        setClassicZoom(nextZoom);
+        requestAnimationFrame(() => {
+          centerClassicScroll();
+          updateClassicViewport();
+        });
+      }
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [viewMode, getClassicPreferredZoom, centerClassicScroll, updateClassicViewport]);
 
   useEffect(() => {
     return () => {
@@ -2292,7 +2326,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                               style={{ width: classicSeatTrackPx }}
                             >
                               {/* Above seats — reference shape as-is (wide rim toward top) */}
-                              <CinemaScreenArc className="h-9 sm:h-10 w-[62%]" />
+                              <CinemaScreenArc className="h-10 sm:h-12 w-[85%] sm:w-[88%]" />
                             </div>
                           </div>
                         </div>
@@ -2424,7 +2458,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                               style={{ width: classicSeatTrackPx }}
                             >
                               {/* Below seats — flip so wide curved edge faces seats above */}
-                              <CinemaScreenArc flip className="h-9 sm:h-10 w-[62%]" />
+                              <CinemaScreenArc flip className="h-10 sm:h-12 w-[85%] sm:w-[88%]" />
                             </div>
                           </div>
                           <p
@@ -2480,7 +2514,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                 <div className="absolute inset-[8px] flex flex-col">
                   {screenPosition === "top" && (
                     <div className="mb-1.5 flex flex-col items-center shrink-0 w-full px-2">
-                      <CinemaScreenArc className="h-3.5 w-[62%]" />
+                      <CinemaScreenArc className="h-3.5 w-[85%] sm:w-[88%]" />
                     </div>
                   )}
                   <div className="flex-1 min-h-0 flex flex-col justify-between relative">
@@ -2539,7 +2573,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                   </div>
                   {screenPosition === "bottom" && (
                     <div className="mt-1.5 flex flex-col items-center shrink-0 w-full">
-                      <CinemaScreenArc flip className="h-3 w-[62%]" />
+                      <CinemaScreenArc flip className="h-3.5 w-[85%] sm:w-[88%]" />
                     </div>
                   )}
 

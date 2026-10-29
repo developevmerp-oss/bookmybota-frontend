@@ -227,6 +227,8 @@ export default function EventCheckout({
   const [selectedSeats, setSelectedSeats] = useState<any[]>([]);
   const [desiredSeatQty, setDesiredSeatQty] = useState<number | null>(null);
   const [seatCountPick, setSeatCountPick] = useState<number | null>(null);
+  const [seatQtyModalOpen, setSeatQtyModalOpen] = useState(false);
+  const autoOpenedMapRef = useRef(false);
   const [seatViewMode, setSeatViewMode] = useState<"canvas" | "grid">("canvas");
   const [isMapFullscreen, setIsMapFullscreen] = useState(false);
   const [expandedCity, setExpandedCity] = useState<string>("");
@@ -527,64 +529,6 @@ export default function EventCheckout({
     return [...seen.entries()].map(([key, iso]) => ({ key, iso }));
   }, [showtimes]);
 
-  useEffect(() => {
-    if (!isOrganizer) dispatch(loadFromStorage());
-  }, [dispatch, isOrganizer]);
-
-  useEffect(() => {
-    if (!open) return;
-    const initial = initialShowtimeId
-      ? showtimes.find((s) => s.id === initialShowtimeId)
-      : undefined;
-    const firstDate = initial ? dateKey(initial.starts_at) : dateOptions[0]?.key || "";
-    const pickedShowtime = initial || (showtimes.length === 1 ? showtimes[0] : undefined);
-    setShowtimeId(pickedShowtime ? pickedShowtime.id : "");
-    setSelectedDateKey(firstDate);
-    setStep(1);
-    setQtyByType({});
-    setSelectedSeats([]);
-    setIsMapFullscreen(false);
-    resetContact(emptyEventCheckoutContactValues());
-    resetContactModal(emptyEventCheckoutContactValues());
-    setPromoInput("");
-    setAppliedPromo(null);
-    setGiftCardInput("");
-    setSelectedGiftCardId("");
-    setAppliedGiftCard(null);
-    setSubmitting(false);
-    setAuthModalOpen(false);
-    setExpandedCity("");
-    setTicketModeDetailsOpen(null);
-    setContactModalOpen(false);
-    setCancelTxnOpen(false);
-    setTicketMode(defaultTicketModeForEvent(event.allowed_ticket_modes));
-    resetDelivery(emptyEventCheckoutDeliveryValues(false));
-  }, [open, event.id, event.allowed_ticket_modes, initialShowtimeId, resetContact, resetContactModal, resetDelivery]);
-
-  useEffect(() => {
-    if (!availableTicketModes.some((o) => o.id === ticketMode)) {
-      setTicketMode(defaultTicketModeForEvent(event.allowed_ticket_modes));
-    }
-  }, [availableTicketModes, ticketMode, event.allowed_ticket_modes]);
-
-  useEffect(() => {
-    setDeliveryValue("needs_delivery", ticketMode === "PHYSICAL_DELIVERY");
-  }, [ticketMode, setDeliveryValue]);
-
-  useEffect(() => {
-    if (isOrganizer || authUser?.role !== "customer") return;
-    resetContact({
-      name: profile?.name || authUser.name || "",
-      phone: sanitizePhoneInput(profile?.phone || authUser.phone || ""),
-      email: profile?.email || authUser.email || "",
-    });
-  }, [authUser, profile, isOrganizer, resetContact]);
-
-  const timesForDate = useMemo(
-    () => showtimes.filter((s) => dateKey(s.starts_at) === selectedDateKey),
-    [showtimes, selectedDateKey]
-  );
-
   const cityVenueGroups = useMemo(() => {
     type Show = (typeof showtimes)[number];
     type VenueBucket = {
@@ -633,6 +577,89 @@ export default function EventCheckout({
       }))
       .sort((a, b) => a.city.localeCompare(b.city));
   }, [showtimes]);
+
+  const totalVenuesCount = useMemo(() => {
+    return cityVenueGroups.reduce((acc, g) => acc + g.venues.length, 0);
+  }, [cityVenueGroups]);
+  const isSingleVenue = totalVenuesCount === 1 || (totalVenuesCount === 0 && showtimes.length <= 1);
+
+  const effectiveSteps = useMemo(() => {
+    if (isSingleVenue) {
+      return [
+        { n: 2, displayN: 1, label: "Tickets", short: "Tickets" },
+        { n: 3, displayN: 2, label: "Ticket Mode", short: "Mode" },
+        { n: 4, displayN: 3, label: "Review & Confirm", short: "Confirm" },
+      ];
+    }
+    return [
+      { n: 1, displayN: 1, label: "Venue", short: "Venue" },
+      { n: 2, displayN: 2, label: "Tickets", short: "Tickets" },
+      { n: 3, displayN: 3, label: "Ticket Mode", short: "Mode" },
+      { n: 4, displayN: 4, label: "Review & Confirm", short: "Confirm" },
+    ];
+  }, [isSingleVenue]);
+
+  useEffect(() => {
+    if (!isOrganizer) dispatch(loadFromStorage());
+  }, [dispatch, isOrganizer]);
+
+  useEffect(() => {
+    if (!open) return;
+    const initial = initialShowtimeId
+      ? showtimes.find((s) => s.id === initialShowtimeId)
+      : undefined;
+    const firstDate = initial ? dateKey(initial.starts_at) : dateOptions[0]?.key || "";
+    const pickedShowtime = initial || (showtimes.length === 1 ? showtimes[0] : (isSingleVenue ? showtimes[0] : undefined));
+    setShowtimeId(pickedShowtime ? pickedShowtime.id : "");
+    setSelectedDateKey(firstDate);
+    setStep(isSingleVenue && pickedShowtime ? 2 : 1);
+    setQtyByType({});
+    setSelectedSeats([]);
+    setDesiredSeatQty(null);
+    setSeatCountPick(null);
+    setSeatQtyModalOpen(false);
+    setIsMapFullscreen(false);
+    autoOpenedMapRef.current = false;
+    resetContact(emptyEventCheckoutContactValues());
+    resetContactModal(emptyEventCheckoutContactValues());
+    setPromoInput("");
+    setAppliedPromo(null);
+    setGiftCardInput("");
+    setSelectedGiftCardId("");
+    setAppliedGiftCard(null);
+    setSubmitting(false);
+    setAuthModalOpen(false);
+    setExpandedCity("");
+    setTicketModeDetailsOpen(null);
+    setContactModalOpen(false);
+    setCancelTxnOpen(false);
+    setTicketMode(defaultTicketModeForEvent(event.allowed_ticket_modes));
+    resetDelivery(emptyEventCheckoutDeliveryValues(false));
+  }, [open, event.id, event.allowed_ticket_modes, initialShowtimeId, isSingleVenue, showtimes, dateOptions, resetContact, resetContactModal, resetDelivery]);
+
+  useEffect(() => {
+    if (!availableTicketModes.some((o) => o.id === ticketMode)) {
+      setTicketMode(defaultTicketModeForEvent(event.allowed_ticket_modes));
+    }
+  }, [availableTicketModes, ticketMode, event.allowed_ticket_modes]);
+
+  useEffect(() => {
+    setDeliveryValue("needs_delivery", ticketMode === "PHYSICAL_DELIVERY");
+  }, [ticketMode, setDeliveryValue]);
+
+  useEffect(() => {
+    if (isOrganizer || authUser?.role !== "customer") return;
+    resetContact({
+      name: profile?.name || authUser.name || "",
+      phone: sanitizePhoneInput(profile?.phone || authUser.phone || ""),
+      email: profile?.email || authUser.email || "",
+    });
+  }, [authUser, profile, isOrganizer, resetContact]);
+
+  const timesForDate = useMemo(
+    () => showtimes.filter((s) => dateKey(s.starts_at) === selectedDateKey),
+    [showtimes, selectedDateKey]
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -1031,6 +1058,21 @@ export default function EventCheckout({
     return Math.min(10, cap);
   }, [hasReservedSeats, isStadiumLayout, ticketTypes, activeLayoutData]);
 
+  // Auto-open map with "How many seats?" popup when in step 2 with seating layout
+  useEffect(() => {
+    if (!open) {
+      autoOpenedMapRef.current = false;
+      return;
+    }
+    if (step === 2 && (hasReservedSeats || showtimeHasSeatingLayout) && !autoOpenedMapRef.current) {
+      autoOpenedMapRef.current = true;
+      setIsMapFullscreen(true);
+      setDesiredSeatQty((curr) => curr || 2);
+      setSeatCountPick((curr) => curr || 2);
+      setSeatQtyModalOpen(true);
+    }
+  }, [open, step, hasReservedSeats, showtimeHasSeatingLayout]);
+
   const eventGridLayout = useMemo(() => {
     type GridSeat = {
       id: string;
@@ -1245,7 +1287,7 @@ export default function EventCheckout({
   const isSingleCitySingleVenue =
     cityVenueGroups.length === 1 && (cityVenueGroups[0]?.venues.length ?? 0) === 1;
   const showStepHeader =
-    step !== 4 && (step !== 1 || !isSingleCitySingleVenue);
+    step !== 4 && (step !== 1 || !isSingleVenue);
 
   const accentBtn = "bg-[#111111] hover:bg-black";
   const accentIcon = "text-[#6900AA]";
@@ -1504,17 +1546,21 @@ export default function EventCheckout({
   };
 
   const canNavigateToStep = (targetStep: number) => {
+    if (isSingleVenue && targetStep === 1) return false;
     if (targetStep === step) return false;
     if (targetStep < step) return true;
     if (targetStep >= 2 && !showtimeId) return false;
     if (targetStep >= 3 && !(hasReservedSeats ? seatsReady : ticketQty >= 1)) return false;
     if (targetStep >= 4 && !canProceedFromTicketMode) return false;
-    return targetStep <= CHECKOUT_STEPS.length;
+    return targetStep <= 4;
   };
 
   const navigateToStep = (targetStep: number) => {
     if (!canNavigateToStep(targetStep)) return;
     if (targetStep !== 2) setIsMapFullscreen(false);
+    if (targetStep === 2 && (hasReservedSeats || showtimeHasSeatingLayout)) {
+      setIsMapFullscreen(true);
+    }
     if (targetStep === 4) {
       void proceedToReview();
       return;
@@ -1549,7 +1595,7 @@ export default function EventCheckout({
     <div className="border-t border-slate-100 bg-white w-full">
       <div className="max-w-[36rem] mx-auto px-4 sm:px-5 py-2 sm:py-2.5">
         <ol className="flex items-center justify-center gap-0.5 sm:gap-1.5 flex-nowrap">
-          {CHECKOUT_STEPS.map((s, i) => {
+          {effectiveSteps.map((s, i) => {
             const done = step > s.n;
             const active = step === s.n;
             const clickable = canNavigateToStep(s.n);
@@ -1576,7 +1622,7 @@ export default function EventCheckout({
                           : "bg-white border border-slate-300 text-slate-400"
                       }`}
                   >
-                    {done ? <Check size={12} strokeWidth={3} /> : s.n}
+                    {done ? <Check size={12} strokeWidth={3} /> : s.displayN}
                   </span>
                   <span
                     className={`whitespace-nowrap text-[0.625rem] md:text-[0.8125rem] font-normal leading-tight ${active || done ? "text-slate-900" : "text-slate-400"
@@ -1601,7 +1647,7 @@ export default function EventCheckout({
                     )}
                   </span>
                 </button>
-                {i < CHECKOUT_STEPS.length - 1 && (
+                {i < effectiveSteps.length - 1 && (
                   <ChevronRight
                     size={12}
                     className="text-slate-300 shrink-0 mx-0.5 sm:mx-1"
@@ -1697,6 +1743,25 @@ export default function EventCheckout({
     return ticketAvail(available, total);
   };
 
+  const handleHeaderBack = () => {
+    if (step === 4) {
+      requestLeaveConfirmStep("back");
+    } else if (step === 3) {
+      setStep(2);
+      if (hasReservedSeats || showtimeHasSeatingLayout) {
+        setIsMapFullscreen(true);
+      }
+    } else if (step === 2) {
+      if (isSingleVenue) {
+        onClose();
+      } else {
+        setStep(1);
+      }
+    } else {
+      onClose();
+    }
+  };
+
   const panel = (
     <div
       className={
@@ -1723,8 +1788,8 @@ export default function EventCheckout({
               <div className="relative flex w-full items-center justify-center py-2 sm:py-2.5">
                 <button
                   type="button"
-                  onClick={() => (step === 4 ? requestLeaveConfirmStep("exit") : onClose())}
-                  aria-label="Back to event"
+                  onClick={handleHeaderBack}
+                  aria-label="Back"
                   className="absolute left-0 z-[1] h-9 w-9 rounded-full text-[#111] flex items-center justify-center hover:bg-slate-100 cursor-pointer shrink-0 transition-colors"
                 >
                   <ArrowLeft size={22} strokeWidth={2} />
@@ -1803,12 +1868,12 @@ export default function EventCheckout({
           </div>
 
           <p className="mt-4 text-[0.8125rem] font-bold uppercase tracking-[0.14em] text-slate-400">
-            Step {step} of {CHECKOUT_STEPS.length}
-            {isOrganizer ? " Â· Organizer sale" : ""}
+            Step {effectiveSteps.find((s) => s.n === step)?.displayN ?? 1} of {effectiveSteps.length}
+            {isOrganizer ? " · Organizer sale" : ""}
           </p>
 
-          <div className="mt-4 grid grid-cols-4 gap-0.5">
-            {CHECKOUT_STEPS.map((s) => {
+          <div className={`mt-4 grid gap-0.5 ${isSingleVenue ? "grid-cols-3" : "grid-cols-4"}`}>
+            {effectiveSteps.map((s) => {
               const done = step > s.n;
               const active = step === s.n;
               const clickable = canNavigateToStep(s.n);
@@ -1833,7 +1898,7 @@ export default function EventCheckout({
                         : "border-2 border-slate-200 text-slate-400 bg-white"
                       }`}
                   >
-                    {done ? <Check size={14} strokeWidth={3} /> : s.n}
+                    {done ? <Check size={14} strokeWidth={3} /> : s.displayN}
                   </span>
                   <span
                     className={`mt-1.5 text-[0.625rem] md:text-[0.6875rem] font-normal text-center leading-tight ${active || done ? "text-slate-900" : "text-slate-400"
@@ -1881,7 +1946,7 @@ export default function EventCheckout({
           </div>
         )}
 
-        {step === 1 && (
+        {step === 1 && !isSingleVenue && (
           <div className="space-y-3">
             {cityVenueGroups.length === 0 ? (
               <p className="text-[1rem] text-slate-500">Showtimes coming soon.</p>
@@ -1933,8 +1998,20 @@ export default function EventCheckout({
                                         return;
                                       }
                                       selectShowtime(s);
-                                      setIsMapFullscreen(false);
                                       setStep(2);
+                                      if (
+                                        (s as any).layout_mode === "standard" ||
+                                        (s as any).layout_mode === "custom" ||
+                                        Boolean((s as any).venue_layout_template_id) ||
+                                        showtimeHasSeatingLayout
+                                      ) {
+                                        setIsMapFullscreen(true);
+                                        setDesiredSeatQty((curr) => curr || 2);
+                                        setSeatCountPick((curr) => curr || 2);
+                                        setSeatQtyModalOpen(true);
+                                      } else {
+                                        setIsMapFullscreen(false);
+                                      }
                                     }}
                                     className="w-full text-left px-3.5 py-3 cursor-pointer"
                                   >
@@ -2050,86 +2127,52 @@ export default function EventCheckout({
                 </div>
               )
             ) : hasReservedSeats ? (
-              <div className="space-y-4">
-                {desiredSeatQty == null ? (
-                  <div className="bg-white border border-slate-200 rounded-xl p-5 sm:p-6 space-y-5">
-                    <div className="text-center">
-                      <h4 className="text-[1.0625rem] md:text-[1.1875rem] font-semibold text-gray-800">
-                        How many seats?
-                      </h4>
-                      <p className="mt-1 text-[0.875rem] md:text-[0.9375rem] text-slate-500">
-                        Pick a count, then choose your seats on the full seating map
-                      </p>
-                    </div>
-                    <div className="grid grid-cols-5 gap-2.5 max-w-sm mx-auto">
-                      {Array.from({ length: maxSeatQtyPick }, (_, i) => i + 1).map((n) => (
-                        <button
-                          key={n}
-                          type="button"
-                          onClick={() => {
-                            setDesiredSeatQty(n);
-                            setSeatCountPick(n);
-                            setSelectedSeats([]);
-                            setSeatViewMode("canvas");
-                            setIsMapFullscreen(true);
-                          }}
-                          className={`h-12 rounded-xl text-sm font-semibold cursor-pointer transition ${seatCountPick === n
-                              ? "text-white shadow-sm"
-                              : "bg-[#F5F5F5] text-[#333] hover:bg-[#EDE4F7]"
-                            }`}
-                          style={
-                            seatCountPick === n
-                              ? { background: seatCountActiveGradient }
-                              : undefined
-                          }
-                        >
-                          {n}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="bg-white border border-slate-200 rounded-xl p-5 text-center space-y-4">
-                    <div>
-                      <h4 className="text-[1.125rem] font-extrabold text-slate-900">
-                        {selectedSeats.length}/{desiredSeatQty} seat
-                        {desiredSeatQty === 1 ? "" : "s"} selected
-                      </h4>
-                      <p className="mt-1 text-[0.875rem] text-slate-500">
-                        {seatsReady
-                          ? "Seats locked in — continue when you are ready"
-                          : "Open the map to finish selecting your seats"}
-                      </p>
-                      {ticketAmount > 0 && (
-                        <p className={`mt-2 text-[1.0625rem] font-bold ${accentIcon}`}>
-                          {formatMoney(ticketAmount, { compact: true })}
-                        </p>
-                      )}
-                    </div>
-                    <div className="flex flex-col sm:flex-row gap-2.5">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setDesiredSeatQty(null);
-                          setSeatCountPick(null);
-                          setSelectedSeats([]);
-                          setIsMapFullscreen(false);
-                        }}
-                        className="flex-1 py-3 rounded-xl border border-slate-200 text-slate-700 text-[0.9375rem] font-semibold cursor-pointer hover:bg-slate-50"
-                      >
-                        Change count
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setIsMapFullscreen(true)}
-                        className={`flex-1 py-3 rounded-xl ${accentBtn} text-white text-[0.9375rem] font-bold cursor-pointer inline-flex items-center justify-center gap-2`}
-                      >
-                        <Maximize2 className="size-4" />
-                        {selectedSeats.length > 0 ? "Edit seats on map" : "Open seating map"}
-                      </button>
-                    </div>
-                  </div>
-                )}
+              <div className="bg-white border border-slate-200 rounded-xl p-5 text-center space-y-4">
+                <div>
+                  <h4 className="text-[1.125rem] font-extrabold text-slate-900">
+                    {selectedSeats.length}/{desiredSeatQty || 2} seat
+                    {(desiredSeatQty || 2) === 1 ? "" : "s"} selected
+                  </h4>
+                  <p className="mt-1 text-[0.875rem] text-slate-500">
+                    {seatsReady
+                      ? "Seats locked in — continue when you are ready"
+                      : "Open the map to choose your seats"}
+                  </p>
+                  {ticketAmount > 0 && (
+                    <p className={`mt-2 text-[1.0625rem] font-bold ${accentIcon}`}>
+                      {formatMoney(ticketAmount, { compact: true })}
+                    </p>
+                  )}
+                </div>
+                <div className="flex flex-col sm:flex-row gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsMapFullscreen(true);
+                      if (!desiredSeatQty) {
+                        setDesiredSeatQty(2);
+                        setSeatCountPick(2);
+                        setSeatQtyModalOpen(true);
+                      }
+                    }}
+                    className={`flex-1 py-3 px-4 rounded-xl font-bold text-white ${accentBtn} cursor-pointer flex items-center justify-center gap-1.5`}
+                  >
+                    <MapIcon className="size-4" />
+                    <span>{seatsReady ? "Review seating map" : "Select seats on map"}</span>
+                  </button>
+                  {desiredSeatQty != null && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsMapFullscreen(true);
+                        setSeatQtyModalOpen(true);
+                      }}
+                      className="px-4 py-3 rounded-xl border border-slate-200 text-slate-700 font-semibold text-sm hover:bg-slate-50 cursor-pointer"
+                    >
+                      Change seats ({desiredSeatQty})
+                    </button>
+                  )}
+                </div>
               </div>
             ) : ticketTypes.length === 0 ? (
               <p className="text-[1rem] text-slate-500">No ticket types yet.</p>
@@ -2772,7 +2815,7 @@ export default function EventCheckout({
                   <div className="flex items-end gap-3">
                     <button
                       type="button"
-                      onClick={() => setStep(1)}
+                      onClick={() => (isSingleVenue ? onClose() : setStep(1))}
                       className="shrink-0 px-4 py-3 rounded-[0.5rem] border border-slate-300 bg-white text-slate-700 font-semibold text-[1rem] inline-flex items-center gap-1 cursor-pointer"
                     >
                       <ArrowLeft size={14} /> Back
@@ -2950,13 +2993,20 @@ export default function EventCheckout({
           nextHref={`/customer/event-bookings/confirmation?id=${bookedSuccessId}`}
         />
       ) : null}
-      {isMapFullscreen && desiredSeatQty != null && (
+      {isMapFullscreen && (
         <div className="fixed inset-0 z-[100] bg-white flex flex-col overflow-hidden">
           <header className="shrink-0 bg-white border-b border-slate-200">
             <div className="px-3 sm:px-4 py-1.5 md:max-lg:py-2.5 flex items-center gap-2.5">
               <button
                 type="button"
-                onClick={() => setIsMapFullscreen(false)}
+                onClick={() => {
+                  setIsMapFullscreen(false);
+                  if (isSingleVenue) {
+                    onClose();
+                  } else {
+                    setStep(1);
+                  }
+                }}
                 className="h-8 w-8 md:max-lg:h-9 md:max-lg:w-9 rounded-full border border-slate-200 flex items-center justify-center text-slate-700 cursor-pointer hover:bg-slate-50 shrink-0"
                 aria-label="Back from seating map"
               >
@@ -3016,7 +3066,7 @@ export default function EventCheckout({
                   </span>
                 )}
                 <p className="text-[0.8125rem] md:max-lg:text-[1rem] lg:text-[0.8125rem] font-extrabold text-[#6900AA] tabular-nums">
-                  {selectedSeats.length}/{desiredSeatQty}
+                  {selectedSeats.length}/{desiredSeatQty || 2}
                 </p>
                 {selectedSeats.length > 0 && (
                   <button
@@ -3033,9 +3083,7 @@ export default function EventCheckout({
                 <button
                   type="button"
                   onClick={() => {
-                    setDesiredSeatQty(null);
-                    setSelectedSeats([]);
-                    setIsMapFullscreen(false);
+                    setSeatQtyModalOpen(true);
                   }}
                   className="text-[0.6875rem] md:max-lg:text-[0.8125rem] lg:text-[0.6875rem] font-semibold text-[#6900AA] hover:underline cursor-pointer"
                 >
@@ -3063,17 +3111,18 @@ export default function EventCheckout({
                                 id,
                                 name: String(t?.ticket_type ?? t?.name ?? "Ticket"),
                                 price: Number(t?.price) || 0,
+                                currency: (t as any)?.currency,
                               },
                             ] as const;
                           })
                           .filter(Boolean) as Array<
-                            readonly [string, { id: string; name: string; price: number }]
+                            readonly [string, { id: string; name: string; price: number; currency?: string }]
                           >
                       ).values()
                     )}
                     onSeatsSelected={handleMapSeatsSelected}
                     initialSelectedSeats={selectedSeats}
-                    maxSelectable={desiredSeatQty}
+                    maxSelectable={desiredSeatQty ?? undefined}
                     hideBookingBar
                   />
                 ) : (
@@ -3082,7 +3131,7 @@ export default function EventCheckout({
                     ticketTypes={ticketTypes}
                     onSeatsSelected={handleMapSeatsSelected}
                     initialSelectedSeats={selectedSeats}
-                    maxSelectable={desiredSeatQty}
+                    maxSelectable={desiredSeatQty ?? undefined}
                     cinemaMode
                     hideSidePanel
                     mapTitle="Event seating map"
@@ -3234,8 +3283,8 @@ export default function EventCheckout({
                 <div className="flex items-center gap-2 flex-wrap">
                   <p className="text-[0.75rem] sm:text-[0.8125rem] md:max-lg:text-[0.9375rem] lg:text-[0.8125rem] text-slate-500 font-medium">
                     {selectedSeats.length === 0
-                      ? `Select ${desiredSeatQty} seat${desiredSeatQty === 1 ? "" : "s"}`
-                      : `${selectedSeats.length}/${desiredSeatQty} selected`}
+                      ? `Select ${desiredSeatQty || 2} seat${(desiredSeatQty || 2) === 1 ? "" : "s"}`
+                      : `${selectedSeats.length}/${desiredSeatQty || 2} selected`}
                   </p>
                   {selectedSeats.length > 0 && (
                     <button
@@ -3264,11 +3313,12 @@ export default function EventCheckout({
               </div>
               <button
                 type="button"
-                disabled={selectedSeats.length !== desiredSeatQty}
+                disabled={selectedSeats.length !== (desiredSeatQty || 2)}
                 onClick={() => {
-                  if (selectedSeats.length !== desiredSeatQty) {
+                  const targetQty = desiredSeatQty || 2;
+                  if (selectedSeats.length !== targetQty) {
                     toast.error(
-                      `Please select exactly ${desiredSeatQty} seat${desiredSeatQty === 1 ? "" : "s"}.`
+                      `Please select exactly ${targetQty} seat${targetQty === 1 ? "" : "s"}.`
                     );
                     return;
                   }
@@ -3277,10 +3327,62 @@ export default function EventCheckout({
                 }}
                 className={`shrink-0 min-w-[7.5rem] sm:min-w-[12rem] px-4 sm:px-5 py-3 sm:py-3.5 ${accentBtn} text-white font-bold text-[0.9375rem] sm:text-[1.0625rem] md:max-lg:text-[1.125rem] lg:text-[1.0625rem] rounded-xl cursor-pointer disabled:bg-slate-300 disabled:cursor-not-allowed`}
               >
-                {selectedSeats.length === desiredSeatQty ? "Continue" : "Select seats"}
+                {selectedSeats.length === (desiredSeatQty || 2) ? "Continue" : "Select seats"}
               </button>
             </div>
           </footer>
+
+          {seatQtyModalOpen && (
+            <div
+              className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/60 backdrop-blur-[1px]"
+              role="dialog"
+              aria-modal="true"
+              onClick={() => {
+                if (desiredSeatQty) setSeatQtyModalOpen(false);
+              }}
+            >
+              <div
+                className="w-full max-w-[28rem] rounded-2xl bg-white p-6 sm:p-7 shadow-2xl space-y-6"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="text-center">
+                  <h3 className="text-[1.1875rem] sm:text-[1.3125rem] font-bold text-gray-900">
+                    How many seats?
+                  </h3>
+                  <p className="mt-1 text-[0.875rem] text-slate-500">
+                    Pick a count, then choose your seats on the full seating map
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-5 gap-2.5 max-w-sm mx-auto">
+                  {Array.from({ length: maxSeatQtyPick }, (_, i) => i + 1).map((n) => {
+                    const isSelected = (seatCountPick ?? desiredSeatQty ?? 2) === n;
+                    return (
+                      <button
+                        key={n}
+                        type="button"
+                        onClick={() => {
+                          setDesiredSeatQty(n);
+                          setSeatCountPick(n);
+                          if (selectedSeats.length > n) {
+                            setSelectedSeats((prev) => prev.slice(0, n));
+                          }
+                          setSeatQtyModalOpen(false);
+                        }}
+                        className={`h-12 rounded-xl text-base font-semibold cursor-pointer transition-all flex items-center justify-center ${
+                          isSelected
+                            ? "bg-[#EDE4F7] text-[#6900AA] ring-2 ring-[#6900AA]/20 shadow-sm font-bold"
+                            : "bg-[#F5F5F5] text-[#333] hover:bg-[#EDE4F7] hover:text-[#6900AA]"
+                        }`}
+                      >
+                        {n}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
       {ticketModeDetailsOpen && (

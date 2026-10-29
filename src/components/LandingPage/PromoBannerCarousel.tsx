@@ -419,7 +419,7 @@ export default function PromoBannerCarousel({ city }: PromoBannerCarouselProps) 
 
   return (
     <section
-      className={`promo-banner-swiper w-full bg-white pt-5 sm:pt-6 lg:pt-7 pb-5 sm:pb-6 lg:pb-7 ${
+      className={`promo-banner-swiper w-full bg-white pt-2 sm:pt-2.5 lg:pt-3 pb-5 sm:pb-6 lg:pb-7 ${
         multi ? "is-multi" : "is-single"
       }`}
     >

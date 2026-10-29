@@ -322,9 +322,8 @@ function SlideCard({
             src={slide.image}
             alt=""
             aria-hidden
-            className={`promo-slide-photo h-full w-full object-cover ${
-              isDesignedPoster ? "promo-slide-photo--designed" : ""
-            }`}
+            className={`promo-slide-photo h-full w-full object-cover ${isDesignedPoster ? "promo-slide-photo--designed" : ""
+              }`}
             draggable={false}
             onError={() => setFailed(true)}
           />
@@ -332,13 +331,12 @@ function SlideCard({
           <div className="h-full w-full promo-slide-fallback" aria-hidden />
         )}
         <div
-          className={`pointer-events-none absolute inset-0 ${
-            isDesignedPoster
-              ? "promo-slide-scrim-designed"
-              : showImage
-                ? "promo-slide-scrim-poster"
-                : "promo-slide-scrim"
-          }`}
+          className={`pointer-events-none absolute inset-0 ${isDesignedPoster
+            ? "promo-slide-scrim-designed"
+            : showImage
+              ? "promo-slide-scrim-poster"
+              : "promo-slide-scrim"
+            }`}
         />
       </div>
 
@@ -350,11 +348,10 @@ function SlideCard({
       ) : null}
 
       <div
-        className={`relative z-[2] flex h-full flex-col justify-center pl-5 pr-2 sm:pl-7 sm:pr-4 md:pl-9 md:pr-6 pb-6 sm:pb-8 ${
-          isDesignedPoster
-            ? "max-w-[52%] sm:max-w-[46%] md:max-w-[42%]"
-            : "max-w-[58%] sm:max-w-[52%] md:max-w-[48%] lg:max-w-[46%]"
-        }`}
+        className={`relative z-[2] flex h-full flex-col justify-center pl-5 pr-2 sm:pl-7 sm:pr-4 md:pl-9 md:pr-6 pb-6 sm:pb-8 ${isDesignedPoster
+          ? "max-w-[52%] sm:max-w-[46%] md:max-w-[42%]"
+          : "max-w-[58%] sm:max-w-[52%] md:max-w-[48%] lg:max-w-[46%]"
+          }`}
       >
         <span className="w-fit mb-2 sm:mb-2.5 text-[9px] sm:text-[10px] font-bold uppercase tracking-[0.14em] px-2.5 py-1 rounded-full bg-[#6900AA] text-white shadow-sm">
           {slide.badge}
@@ -517,9 +514,8 @@ export default function ListingPromoSlider({
 
   return (
     <section
-      className={`promo-banner-swiper w-full bg-white pt-5 sm:pt-6 lg:pt-7 pb-5 sm:pb-6 lg:pb-7 ${
-        multi ? "is-multi" : "is-single"
-      } ${className}`}
+      className={`promo-banner-swiper w-full bg-white pt-2 sm:pt-2.5 lg:pt-3 pb-5 sm:pb-6 lg:pb-7 ${multi ? "is-multi" : "is-single"
+        } ${className}`}
     >
       <div
         className={`relative w-full promo-banner-frame ${multi ? "" : "promo-banner-single-wrap"}`}
@@ -542,11 +538,11 @@ export default function ListingPromoSlider({
           breakpoints={
             multi
               ? {
-                  640: { spaceBetween: 10 },
-                  768: { spaceBetween: 12 },
-                  1024: { spaceBetween: 14 },
-                  1280: { spaceBetween: 16 },
-                }
+                640: { spaceBetween: 10 },
+                768: { spaceBetween: 12 },
+                1024: { spaceBetween: 14 },
+                1280: { spaceBetween: 16 },
+              }
               : undefined
           }
           onSwiper={(swiper) => {

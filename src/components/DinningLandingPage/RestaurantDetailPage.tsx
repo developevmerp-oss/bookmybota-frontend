@@ -2196,7 +2196,10 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
               <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-sm min-w-0 text-slate-600">
                 {infoCostText ? (
                   <>
-                    <span className="font-medium text-wide text-slate-600">{infoCostText}</span>
+                    <span className="inline-flex items-center gap-1 font-medium text-wide text-slate-600">
+                      <EqualApproximately size={15} strokeWidth={2} className="shrink-0 text-slate-600" aria-hidden />
+                      <span>{infoCostText}</span>
+                    </span>
                     <span className="text-slate-600 select-none" aria-hidden>
                       |
                     </span>
@@ -2282,7 +2285,10 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
               ) : null}
 
               {infoCostText ? (
-                <p className="text-sm font-medium text-slate-700">{infoCostText}</p>
+                <p className="inline-flex items-center gap-1 text-sm font-medium text-slate-700">
+                  <EqualApproximately size={14} strokeWidth={2} className="shrink-0 text-slate-600" aria-hidden />
+                  <span>{infoCostText}</span>
+                </p>
               ) : null}
 
               <button
@@ -2633,7 +2639,10 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                       {aboutCostDisplay ? (
                         <div className="mt-5">
                           <h4 className="text-base sm:text-lg lg:text-base font-bold text-zinc-800">Cost</h4>
-                          <p className="mt-1 text-base sm:text-lg lg:text-sm text-slate-500">{aboutCostDisplay}</p>
+                          <p className="mt-1 inline-flex items-center gap-1 text-base sm:text-lg lg:text-sm text-slate-500">
+                            <EqualApproximately size={15} strokeWidth={2} className="shrink-0 text-slate-500" aria-hidden />
+                            <span>{aboutCostDisplay}</span>
+                          </p>
                         </div>
                       ) : null}
 
@@ -4520,9 +4529,22 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                     <p className="text-sm sm:text-base font-bold text-slate-900 truncate leading-tight">
                       {profile.name}
                     </p>
-                    {stickyMetaLine ? (
-                      <p className="mt-0.5 text-xs sm:text-sm text-slate-500 truncate leading-snug">
-                        {stickyMetaLine}
+                    {infoCostText || profile.address?.trim() ? (
+                      <p className="mt-0.5 text-xs sm:text-sm text-slate-500 truncate leading-snug flex items-center gap-1.5 min-w-0">
+                        {infoCostText ? (
+                          <span className="inline-flex items-center gap-1 shrink-0">
+                            <EqualApproximately size={13} strokeWidth={2} className="shrink-0 text-slate-500" aria-hidden />
+                            <span>{infoCostText}</span>
+                          </span>
+                        ) : null}
+                        {infoCostText && profile.address?.trim() ? (
+                          <span className="text-slate-400 select-none" aria-hidden>
+                            |
+                          </span>
+                        ) : null}
+                        {profile.address?.trim() ? (
+                          <span className="truncate">{profile.address.trim()}</span>
+                        ) : null}
                       </p>
                     ) : null}
                   </div>

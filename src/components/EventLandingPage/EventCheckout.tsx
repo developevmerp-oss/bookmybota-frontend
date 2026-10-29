@@ -493,6 +493,12 @@ export default function EventCheckout({
         if (exact) return exact;
       }
 
+      const seatPrice = Number(seat.price ?? seat.unit_price);
+      if (Number.isFinite(seatPrice) && seatPrice > 0) {
+        const byPrice = pricingTicketPool.find((t) => Math.abs(Number(t.price) - seatPrice) < 0.01);
+        if (byPrice) return byPrice;
+      }
+
       const section = String(seat.section_name || "").trim().toLowerCase();
       if (section) {
         const byName = pricingTicketPool.find((t) => {
@@ -505,9 +511,39 @@ export default function EventCheckout({
           );
         });
         if (byName) return byName;
+
+        if (/silver|general|std/i.test(section)) {
+          const silverTier = pricingTicketPool.find(
+            (t) => /silver|general|standard/i.test(t.ticket_type) || Math.abs(Number(t.price) - 350) < 0.01
+          );
+          if (silverTier) return silverTier;
+          const sorted = [...pricingTicketPool].sort((a, b) => Number(a.price) - Number(b.price));
+          if (sorted[0]) return sorted[0];
+        } else if (/gold/i.test(section)) {
+          const goldTier = pricingTicketPool.find(
+            (t) => /gold|premium/i.test(t.ticket_type) || Math.abs(Number(t.price) - 800) < 0.01
+          );
+          if (goldTier) return goldTier;
+          const sorted = [...pricingTicketPool].sort((a, b) => Number(b.price) - Number(a.price));
+          const midIdx = Math.floor(sorted.length / 2);
+          if (sorted[midIdx]) return sorted[midIdx];
+        } else if (/plat/i.test(section)) {
+          const platTier = pricingTicketPool.find(
+            (t) => /plat/i.test(t.ticket_type) || Math.abs(Number(t.price) - 1500) < 0.01
+          );
+          if (platTier) return platTier;
+          const sorted = [...pricingTicketPool].sort((a, b) => Number(b.price) - Number(a.price));
+          return sorted[Math.min(1, sorted.length - 1)] || sorted[0];
+        } else if (/vip|fan\s*pit|pit|floor/i.test(section)) {
+          const vipTier = pricingTicketPool.find(
+            (t) => /vip|fan|pit/i.test(t.ticket_type) || Math.abs(Number(t.price) - 1500) < 0.01
+          );
+          if (vipTier) return vipTier;
+          const sorted = [...pricingTicketPool].sort((a, b) => Number(b.price) - Number(a.price));
+          return sorted[0];
+        }
       }
 
-      const seatPrice = Number(seat.price ?? seat.unit_price);
       if (Number.isFinite(seatPrice) && seatPrice > 0) {
         return {
           id: typeId || `price-${seatPrice}`,
@@ -934,7 +970,9 @@ export default function EventCheckout({
       if (selectedSeats.length > 0) {
         selectedSeats.forEach((s) => {
           if (isRealPhysicalSeat(s)) {
-            items.push({ ticket_type_id: s.ticket_type_id, qty: 1, event_seat_id: String(s.id) });
+            const resolved = resolveSeatTicket(s);
+                        const effectiveTypeId = s.ticket_type_id || resolved?.id;
+                        items.push({ ticket_type_id: effectiveTypeId, qty: 1, event_seat_id: String(s.id) });
           } else {
             items.push({ ticket_type_id: s.ticket_type_id, qty: 1 });
           }

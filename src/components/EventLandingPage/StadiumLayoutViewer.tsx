@@ -654,15 +654,9 @@ export default function StadiumLayoutViewer({
     return map;
   }, [ticketTypes]);
 
-  const lookupTicketPrice = useCallback(
+  const resolveTicketCandidate = useCallback(
     (ticketTypeId: string | null | undefined, blockName?: string) => {
       const id = String(ticketTypeId ?? "").trim();
-      if (id && ticketPriceById.has(id)) {
-        const n = ticketPriceById.get(id)!;
-        if (n > 0) return n;
-      }
-
-      // Collect all ticket candidates from props and API data
       const candidates = [
         ...ticketTypes,
         ...(((data as any)?.ticket_types || []).map((t: any) => ({
@@ -674,12 +668,11 @@ export default function StadiumLayoutViewer({
 
       if (id) {
         const byId = candidates.find((c) => String(c.id).trim() === id);
-        if (byId && byId.price > 0) return byId.price;
+        if (byId && byId.price > 0) return byId;
       }
 
       if (blockName && candidates.length > 0) {
         const bLower = blockName.toLowerCase();
-        // 1. Direct or fuzzy name match
         const matched = candidates.find((tt) => {
           const tLower = tt.name.toLowerCase();
           return (
@@ -688,47 +681,54 @@ export default function StadiumLayoutViewer({
             bLower.replace(/[^a-z0-9]/g, "") === tLower.replace(/[^a-z0-9]/g, "")
           );
         });
-        if (matched && matched.price > 0) return matched.price;
+        if (matched && matched.price > 0) return matched;
 
-        // 2. Rank / Tier keyword mapping:
-        // Fan Pit / VIP -> highest price
         if (/vip|fan\s*pit|pit|floor/i.test(bLower)) {
           const vip = candidates.find((t) => /vip|fan|pit/i.test(t.name));
-          if (vip) return vip.price;
+          if (vip) return vip;
           const sorted = [...candidates].sort((a, b) => b.price - a.price);
-          return sorted[0].price;
+          return sorted[0];
         }
 
-        // Platinum Stand
         if (/plat/i.test(bLower)) {
           const plat = candidates.find((t) => /plat/i.test(t.name));
-          if (plat) return plat.price;
+          if (plat) return plat;
           const sorted = [...candidates].sort((a, b) => b.price - a.price);
-          return sorted[Math.min(1, sorted.length - 1)].price;
+          return sorted[Math.min(1, sorted.length - 1)] || sorted[0];
         }
 
-        // Gold Stand
         if (/gold/i.test(bLower)) {
-          const gold = candidates.find((t) => /gold/i.test(t.name));
-          if (gold) return gold.price;
+          const gold = candidates.find((t) => /gold|prem/i.test(t.name));
+          if (gold) return gold;
           const sorted = [...candidates].sort((a, b) => b.price - a.price);
           const midIdx = Math.floor(sorted.length / 2);
-          return sorted[midIdx].price;
+          return sorted[midIdx];
         }
 
-        // Silver Stand / General
         if (/silver|general|std/i.test(bLower)) {
           const silver = candidates.find((t) => /silver|general|standard/i.test(t.name));
-          if (silver) return silver.price;
+          if (silver) return silver;
           const sorted = [...candidates].sort((a, b) => a.price - b.price);
-          return sorted[0].price;
+          return sorted[0];
         }
       }
 
-      // 3. Fallback: if candidates exist, return first available
-      return candidates[0]?.price || null;
+      return candidates[0] || null;
     },
-    [ticketPriceById, ticketTypes, data]
+    [ticketTypes, data]
+  );
+
+  const lookupTicketPrice = useCallback(
+    (ticketTypeId: string | null | undefined, blockName?: string) => {
+      const id = String(ticketTypeId ?? "").trim();
+      if (id && ticketPriceById.has(id)) {
+        const n = ticketPriceById.get(id)!;
+        if (n > 0) return n;
+      }
+      const resolved = resolveTicketCandidate(ticketTypeId, blockName);
+      return resolved?.price || null;
+    },
+    [ticketPriceById, resolveTicketCandidate]
   );
 
   // Same ticket price used when a seat is selected on the map
@@ -742,6 +742,34 @@ export default function StadiumLayoutViewer({
       return null;
     },
     [lookupTicketPrice]
+  );
+
+  // Price helper for a block (ticket type first, then tier/block price from seating config)
+  const getBlockMinPrice = useCallback(
+    (block: StadiumBlock) => {
+      if (block.price != null && !Number.isNaN(Number(block.price)) && Number(block.price) > 0) {
+        return Number(block.price);
+      }
+      if (block.stand_type === "standing") {
+        const fromTicket = lookupTicketPrice(
+          block.ticket_type_id || block.tiers?.[0]?.ticket_type_id,
+          block.name
+        );
+        if (fromTicket != null && fromTicket > 0) return fromTicket;
+        if (block.tiers?.[0]) {
+          const fromTier = getTierPrice(block.tiers[0]);
+          if (fromTier != null && fromTier > 0) return fromTier;
+        }
+      }
+      const prices = (block.tiers || [])
+        .map((t) => getTierPrice(t))
+        .filter((p): p is number => p !== null && p > 0);
+      if (prices.length > 0) return Math.min(...prices);
+      const fromTicket = lookupTicketPrice(block.ticket_type_id, block.name);
+      if (fromTicket != null && fromTicket > 0) return fromTicket;
+      return null;
+    },
+    [lookupTicketPrice, getTierPrice]
   );
 
   const standPriceAndLeftLabel = useCallback(
@@ -770,16 +798,45 @@ export default function StadiumLayoutViewer({
     [formatPrice]
   );
 
-  // Map price to seats based on ticketTypes
+  // Map price and section to seats based on selectedBlock, tiers, and ticketTypes
   const blockSeats: TierSeat[] = useMemo(() => {
+    const blockMinPrice = selectedBlock ? getBlockMinPrice(selectedBlock) : null;
+    const blockName = selectedBlock?.name;
+
     return rawSeats.map((s) => {
-      const fromTicket = lookupTicketPrice(s.ticket_type_id);
+      const tier = selectedBlock?.tiers?.find(
+        (t) => t.tier_id === s.tier_id || (t as any).id === s.tier_id
+      );
+      const effectiveTicketTypeId =
+        s.ticket_type_id ||
+        tier?.ticket_type_id ||
+        selectedBlock?.ticket_type_id ||
+        null;
+      const standName =
+        s.section_name ||
+        tier?.name ||
+        blockName ||
+        "";
+
+      const matchedCandidate = resolveTicketCandidate(effectiveTicketTypeId, standName);
+      let price = matchedCandidate?.price ?? null;
+      if (price == null && tier) {
+        price = getTierPrice(tier);
+      }
+      if (price == null && blockMinPrice != null && blockMinPrice > 0) {
+        price = blockMinPrice;
+      }
+
+      const finalTicketTypeId = matchedCandidate?.id || effectiveTicketTypeId || s.ticket_type_id;
+
       return {
         ...s,
-        price: fromTicket ?? 0,
+        ticket_type_id: finalTicketTypeId,
+        section_name: standName || s.section_name,
+        price: price ?? 0,
       };
     });
-  }, [rawSeats, lookupTicketPrice]);
+  }, [rawSeats, selectedBlock, resolveTicketCandidate, getTierPrice, getBlockMinPrice]);
 
   // Keep overview instantly fitted so the whole stadium is visible on first paint
   useEffect(() => {
@@ -1116,44 +1173,6 @@ export default function StadiumLayoutViewer({
     },
     [selectedSeats, maxSelectable, onSeatsSelected]
   );
-
-  // Price helper for a block (ticket type first, then tier/block price from seating config)
-  const getBlockMinPrice = useCallback(
-    (block: StadiumBlock) => {
-      // 1. Direct block price
-      if (block.price != null && !Number.isNaN(Number(block.price)) && Number(block.price) > 0) {
-        return Number(block.price);
-      }
-
-      // 2. Standing block check
-      if (block.stand_type === "standing") {
-        const fromTicket = lookupTicketPrice(
-          block.ticket_type_id || block.tiers?.[0]?.ticket_type_id,
-          block.name
-        );
-        if (fromTicket != null && fromTicket > 0) return fromTicket;
-        if (block.tiers?.[0]) {
-          const fromTier = getTierPrice(block.tiers[0]);
-          if (fromTier != null && fromTier > 0) return fromTier;
-        }
-      }
-
-      // 3. Tiers pricing
-      const prices = (block.tiers || [])
-        .map((t) => getTierPrice(t))
-        .filter((p): p is number => p !== null && p > 0);
-      if (prices.length > 0) return Math.min(...prices);
-
-      // 4. Lookup by block.ticket_type_id or name
-      const fromTicket = lookupTicketPrice(block.ticket_type_id, block.name);
-      if (fromTicket != null && fromTicket > 0) return fromTicket;
-
-      return null;
-    },
-    [lookupTicketPrice, getTierPrice]
-  );
-
-
 
   // Filtered blocks if category filter is active
   const filteredBlocks = useMemo(() => {

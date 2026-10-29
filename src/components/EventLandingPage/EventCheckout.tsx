@@ -2409,70 +2409,57 @@ export default function EventCheckout({
               </div>
             )}
 
-            <div className="rounded-xl border border-slate-200 bg-white p-4 pb-4">
-              <p className="text-[0.9375rem] font-bold text-slate-900 mb-3">
-                {isOrganizer ? "Customer contact" : "Sign in & contact details"}
-              </p>
-
-              {isOrganizer ? (
-                <>
-                  {contactDetailsReady ? (
-                    <div className="space-y-1">
-                      <p className="text-[0.875rem] font-semibold text-slate-800">{name}</p>
-                      <p className="text-[0.875rem] text-slate-600">
-                        {phone ? `+251 ${phone}` : "—"}
-                      </p>
-                      <p className="text-[0.875rem] text-slate-600 truncate">{email}</p>
-                    </div>
-                  ) : (
-                    <p className="text-[0.875rem] text-slate-500">
-                      Add customer name, phone, and email to send tickets.
-                    </p>
-                  )}
-                  <button
-                    type="button"
-                    onClick={openContactModal}
-                    className="mt-3 text-[0.875rem] font-semibold text-[#6900AA] hover:underline cursor-pointer"
-                  >
-                    {contactDetailsReady ? "Edit contact details" : "Add contact details"}
-                  </button>
-                </>
-              ) : isCustomerLoggedIn ? (
-                <>
+            {isOrganizer ? (
+              <div className="rounded-xl border border-slate-200 bg-white p-4 pb-4">
+                <p className="text-[0.9375rem] font-bold text-slate-900 mb-3">
+                  Customer contact
+                </p>
+                {contactDetailsReady ? (
                   <div className="space-y-1">
-                    <p className="text-[0.875rem] font-semibold text-slate-800">
-                      {name || authUser?.name}
-                    </p>
+                    <p className="text-[0.875rem] font-semibold text-slate-800">{name}</p>
                     <p className="text-[0.875rem] text-slate-600">
-                      {phone ? `+251 ${phone}` : authUser?.phone ? `+251 ${authUser.phone}` : "—"}
+                      {phone ? `+251 ${phone}` : "—"}
                     </p>
-                    <p className="text-[0.875rem] text-slate-600 truncate">
-                      {email || authUser?.email}
-                    </p>
+                    <p className="text-[0.875rem] text-slate-600 truncate">{email}</p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={openContactModal}
-                    className="mt-3 text-[0.875rem] font-semibold text-[#6900AA] hover:underline cursor-pointer"
-                  >
-                    Edit contact details
-                  </button>
-                </>
-              ) : (
-                <div className="space-y-2">
-                  <p className="text-[0.875rem] text-slate-500 leading-relaxed">
-                    Sign in with your phone number to book tickets and receive your {ticketModeLabel(ticketMode)}.
+                ) : (
+                  <p className="text-[0.875rem] text-slate-500">
+                    Add customer name, phone, and email to send tickets.
                   </p>
-                  <button
-                    type="button"
-                    onClick={() => setAuthModalOpen(true)}
-                    className="text-[0.875rem] font-semibold text-[#6900AA] hover:underline cursor-pointer"
-                  >
-                    Sign in with phone
-                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={openContactModal}
+                  className="mt-3 text-[0.875rem] font-semibold text-[#6900AA] hover:underline cursor-pointer"
+                >
+                  {contactDetailsReady ? "Edit contact details" : "Add contact details"}
+                </button>
+              </div>
+            ) : isCustomerLoggedIn ? (
+              <div className="rounded-xl border border-slate-200 bg-white p-4 pb-4">
+                <p className="text-[0.9375rem] font-bold text-slate-900 mb-3">
+                  Contact details
+                </p>
+                <div className="space-y-1">
+                  <p className="text-[0.875rem] font-semibold text-slate-800">
+                    {name || authUser?.name}
+                  </p>
+                  <p className="text-[0.875rem] text-slate-600">
+                    {phone ? `+251 ${phone}` : authUser?.phone ? `+251 ${authUser.phone}` : "—"}
+                  </p>
+                  <p className="text-[0.875rem] text-slate-600 truncate">
+                    {email || authUser?.email}
+                  </p>
                 </div>
-              )}
-            </div>
+                <button
+                  type="button"
+                  onClick={openContactModal}
+                  className="mt-3 text-[0.875rem] font-semibold text-[#6900AA] hover:underline cursor-pointer"
+                >
+                  Edit contact details
+                </button>
+              </div>
+            ) : null}
           </div>
         )}
 
@@ -2940,7 +2927,7 @@ export default function EventCheckout({
                       isPage ? "rounded-[0.5rem]" : "rounded-xl"
                     }`}
                   >
-                    Sign in with phone
+                    Sign in
                   </button>
                 ) : (
                   <button

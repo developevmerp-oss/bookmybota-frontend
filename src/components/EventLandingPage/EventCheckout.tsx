@@ -195,6 +195,13 @@ function moneySum(values: number[]) {
   return Math.round(values.reduce((sum, n) => sum + (Number(n) || 0), 0) * 100) / 100;
 }
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const isRealPhysicalSeat = (s: any): boolean =>
+  Boolean(s?.id) &&
+  !String(s.id).startsWith("standing-") &&
+  s.row_label !== "Standing" &&
+  UUID_REGEX.test(String(s.id));
+
 export default function EventCheckout({
   event,
   open,
@@ -913,13 +920,7 @@ export default function EventCheckout({
 
     setSubmitting(true);
     try {
-      const physicalSeats = selectedSeats.filter(
-        (s) =>
-          Boolean(s?.id) &&
-          !String(s.id).startsWith("standing-") &&
-          s.row_label !== "Standing" &&
-          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(s.id))
-      );
+      const physicalSeats = selectedSeats.filter(isRealPhysicalSeat);
 
       if (physicalSeats.length > 0) {
         if (!holdId || timeOutOpen || (secondsLeft !== null && secondsLeft <= 0)) {
@@ -932,13 +933,7 @@ export default function EventCheckout({
       const items: any[] = [];
       if (selectedSeats.length > 0) {
         selectedSeats.forEach((s) => {
-          const isPhysicalSeat =
-            Boolean(s?.id) &&
-            !String(s.id).startsWith("standing-") &&
-            s.row_label !== "Standing" &&
-            /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(s.id));
-
-          if (isPhysicalSeat) {
+          if (isRealPhysicalSeat(s)) {
             items.push({ ticket_type_id: s.ticket_type_id, qty: 1, event_seat_id: String(s.id) });
           } else {
             items.push({ ticket_type_id: s.ticket_type_id, qty: 1 });
@@ -1344,11 +1339,12 @@ export default function EventCheckout({
   });
   const detailsReady =
     contactDetailsReady && (isOrganizer || isCustomerLoggedIn);
+  const hasPhysicalSeats = selectedSeats.some(isRealPhysicalSeat);
   const canConfirm =
     detailsReady &&
     !submitting &&
     Boolean(ticketMode) &&
-    (selectedSeats.length === 0 ||
+    (!hasPhysicalSeats ||
       (Boolean(holdId) && !timeOutOpen && (secondsLeft === null || secondsLeft > 0)));
   const deliveryDetailsReady =
     ticketMode !== "PHYSICAL_DELIVERY" ||
@@ -1509,13 +1505,7 @@ export default function EventCheckout({
       return;
     }
 
-    const physicalSeats = selectedSeats.filter(
-      (s) =>
-        Boolean(s?.id) &&
-        !String(s.id).startsWith("standing-") &&
-        s.row_label !== "Standing" &&
-        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(s.id))
-    );
+    const physicalSeats = selectedSeats.filter(isRealPhysicalSeat);
 
     if (physicalSeats.length > 0) {
       const currentSeatIds = physicalSeats.map((s) => String(s.id)).sort().join(",");

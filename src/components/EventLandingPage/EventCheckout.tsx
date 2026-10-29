@@ -513,31 +513,23 @@ export default function EventCheckout({
         if (byName) return byName;
 
         if (/silver|general|std/i.test(section)) {
-          const silverTier = pricingTicketPool.find(
-            (t) => /silver|general|standard/i.test(t.ticket_type) || Math.abs(Number(t.price) - 350) < 0.01
-          );
+          const silverTier = pricingTicketPool.find((t) => /silver|general|standard/i.test(t.ticket_type));
           if (silverTier) return silverTier;
           const sorted = [...pricingTicketPool].sort((a, b) => Number(a.price) - Number(b.price));
           if (sorted[0]) return sorted[0];
         } else if (/gold/i.test(section)) {
-          const goldTier = pricingTicketPool.find(
-            (t) => /gold|premium/i.test(t.ticket_type) || Math.abs(Number(t.price) - 800) < 0.01
-          );
+          const goldTier = pricingTicketPool.find((t) => /gold|premium/i.test(t.ticket_type));
           if (goldTier) return goldTier;
           const sorted = [...pricingTicketPool].sort((a, b) => Number(b.price) - Number(a.price));
           const midIdx = Math.floor(sorted.length / 2);
           if (sorted[midIdx]) return sorted[midIdx];
         } else if (/plat/i.test(section)) {
-          const platTier = pricingTicketPool.find(
-            (t) => /plat/i.test(t.ticket_type) || Math.abs(Number(t.price) - 1500) < 0.01
-          );
+          const platTier = pricingTicketPool.find((t) => /plat/i.test(t.ticket_type));
           if (platTier) return platTier;
           const sorted = [...pricingTicketPool].sort((a, b) => Number(b.price) - Number(a.price));
           return sorted[Math.min(1, sorted.length - 1)] || sorted[0];
         } else if (/vip|fan\s*pit|pit|floor/i.test(section)) {
-          const vipTier = pricingTicketPool.find(
-            (t) => /vip|fan|pit/i.test(t.ticket_type) || Math.abs(Number(t.price) - 1500) < 0.01
-          );
+          const vipTier = pricingTicketPool.find((t) => /vip|fan|pit/i.test(t.ticket_type));
           if (vipTier) return vipTier;
           const sorted = [...pricingTicketPool].sort((a, b) => Number(b.price) - Number(a.price));
           return sorted[0];

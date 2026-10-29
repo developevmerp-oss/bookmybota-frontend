@@ -913,7 +913,15 @@ export default function EventCheckout({
 
     setSubmitting(true);
     try {
-      if (selectedSeats.length > 0) {
+      const physicalSeats = selectedSeats.filter(
+        (s) =>
+          Boolean(s?.id) &&
+          !String(s.id).startsWith("standing-") &&
+          s.row_label !== "Standing" &&
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(s.id))
+      );
+
+      if (physicalSeats.length > 0) {
         if (!holdId || timeOutOpen || (secondsLeft !== null && secondsLeft <= 0)) {
           setTimeOutOpen(true);
           setSubmitting(false);
@@ -924,7 +932,17 @@ export default function EventCheckout({
       const items: any[] = [];
       if (selectedSeats.length > 0) {
         selectedSeats.forEach((s) => {
-          items.push({ ticket_type_id: s.ticket_type_id, qty: 1, event_seat_id: s.id });
+          const isPhysicalSeat =
+            Boolean(s?.id) &&
+            !String(s.id).startsWith("standing-") &&
+            s.row_label !== "Standing" &&
+            /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(s.id));
+
+          if (isPhysicalSeat) {
+            items.push({ ticket_type_id: s.ticket_type_id, qty: 1, event_seat_id: String(s.id) });
+          } else {
+            items.push({ ticket_type_id: s.ticket_type_id, qty: 1 });
+          }
         });
       } else {
         selectedLines.forEach((l) => {
@@ -947,7 +965,7 @@ export default function EventCheckout({
           : {};
 
       const holdPayload =
-        selectedSeats.length > 0 && holdId
+        physicalSeats.length > 0 && holdId
           ? {
             hold_id: holdId,
             session_token: sessionToken || readHoldSessionToken(),
@@ -1491,8 +1509,16 @@ export default function EventCheckout({
       return;
     }
 
-    if (selectedSeats.length > 0) {
-      const currentSeatIds = selectedSeats.map((s) => String(s.id)).sort().join(",");
+    const physicalSeats = selectedSeats.filter(
+      (s) =>
+        Boolean(s?.id) &&
+        !String(s.id).startsWith("standing-") &&
+        s.row_label !== "Standing" &&
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(s.id))
+    );
+
+    if (physicalSeats.length > 0) {
+      const currentSeatIds = physicalSeats.map((s) => String(s.id)).sort().join(",");
       const isHoldActive = Boolean(
         holdId && expiresAt && (secondsLeft === null || secondsLeft > 0) && !timeOutOpen
       );
@@ -1515,7 +1541,7 @@ export default function EventCheckout({
         const existing = sessionToken || readHoldSessionToken();
         const res = await createEventSeatHold({
           eventId: event.id,
-          event_seat_ids: selectedSeats.map((s) => String(s.id)),
+          event_seat_ids: physicalSeats.map((s) => String(s.id)),
           showtime_id: showtimeId || undefined,
           session_token: existing,
         }).unwrap();

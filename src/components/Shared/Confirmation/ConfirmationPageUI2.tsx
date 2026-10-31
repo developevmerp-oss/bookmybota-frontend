@@ -40,15 +40,25 @@ function seatListLabel(
   seats: Array<{ seat_identifier: string; tier_name?: string }> | undefined
 ): string {
   if (!seats?.length) return "—";
-  return seats
-    .map((s) => {
-      const id = s.seat_identifier;
-      if (s.tier_name && !id.toLowerCase().includes(s.tier_name.toLowerCase())) {
-        return `${s.tier_name} ${id}`;
-      }
-      return id;
+  const tierMap = new Map<string, string[]>();
+  for (const s of seats) {
+    let id = String(s.seat_identifier || "").trim();
+    const tier = String(s.tier_name || "").trim();
+    if (tier && id.toLowerCase().startsWith(tier.toLowerCase())) {
+      id = id.slice(tier.length).replace(/^[\s\-_]+/, "").trim();
+    }
+    if (!tierMap.has(tier)) {
+      tierMap.set(tier, []);
+    }
+    tierMap.get(tier)!.push(id || s.seat_identifier);
+  }
+  return Array.from(tierMap.entries())
+    .map(([tier, list]) => {
+      const formatted = list.filter(Boolean).join(", ");
+      return tier ? `${tier} • ${formatted}` : formatted;
     })
-    .join(", ");
+    .filter(Boolean)
+    .join("  •  ");
 }
 
 function DetailCell({

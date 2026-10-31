@@ -53,11 +53,24 @@ function formatLongDate(value?: string) {
 }
 
 export async function buildMovieTicketPdf(booking: MovieTicketPdfBooking): Promise<Blob> {
+  const tierMap = new Map<string, string[]>();
+  for (const s of booking.seats || []) {
+    let id = String(s.seat_identifier || "").trim();
+    const tier = String(s.tier_name || "").trim();
+    if (tier && id.toLowerCase().startsWith(tier.toLowerCase())) {
+      id = id.slice(tier.length).replace(/^[\s\-_]+/, "").trim();
+    }
+    if (!tierMap.has(tier)) tierMap.set(tier, []);
+    tierMap.get(tier)!.push(id || String(s.seat_identifier || "").trim());
+  }
   const seatsLabel =
-    (booking.seats || [])
-      .map((s) => s.seat_identifier)
+    Array.from(tierMap.entries())
+      .map(([tier, list]) => {
+        const formatted = list.filter(Boolean).join(", ");
+        return tier ? `${tier} • ${formatted}` : formatted;
+      })
       .filter(Boolean)
-      .join(", ") || "—";
+      .join("  •  ") || "—";
 
   const venueLine = [booking.cinema_name, booking.cinema_address]
     .filter(Boolean)

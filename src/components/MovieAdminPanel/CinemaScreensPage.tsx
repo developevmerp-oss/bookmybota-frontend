@@ -131,6 +131,58 @@ const PHASE_META: Record<
   },
 };
 
+const LAYOUT_STEPS = ["Screen added", "Layout requested", "Review & approve", "Go-live", "Live"];
+
+/** Which of LAYOUT_STEPS is current (0-based) for a phase. */
+function phaseStep(phase: LayoutPhase): number {
+  switch (phase) {
+    case "none":
+    case "draft":
+    case "rejected":
+      return 0;
+    case "awaiting_admin":
+      return 1;
+    case "ready_to_approve":
+    case "shortlisted":
+      return 2;
+    case "awaiting_live":
+      return 3;
+    case "approved":
+      return 4;
+  }
+}
+
+function LayoutStepper({ phase }: { phase: LayoutPhase }) {
+  const current = phaseStep(phase);
+  return (
+    <ol className="flex flex-wrap items-center gap-x-1 gap-y-1 text-[11px]" aria-label="Layout progress">
+      {LAYOUT_STEPS.map((label, i) => {
+        const done = i < current || phase === "approved";
+        const active = i === current && phase !== "approved";
+        return (
+          <li key={label} className="flex items-center gap-1">
+            <span
+              className={`inline-flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold ${
+                done
+                  ? "bg-emerald-500 text-white"
+                  : active
+                    ? "bg-fuchsia-500 text-white ring-2 ring-fuchsia-300/40"
+                    : "bg-zinc-700/60 text-zinc-400"
+              }`}
+            >
+              {done ? "✓" : i + 1}
+            </span>
+            <span className={active ? "font-semibold text-white" : done ? "text-zinc-300" : "text-zinc-500"}>
+              {label}
+            </span>
+            {i < LAYOUT_STEPS.length - 1 && <span className="mx-1 text-zinc-600">›</span>}
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
 export default function CinemaScreensPage() {
   const user = useAppSelector((state) => state.auth.user);
   const bizId = user?.business_id ?? "";
@@ -360,6 +412,20 @@ export default function CinemaScreensPage() {
     }
   };
 
+  /** One click: approve this option and ask Super Admin to make it live (they still confirm). */
+  const handleApproveAndGoLive = async (templateId: string) => {
+    if (!bizId) return;
+    try {
+      await approveLayout({ bizId, templateId }).unwrap();
+      await publishLayout({ bizId, templateId }).unwrap();
+      toast.success("Layout approved and go-live requested. Super Admin will confirm before it goes live.");
+    } catch (err) {
+      toast.error(extractApiError(err, "Could not approve and request go live"));
+    } finally {
+      refetch();
+    }
+  };
+
   const handleRequestGoLive = async (templateId: string) => {
     if (!bizId) return;
     try {
@@ -455,9 +521,8 @@ export default function CinemaScreensPage() {
           <Clapperboard size={20} className="text-fuchsia-400" /> Screens & layouts
         </h2>
         <p className="text-sm text-zinc-400 mt-1">
-          Create screens with Regular / Recliner / Couple seat counts, request a seat layout once, then
-          track progress. After Super Admin publishes a map, you can review, approve, and manage physical seats —
-          ticket prices are configured showtime-wise when scheduling movies.
+          Add a screen, request its seat layout, then approve it — each screen shows exactly which step it is on and
+          what to do next. Once a layout is live, block seats and change prices for each show from Seat Manager.
         </p>
       </div>
 
@@ -588,8 +653,9 @@ export default function CinemaScreensPage() {
         <div className="glass-panel rounded-2xl border border-amber-500/20 p-5 space-y-3">
           <h3 className="text-white font-semibold">Layouts waiting for your approval</h3>
           <p className="text-sm text-zinc-400">
-            Approve options you like, then use <span className="text-zinc-200 font-medium">Request go live</span> on
-            one — BookMyBota must confirm before it publishes.
+            Happy with a layout? Use <span className="text-zinc-200 font-medium">Approve &amp; go live</span> — one
+            click. BookMyBota confirms before it publishes. Comparing several? Use Approve only, then request go live
+            on your favourite.
           </p>
           {layoutOptions
             .filter(
@@ -611,11 +677,20 @@ export default function CinemaScreensPage() {
                     {opt.hall_name || "Screen"} · capacity {opt.capacity} · {opt.seat_count ?? 0} seats
                   </p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
                     className="btn-primary text-sm"
+                    disabled={approving || publishing}
+                    onClick={() => handleApproveAndGoLive(opt.id)}
+                  >
+                    {approving || publishing ? "Working…" : "Approve & go live"}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-secondary text-sm"
                     disabled={approving}
+                    title="Keep this option on your shortlist and compare other layouts first"
                     onClick={async () => {
                       try {
                         const res = await approveLayout({ bizId, templateId: opt.id }).unwrap();
@@ -629,7 +704,7 @@ export default function CinemaScreensPage() {
                       }
                     }}
                   >
-                    Approve
+                    Approve only
                   </button>
                   <button
                     type="button"
@@ -797,6 +872,7 @@ export default function CinemaScreensPage() {
                       {seatCount > 0 ? ` · ${seatCount} seats mapped` : ""}
                       {screen.layout_name ? ` · ${screen.layout_name}` : ""}
                     </p>
+                    <LayoutStepper phase={phase} />
                     <p className="text-xs text-zinc-500">{meta.hint}</p>
                     {phase === "rejected" && (screen.latest_rejection_reason || screen.pending_rejection_reason) && (
                       <p className="text-xs text-rose-400">
@@ -886,6 +962,13 @@ export default function CinemaScreensPage() {
                         >
                           <Ban size={14} /> Block seats
                         </button>
+                        <a
+                          href="/movie/seat-manager"
+                          className="btn-secondary text-sm inline-flex items-center gap-1.5"
+                          title="Block seats, change prices and sell at the counter for a specific show"
+                        >
+                          Manage seats per show
+                        </a>
                         <button
                           type="button"
                           onClick={() => setLayoutScreenId(screen.id)}
@@ -1281,11 +1364,22 @@ export default function CinemaScreensPage() {
                             <>
                               <button
                                 type="button"
-                                disabled={approving}
-                                onClick={() => handleApproveOption(option.id)}
+                                disabled={approving || publishing}
+                                onClick={async () => {
+                                  await handleApproveAndGoLive(option.id);
+                                  setReviewScreenId(null);
+                                }}
                                 className="btn-primary text-xs py-1.5 px-3 disabled:opacity-50"
                               >
-                                {approving ? "…" : "Approve"}
+                                {approving || publishing ? "…" : "Approve & go live"}
+                              </button>
+                              <button
+                                type="button"
+                                disabled={approving}
+                                onClick={() => handleApproveOption(option.id)}
+                                className="px-3 py-1.5 rounded-xl border border-white/10 text-xs text-zinc-300 hover:bg-white/5 disabled:opacity-50"
+                              >
+                                Approve only
                               </button>
                               <button
                                 type="button"

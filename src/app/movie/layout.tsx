@@ -28,6 +28,7 @@ import {
   UtensilsCrossed,
   FileSignature,
   QrCode,
+  Armchair,
   Wallet,
   X,
 } from "lucide-react";
@@ -91,6 +92,7 @@ function MovieShell({ children }: { children: React.ReactNode }) {
       id: "operations",
       label: "Operations",
       items: [
+        { name: "Seat Manager", href: "/movie/seat-manager", icon: Armchair },
         { name: "Bookings", href: "/movie/bookings", icon: Ticket },
         { name: "Scan Tickets", href: "/movie/scan", icon: QrCode },
       ],

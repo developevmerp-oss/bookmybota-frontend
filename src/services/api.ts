@@ -486,6 +486,73 @@ export interface MovieShowtime {
   layout_name?: string | null;
 }
 
+export type ShowSeatState = 'AVAILABLE' | 'BOOKED' | 'HELD' | 'BLOCKED' | 'OUT_OF_ORDER' | 'SCREEN_BLOCKED';
+
+export interface ShowSeatMapSeat {
+  key: string;
+  identifier: string;
+  row: string;
+  number: string;
+  section: string;
+  x: number;
+  y: number;
+  state: ShowSeatState;
+  price: number;
+  base_price: number;
+  price_overridden: boolean;
+  note: string | null;
+  booking: { booking_code: string; guest_name: string | null; channel: string; paid: number } | null;
+}
+
+export interface ShowSeatMap {
+  showtime: {
+    id: string;
+    movie_title: string;
+    screen_name: string;
+    screen_type?: string;
+    starts_at: string;
+    ends_at?: string | null;
+    language: string;
+    format: string;
+    status: string;
+    is_active: boolean;
+    tier_pricing: MovieShowtimeTierPrice[];
+  };
+  counts: {
+    total: number;
+    available: number;
+    booked: number;
+    held: number;
+    blocked: number;
+    out_of_order: number;
+    screen_blocked: number;
+  };
+  revenue: number;
+  seats: ShowSeatMapSeat[];
+}
+
+export interface ShowSeatOverrideInput {
+  seat_key: string;
+  status?: 'AVAILABLE' | 'BLOCKED' | 'OUT_OF_ORDER';
+  price?: number | null;
+  note?: string | null;
+}
+
+export interface CounterBookingResult {
+  booking_id: string;
+  booking_code: string;
+  qr_code_token: string;
+  total: number;
+  seats: Array<{ identifier: string; section: string; price: number }>;
+}
+
+export interface ShowChannelSummaryRow {
+  channel: string;
+  bookings: number;
+  seats: number;
+  amount: number;
+}
+
 export type MovieShowBookingState = "UPCOMING" | "STARTED" | "ENDED";
 
 export interface PublicMovieShowtimeItem {
@@ -593,6 +660,9 @@ export interface MovieShowtimeLayoutData {
   } | null;
   booked_seat_identifiers: string[];
   held_seat_identifiers?: string[];
+  out_of_order_seat_identifiers?: string[];
+  /** Per-seat price set by the cinema for this show, keyed by seat identifier */
+  seat_price_overrides?: Record<string, number>;
   own_hold?: {
     id: string;
     seat_identifiers: string[];
@@ -7842,6 +7912,56 @@ export const api = createApi({
 
     // ── Cinema Partner Movie Showtimes ─────────────────────────────────────────
 
+    getShowSeatMap: builder.query<ShowSeatMap, { bizId: string; showtimeId: string }>({
+      query: ({ bizId, showtimeId }) => `/businesses/${bizId}/movie-showtimes/${showtimeId}/seat-map`,
+      transformResponse: (res: { data: ShowSeatMap }) => res.data,
+      providesTags: (_r, _e, arg) => [{ type: 'MovieShowtimes', id: `seatmap-${arg.showtimeId}` }],
+    }),
+
+    updateShowSeatOverrides: builder.mutation<
+      { message?: string; data: { applied: number; skipped: Array<{ seat_key: string; reason: string }> } },
+      { bizId: string; showtimeId: string; seats: ShowSeatOverrideInput[] }
+    >({
+      query: ({ bizId, showtimeId, seats }) => ({
+        url: `/businesses/${bizId}/movie-showtimes/${showtimeId}/seat-overrides`,
+        method: 'PUT',
+        body: { seats },
+      }),
+      invalidatesTags: (_r, _e, arg) => [
+        { type: 'MovieShowtimes', id: `seatmap-${arg.showtimeId}` },
+        { type: 'MovieShowtimes', id: `layout-${arg.showtimeId}` },
+      ],
+    }),
+
+    createCounterBooking: builder.mutation<
+      { message?: string; data: CounterBookingResult },
+      {
+        bizId: string;
+        showtimeId: string;
+        seat_keys: string[];
+        guest_name?: string;
+        guest_phone?: string;
+        payment_method?: 'CASH' | 'CARD' | 'MOBILE_MONEY';
+      }
+    >({
+      query: ({ bizId, showtimeId, ...body }) => ({
+        url: `/businesses/${bizId}/movie-showtimes/${showtimeId}/counter-booking`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: (_r, _e, arg) => [
+        { type: 'MovieShowtimes', id: `seatmap-${arg.showtimeId}` },
+        { type: 'MovieShowtimes', id: `layout-${arg.showtimeId}` },
+        'Bookings',
+      ],
+    }),
+
+    getShowChannelSummary: builder.query<ShowChannelSummaryRow[], { bizId: string; showtimeId: string }>({
+      query: ({ bizId, showtimeId }) => `/businesses/${bizId}/movie-showtimes/${showtimeId}/channels`,
+      transformResponse: (res: { data: { channels: ShowChannelSummaryRow[] } }) => res.data.channels,
+      providesTags: (_r, _e, arg) => [{ type: 'MovieShowtimes', id: `seatmap-${arg.showtimeId}` }],
+    }),
+
     getPartnerMovieShowtimes: builder.query<
       MovieShowtime[],
       { bizId: string; date?: string; cinema_screen_id?: string; movie_id?: string }
@@ -9011,6 +9131,10 @@ export const {
   useUpdateCinemaScreenLayoutMutation,
   useUpdateCinemaScreenSeatStatusesMutation,
   useGetPartnerMovieShowtimesQuery,
+  useGetShowSeatMapQuery,
+  useUpdateShowSeatOverridesMutation,
+  useCreateCounterBookingMutation,
+  useGetShowChannelSummaryQuery,
   useCreatePartnerMovieShowtimeMutation,
   useUpdatePartnerMovieShowtimeMutation,
   useDeletePartnerMovieShowtimeMutation,

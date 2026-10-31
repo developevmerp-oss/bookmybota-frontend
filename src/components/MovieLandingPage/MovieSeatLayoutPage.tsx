@@ -794,7 +794,8 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
               /** Left-to-right 01–N across the row, including after an aisle. */
               number: String(displayNum).padStart(2, "0"),
               tierName: sec.secName,
-              price,
+              // Per-seat price set by the cinema for this show wins over the tier price
+              price: layoutData.seat_price_overrides?.[seatId] ?? price,
               isBooked,
               isAisleGap,
               isBestseller: seatHasExplicitBestsellerFlag(seat),

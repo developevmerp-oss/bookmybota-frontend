@@ -132,13 +132,13 @@ export const customerGiftCardBuySchema = yup.object({
     .trim()
     .max(GIFT_CARD_MESSAGE_MAX, `Message must be at most ${GIFT_CARD_MESSAGE_MAX} characters.`)
     .default(""),
-  /** When the gift email is delivered to the recipient (today = send now). */
+  /** When the gift card validity starts (email is delivered immediately upon purchase). */
   delivery_date: yup
     .string()
     .trim()
-    .required("Please choose a delivery date.")
-    .matches(/^\d{4}-\d{2}-\d{2}$/, "Choose a valid delivery date.")
-    .test("not-past", "Delivery date cannot be in the past.", (value) => {
+    .required("Please choose a start date.")
+    .matches(/^\d{4}-\d{2}-\d{2}$/, "Choose a valid start date.")
+    .test("not-past", "Start date cannot be in the past.", (value) => {
       if (!value) return false;
       const today = new Date();
       today.setHours(0, 0, 0, 0);

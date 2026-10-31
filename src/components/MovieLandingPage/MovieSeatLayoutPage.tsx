@@ -1092,26 +1092,71 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
     [findGridSeatContext]
   );
 
-  const formatSelectedSeatLabel = useCallback((s: MovieBookingSeatPayload) => {
-    const ctx = findGridSeatContext(s.seat_identifier);
-    const row = s.row_label || ctx?.seat?.row || "";
-    const numRaw = s.seat_number ?? (ctx?.seat != null ? String(ctx.seat.number) : "");
-    const num = String(numRaw).replace(/^0+/, "") || numRaw;
-    const tier = (s.tier_name || ctx?.seat?.tierName || "").trim();
-    // e.g. "Regular J7"
-    const seatPart = row && num ? `${row}${num}` : String(s.seat_identifier || "").trim();
-    if (tier) {
-      const tierWord = tier
-        .replace(/\s*TIER\s*$/i, "")
-        .replace(/\s*ROWS?\s*$/i, "")
-        .trim();
-      // Title-case first word style: Regular
-      const tierLabel =
-        tierWord.charAt(0).toUpperCase() + tierWord.slice(1).toLowerCase();
-      return `${tierLabel} ${seatPart}`.trim();
+  const formatSelectedSeatCode = useCallback(
+    (s: MovieBookingSeatPayload) => {
+      const ctx = findGridSeatContext(s.seat_identifier);
+      const row = s.row_label || ctx?.seat?.row || "";
+      const numRaw = s.seat_number ?? (ctx?.seat != null ? String(ctx.seat.number) : "");
+      const num = String(numRaw).replace(/^0+/, "") || numRaw;
+      if (row && num) {
+        return `${row}${num}`;
+      }
+      let raw = String(s.seat_identifier || "").trim();
+      const tier = (s.tier_name || ctx?.seat?.tierName || "").trim();
+      if (tier && raw.toLowerCase().startsWith(tier.toLowerCase())) {
+        raw = raw.slice(tier.length).replace(/^[\s\-_]+/, "").trim();
+      }
+      return raw || String(s.seat_identifier || "").trim();
+    },
+    [findGridSeatContext]
+  );
+
+  const formatSelectedSeatLabel = useCallback(
+    (s: MovieBookingSeatPayload) => {
+      const code = formatSelectedSeatCode(s);
+      const ctx = findGridSeatContext(s.seat_identifier);
+      const tier = (s.tier_name || ctx?.seat?.tierName || "").trim();
+      if (tier) {
+        const tierWord = tier
+          .replace(/\s*TIER\s*$/i, "")
+          .replace(/\s*ROWS?\s*$/i, "")
+          .trim();
+        // Title-case first word style: Regular
+        const tierLabel =
+          tierWord.charAt(0).toUpperCase() + tierWord.slice(1).toLowerCase();
+        if (code.toLowerCase().includes(tierLabel.toLowerCase())) {
+          return code;
+        }
+        return `${tierLabel} ${code}`.trim();
+      }
+      return code;
+    },
+    [formatSelectedSeatCode, findGridSeatContext]
+  );
+
+  const selectedSeatTiers = useMemo(() => {
+    return Array.from(new Set(selectedSeats.map((s) => s.tier_name).filter(Boolean)));
+  }, [selectedSeats]);
+
+  const seatSummaryLine = useMemo(() => {
+    if (!selectedSeats.length) return "";
+    const tierMap = new Map<string, string[]>();
+    for (const s of selectedSeats) {
+      const ctx = findGridSeatContext(s.seat_identifier);
+      const tier = (s.tier_name || ctx?.seat?.tierName || "").trim();
+      const code = formatSelectedSeatCode(s);
+      if (!tierMap.has(tier)) {
+        tierMap.set(tier, []);
+      }
+      tierMap.get(tier)!.push(code);
     }
-    return seatPart;
-  }, [findGridSeatContext]);
+    return Array.from(tierMap.entries())
+      .map(([tier, seats]) => {
+        const seatList = seats.join(", ");
+        return tier ? `${tier} • ${seatList}` : seatList;
+      })
+      .join("  •  ");
+  }, [selectedSeats, formatSelectedSeatCode, findGridSeatContext]);
 
   const applyMovieSeats = (next: MovieBookingSeatPayload[]) => {
     const sliced = next.slice(0, qty);
@@ -3152,9 +3197,12 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                         <span
                           key={s.seat_identifier}
                           className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-purple-50 border border-purple-200 text-xs font-semibold text-purple-900"
+                          title={s.tier_name ? `${s.tier_name} • ${formatSelectedSeatCode(s)}` : undefined}
                         >
                           <Armchair className="size-3.5 text-[#6900AA]" />
-                          {formatSelectedSeatLabel(s)}
+                          {selectedSeatTiers.length > 1
+                            ? formatSelectedSeatLabel(s)
+                            : formatSelectedSeatCode(s)}
                         </span>
                       ))}
                     </div>
@@ -3276,12 +3324,11 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                       <p className="text-sm font-semibold text-slate-900">
                         {selectedSeats.length} ticket{selectedSeats.length === 1 ? "" : "s"}
                       </p>
-                      <p className="mt-0.5 text-sm text-slate-600">
-                        {[
-                          Array.from(new Set(selectedSeats.map((s) => s.tier_name).filter(Boolean))).join(", "),
-                          selectedSeats.map((s) => formatSelectedSeatLabel(s)).join(", "),
-                        ].filter(Boolean).join("  •  ")}
-                      </p>
+                      {seatSummaryLine ? (
+                        <p className="mt-0.5 text-sm text-slate-600">
+                          {seatSummaryLine}
+                        </p>
+                      ) : null}
                       {screen?.name ? (
                         <p className="mt-0.5 text-sm text-slate-500">{screen.name}</p>
                       ) : null}

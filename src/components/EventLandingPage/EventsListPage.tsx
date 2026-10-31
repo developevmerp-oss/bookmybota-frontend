@@ -19,7 +19,7 @@ import {
   FaChevronLeft,
   FaChevronRight,
 } from "react-icons/fa";
-import { Check, MapPin, Search, SlidersHorizontal, X } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, ChevronUp, MapPin, Search, SlidersHorizontal, X } from "lucide-react";
 import SafeCoverImage, { EventImageFallback, ArtistImageFallback, ARTIST_IMAGE_FALLBACK_CLASS } from "@/components/Shared/SafeCoverImage";
 import {
   api,
@@ -539,9 +539,9 @@ function DistrictEventCard({
   return (
     <Link
       href={`/events/${event.id}`}
-      className="group block min-w-0 w-full overflow-hidden rounded-2xl border border-[#E5E5E5] bg-white shadow-[0_1px_3px_rgba(17,17,17,0.06)] hover:shadow-[0_8px_24px_rgba(17,17,17,0.1)] hover:-translate-y-0.5 transition-[box-shadow,transform] duration-300"
+      className="group flex flex-col h-full min-w-0 w-full overflow-hidden rounded-2xl border border-[#E5E5E5] bg-white shadow-[0_1px_3px_rgba(17,17,17,0.06)] hover:shadow-[0_8px_24px_rgba(17,17,17,0.1)] hover:-translate-y-0.5 transition-[box-shadow,transform] duration-300"
     >
-      <div className="relative aspect-[3/4] w-full overflow-hidden bg-slate-100">
+      <div className="relative aspect-[3/4] w-full shrink-0 overflow-hidden bg-slate-100">
         <SafeCoverImage
           src={portrait}
           alt={event.name}
@@ -551,9 +551,9 @@ function DistrictEventCard({
         />
         {promoted ? <PromotedBadge /> : null}
       </div>
-      <div className="space-y-1 px-3.5 py-3 sm:px-4 sm:py-3.5">
+      <div className="flex-1 space-y-1 px-3.5 py-3 sm:px-4 sm:py-3.5">
         {dateLine ? (
-          <p className="text-sm font-semibold text-[#B59B2A]">{dateLine}</p>
+          <p className="text-sm font-semibold text-[#B59B2A] line-clamp-1">{dateLine}</p>
         ) : null}
         <h3 className="text-base font-semibold leading-snug text-black line-clamp-2 sm:text-xl">
           {event.name}
@@ -562,7 +562,7 @@ function DistrictEventCard({
           <p className="text-sm font-medium text-[#6B6B6B] line-clamp-1">{place}</p>
         ) : null}
         {price ? (
-          <p className="text-sm font-medium text-[#6B6B6B]">{price}</p>
+          <p className="text-sm font-medium text-[#6B6B6B] line-clamp-1">{price}</p>
         ) : null}
       </div>
     </Link>
@@ -744,6 +744,7 @@ export default function PublicEventsPage() {
     return sortParam && SORT_OPTIONS.some((o) => o.id === sortParam) ? sortParam : "recommended";
   });
   const [page, setPage] = useState(1);
+  const [isAllEventsExpanded, setIsAllEventsExpanded] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [searchPopupOpen, setSearchPopupOpen] = useState(false);
   const [searchDraft, setSearchDraft] = useState("");
@@ -759,6 +760,7 @@ export default function PublicEventsPage() {
   const recommendRef = useRef<HTMLDivElement>(null);
   const artistsRef = useRef<HTMLDivElement>(null);
   const allEventsRef = useRef<HTMLElement>(null);
+  const allEventsRailRef = useRef<HTMLDivElement>(null);
   const filtersStickySentinelRef = useRef<HTMLDivElement>(null);
   const categoryFromFilterRef = useRef(false);
   // One category in URL → dedicated browse from first paint (avoids home showcase flash)
@@ -1387,6 +1389,47 @@ export default function PublicEventsPage() {
   }, [filtered, page]);
   const hasMore = visibleEvents.length < filtered.length;
 
+  const DISPLAY_ONE_ROW_COUNT = 4;
+  const railEvents = filtered.length > 0 ? filtered : visibleEvents;
+  const isOneRowOnly = !isAllEventsExpanded;
+
+  const displayedEvents = useMemo(() => {
+    if (isOneRowOnly) {
+      return visibleEvents.slice(0, DISPLAY_ONE_ROW_COUNT);
+    }
+    return visibleEvents;
+  }, [visibleEvents, isOneRowOnly]);
+
+  const displayedShowcaseCards = useMemo(() => {
+    if (isOneRowOnly) {
+      return emptyShowcaseCards.slice(0, DISPLAY_ONE_ROW_COUNT);
+    }
+    return emptyShowcaseCards;
+  }, [emptyShowcaseCards, isOneRowOnly]);
+
+  const totalEventCount =
+    visibleEvents.length > 0
+      ? filtered.length
+      : showEventShowcase
+      ? emptyShowcaseCards.length
+      : 0;
+
+  const canToggleSeeAll = !catalogPending && totalEventCount > DISPLAY_ONE_ROW_COUNT;
+
+  const toggleSeeAllEvents = useCallback(() => {
+    setIsAllEventsExpanded((prev) => {
+      const next = !prev;
+      if (!next && typeof window !== "undefined") {
+        const el = allEventsRef.current;
+        if (el) {
+          const top = el.getBoundingClientRect().top + window.scrollY - (headerOffset + 12);
+          window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+        }
+      }
+      return next;
+    });
+  }, [headerOffset]);
+
   const infiniteScrollSentinelRef = useRef<HTMLDivElement | null>(null);
 
   const loadMore = useCallback(() => {
@@ -1397,7 +1440,7 @@ export default function PublicEventsPage() {
 
   useEffect(() => {
     const node = infiniteScrollSentinelRef.current;
-    if (!node || !hasMore) return;
+    if (!node || !hasMore || !isAllEventsExpanded) return;
     if (typeof IntersectionObserver === "undefined") return;
 
     const observer = new IntersectionObserver(
@@ -1411,7 +1454,7 @@ export default function PublicEventsPage() {
 
     observer.observe(node);
     return () => observer.disconnect();
-  }, [hasMore, loadMore, visibleEvents.length]);
+  }, [hasMore, loadMore, visibleEvents.length, isAllEventsExpanded]);
 
   useEffect(() => {
     if (!isCategoryBrowse) setSelectedEventGenres([]);
@@ -1419,6 +1462,7 @@ export default function PublicEventsPage() {
 
   useEffect(() => {
     setPage(1);
+    setIsAllEventsExpanded(false);
   }, [
     search,
     city,
@@ -1778,6 +1822,18 @@ export default function PublicEventsPage() {
   const artistsScrollEdges = useHorizontalScrollEdges(artistsRef, [
     artists.length,
     artistsLoading,
+  ]);
+  const allEventsRailCount = catalogPending
+    ? 4
+    : visibleEvents.length > 0
+      ? railEvents.length
+      : showEventShowcase
+        ? emptyShowcaseCards.length
+        : 0;
+  const allEventsScrollEdges = useHorizontalScrollEdges(allEventsRailRef, [
+    allEventsRailCount,
+    catalogPending,
+    isAllEventsExpanded,
   ]);
 
   const onExploreCategory = (key: string) => {
@@ -2291,11 +2347,13 @@ export default function PublicEventsPage() {
     <section
       ref={allEventsRef}
       id="all-events"
-      className={`${isCategoryBrowse ? "pt-6 sm:pt-8" : "pt-8 sm:pt-10"} pb-10 sm:pb-14 lg:pb-16`}
+      className={`${isCategoryBrowse ? "pt-4 sm:pt-5" : "pt-5 sm:pt-6"} ${
+        isAllEventsExpanded ? "pb-8 sm:pb-10" : "pb-2 sm:pb-3"
+      }`}
       style={{ scrollMarginTop: headerOffset + 8 }}
     >
       <div className={CONTAINER}>
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 mb-4 sm:mb-5">
+        <div className="flex items-center justify-between gap-3 mb-2 sm:mb-2.5">
           <div className="min-w-0">
             <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-slate-800">
               {browseHeading}
@@ -2304,6 +2362,20 @@ export default function PublicEventsPage() {
               <CitySectionEmptyNotice message="No events available in your city yet." />
             ) : null}
           </div>
+          {canToggleSeeAll ? (
+            <button
+              type="button"
+              onClick={toggleSeeAllEvents}
+              className="inline-flex items-center gap-1 text-sm sm:text-base font-semibold text-[#6900AA] hover:text-[#57008E] transition-colors cursor-pointer shrink-0"
+            >
+              <span>{isAllEventsExpanded ? "Show Less" : "See All"}</span>
+              {isAllEventsExpanded ? (
+                <ChevronUp className="size-4" />
+              ) : (
+                <ChevronRight className="size-4" />
+              )}
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -2311,8 +2383,8 @@ export default function PublicEventsPage() {
       <div ref={filtersStickySentinelRef} className="h-px w-full" aria-hidden />
       <section className="sticky z-30 w-full bg-transparent" style={{ top: headerOffset }}>
         <div className={`dining-filters-sticky w-full ${isFiltersStuck ? "is-stuck" : ""}`}>
-          <div className={`${CONTAINER} pt-4 pb-1`}>
-            <div className="mb-2">
+          <div className={`${CONTAINER} pt-1 pb-1`}>
+            <div className="mb-0.5">
               <div className="flex items-center gap-2 pb-1 -mx-1 px-1">
                 <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto scrollbar-hide">
                   <button
@@ -2410,7 +2482,7 @@ export default function PublicEventsPage() {
         </div>
       </section>
 
-      <div className={`${CONTAINER} pt-5`}>
+      <div className={`${CONTAINER} pt-3 sm:pt-3.5`}>
         {catalogPending ? (
           <EventListShimmer />
         ) : visibleEvents.length === 0 ? (
@@ -2435,26 +2507,102 @@ export default function PublicEventsPage() {
                   Showing highlights while we wait for events in your city.
                 </p>
               ) : null}
-              <div className="mx-auto grid w-full grid-cols-1 gap-5 md:max-w-none md:grid-cols-2 md:gap-4 lg:grid-cols-4 lg:gap-5">
-                {emptyShowcaseCards.map((event) => (
-                  <ShowcaseEventPosterCard
-                    key={event.id}
-                    title={event.title}
-                    image={event.image}
-                    showDate={event.showDate}
-                    place={event.place}
-                    eventType={event.eventType}
-                    href={event.href}
-                    fullWidth
+              {!isAllEventsExpanded ? (
+                <>
+                  <div
+                    ref={allEventsRailRef}
+                    className="flex items-stretch gap-4 sm:gap-5 overflow-x-auto scrollbar-none snap-x snap-mandatory pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                  >
+                    {emptyShowcaseCards.map((event) => (
+                      <div
+                        key={event.id}
+                        className="shrink-0 w-[min(78vw,19rem)] sm:w-[calc((100%-1.25rem)/2)] md:w-[calc((100%-2.5rem)/3)] lg:w-[calc((100%-3.75rem)/4)] snap-start flex flex-col"
+                      >
+                        <ShowcaseEventPosterCard
+                          title={event.title}
+                          image={event.image}
+                          showDate={event.showDate}
+                          place={event.place}
+                          eventType={event.eventType}
+                          href={event.href}
+                          fullWidth
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <RailPagerNav
+                    canPrev={allEventsScrollEdges.left}
+                    canNext={allEventsScrollEdges.right}
+                    pageCount={allEventsScrollEdges.pageCount}
+                    activePage={allEventsScrollEdges.activePage}
+                    onPrev={() => {
+                      const el = allEventsRailRef.current;
+                      if (el) scrollRailBy(el, -1);
+                    }}
+                    onNext={() => {
+                      const el = allEventsRailRef.current;
+                      if (el) scrollRailBy(el, 1);
+                    }}
+                    label="events"
                   />
-                ))}
-              </div>
+                </>
+              ) : (
+                <div className="mx-auto grid w-full grid-cols-1 gap-5 md:max-w-none md:grid-cols-2 md:gap-4 lg:grid-cols-4 lg:gap-5">
+                  {emptyShowcaseCards.map((event) => (
+                    <ShowcaseEventPosterCard
+                      key={event.id}
+                      title={event.title}
+                      image={event.image}
+                      showDate={event.showDate}
+                      place={event.place}
+                      eventType={event.eventType}
+                      href={event.href}
+                      fullWidth
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           ) : (
             <EventListShimmer />
           )
+        ) : !isAllEventsExpanded ? (
+          <>
+            <div
+              ref={allEventsRailRef}
+              className="flex items-stretch gap-4 sm:gap-5 overflow-x-auto scrollbar-none snap-x snap-mandatory pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            >
+              {railEvents.map((event) => (
+                <div
+                  key={event.id}
+                  className="shrink-0 w-[min(78vw,19rem)] sm:w-[calc((100%-1.25rem)/2)] md:w-[calc((100%-2.5rem)/3)] lg:w-[calc((100%-3.75rem)/4)] snap-start flex flex-col"
+                >
+                  <DistrictEventCard
+                    event={event}
+                    cityLabel={city || undefined}
+                    promoted={isPromotedHere(event)}
+                  />
+                </div>
+              ))}
+            </div>
+            <RailPagerNav
+              canPrev={allEventsScrollEdges.left}
+              canNext={allEventsScrollEdges.right}
+              pageCount={allEventsScrollEdges.pageCount}
+              activePage={allEventsScrollEdges.activePage}
+              onPrev={() => {
+                const el = allEventsRailRef.current;
+                if (el) scrollRailBy(el, -1);
+              }}
+              onNext={() => {
+                const el = allEventsRailRef.current;
+                if (el) scrollRailBy(el, 1);
+              }}
+              label="events"
+            />
+          </>
         ) : (
-          <div className="  grid w-full  grid-cols-1 gap-5  md:grid-cols-2 md:gap-4 lg:grid-cols-4 lg:gap-5">
+          <div className="grid w-full grid-cols-1 gap-5 md:grid-cols-2 md:gap-4 lg:grid-cols-4 lg:gap-5 items-stretch">
             {visibleEvents.map((event) => (
               <DistrictEventCard
                 key={event.id}
@@ -2467,7 +2615,7 @@ export default function PublicEventsPage() {
         )}
 
         {/* Infinite scroll sentinel + loader */}
-        {hasMore && (
+        {isAllEventsExpanded && hasMore && (
           <div
             ref={infiniteScrollSentinelRef}
             className="mt-8 mb-6 flex justify-center items-center py-4"
@@ -2476,6 +2624,20 @@ export default function PublicEventsPage() {
               <span className="size-4 rounded-full border-2 border-[#6900AA] border-t-transparent animate-spin" />
               <span>Loading more events...</span>
             </div>
+          </div>
+        )}
+
+        {/* Bottom Show Less button when expanded */}
+        {isAllEventsExpanded && canToggleSeeAll && (
+          <div className="mt-8 sm:mt-10 flex justify-center">
+            <button
+              type="button"
+              onClick={toggleSeeAllEvents}
+              className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full border border-slate-200 bg-white text-sm font-semibold text-[#6900AA] hover:bg-[#FAF5FF] hover:border-[#6900AA]/30 shadow-sm transition-all cursor-pointer"
+            >
+              <span>Show Less</span>
+              <ChevronUp className="size-4" />
+            </button>
           </div>
         )}
       </div>
@@ -2898,56 +3060,59 @@ export default function PublicEventsPage() {
           </section>
           */}
 
-          {/* 4) Artists */}
-          <section className="pt-8 sm:pt-10 pb-2 bg-white">
-            <div className={CONTAINER}>
-              <div className="flex items-center justify-between gap-3 mb-4 sm:mb-5">
-                <h2 className="text-lg sm:text-xl md:text-2xl font-semibold text-slate-800">
-                  {city ? `Artists in ${headingCity}` : "Artists in your District"}
-                </h2>
-              </div>
-              {artistsLoading ? (
-                <ArtistRailShimmer count={6} />
-              ) : artists.length > 0 ? (
-                <>
-                  <div
-                    ref={artistsRef}
-                    className="flex gap-4 sm:gap-5 overflow-x-auto scrollbar-none snap-x snap-mandatory pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-                  >
-                    {artists.map((artist) => (
-                      <ArtistChip key={artist.id} artist={artist} />
-                    ))}
-                  </div>
-                  <RailPagerNav
-                    canPrev={artistsScrollEdges.left}
-                    canNext={artistsScrollEdges.right}
-                    pageCount={artistsScrollEdges.pageCount}
-                    activePage={artistsScrollEdges.activePage}
-                    onPrev={() => {
-                      const el = artistsRef.current;
-                      if (el) scrollRailBy(el, -1);
-                    }}
-                    onNext={() => {
-                      const el = artistsRef.current;
-                      if (el) scrollRailBy(el, 1);
-                    }}
-                    label="artists"
-                  />
-                </>
-              ) : (
-                <p className="text-sm text-slate-500">
-                  No artists listed yet.{" "}
-                  <Link href="/artists" className="text-[#6900AA] font-semibold hover:underline">
-                    Browse artists
-                  </Link>
-                </p>
-              )}
-            </div>
-          </section>
         </>
       ) : null}
 
       {eventsGridSection}
+
+      {!isCategoryBrowse ? (
+        /* 4) Artists */
+        <section className="pt-4 sm:pt-5 pb-10 sm:pb-14 bg-white border-t border-slate-100">
+          <div className={CONTAINER}>
+            <div className="flex items-center justify-between gap-3 mb-3 sm:mb-4">
+              <h2 className="text-lg sm:text-xl md:text-2xl font-semibold text-slate-800">
+                {city ? `Artists in ${headingCity}` : "Artists"}
+              </h2>
+            </div>
+            {artistsLoading ? (
+              <ArtistRailShimmer count={6} />
+            ) : artists.length > 0 ? (
+              <>
+                <div
+                  ref={artistsRef}
+                  className="flex gap-4 sm:gap-5 overflow-x-auto scrollbar-none snap-x snap-mandatory pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                >
+                  {artists.map((artist) => (
+                    <ArtistChip key={artist.id} artist={artist} />
+                  ))}
+                </div>
+                <RailPagerNav
+                  canPrev={artistsScrollEdges.left}
+                  canNext={artistsScrollEdges.right}
+                  pageCount={artistsScrollEdges.pageCount}
+                  activePage={artistsScrollEdges.activePage}
+                  onPrev={() => {
+                    const el = artistsRef.current;
+                    if (el) scrollRailBy(el, -1);
+                  }}
+                  onNext={() => {
+                    const el = artistsRef.current;
+                    if (el) scrollRailBy(el, 1);
+                  }}
+                  label="artists"
+                />
+              </>
+            ) : (
+              <p className="text-sm text-slate-500">
+                No artists listed yet.{" "}
+                <Link href="/artists" className="text-[#6900AA] font-semibold hover:underline">
+                  Browse artists
+                </Link>
+              </p>
+            )}
+          </div>
+        </section>
+      ) : null}
 
       {filtersOpen ? (
         <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center">

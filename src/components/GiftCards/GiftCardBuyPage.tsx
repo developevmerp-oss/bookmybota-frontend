@@ -14,6 +14,7 @@ import {
   Lock,
   ShoppingBag,
   Wallet,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -31,6 +32,7 @@ import {
   DEFAULT_GIFT_CARD_VALIDITY_DAYS,
   computeGiftCardExpiryDate,
   formatGiftCardExpiryDate,
+  formatGiftCardExpiryTime,
   formatGiftCardValidityLabel,
 } from "@/lib/giftCardValidity";
 import {
@@ -136,6 +138,7 @@ export default function GiftCardBuyPage() {
     control,
     watch,
     setValue,
+    reset,
     formState: { errors },
   } = useForm<CustomerGiftCardBuyValues>({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -157,13 +160,15 @@ export default function GiftCardBuyPage() {
   const personalMessage = watch("personal_message") || "";
   const deliveryDate = watch("delivery_date") || minDeliveryDate;
   const amount = Number(watch("denomination")) || defaultDenomination;
-
-  const previewExpiryDate = formatGiftCardExpiryDate(
-    computeGiftCardExpiryDate(
-      new Date(`${deliveryDate}T12:00:00.000Z`),
-      validityDays
-    )
+  const previewStartDate = formatGiftCardExpiryDate(
+    new Date(`${deliveryDate}T12:00:00.000Z`)
   );
+  const previewExpiry = computeGiftCardExpiryDate(
+    new Date(`${deliveryDate}T12:00:00.000Z`),
+    validityDays
+  );
+  const previewExpiryDate = formatGiftCardExpiryDate(previewExpiry);
+  const previewExpiryTime = formatGiftCardExpiryTime(previewExpiry);
 
   useEffect(() => {
     const first = amountChips.find((c) => c.available);
@@ -210,7 +215,11 @@ export default function GiftCardBuyPage() {
         delivery_date: values.delivery_date,
       }).unwrap();
       setIssued(res.data);
-      toast.success(res.message || "Gift card purchased");
+      let successMsg = res.message || "Gift card purchased";
+      successMsg = successMsg.replace(/\b(\d{4})-(\d{2})-(\d{2})\b/g, (_match, y, m, d) => {
+        return formatDateCustomer(`${y}-${m}-${d}`);
+      });
+      toast.success(successMsg);
     } catch (err) {
       toast.error(extractApiError(err, "Purchase failed"));
     }
@@ -250,105 +259,8 @@ export default function GiftCardBuyPage() {
 
   return (
     <div className="bg-[#F5F5F5] min-h-[calc(100vh-4rem)] pb-10 sm:pb-14">
-      {issued ? (
-        <div className="max-w-lg mx-auto px-4 pt-8 sm:pt-12">
-          <div className="bg-white rounded-lg shadow-[0_4px_24px_rgba(0,0,0,0.08)] p-5 sm:p-8">
-            <div className="flex flex-col items-center text-center mb-5">
-              <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500 text-white mb-3">
-                <Check size={24} strokeWidth={3} />
-              </span>
-              <h1 className="text-xl sm:text-2xl font-extrabold text-[#111111]">
-                Payment Successful!
-              </h1>
-              <p className="mt-2 text-sm text-slate-600 max-w-sm">
-                {emailSentNow ? (
-                  <>
-                    Your e-gift was{" "}
-                    <span className="font-bold text-[#6900AA]">
-                      emailed to {issued.recipient_email || issued.recipient_name || "the recipient"}
-                    </span>
-                    . Save the code below for your records.
-                  </>
-                ) : (
-                  <>
-                    Your e-gift is scheduled to be emailed to{" "}
-                    <span className="font-bold text-[#6900AA]">
-                      {issued.recipient_email || "the recipient"}
-                    </span>
-                    {scheduledLabel ? (
-                      <>
-                        {" "}
-                        on <span className="font-bold text-[#6900AA]">{scheduledLabel}</span>
-                      </>
-                    ) : null}
-                    . Save the code below for your records.
-                  </>
-                )}
-              </p>
-            </div>
-
-            <div className="space-y-2.5 mb-5">
-              {issuedCards.map((card) => (
-                <div
-                  key={card.id || card.code}
-                  className="rounded-lg bg-[#F5EBFF] border border-[#E8D5FF] px-4 py-3.5 flex items-center gap-3"
-                >
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#6900AA]">
-                      Gift card code
-                    </p>
-                    <code className="text-sm sm:text-base font-extrabold tracking-wide text-[#6900AA] break-all">
-                      {card.code}
-                    </code>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => void copyCode(card.code)}
-                    className="shrink-0 h-10 w-10 rounded-lg bg-[#6900AA] text-white inline-flex items-center justify-center hover:bg-[#57008E]"
-                    aria-label="Copy code"
-                  >
-                    <Copy size={17} />
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            <p className="text-center text-2xl font-extrabold text-[#6900AA] mb-2">
-              {formatMoney(issued.total_payable ?? issued.initial_balance, { compact: true })}
-            </p>
-            {issued.expires_at ? (
-              <p className="text-center text-sm text-slate-500 mb-5">
-                Valid until{" "}
-                <span className="font-semibold text-slate-700">
-                  {formatGiftCardExpiryDate(issued.expires_at)}
-                </span>
-              </p>
-            ) : (
-              <p className="text-center text-sm text-slate-500 mb-5">Valid for {validityLabel}</p>
-            )}
-
-            <div className="flex flex-col sm:flex-row gap-3">
-              <Link
-                href={`/customer/gift-cards/${issued.id}`}
-                className="inline-flex flex-1 items-center justify-center gap-2 h-11 rounded-lg bg-[#6900AA] text-white text-sm font-semibold hover:bg-[#5A008F]"
-              >
-                <Wallet size={17} />
-                View in My Gift Cards
-              </Link>
-              <Link
-                href="/gift-cards"
-                className="inline-flex flex-1 items-center justify-center gap-2 h-11 rounded-lg border border-[#6900AA] text-[#6900AA] text-sm font-semibold hover:bg-[#F7E9FF]"
-              >
-                <ShoppingBag size={17} />
-                Buy another
-              </Link>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <>
-          {/* BookMyShow-style gift hero banner */}
-          <div className="relative overflow-hidden bg-[#1A0529]">
+      {/* BookMyShow-style gift hero banner */}
+      <div className="relative overflow-hidden bg-[#1A0529]">
             {heroImg ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
@@ -505,7 +417,7 @@ export default function GiftCardBuyPage() {
 
                 <div>
                   <label className={labelClass}>
-                    <RequiredMark /> Delivery date
+                    <RequiredMark /> Start date
                   </label>
                   <div className={fieldWrapClass}>
                     <input
@@ -523,9 +435,6 @@ export default function GiftCardBuyPage() {
                       }}
                     />
                   </div>
-                  <p className="mt-1.5 text-[12px] text-[#6B7280]">
-                    Today = email right after payment. Future date = schedule the gift email.
-                  </p>
                   {errors.delivery_date && (
                     <p className={fieldErrorClass}>{errors.delivery_date.message}</p>
                   )}
@@ -561,9 +470,18 @@ export default function GiftCardBuyPage() {
                       </div>
                     )}
                   />
-                  <p className="mt-2 text-[12px] text-[#6B7280]">
-                    Valid for {validityLabel} from delivery · through {previewExpiryDate}
-                  </p>
+                  <div className="mt-2.5 px-3 py-2.5 rounded-md bg-[#FAF5FF] border border-[#E9D5FF] text-[12px] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5">
+                    <div className="font-bold text-[#6900AA]">
+                      Validity: {validityLabel}
+                    </div>
+                    <div className="text-[#4B5563]">
+                      Valid from <strong className="text-[#111111] font-semibold">{previewStartDate}</strong> until{" "}
+                      <strong className="text-[#111111] font-semibold">
+                        {previewExpiryDate}
+                        {previewExpiryTime ? `, ${previewExpiryTime}` : ""}.
+                      </strong>
+                    </div>
+                  </div>
                   {errors.denomination && (
                     <p className={fieldErrorClass}>{errors.denomination.message}</p>
                   )}
@@ -665,7 +583,118 @@ export default function GiftCardBuyPage() {
               </div>
             </form>
           </div>
-        </>
+
+      {/* Payment Success Popup Modal */}
+      {issued && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setIssued(null)}
+        >
+          <div
+            className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl p-6 sm:p-7 text-center animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Top-Right Close Button */}
+            <button
+              type="button"
+              onClick={() => setIssued(null)}
+              className="absolute top-4 right-4 h-8 w-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center transition-colors"
+              aria-label="Close"
+            >
+              <X size={18} strokeWidth={2.5} />
+            </button>
+
+            {/* Checkmark and Headline */}
+            <div className="flex flex-col items-center mb-4">
+              <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500 text-white mb-3 shadow-md shadow-emerald-500/20">
+                <Check size={24} strokeWidth={3} />
+              </span>
+              <h2 className="text-xl sm:text-2xl font-extrabold text-[#111111]">
+                Payment Successful!
+              </h2>
+              <p className="mt-2 text-sm text-slate-600 max-w-xs">
+                Your e-gift was{" "}
+                <span className="font-bold text-[#6900AA]">
+                  emailed to {issued.recipient_email || issued.recipient_name || "the recipient"}
+                </span>
+                . Save the code below for your records.
+              </p>
+            </div>
+
+            {/* Code Cards */}
+            <div className="space-y-2 mb-4">
+              {issuedCards.map((card) => (
+                <div
+                  key={card.id || card.code}
+                  className="rounded-xl bg-[#FAF5FF] border border-[#E9D5FF] px-4 py-3 flex items-center justify-between gap-3 text-left"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#6900AA]">
+                      Gift card code
+                    </p>
+                    <code className="text-base sm:text-lg font-mono font-extrabold tracking-wider text-[#111111] break-all">
+                      {card.code}
+                    </code>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void copyCode(card.code)}
+                    className="shrink-0 h-9 w-9 rounded-lg bg-[#6900AA] hover:bg-[#57008E] text-white inline-flex items-center justify-center transition-colors shadow-sm"
+                    aria-label="Copy code"
+                  >
+                    <Copy size={16} />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {/* Amount and Dynamic Validity */}
+            <div className="mb-5">
+              <p className="text-2xl sm:text-3xl font-black text-[#6900AA]">
+                {formatMoney(issued.total_payable ?? issued.initial_balance, { compact: true })}
+              </p>
+              <p className="text-xs text-slate-500 mt-1">
+                {issued.expires_at ? (
+                  <>
+                    Valid until{" "}
+                    <span className="font-semibold text-slate-700">
+                      {formatGiftCardExpiryDate(issued.expires_at)}
+                      {formatGiftCardExpiryTime(issued.expires_at)
+                        ? `, ${formatGiftCardExpiryTime(issued.expires_at)}`
+                        : ""}
+                    </span>
+                  </>
+                ) : (
+                  `Valid for ${validityLabel}`
+                )}
+              </p>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex flex-col sm:flex-row gap-2.5">
+              <Link
+                href={`/customer/gift-cards/${issued.id}`}
+                className="inline-flex flex-1 items-center justify-center gap-2 h-11 rounded-xl bg-[#6900AA] text-white text-sm font-bold hover:bg-[#57008E] transition-colors shadow-sm"
+              >
+                <Wallet size={16} />
+                View in My Gift Cards
+              </Link>
+              <button
+                type="button"
+                onClick={() => {
+                  setIssued(null);
+                  reset();
+                }}
+                className="inline-flex flex-1 items-center justify-center gap-2 h-11 rounded-xl border border-[#6900AA] text-[#6900AA] text-sm font-bold hover:bg-[#FAF5FF] transition-colors"
+              >
+                <ShoppingBag size={16} />
+                Buy another
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       <CustomerAuthModal

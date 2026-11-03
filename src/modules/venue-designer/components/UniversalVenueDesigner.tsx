@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useMemo, useCallback } from "react";
+import React, { useState, useRef, useMemo, useCallback, useEffect } from "react";
 import { Stage, Layer, Rect, Circle, Line, Text, Group, Shape, Image as KonvaImage } from "react-konva";
 import useImage from "use-image";
 import Konva from "konva";
@@ -35,24 +35,54 @@ import {
   Square,
   HelpCircle,
   Menu,
+  Shapes,
+  Armchair,
+  BookmarkPlus,
 } from "lucide-react";
 import {
   VenueType,
   ObjectType,
   UniversalVenueObject,
   UniversalVenueLayout,
+  LayoutCategory,
+  LayoutStandardTemplate,
+  LAYOUT_CATEGORIES,
+  RowConfig,
+  SeatType,
+  ShapePreset,
 } from "../types";
 import { UNIVERSAL_TEMPLATES } from "../templates/universalTemplates";
 import {
   generateSeatsForObject,
   computeLayoutCapacity,
   validateLayout,
+  buildRows,
+  gridStandSize,
+  resolveRows,
 } from "../utils/geometryEngine";
+import {
+  BASIC_SHAPES,
+  DEFAULT_SEAT_TYPES,
+  ELEMENT_PRESETS,
+  categoryForVenueType,
+  venueTypeForCategory,
+} from "../utils/presets";
+import RowsEditor from "./RowsEditor";
+import SeatTypesPanel from "./SeatTypesPanel";
+import SaveTemplateModal from "./SaveTemplateModal";
+import { ShapeNode, StandSeats } from "./CanvasElements";
 import TemplatePickerModal from "./TemplatePickerModal";
 import ReferenceImageModal from "./ReferenceImageModal";
 import TextPromptLayoutModal from "./TextPromptLayoutModal";
 import CustomerPreviewModal from "./CustomerPreviewModal";
-import { saveDraftLayoutApi, publishLayoutApi } from "../services/venueDesignerApi";
+import {
+  saveDraftLayoutApi,
+  publishLayoutApi,
+  listStandardTemplatesApi,
+  saveStandardTemplateApi,
+  updateStandardTemplateApi,
+  deleteStandardTemplateApi,
+} from "../services/venueDesignerApi";
 
 export const CANVAS_W = 1600;
 export const CANVAS_H = 1200;
@@ -85,6 +115,16 @@ export default function UniversalVenueDesigner({
     initialLayout?.status || "DRAFT"
   );
 
+  // Seat types (name, colour, price) shared by every row of this layout
+  const [seatTypes, setSeatTypes] = useState<SeatType[]>(
+    initialLayout?.seatTypes && initialLayout.seatTypes.length > 0
+      ? initialLayout.seatTypes
+      : DEFAULT_SEAT_TYPES
+  );
+  const [category, setCategory] = useState<LayoutCategory>(
+    initialLayout?.category || categoryForVenueType(initialLayout?.venueType || "stadium_football")
+  );
+
   // Objects list (stands, stages, tables, gates)
   const [objects, setObjects] = useState<UniversalVenueObject[]>(
     initialLayout?.objects || UNIVERSAL_TEMPLATES[0].objects
@@ -113,9 +153,17 @@ export default function UniversalVenueDesigner({
   const [isBlueprintModalOpen, setIsBlueprintModalOpen] = useState(false);
   const [isTextPromptModalOpen, setIsTextPromptModalOpen] = useState(false);
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
+  const [isSaveTemplateOpen, setIsSaveTemplateOpen] = useState(false);
+  const [savingTemplate, setSavingTemplate] = useState(false);
+  const [savedTemplates, setSavedTemplates] = useState<LayoutStandardTemplate[]>([]);
+  const [savedLoading, setSavedLoading] = useState(false);
+  const [savedError, setSavedError] = useState<string | null>(null);
+  const [inspectorTab, setInspectorTab] = useState<"properties" | "seatTypes">("properties");
 
   // Canvas Stage controls
   const stageRef = useRef<Konva.Stage>(null);
+  const canvasBoxRef = useRef<HTMLDivElement>(null);
+  const [stageSize, setStageSize] = useState<{ w: number; h: number }>({ w: 900, h: 600 });
   const [scale, setScale] = useState<number>(0.85);
   const [stagePos, setStagePos] = useState<{ x: number; y: number }>({ x: 60, y: 30 });
 
@@ -150,10 +198,13 @@ export default function UniversalVenueDesigner({
   // Zoom controls
   const handleZoomIn = () => setScale((s) => Math.min(3, s + 0.15));
   const handleZoomOut = () => setScale((s) => Math.max(0.3, s - 0.15));
-  const handleResetZoom = () => {
-    setScale(0.85);
-    setStagePos({ x: 60, y: 30 });
-  };
+  /** Fit the whole canvas inside the visible area, centred */
+  const fitToView = useCallback((w: number, h: number) => {
+    const next = Math.max(0.25, Math.min(1.2, Math.min(w / CANVAS_W, h / CANVAS_H) * 0.96));
+    setScale(next);
+    setStagePos({ x: (w - CANVAS_W * next) / 2, y: (h - CANVAS_H * next) / 2 });
+  }, []);
+  const handleResetZoom = () => fitToView(stageSize.w, stageSize.h);
 
   // Wheel zoom
   const handleWheel = (e: any) => {
@@ -181,10 +232,64 @@ export default function UniversalVenueDesigner({
   };
 
   // Compute live layout capacity & financial potential
-  const metrics = useMemo(() => computeLayoutCapacity(objects), [objects]);
+  const metrics = useMemo(() => computeLayoutCapacity(objects, seatTypes), [objects, seatTypes]);
 
   // Validation report
-  const validation = useMemo(() => validateLayout(objects), [objects]);
+  const validation = useMemo(() => validateLayout(objects, seatTypes), [objects, seatTypes]);
+
+  // How many rows / tables use each seat type
+  const seatTypeUsage = useMemo(() => {
+    const usage: Record<string, number> = {};
+    objects.forEach((o) => {
+      if (o.type === "curved_stand" || o.type === "grid_stand") {
+        resolveRows(o).forEach((r) => {
+          const id = r.seatTypeId || o.seatTypeId;
+          if (id) usage[id] = (usage[id] || 0) + 1;
+        });
+      } else if (o.seatTypeId) {
+        usage[o.seatTypeId] = (usage[o.seatTypeId] || 0) + 1;
+      }
+    });
+    return usage;
+  }, [objects]);
+
+  // Keep the canvas exactly as big as the space between the two side panels
+  useEffect(() => {
+    const el = canvasBoxRef.current;
+    if (!el) return;
+    let fitted = false;
+    const measure = () => {
+      const w = Math.max(300, el.clientWidth);
+      const h = Math.max(300, el.clientHeight);
+      setStageSize({ w, h });
+      // Start with the whole canvas in view
+      if (!fitted) {
+        fitted = true;
+        fitToView(w, h);
+      }
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [fitToView]);
+
+  // Load the user's saved standard layouts whenever the template picker opens
+  useEffect(() => {
+    if (!isTemplateModalOpen) return;
+    let cancelled = false;
+    setSavedLoading(true);
+    setSavedError(null);
+    listStandardTemplatesApi().then((res) => {
+      if (cancelled) return;
+      setSavedTemplates(res.data);
+      setSavedError(res.error || null);
+      setSavedLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isTemplateModalOpen]);
 
   // Selected object
   const selectedObject = useMemo(() => {
@@ -219,6 +324,7 @@ export default function UniversalVenueDesigner({
         seatsPerRow: 28,
         aisleGaps: [9, 19],
         price: 350,
+        rows: buildRows("A", 8, 28, seatTypes[0]?.id).map((r) => ({ ...r, gaps: [9, 19] })),
       };
     } else if (type === "grid_stand") {
       newObj = {
@@ -236,6 +342,7 @@ export default function UniversalVenueDesigner({
         seatsPerRow: 22,
         aisleGaps: [11],
         price: 300,
+        rows: buildRows("A", 10, 22, seatTypes[0]?.id).map((r) => ({ ...r, gaps: [11] })),
       };
     } else if (type === "general_admission") {
       newObj = {
@@ -340,6 +447,65 @@ export default function UniversalVenueDesigner({
     toast.success(`Added ${newObj.name}`);
   };
 
+  /** Patch the selected element */
+  const patchSelected = (patch: Partial<UniversalVenueObject>) => {
+    if (!selectedObject) return;
+    setObjects((prev) => prev.map((o) => (o.id === selectedObject.id ? { ...o, ...patch } : o)));
+  };
+
+  const handleRowsChange = (rows: RowConfig[]) => patchSelected({ rows });
+
+  /** Removing a seat type sends its rows back to the stand colour */
+  const handleSeatTypesChange = (next: SeatType[]) => {
+    const keep = new Set(next.map((t) => t.id));
+    setSeatTypes(next);
+    setObjects((prev) =>
+      prev.map((o) => {
+        let changed = false;
+        let rows = o.rows;
+        if (o.rows) {
+          rows = o.rows.map((r) => {
+            if (r.seatTypeId && !keep.has(r.seatTypeId)) {
+              changed = true;
+              return { ...r, seatTypeId: undefined };
+            }
+            return r;
+          });
+        }
+        const seatTypeId = o.seatTypeId && !keep.has(o.seatTypeId) ? undefined : o.seatTypeId;
+        if (seatTypeId !== o.seatTypeId) changed = true;
+        return changed ? { ...o, rows, seatTypeId } : o;
+      })
+    );
+  };
+
+  /** Add a free shape or a ready-made venue element */
+  const handleAddShape = (preset: ShapePreset) => {
+    pushHistorySnapshot();
+    const count = objects.filter((o) => o.type === "shape" && o.name.startsWith(preset.name)).length + 1;
+    const newId = `obj_shape_${Date.now()}`;
+    const newObj: UniversalVenueObject = {
+      id: newId,
+      name: count > 1 ? `${preset.name} ${count}` : preset.name,
+      type: "shape",
+      shapeKind: preset.shapeKind,
+      x: CX,
+      y: CY,
+      width: preset.width,
+      height: preset.height,
+      rotation: 0,
+      color: preset.color,
+      label: preset.label,
+      fontSize: 12,
+      textColor: "#ffffff",
+      opacity: 0.92,
+    };
+    setObjects((prev) => [...prev, newObj]);
+    setSelectedObjectId(newId);
+    setInspectorTab("properties");
+    toast.success(`Added ${newObj.name}`);
+  };
+
   // Duplicate selected object
   const handleDuplicate = () => {
     if (!selectedObject) return;
@@ -372,6 +538,8 @@ export default function UniversalVenueDesigner({
       id: layoutId,
       name: layoutName,
       venueType,
+      category,
+      seatTypes,
       version: layoutVersion,
       status,
       canvasWidth: CANVAS_W,
@@ -436,8 +604,76 @@ export default function UniversalVenueDesigner({
     }
   };
 
+  const handleSaveTemplate = async (input: {
+    name: string;
+    description: string;
+    category: LayoutCategory;
+    isShared: boolean;
+  }) => {
+    if (objects.length === 0) {
+      toast.error("Add at least one element before saving a template.");
+      return;
+    }
+    setSavingTemplate(true);
+    const res = await saveStandardTemplateApi({
+      name: input.name,
+      description: input.description,
+      category: input.category,
+      isShared: input.isShared,
+      canvasWidth: CANVAS_W,
+      canvasHeight: CANVAS_H,
+      objects,
+      seatTypes,
+      capacity: metrics.totalCapacity,
+    });
+    setSavingTemplate(false);
+    if (!res.success) {
+      toast.error(res.error || "Could not save the template");
+      return;
+    }
+    setIsSaveTemplateOpen(false);
+    toast.success(`Saved “${input.name}” as a standard layout`);
+  };
+
+  const handleUseSavedTemplate = (tmpl: LayoutStandardTemplate) => {
+    pushHistorySnapshot();
+    // Fresh ids so two layouts built from the same template never share element ids
+    const stamp = Date.now();
+    const loaded = (tmpl.objects_json || []).map((o, i) => ({
+      ...JSON.parse(JSON.stringify(o)),
+      id: `${o.id}_${stamp}_${i}`,
+    })) as UniversalVenueObject[];
+    setObjects(loaded);
+    setSeatTypes(tmpl.seat_types_json?.length ? tmpl.seat_types_json : DEFAULT_SEAT_TYPES);
+    setCategory(tmpl.category);
+    setVenueType(venueTypeForCategory(tmpl.category));
+    setLayoutName(tmpl.name);
+    setSelectedObjectId(loaded[0]?.id || null);
+    toast.success(`Loaded “${tmpl.name}”`);
+  };
+
+  const handleDeleteSavedTemplate = async (tmpl: LayoutStandardTemplate) => {
+    const res = await deleteStandardTemplateApi(tmpl.id);
+    if (!res.success) {
+      toast.error(res.error || "Could not delete the template");
+      return;
+    }
+    setSavedTemplates((prev) => prev.filter((t) => t.id !== tmpl.id));
+    toast.success("Template deleted");
+  };
+
+  const handleToggleShareSaved = async (tmpl: LayoutStandardTemplate) => {
+    const res = await updateStandardTemplateApi(tmpl.id, { isShared: !tmpl.is_shared });
+    if (!res.success || !res.data) {
+      toast.error(res.error || "Could not update sharing");
+      return;
+    }
+    setSavedTemplates((prev) => prev.map((t) => (t.id === tmpl.id ? { ...t, is_shared: res.data!.is_shared } : t)));
+    toast.success(res.data.is_shared ? "Shared with everyone" : "Now private");
+  };
+
   return (
-    <div className="w-full h-full flex flex-col bg-slate-950 text-white select-none overflow-hidden relative font-sans">
+    <div className="venue-designer-root w-full h-full flex flex-col bg-slate-950 text-white select-none overflow-hidden relative font-sans">
       {/* ── TOP TOOLBAR ── */}
       <div className="bg-slate-900 border-b border-slate-800 px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs shrink-0 shadow-lg">
         <div className="flex items-center gap-3">
@@ -454,6 +690,24 @@ export default function UniversalVenueDesigner({
             className="bg-slate-950 border border-slate-700 rounded px-2.5 py-1 text-xs font-bold text-white focus:outline-none focus:border-red-500 w-52"
             placeholder="Venue Layout Name"
           />
+
+          {/* Layout category */}
+          <select
+            value={category}
+            onChange={(e) => {
+              const next = e.target.value as LayoutCategory;
+              setCategory(next);
+              setVenueType(venueTypeForCategory(next));
+            }}
+            className="bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs font-semibold text-slate-200 focus:outline-none focus:border-red-500"
+            aria-label="Layout category"
+          >
+            {LAYOUT_CATEGORIES.map((c) => (
+              <option key={c.value} value={c.value}>
+                {c.label}
+              </option>
+            ))}
+          </select>
 
           {/* Status Badge */}
           <span
@@ -475,6 +729,14 @@ export default function UniversalVenueDesigner({
           >
             <FolderOpen className="w-3.5 h-3.5 text-amber-400" />
             <span>Templates</span>
+          </button>
+
+          <button
+            onClick={() => setIsSaveTemplateOpen(true)}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-750 text-slate-200 border border-slate-700 font-semibold text-xs transition-colors"
+          >
+            <BookmarkPlus className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Save as template</span>
           </button>
 
           <button
@@ -602,9 +864,9 @@ export default function UniversalVenueDesigner({
       {/* ── WORKSPACE (3-COLUMN LAYOUT) ── */}
       <div className="flex-1 flex overflow-hidden relative">
         {/* LEFT COLUMN: OBJECTS TOOLBOX & HIERARCHY */}
-        <div className="w-72 bg-slate-900 border-r border-slate-800 flex flex-col shrink-0 overflow-hidden">
+        <div className="w-72 bg-slate-900 border-r border-slate-800 flex flex-col shrink-0 overflow-y-auto custom-scrollbar">
           {/* Quick Add Palette */}
-          <div className="p-3 border-b border-slate-800 space-y-2">
+          <div className="p-3 border-b border-slate-800 space-y-2 shrink-0">
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
               Add Venue Elements
             </span>
@@ -676,6 +938,40 @@ export default function UniversalVenueDesigner({
             </div>
           </div>
 
+          {/* Shapes & ready-made elements (kept in the palette block above via portal-free sibling) */}
+          <div className="px-3 py-2 border-b border-slate-800 space-y-2 shrink-0">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+              <Shapes className="w-3 h-3" /> Shapes
+            </span>
+            <div className="grid grid-cols-2 gap-1.5">
+              {BASIC_SHAPES.map((preset) => (
+                <button
+                  key={preset.id}
+                  onClick={() => handleAddShape(preset)}
+                  className="flex items-center gap-1.5 p-2 rounded bg-slate-950 hover:bg-slate-800 border border-slate-800 text-left text-[11px] font-medium text-slate-200 hover:text-white transition-colors"
+                >
+                  <div className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: preset.color }} />
+                  <span className="truncate">{preset.name}</span>
+                </button>
+              ))}
+            </div>
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1 pt-1">
+              <Armchair className="w-3 h-3" /> Venue elements
+            </span>
+            <div className="grid grid-cols-2 gap-1.5">
+              {ELEMENT_PRESETS.map((preset) => (
+                <button
+                  key={preset.id}
+                  onClick={() => handleAddShape(preset)}
+                  className="flex items-center gap-1.5 p-2 rounded bg-slate-950 hover:bg-slate-800 border border-slate-800 text-left text-[11px] font-medium text-slate-200 hover:text-white transition-colors"
+                >
+                  <div className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: preset.color }} />
+                  <span className="truncate">{preset.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Objects Tree Hierarchy */}
           <div className="p-3 border-b border-slate-800 flex items-center justify-between">
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
@@ -683,7 +979,7 @@ export default function UniversalVenueDesigner({
             </span>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-2 space-y-1.5 custom-scrollbar">
+          <div className="p-2 space-y-1.5 shrink-0">
             {objects.map((obj) => {
               const isSelected = selectedObjectId === obj.id;
               return (
@@ -715,11 +1011,11 @@ export default function UniversalVenueDesigner({
         </div>
 
         {/* CENTER COLUMN: INTERACTIVE CANVAS */}
-        <div className="flex-1 bg-slate-950 relative overflow-hidden">
+        <div ref={canvasBoxRef} className="flex-1 min-w-0 bg-slate-950 relative overflow-hidden">
           <Stage
             ref={stageRef}
-            width={typeof window !== "undefined" ? window.innerWidth - 650 : 1000}
-            height={typeof window !== "undefined" ? window.innerHeight - 150 : 800}
+            width={stageSize.w}
+            height={stageSize.h}
             scaleX={scale}
             scaleY={scale}
             x={stagePos.x}
@@ -826,10 +1122,31 @@ export default function UniversalVenueDesigner({
                 })}
             </Layer>
 
+            {/* Free shapes & venue elements */}
+            <Layer>
+              {objects
+                .filter((o) => o.type === "shape")
+                .map((obj) => (
+                  <ShapeNode
+                    key={obj.id}
+                    obj={obj}
+                    selected={selectedObjectId === obj.id}
+                    draggable={toolMode === "select"}
+                    onSelect={() => setSelectedObjectId(obj.id)}
+                    onDragEnd={(x, y) => {
+                      pushHistorySnapshot();
+                      const nx = gridSnap ? Math.round(x / gridSize) * gridSize : x;
+                      const ny = gridSnap ? Math.round(y / gridSize) * gridSize : y;
+                      setObjects((prev) => prev.map((o) => (o.id === obj.id ? { ...o, x: nx, y: ny } : o)));
+                    }}
+                  />
+                ))}
+            </Layer>
+
             {/* Stands & Seating Elements Layer */}
             <Layer>
               {objects
-                .filter((o) => o.type !== "stage" && o.type !== "sports_court" && o.type !== "gate")
+                .filter((o) => o.type !== "stage" && o.type !== "sports_court" && o.type !== "gate" && o.type !== "shape")
                 .map((obj) => {
                   const isSelected = selectedObjectId === obj.id;
 
@@ -865,6 +1182,7 @@ export default function UniversalVenueDesigner({
                           strokeWidth={isSelected ? 3 : 1.5}
                           opacity={0.88}
                         />
+                        <StandSeats obj={obj} seatTypes={seatTypes} />
                         <Text
                           x={lx - 75}
                           y={ly - 10}
@@ -893,6 +1211,8 @@ export default function UniversalVenueDesigner({
 
                   // 2. Grid Stand & GA Standing
                   if (obj.type === "grid_stand" || obj.type === "general_admission") {
+                    const frame =
+                      obj.type === "grid_stand" ? gridStandSize(obj) : { width: obj.width, height: obj.height };
                     return (
                       <Group
                         key={obj.id}
@@ -914,20 +1234,23 @@ export default function UniversalVenueDesigner({
                         }}
                       >
                         <Rect
-                          x={-obj.width / 2}
-                          y={-obj.height / 2}
-                          width={obj.width}
-                          height={obj.height}
+                          x={-frame.width / 2}
+                          y={-frame.height / 2}
+                          width={frame.width}
+                          height={frame.height}
                           fill={isSelected ? "#e11d48" : obj.color}
                           cornerRadius={8}
                           stroke={isSelected ? "#ffffff" : "#0f172a"}
                           strokeWidth={isSelected ? 3 : 1.5}
-                          opacity={0.88}
+                          opacity={obj.type === "grid_stand" ? 0.25 : 0.88}
                         />
+                        {obj.type === "grid_stand" && (
+                          <StandSeats obj={obj} seatTypes={seatTypes} offsetX={obj.x} offsetY={obj.y} />
+                        )}
                         <Text
-                          x={-obj.width / 2}
-                          y={-10}
-                          width={obj.width}
+                          x={-frame.width / 2}
+                          y={obj.type === "grid_stand" ? -frame.height / 2 - 14 : -10}
+                          width={frame.width}
                           text={obj.name.toUpperCase()}
                           fill="#ffffff"
                           fontStyle="bold"
@@ -935,9 +1258,9 @@ export default function UniversalVenueDesigner({
                           align="center"
                         />
                         <Text
-                          x={-obj.width / 2}
-                          y={6}
-                          width={obj.width}
+                          x={-frame.width / 2}
+                          y={obj.type === "grid_stand" ? frame.height / 2 + 4 : 6}
+                          width={frame.width}
                           text={
                             obj.type === "general_admission"
                               ? `${obj.standingCapacity} Standing • ${obj.price || 0} ETB`
@@ -1058,7 +1381,31 @@ export default function UniversalVenueDesigner({
         </div>
 
         {/* RIGHT COLUMN: PARAMETRIC OBJECT INSPECTOR */}
-        <div className="w-80 bg-slate-900 border-l border-slate-800 flex flex-col shrink-0 overflow-y-auto custom-scrollbar">
+        <div className="w-96 bg-slate-900 border-l border-slate-800 flex flex-col shrink-0 overflow-y-auto custom-scrollbar">
+          <div className="flex border-b border-slate-800 shrink-0">
+            {(
+              [
+                { id: "properties", label: "Properties" },
+                { id: "seatTypes", label: `Seat types (${seatTypes.length})` },
+              ] as const
+            ).map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setInspectorTab(tab.id)}
+                className={`flex-1 py-2 text-[11px] font-bold border-b-2 transition-colors ${
+                  inspectorTab === tab.id ? "border-red-500 text-white" : "border-transparent text-slate-400 hover:text-white"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {inspectorTab === "seatTypes" && (
+            <SeatTypesPanel seatTypes={seatTypes} usage={seatTypeUsage} onChange={handleSeatTypesChange} />
+          )}
+
+          {inspectorTab === "properties" && (<>
           <div className="p-3 border-b border-slate-800 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Sliders className="w-4 h-4 text-red-400" />
@@ -1212,58 +1559,28 @@ export default function UniversalVenueDesigner({
                 </div>
               )}
 
-              {/* Row & Seat Count */}
+              {/* Rows: any row name, seat count and seat type */}
               {(selectedObject.type === "curved_stand" || selectedObject.type === "grid_stand") && (
-                <div className="p-3 bg-slate-950 rounded-lg border border-slate-800 space-y-2">
-                  <span className="font-bold text-[11px] text-blue-300 block">
-                    Rows &amp; Seats Configuration
-                  </span>
+                <RowsEditor obj={selectedObject} seatTypes={seatTypes} onChange={handleRowsChange} />
+              )}
 
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <span className="text-[10px] text-slate-400 block">Start Row</span>
-                      <input
-                        type="text"
-                        value={selectedObject.rowStart || "A"}
-                        onChange={(e) => {
-                          const val = e.target.value.toUpperCase();
-                          setObjects((prev) =>
-                            prev.map((o) => (o.id === selectedObject.id ? { ...o, rowStart: val } : o))
-                          );
-                        }}
-                        className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white font-bold text-center"
-                      />
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-slate-400 block">End Row</span>
-                      <input
-                        type="text"
-                        value={selectedObject.rowEnd || "J"}
-                        onChange={(e) => {
-                          const val = e.target.value.toUpperCase();
-                          setObjects((prev) =>
-                            prev.map((o) => (o.id === selectedObject.id ? { ...o, rowEnd: val } : o))
-                          );
-                        }}
-                        className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white font-bold text-center"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <span className="text-[10px] text-slate-400 block">Seats Per Row</span>
-                    <input
-                      type="number"
-                      value={selectedObject.seatsPerRow || 24}
-                      onChange={(e) => {
-                        const val = parseInt(e.target.value) || 10;
-                        setObjects((prev) =>
-                          prev.map((o) => (o.id === selectedObject.id ? { ...o, seatsPerRow: val } : o))
-                        );
-                      }}
-                      className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white font-bold"
-                    />
-                  </div>
+              {/* Seat type for tables */}
+              {(selectedObject.type === "table_round" || selectedObject.type === "table_rect") && (
+                <div>
+                  <label className="text-slate-400 block mb-1">Seat type</label>
+                  <select
+                    value={selectedObject.seatTypeId || ""}
+                    onChange={(e) => patchSelected({ seatTypeId: e.target.value || undefined })}
+                    className="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1.5 text-white"
+                    aria-label="Table seat type"
+                  >
+                    <option value="">Element colour and price</option>
+                    {seatTypes.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name} · {t.price} ETB
+                      </option>
+                    ))}
+                  </select>
                 </div>
               )}
 
@@ -1307,6 +1624,164 @@ export default function UniversalVenueDesigner({
                   />
                 </div>
               )}
+
+              {/* Shape settings */}
+              {selectedObject.type === "shape" && (
+                <div className="p-3 bg-slate-950 rounded-lg border border-slate-800 space-y-2">
+                  <span className="font-bold text-[11px] text-sky-300 block">Shape</span>
+                  <div>
+                    <span className="text-[10px] text-slate-400 block">Kind</span>
+                    <select
+                      value={selectedObject.shapeKind || "rect"}
+                      onChange={(e) => patchSelected({ shapeKind: e.target.value as UniversalVenueObject["shapeKind"] })}
+                      className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white"
+                    >
+                      <option value="rect">Rectangle</option>
+                      <option value="ellipse">Circle / Oval</option>
+                      <option value="triangle">Triangle</option>
+                      <option value="diamond">Diamond</option>
+                      <option value="line">Line / Wall</option>
+                    </select>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <span className="text-[10px] text-slate-400 block">Width</span>
+                      <input
+                        type="number"
+                        min={2}
+                        value={selectedObject.width}
+                        onChange={(e) => patchSelected({ width: Math.max(2, parseInt(e.target.value, 10) || 2) })}
+                        className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white font-mono"
+                        aria-label="Shape width"
+                      />
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-400 block">Height</span>
+                      <input
+                        type="number"
+                        min={2}
+                        value={selectedObject.height}
+                        onChange={(e) => patchSelected({ height: Math.max(2, parseInt(e.target.value, 10) || 2) })}
+                        className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white font-mono"
+                        aria-label="Shape height"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-400 block">Text on shape</span>
+                    <input
+                      type="text"
+                      value={selectedObject.label || ""}
+                      onChange={(e) => patchSelected({ label: e.target.value })}
+                      className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white"
+                      aria-label="Shape text"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <span className="text-[10px] text-slate-400 block">Text colour</span>
+                      <input
+                        type="color"
+                        value={selectedObject.textColor || "#ffffff"}
+                        onChange={(e) => patchSelected({ textColor: e.target.value })}
+                        className="w-full h-7 rounded border-0 bg-transparent cursor-pointer"
+                        aria-label="Text colour"
+                      />
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-400 block">Text size</span>
+                      <input
+                        type="number"
+                        min={6}
+                        max={72}
+                        value={selectedObject.fontSize || 12}
+                        onChange={(e) => patchSelected({ fontSize: Math.max(6, parseInt(e.target.value, 10) || 12) })}
+                        className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white font-mono"
+                        aria-label="Text size"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <span className="text-[10px] text-slate-400 block">Border colour</span>
+                      <input
+                        type="color"
+                        value={selectedObject.strokeColor || "#0f172a"}
+                        onChange={(e) => patchSelected({ strokeColor: e.target.value })}
+                        className="w-full h-7 rounded border-0 bg-transparent cursor-pointer"
+                        aria-label="Border colour"
+                      />
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-400 block">Border width</span>
+                      <input
+                        type="number"
+                        min={0}
+                        max={12}
+                        value={selectedObject.strokeWidth ?? 1.5}
+                        onChange={(e) => patchSelected({ strokeWidth: Math.max(0, parseFloat(e.target.value) || 0) })}
+                        className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white font-mono"
+                        aria-label="Border width"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Position, rotation and see-through for every element */}
+              <div className="p-3 bg-slate-950 rounded-lg border border-slate-800 space-y-2">
+                <span className="font-bold text-[11px] text-slate-300 block">Position &amp; look</span>
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <span className="text-[10px] text-slate-400 block">X</span>
+                    <input
+                      type="number"
+                      value={Math.round(selectedObject.x)}
+                      onChange={(e) => patchSelected({ x: parseInt(e.target.value, 10) || 0 })}
+                      className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white font-mono"
+                      aria-label="Position X"
+                    />
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-400 block">Y</span>
+                    <input
+                      type="number"
+                      value={Math.round(selectedObject.y)}
+                      onChange={(e) => patchSelected({ y: parseInt(e.target.value, 10) || 0 })}
+                      className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white font-mono"
+                      aria-label="Position Y"
+                    />
+                  </div>
+                  {selectedObject.type !== "curved_stand" && (
+                    <div>
+                      <span className="text-[10px] text-slate-400 block">Rotate °</span>
+                      <input
+                        type="number"
+                        value={Math.round(selectedObject.rotation || 0)}
+                        onChange={(e) => patchSelected({ rotation: parseInt(e.target.value, 10) || 0 })}
+                        className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white font-mono"
+                        aria-label="Rotation"
+                      />
+                    </div>
+                  )}
+                </div>
+                {selectedObject.type === "shape" && (
+                  <div>
+                    <span className="text-[10px] text-slate-400 block">
+                      Opacity {Math.round((selectedObject.opacity ?? 0.92) * 100)}%
+                    </span>
+                    <input
+                      type="range"
+                      min={10}
+                      max={100}
+                      value={Math.round((selectedObject.opacity ?? 0.92) * 100)}
+                      onChange={(e) => patchSelected({ opacity: parseInt(e.target.value, 10) / 100 })}
+                      className="w-full accent-red-500"
+                      aria-label="Opacity"
+                    />
+                  </div>
+                )}
+              </div>
             </div>
           ) : (
             <div className="p-6 text-center text-slate-500 space-y-2">
@@ -1317,6 +1792,7 @@ export default function UniversalVenueDesigner({
               </p>
             </div>
           )}
+          </>)}
         </div>
       </div>
 
@@ -1378,9 +1854,27 @@ export default function UniversalVenueDesigner({
           setVenueType(tmpl.venueType);
           setLayoutName(tmpl.name);
           setObjects(tmpl.objects);
+          setCategory(categoryForVenueType(tmpl.venueType));
           setSelectedObjectId(tmpl.objects[0]?.id || null);
           toast.success(`Loaded template: ${tmpl.name}`);
         }}
+        savedTemplates={savedTemplates}
+        savedLoading={savedLoading}
+        savedError={savedError}
+        onSelectSaved={handleUseSavedTemplate}
+        onDeleteSaved={handleDeleteSavedTemplate}
+        onToggleShareSaved={handleToggleShareSaved}
+      />
+
+      <SaveTemplateModal
+        open={isSaveTemplateOpen}
+        defaultName={layoutName}
+        defaultCategory={category}
+        elementCount={objects.length}
+        capacity={metrics.totalCapacity}
+        saving={savingTemplate}
+        onClose={() => setIsSaveTemplateOpen(false)}
+        onSave={handleSaveTemplate}
       />
 
       <ReferenceImageModal
@@ -1407,6 +1901,7 @@ export default function UniversalVenueDesigner({
         onClose={() => setIsPreviewModalOpen(false)}
         layoutName={layoutName}
         objects={objects}
+        seatTypes={seatTypes}
       />
     </div>
   );

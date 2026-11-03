@@ -1293,6 +1293,11 @@ html.admin-theme .admin-dashboard-layout .text-white-keep {
   color: #ffffff !important;
 }
 
+/* The venue designer is a dark workspace inside the light admin shell: keep its own white text */
+html.admin-theme .admin-dashboard-layout .venue-designer-root .text-white {
+  color: #ffffff !important;
+}
+
 /* Secondary Button in Admin Theme */
 html.admin-theme .admin-dashboard-layout .btn-secondary {
   background-color: #f3f4f6 !important;

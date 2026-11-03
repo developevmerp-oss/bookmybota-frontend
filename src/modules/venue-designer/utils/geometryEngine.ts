@@ -1,6 +1,13 @@
 "use client";
 
-import { UniversalVenueObject, UniversalSeat, UniversalTableSeat, UniversalVenueLayout } from "../types";
+import {
+  RowConfig,
+  SeatType,
+  UniversalVenueObject,
+  UniversalSeat,
+  UniversalTableSeat,
+  UniversalVenueLayout,
+} from "../types";
 
 /** Expand "A" -> "Z" into ["A", "B", "C", ...] */
 export function expandRowRange(rowStart = "A", rowEnd = "J"): string[] {
@@ -21,53 +28,158 @@ export function expandRowRange(rowStart = "A", rowEnd = "J"): string[] {
   return Array.from({ length: endCode - startCode + 1 }, (_, i) => String.fromCharCode(startCode + i));
 }
 
+/** Next row label after the given one: A -> B, Z -> AA, 9 -> 10, "Row 3" -> "Row 4" */
+export function nextRowLabel(label: string): string {
+  const raw = (label || "").trim();
+  if (!raw) return "A";
+  const trailingNum = raw.match(/^(.*?)(\d+)$/);
+  if (trailingNum) return `${trailingNum[1]}${parseInt(trailingNum[2], 10) + 1}`;
+  const upper = raw.toUpperCase();
+  if (/^[A-Z]+$/.test(upper)) {
+    const chars = upper.split("");
+    let i = chars.length - 1;
+    while (i >= 0) {
+      if (chars[i] === "Z") {
+        chars[i] = "A";
+        i -= 1;
+      } else {
+        chars[i] = String.fromCharCode(chars[i].charCodeAt(0) + 1);
+        return chars.join("");
+      }
+    }
+    return `A${chars.join("")}`;
+  }
+  return `${raw}2`;
+}
+
+let rowCounter = 0;
+export function newRowId(): string {
+  rowCounter += 1;
+  return `row_${Date.now().toString(36)}_${rowCounter}`;
+}
+
+/** Build rows from a start label, a count and a seat count, e.g. A, B, C ... */
+export function buildRows(startLabel: string, rowCount: number, seatCount: number, seatTypeId?: string): RowConfig[] {
+  const rows: RowConfig[] = [];
+  let label = (startLabel || "A").trim() || "A";
+  const count = Math.max(1, Math.min(200, Math.floor(rowCount) || 1));
+  for (let i = 0; i < count; i += 1) {
+    rows.push({ id: newRowId(), label, seatCount: Math.max(1, Math.floor(seatCount) || 1), seatTypeId });
+    label = nextRowLabel(label);
+  }
+  return rows;
+}
+
+/**
+ * Rows of a stand. Custom rows win; older layouts fall back to the row range
+ * (rowStart to rowEnd) with one seat count for every row.
+ */
+export function resolveRows(obj: UniversalVenueObject): RowConfig[] {
+  if (obj.rows && obj.rows.length > 0) return obj.rows;
+  const labels = expandRowRange(obj.rowStart || "A", obj.rowEnd || "H");
+  const perRow = obj.seatsPerRow || (obj.type === "curved_stand" ? 24 : 20);
+  return labels.map((label) => ({
+    id: `legacy_${label}`,
+    label,
+    seatCount: perRow,
+    seatTypeId: obj.seatTypeId,
+    gaps: obj.aisleGaps,
+  }));
+}
+
+/** Seats a row really has, after aisle gaps are left out */
+export function rowSeatTotal(row: RowConfig): number {
+  const gaps = new Set((row.gaps || []).filter((g) => g >= 1 && g <= row.seatCount));
+  return Math.max(0, row.seatCount - gaps.size);
+}
+
+function seatTypeFor(
+  seatTypes: SeatType[] | undefined,
+  row: RowConfig | undefined,
+  obj: UniversalVenueObject
+): SeatType | undefined {
+  const id = row?.seatTypeId || obj.seatTypeId;
+  return id ? seatTypes?.find((t) => t.id === id) : undefined;
+}
+
+/** Price and colour of a row: its seat type first, then the stand's own price and colour */
+export function rowAppearance(
+  obj: UniversalVenueObject,
+  row: RowConfig,
+  seatTypes?: SeatType[]
+): { color: string; price: number; seatTypeId?: string } {
+  const type = seatTypeFor(seatTypes, row, obj);
+  return {
+    color: type?.color || obj.color,
+    price: type ? type.price : obj.price || 0,
+    seatTypeId: type?.id,
+  };
+}
+
+/** Box that wraps all rows of a grid stand, so the selection frame always matches the seats */
+export function gridStandSize(obj: UniversalVenueObject): { width: number; height: number } {
+  const rows = resolveRows(obj);
+  const widest = rows.reduce((max, r) => Math.max(max, r.seatCount), 1);
+  const seatSpacing = obj.seatSpacing || 18;
+  const rowSpacing = obj.rowSpacing || 22;
+  return {
+    width: Math.max(80, (widest - 1) * seatSpacing + 56),
+    height: Math.max(48, (rows.length - 1) * rowSpacing + 40),
+  };
+}
+
 /**
  * Generate all physical seats for a specific venue object (Curved Stand, Grid Stand, Table)
  */
-export function generateSeatsForObject(obj: UniversalVenueObject): UniversalSeat[] {
+export function generateSeatsForObject(obj: UniversalVenueObject, seatTypes?: SeatType[]): UniversalSeat[] {
   const seats: UniversalSeat[] = [];
+  // Two rows with the same name would give two seats the same id, so later ones get a suffix
+  const usedIds = new Map<string, number>();
+  const uniqueId = (id: string) => {
+    const seen = usedIds.get(id) || 0;
+    usedIds.set(id, seen + 1);
+    return seen === 0 ? id : `${id}~${seen + 1}`;
+  };
 
   // 1. Curved Stand (Annular Arc)
   if (obj.type === "curved_stand") {
-    const rows = expandRowRange(obj.rowStart || "A", obj.rowEnd || "H");
-    const seatsPerRow = obj.seatsPerRow || 24;
+    const rows = resolveRows(obj);
     const innerR = obj.innerRadius || 200;
     const outerR = obj.outerRadius || 320;
     const startAngDeg = obj.startAngle || 0;
     const sweepAngDeg = obj.sweepAngle || 90;
-    const aisleGaps = new Set(obj.aisleGaps || []);
 
     const rowCount = rows.length;
     const radialStep = rowCount > 1 ? (outerR - innerR) / (rowCount - 1) : 0;
 
-    rows.forEach((rowLabel, rIdx) => {
+    rows.forEach((row, rIdx) => {
       const radius = innerR + rIdx * radialStep;
-      // Angle per seat
-      const angleStep = sweepAngDeg / Math.max(seatsPerRow - 1, 1);
+      const gaps = new Set(row.gaps || []);
+      const angleStep = sweepAngDeg / Math.max(row.seatCount - 1, 1);
+      const look = rowAppearance(obj, row, seatTypes);
 
       let currentSeatNum = 1;
-      for (let sIdx = 0; sIdx < seatsPerRow; sIdx++) {
-        // Skip aisle gaps if specified
-        if (aisleGaps.has(sIdx + 1)) {
-          continue;
-        }
+      for (let sIdx = 0; sIdx < row.seatCount; sIdx++) {
+        if (gaps.has(sIdx + 1)) continue;
 
         const angleDeg = startAngDeg + sIdx * angleStep;
         const angleRad = (angleDeg * Math.PI) / 180;
 
         const sx = Math.round(obj.x + radius * Math.cos(angleRad));
         const sy = Math.round(obj.y + radius * Math.sin(angleRad));
-        const seatId = `${obj.name.replace(/\s+/g, "_")}-${rowLabel}-${currentSeatNum}`;
+        const seatId = uniqueId(`${obj.name.replace(/\s+/g, "_")}-${row.label}-${currentSeatNum}`);
 
         seats.push({
           id: seatId,
           sectionId: obj.id,
-          rowLabel,
+          rowLabel: row.label,
           seatNumber: String(currentSeatNum),
           x: sx,
           y: sy,
           category: obj.defaultCategory || (rIdx < 2 ? "vip" : "standard"),
-          price: obj.price || 250,
+          price: look.price || 250,
+          seatTypeId: look.seatTypeId,
+          color: look.color,
           status: "AVAILABLE",
         });
         currentSeatNum++;
@@ -79,36 +191,38 @@ export function generateSeatsForObject(obj: UniversalVenueObject): UniversalSeat
 
   // 2. Seated Grid (Orthogonal rows & columns)
   if (obj.type === "grid_stand") {
-    const rows = expandRowRange(obj.rowStart || "A", obj.rowEnd || "H");
-    const seatsPerRow = obj.seatsPerRow || 20;
-    const aisleGaps = new Set(obj.aisleGaps || []);
+    const rows = resolveRows(obj);
     const seatSpacing = obj.seatSpacing || 18;
     const rowSpacing = obj.rowSpacing || 22;
 
-    const totalGridW = (seatsPerRow - 1) * seatSpacing;
     const totalGridH = (rows.length - 1) * rowSpacing;
-
-    const startX = obj.x - totalGridW / 2;
     const startY = obj.y - totalGridH / 2;
 
-    rows.forEach((rowLabel, rIdx) => {
+    rows.forEach((row, rIdx) => {
+      const gaps = new Set(row.gaps || []);
+      const rowWidth = (row.seatCount - 1) * seatSpacing;
+      const startX = obj.x - rowWidth / 2;
+      const look = rowAppearance(obj, row, seatTypes);
+
       let currentSeatNum = 1;
-      for (let sIdx = 0; sIdx < seatsPerRow; sIdx++) {
-        if (aisleGaps.has(sIdx + 1)) continue;
+      for (let sIdx = 0; sIdx < row.seatCount; sIdx++) {
+        if (gaps.has(sIdx + 1)) continue;
 
         const sx = Math.round(startX + sIdx * seatSpacing);
         const sy = Math.round(startY + rIdx * rowSpacing);
-        const seatId = `${obj.name.replace(/\s+/g, "_")}-${rowLabel}-${currentSeatNum}`;
+        const seatId = uniqueId(`${obj.name.replace(/\s+/g, "_")}-${row.label}-${currentSeatNum}`);
 
         seats.push({
           id: seatId,
           sectionId: obj.id,
-          rowLabel,
+          rowLabel: row.label,
           seatNumber: String(currentSeatNum),
           x: sx,
           y: sy,
           category: obj.defaultCategory || "standard",
-          price: obj.price || 300,
+          price: look.price || 300,
+          seatTypeId: look.seatTypeId,
+          color: look.color,
           status: "AVAILABLE",
         });
         currentSeatNum++;
@@ -123,6 +237,7 @@ export function generateSeatsForObject(obj: UniversalVenueObject): UniversalSeat
     const count = obj.tableSeatCount || 8;
     const tableRadius = Math.min(obj.width, obj.height) / 2;
     const chairDistance = tableRadius + 16;
+    const type = seatTypeFor(seatTypes, undefined, obj);
 
     for (let i = 0; i < count; i++) {
       const angleRad = (i / count) * 2 * Math.PI - Math.PI / 2;
@@ -138,7 +253,9 @@ export function generateSeatsForObject(obj: UniversalVenueObject): UniversalSeat
         x: sx,
         y: sy,
         category: obj.defaultCategory || "vip",
-        price: obj.price || 500,
+        price: (type ? type.price : obj.price) || 500,
+        seatTypeId: type?.id,
+        color: type?.color || obj.color,
         status: "AVAILABLE",
       });
     }
@@ -152,6 +269,9 @@ export function generateSeatsForObject(obj: UniversalVenueObject): UniversalSeat
     const halfW = obj.width / 2;
     const halfH = obj.height / 2;
     const sideCount = Math.floor(count / 2);
+    const type = seatTypeFor(seatTypes, undefined, obj);
+    const price = (type ? type.price : obj.price) || 400;
+    const color = type?.color || obj.color;
 
     for (let i = 0; i < sideCount; i++) {
       const stepX = sideCount > 1 ? (obj.width - 24) / (sideCount - 1) : 0;
@@ -166,7 +286,9 @@ export function generateSeatsForObject(obj: UniversalVenueObject): UniversalSeat
         x: Math.round(posX),
         y: Math.round(obj.y - halfH - 14),
         category: obj.defaultCategory || "standard",
-        price: obj.price || 400,
+        price,
+        seatTypeId: type?.id,
+        color,
         status: "AVAILABLE",
       });
 
@@ -179,7 +301,9 @@ export function generateSeatsForObject(obj: UniversalVenueObject): UniversalSeat
         x: Math.round(posX),
         y: Math.round(obj.y + halfH + 14),
         category: obj.defaultCategory || "standard",
-        price: obj.price || 400,
+        price,
+        seatTypeId: type?.id,
+        color,
         status: "AVAILABLE",
       });
     }
@@ -193,7 +317,7 @@ export function generateSeatsForObject(obj: UniversalVenueObject): UniversalSeat
 /**
  * Compute total metrics for layout
  */
-export function computeLayoutCapacity(objects: UniversalVenueObject[]) {
+export function computeLayoutCapacity(objects: UniversalVenueObject[], seatTypes?: SeatType[]) {
   let seatedCapacity = 0;
   let standingCapacity = 0;
   let totalTables = 0;
@@ -206,16 +330,17 @@ export function computeLayoutCapacity(objects: UniversalVenueObject[]) {
       standingCapacity += cap;
       estimatedRevenue += cap * (obj.price || 200);
     } else if (obj.type === "curved_stand" || obj.type === "grid_stand") {
-      const rows = expandRowRange(obj.rowStart, obj.rowEnd);
-      const perRow = obj.seatsPerRow || 20;
-      const count = rows.length * perRow;
-      seatedCapacity += count;
-      estimatedRevenue += count * (obj.price || 300);
+      resolveRows(obj).forEach((row) => {
+        const count = rowSeatTotal(row);
+        seatedCapacity += count;
+        estimatedRevenue += count * (rowAppearance(obj, row, seatTypes).price || 300);
+      });
     } else if (obj.type === "table_round" || obj.type === "table_rect") {
       totalTables += 1;
       const count = obj.tableSeatCount || 8;
+      const type = seatTypeFor(seatTypes, undefined, obj);
       seatedCapacity += count;
-      estimatedRevenue += count * (obj.price || 500);
+      estimatedRevenue += count * ((type ? type.price : obj.price) || 500);
     } else if (obj.type === "gate") {
       totalGates += 1;
     }
@@ -234,10 +359,14 @@ export function computeLayoutCapacity(objects: UniversalVenueObject[]) {
 /**
  * Validate layout geometry and prevent duplicate seat identifiers
  */
-export function validateLayout(objects: UniversalVenueObject[]): { isValid: boolean; warnings: string[] } {
+export function validateLayout(
+  objects: UniversalVenueObject[],
+  seatTypes?: SeatType[]
+): { isValid: boolean; warnings: string[] } {
   const warnings: string[] = [];
   const seenIds = new Set<string>();
   const seenNames = new Set<string>();
+  const typeIds = new Set((seatTypes || []).map((t) => t.id));
 
   objects.forEach((obj) => {
     if (seenIds.has(obj.id)) {
@@ -245,7 +374,9 @@ export function validateLayout(objects: UniversalVenueObject[]): { isValid: bool
     }
     seenIds.add(obj.id);
 
-    if (seenNames.has(obj.name)) {
+    if (!obj.name || !obj.name.trim()) {
+      warnings.push("An element has no name. Give every element a name.");
+    } else if (seenNames.has(obj.name)) {
       warnings.push(`Duplicate section name "${obj.name}". Names should be unique.`);
     }
     seenNames.add(obj.name);
@@ -259,8 +390,35 @@ export function validateLayout(objects: UniversalVenueObject[]): { isValid: bool
       }
     }
 
+    if (obj.type === "curved_stand" || obj.type === "grid_stand") {
+      const rows = resolveRows(obj);
+      const seenRows = new Set<string>();
+      rows.forEach((row) => {
+        const label = (row.label || "").trim();
+        if (!label) {
+          warnings.push(`Section "${obj.name}": every row needs a name.`);
+        } else if (seenRows.has(label.toLowerCase())) {
+          warnings.push(`Section "${obj.name}": row "${label}" is used twice.`);
+        }
+        seenRows.add(label.toLowerCase());
+        if (!(row.seatCount >= 1)) {
+          warnings.push(`Section "${obj.name}": row "${label || "?"}" needs at least 1 seat.`);
+        }
+        if (row.seatTypeId && !typeIds.has(row.seatTypeId)) {
+          warnings.push(`Section "${obj.name}": row "${label}" uses a seat type that was removed.`);
+        }
+      });
+      if (rows.reduce((sum, r) => sum + rowSeatTotal(r), 0) === 0) {
+        warnings.push(`Section "${obj.name}" has no seats.`);
+      }
+    }
+
     if (obj.type === "general_admission" && (!obj.standingCapacity || obj.standingCapacity <= 0)) {
       warnings.push(`Standing zone "${obj.name}" has zero or negative capacity.`);
+    }
+
+    if (obj.type === "shape" && (!(obj.width > 0) || !(obj.height > 0)) && obj.shapeKind !== "line") {
+      warnings.push(`Shape "${obj.name}" needs a width and height above zero.`);
     }
   });
 

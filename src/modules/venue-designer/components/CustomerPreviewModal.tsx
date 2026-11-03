@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from "react";
 import { X, Smartphone, Monitor, CheckCircle2, DollarSign, Users, Info } from "lucide-react";
-import { UniversalVenueObject, UniversalSeat } from "../types";
+import { UniversalVenueObject, UniversalSeat, SeatType } from "../types";
 import { generateSeatsForObject, computeLayoutCapacity } from "../utils/geometryEngine";
 
 interface CustomerPreviewModalProps {
@@ -10,6 +10,7 @@ interface CustomerPreviewModalProps {
   onClose: () => void;
   layoutName: string;
   objects: UniversalVenueObject[];
+  seatTypes?: SeatType[];
 }
 
 export default function CustomerPreviewModal({
@@ -17,6 +18,7 @@ export default function CustomerPreviewModal({
   onClose,
   layoutName,
   objects,
+  seatTypes,
 }: CustomerPreviewModalProps) {
   const [deviceMode, setDeviceMode] = useState<"desktop" | "mobile">("desktop");
   const [selectedSeat, setSelectedSeat] = useState<UniversalSeat | null>(null);
@@ -26,13 +28,13 @@ export default function CustomerPreviewModal({
   const allSeats = useMemo(() => {
     const list: UniversalSeat[] = [];
     objects.forEach((obj) => {
-      const s = generateSeatsForObject(obj);
+      const s = generateSeatsForObject(obj, seatTypes);
       list.push(...s);
     });
     return list;
-  }, [objects]);
+  }, [objects, seatTypes]);
 
-  const metrics = useMemo(() => computeLayoutCapacity(objects), [objects]);
+  const metrics = useMemo(() => computeLayoutCapacity(objects, seatTypes), [objects, seatTypes]);
 
   if (!open) return null;
 
@@ -79,6 +81,7 @@ export default function CustomerPreviewModal({
 
             <button
               onClick={onClose}
+              aria-label="Close preview"
               className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
             >
               <X className="w-5 h-5" />
@@ -184,6 +187,46 @@ export default function CustomerPreviewModal({
                     </g>
                   ))}
 
+                {/* Render free shapes and venue elements (screen, exits, restrooms ...) */}
+                {objects
+                  .filter((o) => o.type === "shape")
+                  .map((obj) => {
+                    const kind = obj.shapeKind || "rect";
+                    const w = obj.width;
+                    const h = obj.height;
+                    const common = {
+                      fill: obj.color,
+                      stroke: obj.strokeColor || "#0f172a",
+                      strokeWidth: obj.strokeWidth ?? 1.5,
+                      opacity: obj.opacity ?? 0.92,
+                    };
+                    return (
+                      <g key={obj.id} transform={`translate(${obj.x} ${obj.y}) rotate(${obj.rotation || 0})`}>
+                        {kind === "ellipse" ? (
+                          <ellipse rx={w / 2} ry={h / 2} {...common} />
+                        ) : kind === "triangle" ? (
+                          <polygon points={`0,${-h / 2} ${w / 2},${h / 2} ${-w / 2},${h / 2}`} {...common} />
+                        ) : kind === "diamond" ? (
+                          <polygon points={`0,${-h / 2} ${w / 2},0 0,${h / 2} ${-w / 2},0`} {...common} />
+                        ) : (
+                          <rect x={-w / 2} y={-h / 2} width={w} height={h} rx={kind === "line" ? 2 : obj.cornerRadius ?? 6} {...common} />
+                        )}
+                        {obj.label && kind !== "line" && (
+                          <text
+                            x={0}
+                            y={(obj.fontSize || 12) / 3}
+                            textAnchor="middle"
+                            fill={obj.textColor || "#ffffff"}
+                            fontSize={obj.fontSize || 12}
+                            fontWeight="bold"
+                          >
+                            {obj.label}
+                          </text>
+                        )}
+                      </g>
+                    );
+                  })}
+
                 {/* Render Physical Seats */}
                 {allSeats.map((seat) => {
                   const isSelected = selectedSeat?.id === seat.id;
@@ -193,7 +236,7 @@ export default function CustomerPreviewModal({
                       cx={seat.x}
                       cy={seat.y}
                       r={isSelected ? 6.5 : 4.5}
-                      fill={isSelected ? "#10b981" : "#3b82f6"}
+                      fill={isSelected ? "#10b981" : seat.color || "#3b82f6"}
                       stroke={isSelected ? "#ffffff" : "#0f172a"}
                       strokeWidth={isSelected ? 2 : 0.8}
                       className="cursor-pointer hover:fill-emerald-400 transition-all"

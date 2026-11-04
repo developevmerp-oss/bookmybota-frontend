@@ -8,6 +8,15 @@ type SeatLike = {
   status?: string | null;
 };
 
+export type SeatMarkerVisual = {
+  fill: string;
+  stroke?: string;
+  strokeWidth?: number;
+  title?: string;
+  cursor?: string;
+  onClick?: () => void;
+};
+
 type ShapeLike = {
   type?: string;
   x?: number;
@@ -285,6 +294,7 @@ export default function LayoutSeatPreview({
   heightClass = "h-28",
   selectedBlockId: controlledSelectedBlockId,
   onSelectBlock: controlledOnSelectBlock,
+  seatMarker,
 }: {
   seats?: unknown;
   config?: unknown;
@@ -292,6 +302,8 @@ export default function LayoutSeatPreview({
   heightClass?: string;
   selectedBlockId?: string | null;
   onSelectBlock?: (blockId: string | null) => void;
+  /** When set, each seat uses this fill and can be clicked. Preview-only callers leave it unset. */
+  seatMarker?: (seat: SeatLike, index: number) => SeatMarkerVisual | null | undefined;
 }) {
   const [internalSelectedBlockId, setInternalSelectedBlockId] = useState<string | null>(null);
   const [selectedTierId, setSelectedTierId] = useState<string | null>(null);
@@ -1244,17 +1256,29 @@ export default function LayoutSeatPreview({
         );
       })}
 
-      {seatList.map((seat, idx) => (
-        <circle
-          key={`seat-${idx}`}
-          cx={Number(seat.coordinate_x) || 0}
-          cy={Number(seat.coordinate_y) || 0}
-          r={radius}
-          fill={resolveSeatFill(seat, sectionColors)}
-          stroke="#ffffff"
-          strokeWidth={Math.max(0.3, radius / 8)}
-        />
-      ))}
+      {seatList.map((seat, idx) => {
+        const marker = seatMarker?.(seat, idx);
+        const fill = marker?.fill || resolveSeatFill(seat, sectionColors);
+        const stroke = marker?.stroke || "#ffffff";
+        const strokeWidth = marker?.strokeWidth ?? Math.max(0.3, radius / 8);
+        return (
+          <g key={`seat-${idx}`}>
+            {marker?.title ? <title>{marker.title}</title> : null}
+            <circle
+              cx={Number(seat.coordinate_x) || 0}
+              cy={Number(seat.coordinate_y) || 0}
+              r={marker?.onClick ? radius * 1.15 : radius}
+              fill={fill}
+              stroke={stroke}
+              strokeWidth={strokeWidth}
+              style={{ cursor: marker?.cursor || (marker?.onClick ? "pointer" : undefined) }}
+              onClick={marker?.onClick}
+            >
+              {marker?.title ? <title>{marker.title}</title> : null}
+            </circle>
+          </g>
+        );
+      })}
 
       {labels.map((label, idx) => {
         const x = Number(label.x) || 0;

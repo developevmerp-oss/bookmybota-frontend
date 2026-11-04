@@ -24,6 +24,8 @@ import {
 } from "@/services/api";
 import { extractApiError } from "@/lib/apiErrors";
 import LayoutSeatPreview from "@/components/venue/LayoutSeatPreview";
+import ContractRequiredDialog from "./ContractRequiredDialog";
+import { useContractGate } from "./useContractGate";
 import {
   buildCinemaSeatTypeZones,
   CINEMA_SEAT_TYPE_FIELDS,
@@ -186,6 +188,8 @@ function LayoutStepper({ phase }: { phase: LayoutPhase }) {
 export default function CinemaScreensPage() {
   const user = useAppSelector((state) => state.auth.user);
   const bizId = user?.business_id ?? "";
+  const { isLoading: gateLoading, unlocked } = useContractGate();
+  const [contractDialogOpen, setContractDialogOpen] = useState(false);
   const { data: screens = [], isLoading, refetch } = useGetCinemaScreensQuery(bizId, {
     skip: !bizId,
   });
@@ -514,15 +518,27 @@ export default function CinemaScreensPage() {
     return <p className="text-zinc-400">Cinema business not linked to this account.</p>;
   }
 
+  // Until the contract is signed, every button on this page opens the "create your contract" popup
+  const blockUntilContract = (e: React.SyntheticEvent) => {
+    if (unlocked || gateLoading) return;
+    const target = e.target as HTMLElement;
+    if (e.type === "submit" || target.closest("button, a[href], [role='button']")) {
+      e.preventDefault();
+      e.stopPropagation();
+      setContractDialogOpen(true);
+    }
+  };
+
   return (
-    <div className="w-full space-y-6">
+    <>
+    <div className="w-full space-y-6" onClickCapture={blockUntilContract} onSubmitCapture={blockUntilContract}>
       <div>
         <h2 className="text-xl font-bold text-white flex items-center gap-2">
           <Clapperboard size={20} className="text-fuchsia-400" /> Screens & layouts
         </h2>
         <p className="text-sm text-zinc-400 mt-1">
           Add a screen, request its seat layout, then approve it — each screen shows exactly which step it is on and
-          what to do next. Once a layout is live, block seats and change prices for each show from Seat Manager.
+          what to do next. Once a layout is live, manage shows, prices and seats from Shows & Seats.
         </p>
       </div>
 
@@ -963,11 +979,11 @@ export default function CinemaScreensPage() {
                           <Ban size={14} /> Block seats
                         </button>
                         <a
-                          href="/movie/seat-manager"
+                          href="/movie/shows"
                           className="btn-secondary text-sm inline-flex items-center gap-1.5"
-                          title="Block seats, change prices and sell at the counter for a specific show"
+                          title="Schedule shows, block seats, change prices and sell at the counter"
                         >
-                          Manage seats per show
+                          Shows &amp; seats
                         </a>
                         <button
                           type="button"
@@ -1455,6 +1471,8 @@ export default function CinemaScreensPage() {
         />
       )}
     </div>
+    <ContractRequiredDialog open={contractDialogOpen} onClose={() => setContractDialogOpen(false)} />
+    </>
   );
 }
 

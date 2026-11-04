@@ -5,7 +5,8 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage, setCredentials } from "@/features/auth/authSlice";
-import { useGetBusinessSettingsQuery, useGetCinemaContractQuery } from "@/services/api";
+import { useGetBusinessSettingsQuery } from "@/services/api";
+import { useContractGate } from "@/components/MovieAdminPanel/useContractGate";
 import SessionGuard from "@/components/Shared/SessionGuard";
 import { PartnerPanelShimmer } from "@/components/Shared/Shimmer";
 import PartnerProfileHoverMenu, {
@@ -28,7 +29,6 @@ import {
   UtensilsCrossed,
   FileSignature,
   QrCode,
-  Armchair,
   Wallet,
   X,
 } from "lucide-react";
@@ -55,7 +55,7 @@ function MovieShell({ children }: { children: React.ReactNode }) {
 
   const bizId = user?.business_id ?? "";
   const { data: settings } = useGetBusinessSettingsQuery(bizId, { skip: !bizId });
-  const { data: contract } = useGetCinemaContractQuery();
+  const { contract, isLoading: contractLoading, unlocked } = useContractGate();
   const cinemaName = settings?.name || "Movie Admin";
   const displayName = user?.name?.trim() || cinemaName;
   const initial = (displayName.charAt(0) || "M").toUpperCase();
@@ -64,17 +64,26 @@ function MovieShell({ children }: { children: React.ReactNode }) {
   const hasBeveragesEnabled =
     contract?.status === "ACTIVE" && Number(contract?.beverage_commission_percent ?? 0) > 0;
 
-  const sections: NavSection[] = [
+  const cinemaSection: NavSection = {
+    id: "cinema",
+    label: "Cinema",
+    items: [
+      { name: "Dashboard", href: "/movie/dashboard", icon: LayoutDashboard },
+      { name: "Contract", href: "/movie/contract", icon: FileSignature },
+      { name: "Screens & Layouts", href: "/movie/screens", icon: MonitorPlay },
+      ...(hasBeveragesEnabled
+        ? [{ name: "Beverages & Snacks", href: "/movie/beverages", icon: UtensilsCrossed }]
+        : []),
+    ],
+  };
+  const laterSections: NavSection[] = [
     {
-      id: "cinema",
-      label: "Cinema",
+      id: "operations",
+      label: "Operations",
       items: [
-        { name: "Dashboard", href: "/movie/dashboard", icon: LayoutDashboard },
-        { name: "Contract", href: "/movie/contract", icon: FileSignature },
-        { name: "Screens & Layouts", href: "/movie/screens", icon: MonitorPlay },
-        ...(hasBeveragesEnabled
-          ? [{ name: "Beverages & Snacks", href: "/movie/beverages", icon: UtensilsCrossed }]
-          : []),
+        { name: "Shows & Seats", href: "/movie/shows", icon: Clapperboard },
+        { name: "Bookings", href: "/movie/bookings", icon: Ticket },
+        { name: "Scan Tickets", href: "/movie/scan", icon: QrCode },
       ],
     },
     {
@@ -85,16 +94,6 @@ function MovieShell({ children }: { children: React.ReactNode }) {
         { name: "Movie Offers", href: "/movie/offers", icon: Tag },
         { name: "Reviews", href: "/movie/reviews", icon: MessageSquare },
         { name: "Promotions", href: "/movie/promotions", icon: Megaphone },
-        { name: "Showtimes", href: "/movie/showtimes", icon: Clapperboard },
-      ],
-    },
-    {
-      id: "operations",
-      label: "Operations",
-      items: [
-        { name: "Seat Manager", href: "/movie/seat-manager", icon: Armchair },
-        { name: "Bookings", href: "/movie/bookings", icon: Ticket },
-        { name: "Scan Tickets", href: "/movie/scan", icon: QrCode },
       ],
     },
     {
@@ -106,10 +105,19 @@ function MovieShell({ children }: { children: React.ReactNode }) {
       ],
     },
   ];
+  // Before the contract is signed only Dashboard, Contract and Screens & Layouts are available
+  const sections: NavSection[] = unlocked ? [cinemaSection, ...laterSections] : [cinemaSection];
 
   const profileLink: NavLink = { name: "Profile", href: "/movie/profile", icon: User };
 
-  const allLinks = [...sections.flatMap((s) => s.items), profileLink];
+  const allLinks = [cinemaSection, ...laterSections].flatMap((s) => s.items).concat(profileLink);
+
+  // Direct URLs to locked pages go back to the dashboard until the contract is signed
+  const lockedAllowed = ["/movie/dashboard", "/movie/contract", "/movie/screens", "/movie/profile", "/movie/change-password"];
+  const onLockedPage = !lockedAllowed.some((href) => pathname === href || pathname.startsWith(`${href}/`));
+  useEffect(() => {
+    if (!contractLoading && !unlocked && onLockedPage) router.replace("/movie/dashboard");
+  }, [contractLoading, unlocked, onLockedPage, router]);
 
   const isNavActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
 
@@ -152,9 +160,11 @@ function MovieShell({ children }: { children: React.ReactNode }) {
           <div className="space-y-0.5">{section.items.map((item) => renderLink(item, onNavigate))}</div>
         </div>
       ))}
-      <div className="pt-1.5 mt-1.5 border-t border-[var(--sidebar-border)] space-y-0.5">
-        {renderLink(profileLink, onNavigate)}
-      </div>
+      {unlocked && (
+        <div className="pt-1.5 mt-1.5 border-t border-[var(--sidebar-border)] space-y-0.5">
+          {renderLink(profileLink, onNavigate)}
+        </div>
+      )}
     </nav>
   );
 

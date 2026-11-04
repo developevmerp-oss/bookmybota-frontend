@@ -395,9 +395,8 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
   const [selectedBeverages, setSelectedBeverages] = useState<Record<string, SelectedBeverage>>({});
   const [bevCategoryFilter, setBevCategoryFilter] = useState<string>("ALL");
 
-  /** Classic layout only — Interactive Map / Grid / Classic tabs are hidden. */
-  const [viewMode] = useState<"canvas" | "grid" | "classic">("classic");
-  // const [viewMode, setViewMode] = useState<"canvas" | "grid" | "classic">("classic");
+  /** Classic is the original static seat grid. Canvas is the screen layout saved for this show. */
+  const [viewMode, setViewMode] = useState<"canvas" | "grid" | "classic">("classic");
   const [isMapFullscreen, setIsMapFullscreen] = useState(false);
   const [classicZoom, setClassicZoom] = useState(1.0);
   const [showClassicMinimap, setShowClassicMinimap] = useState(false);
@@ -546,21 +545,34 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
   const bookedSet = useMemo(() => {
     const booked = layoutData?.booked_seat_identifiers ?? [];
     const held = layoutData?.held_seat_identifiers ?? [];
+    const showBlocked = layoutData?.show_blocked_seat_identifiers ?? [];
+    const screenBlocked = layoutData?.blocked_seat_identifiers ?? [];
     const set = new Set<string>();
-    for (const raw of [...booked, ...held]) {
-      if (!raw) continue;
-      const s = String(raw).trim();
+    const add = (value: string) => {
+      const s = value.trim();
+      if (!s) return;
       set.add(s);
       set.add(s.toUpperCase());
       set.add(s.toLowerCase());
-      const match = s.match(/^([A-Za-z]+)0*(\d+)$/);
+    };
+    for (const raw of [...booked, ...held, ...showBlocked, ...screenBlocked]) {
+      if (!raw) continue;
+      const s = String(raw).trim();
+      add(s);
+      const match = s.match(/^([A-Za-z]+)[-_ ]?0*(\d+)$/);
       if (match) {
         const prefix = match[1];
         const num = Number(match[2]);
-        set.add(`${prefix}${num}`);
-        set.add(`${prefix}${String(num).padStart(2, "0")}`);
-        set.add(`${prefix.toUpperCase()}${num}`);
-        set.add(`${prefix.toUpperCase()}${String(num).padStart(2, "0")}`);
+        add(`${prefix}${num}`);
+        add(`${prefix}${String(num).padStart(2, "0")}`);
+      }
+      const sectionMatch = s.match(/^(.+)-([A-Za-z]+)-0*(\d+)$/);
+      if (sectionMatch) {
+        const row = sectionMatch[2];
+        const num = Number(sectionMatch[3]);
+        add(`${row}${num}`);
+        add(`${row}${String(num).padStart(2, "0")}`);
+        add(`${sectionMatch[1].trim()} ${row}${num}`);
       }
     }
     return set;
@@ -573,6 +585,10 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
       layoutData.layout_template.seats_json.length > 0
     );
   }, [layoutData]);
+
+  useEffect(() => {
+    if (viewMode === "canvas" && !hasCanvasLayout) setViewMode("classic");
+  }, [viewMode, hasCanvasLayout]);
 
   const getTierPrice = useCallback(
     (sectionName: string, sectionIdx: number = 0): number => {
@@ -2281,22 +2297,35 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
         </div>
       )}
 
-      {/* View tabs (Interactive Map / Grid / Classic) — hidden; classic layout is default
       <div className="flex flex-wrap items-center justify-between gap-3 px-0.5 py-1 shrink-0">
-        <div className="flex items-center gap-1 p-0.5 bg-slate-50 rounded-lg">
+        <div className="flex items-center gap-1 rounded-lg bg-slate-100 p-0.5">
+          <button
+            type="button"
+            onClick={() => setViewMode("classic")}
+            className={`rounded-md px-3 py-1.5 text-xs font-semibold ${
+              viewMode === "classic" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800"
+            }`}
+          >
+            Classic
+          </button>
           {hasCanvasLayout && (
-            <button type="button" onClick={() => setViewMode("canvas")} ...>
-              Interactive Map
+            <button
+              type="button"
+              onClick={() => setViewMode("canvas")}
+              className={`rounded-md px-3 py-1.5 text-xs font-semibold ${
+                viewMode === "canvas" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              Your layout
             </button>
           )}
-          <button type="button" onClick={() => setViewMode("grid")} ...>Grid View</button>
-          <button type="button" onClick={() => setViewMode("classic")} ...>Classic View</button>
         </div>
         <p className="text-xs text-slate-500">
-          Select exactly <span className="text-slate-900 font-bold">{qty}</span> seat{qty === 1 ? "" : "s"}
+          {viewMode === "classic"
+            ? "Original seat grid. Occupied seats stay disabled."
+            : "The layout saved for this screen. Occupied seats stay disabled."}
         </p>
       </div>
-      */}
 
       {viewMode === "canvas" && hasCanvasLayout && canvasLayoutData ? (
         <div className="relative rounded-xl border border-slate-100 bg-white overflow-hidden h-[min(62vh,620px)] sm:h-[min(68vh,680px)] lg:flex-1 lg:min-h-0 lg:h-auto">

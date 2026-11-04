@@ -1,13 +1,15 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import { Suspense } from "react";
-import { AdminListShimmer } from "@/components/Shared/Shimmer";
-import MovieSeatManagerPage from "@/components/MovieAdminPanel/MovieSeatManagerPage";
-
-export default function MovieSeatManagerRoutePage() {
-  return (
-    <Suspense fallback={<AdminListShimmer rows={6} columns={5} />}>
-      <MovieSeatManagerPage />
-    </Suspense>
-  );
+/** Showtimes and Seat Manager are now one module: Shows & Seats. */
+export default async function LegacySeatManagerRedirect({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(await searchParams)) {
+    if (typeof value === "string") params.set(key, value);
+  }
+  const qs = params.toString();
+  redirect(qs ? `/movie/shows?${qs}` : "/movie/shows");
 }

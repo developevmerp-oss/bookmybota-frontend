@@ -97,7 +97,7 @@ export default function MovieCatalogBrowsePage() {
                 </p>
                 <div className="pt-2 mt-auto border-t border-white/5">
                   <Link
-                    href={`/movie/showtimes?movie_id=${movie.id}`}
+                    href={`/movie/shows?movie_id=${movie.id}`}
                     className="inline-flex items-center justify-center gap-1.5 w-full py-1.5 px-3 rounded-lg bg-fuchsia-500/15 hover:bg-fuchsia-500/25 text-fuchsia-300 text-xs font-bold transition-colors"
                   >
                     Schedule Show

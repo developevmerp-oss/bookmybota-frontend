@@ -496,6 +496,7 @@ export interface ShowSeatMapSeat {
   section: string;
   x: number;
   y: number;
+  color?: string | null;
   state: ShowSeatState;
   price: number;
   base_price: number;
@@ -528,13 +529,13 @@ export interface ShowSeatMap {
     screen_blocked: number;
   };
   revenue: number;
+  layout?: { seating_config?: unknown };
   seats: ShowSeatMapSeat[];
 }
 
 export interface ShowSeatOverrideInput {
   seat_key: string;
   status?: 'AVAILABLE' | 'BLOCKED' | 'OUT_OF_ORDER';
-  price?: number | null;
   note?: string | null;
 }
 
@@ -660,6 +661,8 @@ export interface MovieShowtimeLayoutData {
   } | null;
   booked_seat_identifiers: string[];
   held_seat_identifiers?: string[];
+  blocked_seat_identifiers?: string[];
+  show_blocked_seat_identifiers?: string[];
   out_of_order_seat_identifiers?: string[];
   /** Per-seat price set by the cinema for this show, keyed by seat identifier */
   seat_price_overrides?: Record<string, number>;

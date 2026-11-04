@@ -389,7 +389,8 @@ export default function OrganizerAccountSetupForm({
       }).unwrap();
       setOnboardStatus("success");
       toast.success(data.message || "Registration received");
-      setTimeout(() => router.push(backHref), 2500);
+      // Cinema partners get a popup with a login button instead of an automatic redirect
+      if (module !== "cinema") setTimeout(() => router.push(backHref), 2500);
     } catch (err: unknown) {
       const message = extractApiError(
         err,
@@ -414,6 +415,39 @@ export default function OrganizerAccountSetupForm({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [showTermsModal]);
+
+  if (onboardStatus === "success" && module === "cinema") {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="cinema-register-success-title"
+          className="w-full max-w-md rounded-2xl bg-white border border-slate-200 shadow-2xl px-6 py-8 text-center"
+        >
+          <div className="w-16 h-16 rounded-full bg-green-100 text-green-600 flex items-center justify-center mx-auto mb-4">
+            <CheckCircle size={32} />
+          </div>
+          <h2 id="cinema-register-success-title" className="text-2xl font-bold text-[#111111] mb-2">
+            Registration received
+          </h2>
+          <p className="text-sm text-slate-600 leading-relaxed">
+            Thank you for registering your cinema. Our team will contact you shortly, within 1 to 2 days.
+          </p>
+          <p className="text-sm text-slate-500 leading-relaxed mt-3">
+            You can log in only after your account is approved. We will email your login details once it is.
+          </p>
+          <button
+            type="button"
+            onClick={() => router.push("/movie/login")}
+            className="mt-6 w-full rounded-full bg-[#e11d48] hover:bg-[#be123c] text-white py-3 text-sm font-bold cursor-pointer"
+          >
+            Go to login
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (onboardStatus === "success") {
     return (

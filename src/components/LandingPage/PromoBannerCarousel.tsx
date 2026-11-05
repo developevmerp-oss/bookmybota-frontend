@@ -43,7 +43,10 @@ type Slide = {
   title: string;
   year?: string;
   tagline?: string;
+  /** Desktop 3:1 creative */
   image: string;
+  /** Mobile / tablet 2:1 creative (falls back to `image`) */
+  imageMobile?: string;
   href: string;
   badge: string;
   dateLabel?: string;
@@ -229,7 +232,9 @@ function promoToSlide(
   }
 ): Slide {
   const banner = resolveMediaUrl(promo.banner_image_url || "");
-  const designed = Boolean(banner);
+  const bannerMobile =
+    resolveMediaUrl(promo.banner_image_mobile_url || "") || banner;
+  const designed = Boolean(banner || bannerMobile);
   const { linkedEvent, linkedMovie, linkedDining } = resolvePromoLinks(promo, ctx);
   const href =
     promotionClickHref(promo) ||
@@ -281,6 +286,7 @@ function promoToSlide(
         : undefined),
     // Slider API requires banner — always prefer the promotion creative
     image: banner || base?.image || "",
+    imageMobile: bannerMobile || banner || base?.image || "",
     href,
     badge: categoryBadge(promo.category || base?.badge, base?.badge || "EVENT"),
     dateLabel: base?.dateLabel,
@@ -295,22 +301,34 @@ function promoToSlide(
 }
 
 function SlideCard({ slide }: { slide: Slide }) {
-  const [failed, setFailed] = useState(false);
-  const showImage = Boolean(slide.image) && !failed;
+  const [failedDesktop, setFailedDesktop] = useState(false);
+  const [failedMobile, setFailedMobile] = useState(false);
+  const desktopSrc = slide.image;
+  const mobileSrc = slide.imageMobile || slide.image;
+  const showDesktop = Boolean(desktopSrc) && !failedDesktop;
+  const showMobile = Boolean(mobileSrc) && !failedMobile;
 
-  // Frame aspect matches partner admin crop (3:1 / 1920×640).
+  // Desktop 3:1 / mobile-tablet 2:1 — match partner crop uploads.
   return (
     <div className="absolute inset-0 overflow-hidden bg-[#111]">
-      {showImage ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={slide.image}
-          alt=""
-          aria-hidden
-          className="promo-slide-photo h-full w-full object-cover object-center"
-          draggable={false}
-          onError={() => setFailed(true)}
-        />
+      {showDesktop || showMobile ? (
+        <picture>
+          {showDesktop ? (
+            <source media="(min-width: 1024px)" srcSet={desktopSrc} />
+          ) : null}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={showMobile ? mobileSrc : desktopSrc}
+            alt=""
+            aria-hidden
+            className="promo-slide-photo h-full w-full object-cover object-center"
+            draggable={false}
+            onError={() => {
+              setFailedMobile(true);
+              setFailedDesktop(true);
+            }}
+          />
+        </picture>
       ) : (
         <div className="h-full w-full promo-slide-fallback" aria-hidden />
       )}

@@ -1,6 +1,9 @@
 const CINEMA_FAVORITES_KEY = "movie_cinema_favorites";
 const CINEMA_FAVORITES_ITEMS_KEY = "movie_cinema_favorites_items";
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 export type SavedCinemaItem = {
   id: string;
   name: string;
@@ -9,6 +12,27 @@ export type SavedCinemaItem = {
   slug?: string;
   href?: string;
 };
+
+/** Guest IDs used for post-login sync (UUID cinema business ids only). */
+export function readGuestCinemaWishlistIds(): string[] {
+  const fromIds = readCinemaFavoriteIds().filter((id) => UUID_RE.test(id));
+  const fromItems = readCinemaFavoriteItems()
+    .map((item) => String(item.id || "").trim())
+    .filter((id) => UUID_RE.test(id));
+  return Array.from(new Set([...fromIds, ...fromItems]));
+}
+
+export function clearGuestCinemaWishlistIds() {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.removeItem(CINEMA_FAVORITES_KEY);
+    localStorage.removeItem(CINEMA_FAVORITES_ITEMS_KEY);
+    window.dispatchEvent(new CustomEvent("movie_cinema_favorites_changed"));
+    window.dispatchEvent(new Event("storage"));
+  } catch {
+    /* ignore */
+  }
+}
 
 export function readCinemaFavoriteIds(): string[] {
   if (typeof window === "undefined") return [];

@@ -79,6 +79,8 @@ import { extractApiError } from "@/lib/apiErrors";
 import {
   LANDING_PROMO_BANNER_ASPECT,
   LANDING_PROMO_BANNER_SIZE_HINT,
+  LANDING_PROMO_BANNER_MOBILE_ASPECT,
+  LANDING_PROMO_BANNER_MOBILE_SIZE_HINT,
 } from "@/lib/landingPromoBanner";
 import {
   getTicketCapacitySummary,
@@ -199,6 +201,9 @@ function eventToValues(event?: OrganizerEvent | null): EventFormValues {
     promo_plan_id: (promo as any)?.plan_id != null ? String((promo as any).plan_id) : "",
     promo_title: promo?.title ? String(promo.title) : "",
     promo_banner_url: (promo as any)?.banner_image_url ? String((promo as any).banner_image_url) : "",
+    promo_banner_mobile_url: (promo as any)?.banner_image_mobile_url
+      ? String((promo as any).banner_image_mobile_url)
+      : "",
     promo_slider_accent_text: (promo as any)?.slider_accent_text
       ? String((promo as any).slider_accent_text)
       : "",
@@ -2614,6 +2619,7 @@ export default function EventForm({
   const wantPromotion = watch("want_promotion");
   const promoPlanId = watch("promo_plan_id");
   const promoBannerUrl = watch("promo_banner_url");
+  const promoBannerMobileUrl = watch("promo_banner_mobile_url");
   const selectedPromoPlan = useMemo(
     () => promoPlans.find((p) => String(p.id) === String(promoPlanId || "")),
     [promoPlans, promoPlanId]
@@ -2906,6 +2912,7 @@ export default function EventForm({
               plan_id: Number(values.promo_plan_id),
               title: values.promo_title.trim(),
               banner_image_url: values.promo_banner_url?.trim() || undefined,
+              banner_image_mobile_url: values.promo_banner_mobile_url?.trim() || undefined,
               slider_accent_text: values.promo_slider_accent_text?.trim() || null,
               start_date: values.promo_start_date,
             }
@@ -3058,7 +3065,12 @@ export default function EventForm({
         return;
       }
       if (values.promo_needs_banner && !values.promo_banner_url?.trim()) {
-        toast.error("Banner image is required for the selected promotion plan.");
+        toast.error("Desktop 3:1 banner is required for the selected promotion plan.");
+        goToStep("media");
+        return;
+      }
+      if (values.promo_needs_banner && !values.promo_banner_mobile_url?.trim()) {
+        toast.error("Mobile / tablet 2:1 banner is required for the selected promotion plan.");
         goToStep("media");
         return;
       }
@@ -3383,6 +3395,7 @@ export default function EventForm({
         const start = getValues("promo_start_date")?.trim();
         const landing = Boolean(getValues("promo_needs_banner"));
         const banner = getValues("promo_banner_url")?.trim();
+        const bannerMobile = getValues("promo_banner_mobile_url")?.trim();
         if (!planId) {
           toast.error("Select a promotion plan, or turn off Add promotion.");
           return false;
@@ -3409,7 +3422,11 @@ export default function EventForm({
           return false;
         }
         if (landing && !banner) {
-          toast.error("Banner image is required for this promotion plan.");
+          toast.error("Desktop 3:1 banner is required for this promotion plan.");
+          return false;
+        }
+        if (landing && !bannerMobile) {
+          toast.error("Mobile / tablet 2:1 banner is required for this promotion plan.");
           return false;
         }
       }
@@ -4197,6 +4214,7 @@ export default function EventForm({
                     setValue("promo_plan_id", "", { shouldDirty: true });
                     setValue("promo_title", "", { shouldDirty: true });
                     setValue("promo_banner_url", "", { shouldDirty: true });
+                    setValue("promo_banner_mobile_url", "", { shouldDirty: true });
                     setValue("promo_slider_accent_text", "", { shouldDirty: true });
                     setValue("promo_start_date", "", { shouldDirty: true });
                     setValue("promo_needs_banner", false, { shouldDirty: true });
@@ -4327,34 +4345,71 @@ export default function EventForm({
                         </div>
 
                         {watch("promo_needs_banner") ? (
-                          <div className="space-y-2">
-                            <label className="text-sm font-semibold text-slate-600">
-                              Banner image <span className="text-rose-500">*</span>
-                            </label>
-                            <CroppedImageField
-                              value={promoBannerUrl || ""}
-                              aspect={LANDING_PROMO_BANNER_ASPECT}
-                              disabled={uploading}
-                              previewClassName="w-full aspect-[3/1] rounded-xl border border-slate-200 overflow-hidden bg-slate-100"
-                              emptyClassName="flex flex-col items-center justify-center w-full aspect-[3/1] rounded-xl border border-dashed border-slate-300 hover:border-rose-400 bg-slate-50"
-                              onRemove={() => setValue("promo_banner_url", "", { shouldDirty: true })}
-                              onCroppedFile={(file) =>
-                                uploadCropped(file, (url) =>
-                                  setValue("promo_banner_url", url, { shouldDirty: true })
-                                )
-                              }
-                              emptyContent={
-                                <>
-                                  <ImagePlus className="text-slate-400 mb-2" size={28} />
-                                  <span className="text-xs portal-muted">Add 3:1 promo banner</span>
-                                </>
-                              }
-                            />
-                            <p className="text-[11px] text-slate-500 leading-relaxed">
-                              Crop to <span className="font-semibold text-slate-600">3:1</span> — recommended{" "}
-                              <span className="font-semibold text-slate-600">{LANDING_PROMO_BANNER_SIZE_HINT}</span>.
-                              Same size as the home page promotion slider.
-                            </p>
+                          <div className="space-y-4">
+                            <div className="space-y-2">
+                              <label className="text-sm font-semibold text-slate-600">
+                                Desktop banner (3:1) <span className="text-rose-500">*</span>
+                              </label>
+                              <CroppedImageField
+                                value={promoBannerUrl || ""}
+                                aspect={LANDING_PROMO_BANNER_ASPECT}
+                                disabled={uploading}
+                                previewClassName="w-full aspect-[3/1] rounded-xl border border-slate-200 overflow-hidden bg-slate-100"
+                                emptyClassName="flex flex-col items-center justify-center w-full aspect-[3/1] rounded-xl border border-dashed border-slate-300 hover:border-rose-400 bg-slate-50"
+                                onRemove={() => setValue("promo_banner_url", "", { shouldDirty: true })}
+                                onCroppedFile={(file) =>
+                                  uploadCropped(file, (url) =>
+                                    setValue("promo_banner_url", url, { shouldDirty: true })
+                                  )
+                                }
+                                emptyContent={
+                                  <>
+                                    <ImagePlus className="text-slate-400 mb-2" size={28} />
+                                    <span className="text-xs portal-muted">Upload desktop 3:1 banner</span>
+                                  </>
+                                }
+                              />
+                              <p className="text-[11px] text-slate-500 leading-relaxed">
+                                Desktop / laptop slider — crop{" "}
+                                <span className="font-semibold text-slate-600">3:1</span>, recommended{" "}
+                                <span className="font-semibold text-slate-600">{LANDING_PROMO_BANNER_SIZE_HINT}</span>.
+                              </p>
+                            </div>
+
+                            <div className="space-y-2">
+                              <label className="text-sm font-semibold text-slate-600">
+                                Mobile &amp; tablet banner (2:1) <span className="text-rose-500">*</span>
+                              </label>
+                              <CroppedImageField
+                                value={promoBannerMobileUrl || ""}
+                                aspect={LANDING_PROMO_BANNER_MOBILE_ASPECT}
+                                disabled={uploading}
+                                previewClassName="w-full aspect-[2/1] rounded-xl border border-slate-200 overflow-hidden bg-slate-100"
+                                emptyClassName="flex flex-col items-center justify-center w-full aspect-[2/1] rounded-xl border border-dashed border-slate-300 hover:border-rose-400 bg-slate-50"
+                                onRemove={() =>
+                                  setValue("promo_banner_mobile_url", "", { shouldDirty: true })
+                                }
+                                onCroppedFile={(file) =>
+                                  uploadCropped(file, (url) =>
+                                    setValue("promo_banner_mobile_url", url, { shouldDirty: true })
+                                  )
+                                }
+                                emptyContent={
+                                  <>
+                                    <ImagePlus className="text-slate-400 mb-2" size={28} />
+                                    <span className="text-xs portal-muted">Upload mobile / tablet 2:1 banner</span>
+                                  </>
+                                }
+                              />
+                              <p className="text-[11px] text-slate-500 leading-relaxed">
+                                Phone &amp; tablet slider — crop{" "}
+                                <span className="font-semibold text-slate-600">2:1</span>, recommended{" "}
+                                <span className="font-semibold text-slate-600">
+                                  {LANDING_PROMO_BANNER_MOBILE_SIZE_HINT}
+                                </span>
+                                .
+                              </p>
+                            </div>
 
                             <div className="space-y-1.5 pt-1">
                               <label className="text-sm font-semibold text-slate-600">
@@ -4374,33 +4429,68 @@ export default function EventForm({
                             </div>
                           </div>
                         ) : (
-                          <div className="space-y-2">
-                            <label className="text-sm font-semibold text-slate-600">
-                              Banner image (optional)
-                            </label>
-                            <CroppedImageField
-                              value={promoBannerUrl || ""}
-                              aspect={LANDING_PROMO_BANNER_ASPECT}
-                              disabled={uploading}
-                              previewClassName="w-full aspect-[3/1] rounded-xl border border-slate-200 overflow-hidden bg-slate-100"
-                              emptyClassName="flex flex-col items-center justify-center w-full aspect-[3/1] rounded-xl border border-dashed border-slate-300 hover:border-rose-400 bg-slate-50"
-                              onRemove={() => setValue("promo_banner_url", "", { shouldDirty: true })}
-                              onCroppedFile={(file) =>
-                                uploadCropped(file, (url) =>
-                                  setValue("promo_banner_url", url, { shouldDirty: true })
-                                )
-                              }
-                              emptyContent={
-                                <>
-                                  <ImagePlus className="text-slate-400 mb-2" size={28} />
-                                  <span className="text-xs portal-muted">Optional 3:1 promo banner</span>
-                                </>
-                              }
-                            />
-                            <p className="text-[11px] text-slate-500 leading-relaxed">
-                              Crop to <span className="font-semibold text-slate-600">3:1</span> — recommended{" "}
-                              <span className="font-semibold text-slate-600">{LANDING_PROMO_BANNER_SIZE_HINT}</span>.
-                            </p>
+                          <div className="space-y-4">
+                            <div className="space-y-2">
+                              <label className="text-sm font-semibold text-slate-600">
+                                Desktop banner (optional)
+                              </label>
+                              <CroppedImageField
+                                value={promoBannerUrl || ""}
+                                aspect={LANDING_PROMO_BANNER_ASPECT}
+                                disabled={uploading}
+                                previewClassName="w-full aspect-[3/1] rounded-xl border border-slate-200 overflow-hidden bg-slate-100"
+                                emptyClassName="flex flex-col items-center justify-center w-full aspect-[3/1] rounded-xl border border-dashed border-slate-300 hover:border-rose-400 bg-slate-50"
+                                onRemove={() => setValue("promo_banner_url", "", { shouldDirty: true })}
+                                onCroppedFile={(file) =>
+                                  uploadCropped(file, (url) =>
+                                    setValue("promo_banner_url", url, { shouldDirty: true })
+                                  )
+                                }
+                                emptyContent={
+                                  <>
+                                    <ImagePlus className="text-slate-400 mb-2" size={28} />
+                                    <span className="text-xs portal-muted">Optional 3:1 promo banner</span>
+                                  </>
+                                }
+                              />
+                              <p className="text-[11px] text-slate-500 leading-relaxed">
+                                Crop to <span className="font-semibold text-slate-600">3:1</span> — recommended{" "}
+                                <span className="font-semibold text-slate-600">{LANDING_PROMO_BANNER_SIZE_HINT}</span>.
+                              </p>
+                            </div>
+                            <div className="space-y-2">
+                              <label className="text-sm font-semibold text-slate-600">
+                                Mobile &amp; tablet banner (optional)
+                              </label>
+                              <CroppedImageField
+                                value={promoBannerMobileUrl || ""}
+                                aspect={LANDING_PROMO_BANNER_MOBILE_ASPECT}
+                                disabled={uploading}
+                                previewClassName="w-full aspect-[2/1] rounded-xl border border-slate-200 overflow-hidden bg-slate-100"
+                                emptyClassName="flex flex-col items-center justify-center w-full aspect-[2/1] rounded-xl border border-dashed border-slate-300 hover:border-rose-400 bg-slate-50"
+                                onRemove={() =>
+                                  setValue("promo_banner_mobile_url", "", { shouldDirty: true })
+                                }
+                                onCroppedFile={(file) =>
+                                  uploadCropped(file, (url) =>
+                                    setValue("promo_banner_mobile_url", url, { shouldDirty: true })
+                                  )
+                                }
+                                emptyContent={
+                                  <>
+                                    <ImagePlus className="text-slate-400 mb-2" size={28} />
+                                    <span className="text-xs portal-muted">Optional 2:1 mobile banner</span>
+                                  </>
+                                }
+                              />
+                              <p className="text-[11px] text-slate-500 leading-relaxed">
+                                Crop to <span className="font-semibold text-slate-600">2:1</span> — recommended{" "}
+                                <span className="font-semibold text-slate-600">
+                                  {LANDING_PROMO_BANNER_MOBILE_SIZE_HINT}
+                                </span>
+                                .
+                              </p>
+                            </div>
                           </div>
                         )}
 
@@ -4442,6 +4532,7 @@ export default function EventForm({
                           const start = getValues("promo_start_date")?.trim();
                           const landing = Boolean(getValues("promo_needs_banner"));
                           const banner = getValues("promo_banner_url")?.trim();
+                          const bannerMobile = getValues("promo_banner_mobile_url")?.trim();
                           if (!planId) {
                             toast.error("Select a promotion plan.");
                             return;
@@ -4468,7 +4559,11 @@ export default function EventForm({
                             return;
                           }
                           if (landing && !banner) {
-                            toast.error("Banner image is required for this promotion plan.");
+                            toast.error("Desktop 3:1 banner is required for this promotion plan.");
+                            return;
+                          }
+                          if (landing && !bannerMobile) {
+                            toast.error("Mobile / tablet 2:1 banner is required for this promotion plan.");
                             return;
                           }
                           setValue("want_promotion", true, { shouldDirty: true });

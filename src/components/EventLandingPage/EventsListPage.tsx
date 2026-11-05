@@ -301,7 +301,7 @@ function PromoFeatureCard({
         />
       </div>
       <div className="space-y-0.5 px-3.5 py-3 sm:px-4 sm:py-3.5">
-        <h3 className="line-clamp-2 text-[15px] font-bold leading-snug tracking-tight text-[#1A1A1A] sm:text-base">
+        <h3 className="break-words text-[15px] font-bold leading-snug tracking-tight text-[#1A1A1A] sm:text-base">
           {event.name}
         </h3>
         {price ? (
@@ -562,7 +562,7 @@ function DistrictEventCard({
         {dateLine ? (
           <p className="text-sm font-semibold text-[#B59B2A] line-clamp-1">{dateLine}</p>
         ) : null}
-        <h3 className="text-base font-semibold leading-snug text-black line-clamp-2 sm:text-xl">
+        <h3 className="text-base font-semibold leading-snug text-black break-words sm:text-xl">
           {event.name}
         </h3>
         {place ? (
@@ -592,7 +592,7 @@ function RecommendCard({
   return (
     <Link
       href={`/events/${event.id}`}
-      className="group shrink-0 w-[48vw] sm:w-[200px] md:w-[220px] lg:w-[240px] 2xl:w-[240px] snap-start rounded-2xl transition-[transform,box-shadow] duration-300 hover:-translate-y-0.5"
+      className="group block w-full min-w-0 rounded-2xl transition-[transform,box-shadow] duration-300 hover:-translate-y-0.5"
     >
       <div className="relative aspect-[3/4] w-full overflow-hidden rounded-2xl bg-slate-100 shadow-[0_1px_3px_rgba(17,17,17,0.06)] group-hover:shadow-[0_8px_24px_rgba(17,17,17,0.1)] transition-shadow duration-300">
         <SafeCoverImage
@@ -611,7 +611,7 @@ function RecommendCard({
             <span className="truncate">{place}</span>
           </p>
         ) : null}
-        <h3 className="text-sm sm:text-lg font-bold text-slate-900 line-clamp-1">{event.name}</h3>
+        <h3 className="text-sm sm:text-lg font-bold text-slate-900 break-words">{event.name}</h3>
         {dateLine ? <p className="text-sm font-semibold text-slate-500 line-clamp-1">{dateLine}</p> : null}
       </div>
     </Link>
@@ -637,7 +637,7 @@ function RecommendShowcaseCard({
   return (
     <Link
       href={href}
-      className="group shrink-0 w-[48vw] sm:w-[200px] md:w-[220px] lg:w-[240px] 2xl:w-[240px] snap-start rounded-2xl transition-[transform,box-shadow] duration-300 hover:-translate-y-0.5"
+      className="group block w-full min-w-0 rounded-2xl transition-[transform,box-shadow] duration-300 hover:-translate-y-0.5"
     >
       <div className="relative aspect-[3/4] w-full overflow-hidden rounded-2xl bg-slate-100 shadow-[0_1px_3px_rgba(17,17,17,0.06)] group-hover:shadow-[0_8px_24px_rgba(17,17,17,0.1)] transition-shadow duration-300">
         <SafeCoverImage
@@ -655,7 +655,7 @@ function RecommendShowcaseCard({
             <span className="truncate">{place}</span>
           </p>
         ) : null}
-        <h3 className="text-sm sm:text-lg font-bold text-slate-900 line-clamp-1">{title}</h3>
+        <h3 className="text-sm sm:text-lg font-bold text-slate-900 break-words">{title}</h3>
         {dateLine ? <p className="text-sm font-semibold text-slate-500 line-clamp-1">{dateLine}</p> : null}
       </div>
     </Link>
@@ -680,7 +680,7 @@ function ArtistChip({ artist }: { artist: PublicRegisteredPartner }) {
           fallback={<ArtistImageFallback size={40} />}
         />
       </div>
-      <span className="text-sm sm:text-base font-semibold text-slate-800 line-clamp-2 leading-tight px-0.5 w-full">
+      <span className="text-sm sm:text-base font-semibold text-slate-800 break-words leading-tight px-0.5 w-full">
         {artist.name}
       </span>
     </Link>
@@ -2604,7 +2604,7 @@ export default function PublicEventsPage() {
                   </div>
                 </>
               ) : (
-                <div className="mx-auto grid w-full grid-cols-2 gap-4 lg:grid-cols-4 lg:gap-6">
+                <div className="mx-auto grid w-full grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 lg:gap-6">
                   {emptyShowcaseCards.map((event) => (
                     <ShowcaseEventPosterCard
                       key={event.id}
@@ -2658,7 +2658,7 @@ export default function PublicEventsPage() {
             </div>
           </>
         ) : (
-          <div className="grid w-full grid-cols-2 gap-4 lg:grid-cols-4 lg:gap-6 items-stretch">
+          <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 lg:gap-6 items-stretch">
             {visibleEvents.map((event) => (
               <DistrictEventCard
                 key={event.id}

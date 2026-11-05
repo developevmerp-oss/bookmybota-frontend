@@ -455,7 +455,7 @@ export default function CustomerDashboard() {
                           {kindLabel}
                         </span>
                       </div>
-                      <h3 className="text-[15px] sm:text-lg font-bold text-[#0F172A] mt-1 line-clamp-2 leading-snug group-hover:text-[#6900AA] transition-colors">
+                      <h3 className="text-[15px] sm:text-lg font-bold text-[#0F172A] mt-1 break-words leading-snug group-hover:text-[#6900AA] transition-colors">
                         {b.title}
                       </h3>
                       {b.address ? (

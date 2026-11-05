@@ -1,8 +1,8 @@
-/* Landing promo carousel — height for layout; width locks to partner crop aspect (3:1) */
+/* Landing promo carousel — desktop 3:1, mobile/tablet 2:1 */
 .promo-banner-swiper {
-  /* Phone: slightly inset, height still follows the 3:1 creative. */
-  --promo-h: calc(100vw * 0.84 / 2.4);
-  --promo-aspect: 3; /* must match LANDING_PROMO_BANNER_ASPECT / partner crop */
+  /* Phone / tablet: 2:1 creative — taller than desktop so art stays readable */
+  --promo-aspect: 2;
+  --promo-h: calc(100vw * 0.84 / var(--promo-aspect));
   --promo-slide-w: min(84%, calc(var(--promo-h) * var(--promo-aspect)));
   --promo-peek-gap: 0.5rem;
   overflow-x: clip;
@@ -15,7 +15,7 @@
 
 @media (min-width: 640px) {
   .promo-banner-swiper {
-    --promo-h: calc(100vw * 0.82 / 2.4);
+    --promo-h: calc(100vw * 0.82 / var(--promo-aspect));
     --promo-slide-w: min(82%, calc(var(--promo-h) * var(--promo-aspect)));
     --promo-peek-gap: 0.65rem;
   }
@@ -23,14 +23,16 @@
 
 @media (min-width: 768px) {
   .promo-banner-swiper {
-    --promo-h: calc(100vw * 0.82 / 2.4);
+    --promo-h: calc(100vw * 0.82 / var(--promo-aspect));
     --promo-slide-w: min(82%, calc(var(--promo-h) * var(--promo-aspect)));
     --promo-peek-gap: 0.75rem;
   }
 }
 
+/* Desktop / laptop: keep partner 3:1 crop */
 @media (min-width: 1024px) {
   .promo-banner-swiper {
+    --promo-aspect: 3;
     --promo-h: 380px;
     --promo-slide-w: min(90%, calc(var(--promo-h) * var(--promo-aspect)));
     --promo-peek-gap: 0.85rem;
@@ -53,11 +55,6 @@
 }
 
 /*
- * Laptop / desktop keep the main --promo-h values above (380 / 400 / 440).
- * Do not shrink by viewport height — that made MacBook/laptop shorter than before.
- */
-
-/*
  * One slide: fill the content row (same horizontal inset as site container).
  * Do NOT cap width at height×aspect — that left large empty side gaps on tablet/desktop.
  */
@@ -72,14 +69,14 @@
 @media (max-width: 767px) {
   .promo-banner-swiper.is-single {
     --promo-slide-w: calc(100% - 1.5rem);
-    --promo-h: calc((100vw - 3.5rem) / 2.4);
+    --promo-h: calc((100vw - 3.5rem) / var(--promo-aspect));
   }
 }
 
 @media (min-width: 768px) and (max-width: 1023px) {
   .promo-banner-swiper.is-single {
     --promo-slide-w: calc(100% - 2rem);
-    --promo-h: calc((100vw - 4.5rem) / 2.4);
+    --promo-h: calc((100vw - 4.5rem) / var(--promo-aspect));
     padding-left: 1.25rem; /* md:px-5 */
     padding-right: 1.25rem;
   }

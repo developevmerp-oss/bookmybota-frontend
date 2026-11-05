@@ -99,7 +99,7 @@ export function placementOption(plan: PlacementFlagsLike | null | undefined): Pl
   return PLACEMENT_OPTIONS.find((o) => o.value === value) ?? PLACEMENT_OPTIONS[1];
 }
 
-/** Home hero and category slider placements need a 3:1 banner creative. */
+/** Home hero and category slider placements need desktop 3:1 + mobile/tablet 2:1 banners. */
 export function placementNeedsBanner(plan: PlacementFlagsLike | null | undefined): boolean {
   const flags = FLAGS[placementOf(plan)];
   return flags.landing_slider || flags.category_rail;

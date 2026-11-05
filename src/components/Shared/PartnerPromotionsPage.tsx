@@ -47,6 +47,8 @@ import {
 import {
   LANDING_PROMO_BANNER_ASPECT,
   LANDING_PROMO_BANNER_SIZE_HINT,
+  LANDING_PROMO_BANNER_MOBILE_ASPECT,
+  LANDING_PROMO_BANNER_MOBILE_SIZE_HINT,
 } from "@/lib/landingPromoBanner";
 
 type PartnerModule = "DINING" | "EVENTS" | "MOVIES";
@@ -138,6 +140,7 @@ export default function PartnerPromotionsPage({
 
   const planId = watch("plan_id");
   const bannerUrl = watch("banner_image_url");
+  const bannerMobileUrl = watch("banner_image_mobile_url");
   const landingSlider = watch("landing_slider");
   const categoryRail = watch("category_rail");
   const allowsItemTarget = watch("allows_item_target");
@@ -291,6 +294,7 @@ export default function PartnerPromotionsPage({
       plan_id: String(camp.plan_id),
       title: camp.title || camp.plan_name || "",
       banner_image_url: camp.banner_image_url || "",
+      banner_image_mobile_url: camp.banner_image_mobile_url || "",
       slider_accent_text: camp.slider_accent_text || "",
       target_type: nextTarget as PartnerPromotionsFormValues["target_type"],
       target_id: camp.target_id || "",
@@ -304,7 +308,10 @@ export default function PartnerPromotionsPage({
     setModalOpen(true);
   };
 
-  const onUpload = async (file: File | null) => {
+  const onUploadBanner = async (
+    file: File | null,
+    field: "banner_image_url" | "banner_image_mobile_url"
+  ) => {
     if (!file) return;
     try {
       const fd = new FormData();
@@ -312,8 +319,11 @@ export default function PartnerPromotionsPage({
       const res = await uploadImage(fd).unwrap();
       const url = extractUploadUrl(res);
       if (!url) throw new Error("Upload failed");
-      setValue("banner_image_url", url, { shouldValidate: true, shouldDirty: true });
-      toast.success((res as { message?: string })?.message || "Banner uploaded");
+      setValue(field, url, { shouldValidate: true, shouldDirty: true });
+      toast.success(
+        (res as { message?: string })?.message ||
+          (field === "banner_image_mobile_url" ? "Mobile banner uploaded" : "Desktop banner uploaded")
+      );
     } catch (err) {
       toast.error(extractApiError(err, "Failed to upload banner"));
     }
@@ -338,6 +348,7 @@ export default function PartnerPromotionsPage({
     const payload = {
       title: values.title.trim(),
       banner_image_url: values.banner_image_url || undefined,
+      banner_image_mobile_url: values.banner_image_mobile_url || undefined,
       slider_accent_text: values.slider_accent_text?.trim() || "",
       start_date: values.start_date,
       target_type: effectiveTargetType,
@@ -486,36 +497,90 @@ export default function PartnerPromotionsPage({
       </div>
 
       {planId ? (
-        <div className="space-y-2">
-          <span className={`font-semibold text-slate-600 ${isDining ? "text-sm" : "text-xs"}`}>
-            Banner image {bannerRequired ? <RequiredMark /> : <span className="text-slate-400 font-normal">(optional)</span>}
-          </span>
-          <CroppedImageField
-            value={bannerUrl || ""}
-            aspect={LANDING_PROMO_BANNER_ASPECT}
-            disabled={uploading}
-            previewClassName="w-full aspect-[3/1] object-cover rounded-xl border border-slate-200 overflow-hidden"
-            emptyClassName="flex flex-col items-center justify-center w-full aspect-[3/1] rounded-xl border border-dashed border-slate-300 bg-slate-50 hover:border-rose-400 text-slate-400"
-            emptyLabel="Upload & crop banner"
-            emptyContent={
-              <>
-                <ImagePlus size={28} className="mb-2" />
-                <span className={`font-semibold text-slate-600 ${isDining ? "text-sm" : "text-xs"}`}>
-                  Upload & crop banner
-                </span>
-              </>
-            }
-            onRemove={() => setValue("banner_image_url", "", { shouldValidate: true, shouldDirty: true })}
-            onCroppedFile={(file) => void onUpload(file)}
-          />
-          <p className="text-[11px] text-slate-500 leading-relaxed">
-            Crop to <span className="font-semibold text-slate-600">3:1</span> — recommended{" "}
-            <span className="font-semibold text-slate-600">{LANDING_PROMO_BANNER_SIZE_HINT}</span>.
-            Same size as the home page promotion slider so the banner shows without cropping.
-          </p>
-          {errors.banner_image_url && (
-            <p className={fieldErrorClass}>{errors.banner_image_url.message}</p>
-          )}
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <span className={`font-semibold text-slate-600 ${isDining ? "text-sm" : "text-xs"}`}>
+              Desktop banner (3:1){" "}
+              {bannerRequired ? (
+                <RequiredMark />
+              ) : (
+                <span className="text-slate-400 font-normal">(optional)</span>
+              )}
+            </span>
+            <CroppedImageField
+              value={bannerUrl || ""}
+              aspect={LANDING_PROMO_BANNER_ASPECT}
+              disabled={uploading}
+              previewClassName="w-full aspect-[3/1] object-cover rounded-xl border border-slate-200 overflow-hidden"
+              emptyClassName="flex flex-col items-center justify-center w-full aspect-[3/1] rounded-xl border border-dashed border-slate-300 bg-slate-50 hover:border-rose-400 text-slate-400"
+              emptyLabel="Upload & crop desktop banner"
+              emptyContent={
+                <>
+                  <ImagePlus size={28} className="mb-2" />
+                  <span className={`font-semibold text-slate-600 ${isDining ? "text-sm" : "text-xs"}`}>
+                    Upload & crop desktop banner
+                  </span>
+                </>
+              }
+              onRemove={() =>
+                setValue("banner_image_url", "", { shouldValidate: true, shouldDirty: true })
+              }
+              onCroppedFile={(file) => void onUploadBanner(file, "banner_image_url")}
+            />
+            <p className="text-[11px] text-slate-500 leading-relaxed">
+              Laptop / desktop slider — crop to{" "}
+              <span className="font-semibold text-slate-600">3:1</span>, recommended{" "}
+              <span className="font-semibold text-slate-600">{LANDING_PROMO_BANNER_SIZE_HINT}</span>.
+            </p>
+            {errors.banner_image_url && (
+              <p className={fieldErrorClass}>{errors.banner_image_url.message}</p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <span className={`font-semibold text-slate-600 ${isDining ? "text-sm" : "text-xs"}`}>
+              Mobile &amp; tablet banner (2:1){" "}
+              {bannerRequired ? (
+                <RequiredMark />
+              ) : (
+                <span className="text-slate-400 font-normal">(optional)</span>
+              )}
+            </span>
+            <CroppedImageField
+              value={bannerMobileUrl || ""}
+              aspect={LANDING_PROMO_BANNER_MOBILE_ASPECT}
+              disabled={uploading}
+              previewClassName="w-full aspect-[2/1] object-cover rounded-xl border border-slate-200 overflow-hidden"
+              emptyClassName="flex flex-col items-center justify-center w-full aspect-[2/1] rounded-xl border border-dashed border-slate-300 bg-slate-50 hover:border-rose-400 text-slate-400"
+              emptyLabel="Upload & crop mobile banner"
+              emptyContent={
+                <>
+                  <ImagePlus size={28} className="mb-2" />
+                  <span className={`font-semibold text-slate-600 ${isDining ? "text-sm" : "text-xs"}`}>
+                    Upload & crop mobile / tablet banner
+                  </span>
+                </>
+              }
+              onRemove={() =>
+                setValue("banner_image_mobile_url", "", {
+                  shouldValidate: true,
+                  shouldDirty: true,
+                })
+              }
+              onCroppedFile={(file) => void onUploadBanner(file, "banner_image_mobile_url")}
+            />
+            <p className="text-[11px] text-slate-500 leading-relaxed">
+              Phone &amp; tablet slider — crop to{" "}
+              <span className="font-semibold text-slate-600">2:1</span>, recommended{" "}
+              <span className="font-semibold text-slate-600">
+                {LANDING_PROMO_BANNER_MOBILE_SIZE_HINT}
+              </span>
+              . Taller than desktop so artwork stays clear on small screens.
+            </p>
+            {errors.banner_image_mobile_url && (
+              <p className={fieldErrorClass}>{errors.banner_image_mobile_url.message}</p>
+            )}
+          </div>
 
           <div className="space-y-1.5 pt-1">
             <label className={`font-semibold text-slate-600 ${isDining ? "text-sm" : "text-xs"}`}>

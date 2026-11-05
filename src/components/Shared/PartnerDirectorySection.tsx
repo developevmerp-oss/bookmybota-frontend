@@ -111,7 +111,7 @@ export function PartnerCard({
       <div className="absolute inset-x-0 bottom-0 h-[46%] bg-gradient-to-t from-black/90 via-black/55 to-transparent" />
 
       <div className="absolute inset-x-0 bottom-0 z-10 flex flex-col gap-1.5 p-3.5 sm:p-4 pt-0">
-        <h3 className="font-bold text-white text-[1.05rem] sm:text-lg leading-snug line-clamp-1 drop-shadow-sm">
+        <h3 className="font-bold text-white text-[1.05rem] sm:text-lg leading-snug break-words drop-shadow-sm">
           {partner.name}
         </h3>
 

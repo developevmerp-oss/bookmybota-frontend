@@ -7,14 +7,10 @@ import { useForm, Controller } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import {
   ArrowLeft,
-  Check,
   CircleHelp,
   Copy,
   Loader2,
   Lock,
-  ShoppingBag,
-  Wallet,
-  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -46,8 +42,22 @@ import GiftCardDesignFace from "@/components/GiftCards/GiftCardDesignFace";
 import GiftCardInfoModals, {
   type GiftCardInfoModalKind,
 } from "@/components/GiftCards/GiftCardInfoModals";
+import PaymentSuccessView from "@/components/Shared/PaymentSuccessView";
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
+
+function formatGiftCodeDisplay(code: string) {
+  const raw = code.replace(/\s+/g, "").toUpperCase();
+  if (raw.includes("-")) {
+    return raw
+      .split("-")
+      .filter(Boolean)
+      .map((part) => part.trim())
+      .join(" - ");
+  }
+  const chunks = raw.match(/.{1,4}/g);
+  return chunks ? chunks.join(" - ") : raw;
+}
 
 const fieldErrorClass = "mt-1.5 text-[12px] font-semibold text-rose-500";
 const labelClass = "block text-[13px] sm:text-sm font-medium text-[#333333] mb-1.5";
@@ -584,78 +594,67 @@ export default function GiftCardBuyPage() {
             </form>
           </div>
 
-      {/* Payment Success Popup Modal */}
-      {issued && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
-          role="dialog"
-          aria-modal="true"
-          onClick={() => setIssued(null)}
-        >
-          <div
-            className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl p-6 sm:p-7 text-center animate-in zoom-in-95 duration-200"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Top-Right Close Button */}
-            <button
-              type="button"
-              onClick={() => setIssued(null)}
-              className="absolute top-4 right-4 h-8 w-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center transition-colors"
-              aria-label="Close"
-            >
-              <X size={18} strokeWidth={2.5} />
-            </button>
-
-            {/* Checkmark and Headline */}
-            <div className="flex flex-col items-center mb-4">
-              <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500 text-white mb-3 shadow-md shadow-emerald-500/20">
-                <Check size={24} strokeWidth={3} />
-              </span>
-              <h2 className="text-xl sm:text-2xl font-extrabold text-[#111111]">
-                Payment Successful!
-              </h2>
-              <p className="mt-2 text-sm text-slate-600 max-w-xs">
-                Your e-gift was{" "}
+      {issued ? (
+        <PaymentSuccessView
+          presentation="modal"
+          module="gift_cards"
+          bookingId={issued.id}
+          nextHref={`/customer/gift-cards/${issued.id}`}
+          onClose={() => setIssued(null)}
+          onExplore={() => {
+            setIssued(null);
+            reset();
+          }}
+          subtitle={
+            emailSentNow ? (
+              <>
+                Your e-gift was emailed to{" "}
                 <span className="font-bold text-[#6900AA]">
-                  emailed to {issued.recipient_email || issued.recipient_name || "the recipient"}
+                  {issued.recipient_email || issued.recipient_name || "the recipient"}
                 </span>
                 . Save the code below for your records.
-              </p>
-            </div>
-
-            {/* Code Cards */}
-            <div className="space-y-2 mb-4">
-              {issuedCards.map((card) => (
-                <div
-                  key={card.id || card.code}
-                  className="rounded-xl bg-[#FAF5FF] border border-[#E9D5FF] px-4 py-3 flex items-center justify-between gap-3 text-left"
-                >
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#6900AA]">
-                      Gift card code
-                    </p>
-                    <code className="text-base sm:text-lg font-mono font-extrabold tracking-wider text-[#111111] break-all">
-                      {card.code}
-                    </code>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => void copyCode(card.code)}
-                    className="shrink-0 h-9 w-9 rounded-lg bg-[#6900AA] hover:bg-[#57008E] text-white inline-flex items-center justify-center transition-colors shadow-sm"
-                    aria-label="Copy code"
-                  >
-                    <Copy size={16} />
-                  </button>
+              </>
+            ) : scheduledLabel ? (
+              <>
+                Delivery is scheduled for{" "}
+                <span className="font-bold text-[#6900AA]">{scheduledLabel}</span>. Save the
+                code below for your records.
+              </>
+            ) : (
+              <>Your e-gift is confirmed. Save the code below for your records.</>
+            )
+          }
+        >
+          <div className="space-y-3 w-full">
+            {issuedCards.map((card) => (
+              <div
+                key={card.id || card.code}
+                className="rounded-xl bg-[#FAF5FF] border border-[#E9D5FF] px-3.5 py-3.5 flex items-center justify-between gap-3 text-left"
+              >
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#6900AA]">
+                    Gift card code
+                  </p>
+                  <code className="block mt-1 text-[0.9375rem] sm:text-[1.0625rem] font-mono font-extrabold tracking-wide text-[#111111] break-all leading-snug">
+                    {formatGiftCodeDisplay(card.code)}
+                  </code>
                 </div>
-              ))}
-            </div>
+                <button
+                  type="button"
+                  onClick={() => void copyCode(card.code)}
+                  className="shrink-0 h-10 w-10 rounded-lg bg-[#6900AA] hover:bg-[#57008E] text-white inline-flex items-center justify-center transition-colors shadow-sm cursor-pointer"
+                  aria-label="Copy code"
+                >
+                  <Copy size={16} />
+                </button>
+              </div>
+            ))}
 
-            {/* Amount and Dynamic Validity */}
-            <div className="mb-5">
-              <p className="text-2xl sm:text-3xl font-black text-[#6900AA]">
+            <div className="pt-0.5">
+              <p className="text-[1.625rem] sm:text-[1.75rem] font-black text-[#6900AA] tabular-nums leading-none">
                 {formatMoney(issued.total_payable ?? issued.initial_balance, { compact: true })}
               </p>
-              <p className="text-xs text-slate-500 mt-1">
+              <p className="text-xs text-slate-500 mt-1.5 leading-snug">
                 {issued.expires_at ? (
                   <>
                     Valid until{" "}
@@ -671,31 +670,9 @@ export default function GiftCardBuyPage() {
                 )}
               </p>
             </div>
-
-            {/* Action Buttons */}
-            <div className="flex flex-col sm:flex-row gap-2.5">
-              <Link
-                href={`/customer/gift-cards/${issued.id}`}
-                className="inline-flex flex-1 items-center justify-center gap-2 h-11 rounded-xl bg-[#6900AA] text-white text-sm font-bold hover:bg-[#57008E] transition-colors shadow-sm"
-              >
-                <Wallet size={16} />
-                View in My Gift Cards
-              </Link>
-              <button
-                type="button"
-                onClick={() => {
-                  setIssued(null);
-                  reset();
-                }}
-                className="inline-flex flex-1 items-center justify-center gap-2 h-11 rounded-xl border border-[#6900AA] text-[#6900AA] text-sm font-bold hover:bg-[#FAF5FF] transition-colors"
-              >
-                <ShoppingBag size={16} />
-                Buy another
-              </button>
-            </div>
           </div>
-        </div>
-      )}
+        </PaymentSuccessView>
+      ) : null}
 
       <CustomerAuthModal
         open={loginOpen}

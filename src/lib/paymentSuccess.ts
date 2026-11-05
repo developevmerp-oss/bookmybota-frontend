@@ -1,4 +1,4 @@
-export type BookingPaymentModule = "movies" | "events" | "dining";
+export type BookingPaymentModule = "movies" | "events" | "dining" | "gift_cards";
 
 type PaymentSuccessOpts = {
   module: BookingPaymentModule;
@@ -42,6 +42,14 @@ const MODULE_COPY: Record<
     exploreHref: "/dining",
     exploreLabel: "Explore",
   },
+  gift_cards: {
+    eyebrow: "E-gift card",
+    title: "Payment Successful!",
+    subtitle: "Your e-gift was sent. Save the code below for your records.",
+    nextLabel: "View in My Gift Cards",
+    exploreHref: "/gift-cards",
+    exploreLabel: "Buy another",
+  },
 };
 
 /** Build intermediate success URL shown after booking, before confirmation. */
@@ -54,7 +62,12 @@ export function paymentSuccessHref(opts: PaymentSuccessOpts): string {
 }
 
 export function paymentSuccessCopy(module: string | null | undefined) {
-  if (module === "movies" || module === "events" || module === "dining") {
+  if (
+    module === "movies" ||
+    module === "events" ||
+    module === "dining" ||
+    module === "gift_cards"
+  ) {
     return MODULE_COPY[module];
   }
   return {

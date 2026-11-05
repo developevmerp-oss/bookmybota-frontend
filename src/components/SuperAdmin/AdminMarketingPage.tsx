@@ -43,7 +43,12 @@ import { toast } from 'sonner';
 import { formatDate, toDateInput } from '@/lib/dateFormat';
 import { extractUploadUrl } from '@/lib/mediaUrl';
 import { CroppedImageField } from '@/components/Shared/ImageCropPicker';
-import { LANDING_PROMO_BANNER_ASPECT, LANDING_PROMO_BANNER_SIZE_HINT } from '@/lib/landingPromoBanner';
+import {
+  LANDING_PROMO_BANNER_ASPECT,
+  LANDING_PROMO_BANNER_SIZE_HINT,
+  LANDING_PROMO_BANNER_MOBILE_ASPECT,
+  LANDING_PROMO_BANNER_MOBILE_SIZE_HINT,
+} from '@/lib/landingPromoBanner';
 import { formatMoneyDisplay } from '@/lib/currencyFormat';
 import { extractApiError } from '@/lib/apiErrors';
 import { resolveMediaUrl } from '@/lib/mediaUrl';
@@ -151,6 +156,7 @@ function CampaignEditFields({
   startDate,
   endDate,
   banner,
+  bannerMobile,
   accent,
   uploading,
   plan,
@@ -159,14 +165,17 @@ function CampaignEditFields({
   onStart,
   onEnd,
   onBanner,
+  onBannerMobile,
   onAccent,
   onUpload,
+  onUploadMobile,
 }: {
   title: string;
   category: string;
   startDate: string;
   endDate: string;
   banner: string;
+  bannerMobile: string;
   accent: string;
   uploading: boolean;
   plan: PlacementFlagsLike | null;
@@ -175,8 +184,10 @@ function CampaignEditFields({
   onStart: (value: string) => void;
   onEnd: (value: string) => void;
   onBanner: (value: string) => void;
+  onBannerMobile: (value: string) => void;
   onAccent: (value: string) => void;
   onUpload: (file: File | null) => void;
+  onUploadMobile: (file: File | null) => void;
 }) {
   const needsBanner = placementNeedsBanner(plan);
   const placements = plan ? [placementOption(plan).short] : [];
@@ -227,7 +238,8 @@ function CampaignEditFields({
       </div>
       <div>
         <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">
-          Banner {needsBanner ? <span className="text-rose-500">*</span> : <span className="normal-case tracking-normal text-zinc-500">(optional)</span>}
+          Desktop banner (3:1){" "}
+          {needsBanner ? <span className="text-rose-500">*</span> : <span className="normal-case tracking-normal text-zinc-500">(optional)</span>}
         </label>
         <CroppedImageField
           value={banner}
@@ -235,18 +247,43 @@ function CampaignEditFields({
           disabled={uploading}
           previewClassName="w-full aspect-[3/1] object-cover rounded-xl border border-slate-200 overflow-hidden"
           emptyClassName="flex flex-col items-center justify-center w-full aspect-[3/1] rounded-xl border border-dashed border-slate-300 bg-slate-50 hover:border-rose-400 text-slate-400"
-          emptyLabel="Upload and crop banner"
+          emptyLabel="Upload desktop banner"
           emptyContent={
             <>
               <ImagePlus size={22} className="mb-1" />
-              <span className="text-xs font-semibold text-slate-600">Upload and crop banner</span>
+              <span className="text-xs font-semibold text-slate-600">Upload desktop 3:1 banner</span>
             </>
           }
           onRemove={() => onBanner('')}
           onCroppedFile={onUpload}
         />
         <p className="text-[11px] text-zinc-500 mt-1.5">
-          3:1 banner, recommended {LANDING_PROMO_BANNER_SIZE_HINT}. Required when the plan uses the home slider or category rail.
+          Desktop slider — {LANDING_PROMO_BANNER_SIZE_HINT}.
+        </p>
+      </div>
+      <div>
+        <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">
+          Mobile &amp; tablet banner (2:1){" "}
+          {needsBanner ? <span className="text-rose-500">*</span> : <span className="normal-case tracking-normal text-zinc-500">(optional)</span>}
+        </label>
+        <CroppedImageField
+          value={bannerMobile}
+          aspect={LANDING_PROMO_BANNER_MOBILE_ASPECT}
+          disabled={uploading}
+          previewClassName="w-full aspect-[2/1] object-cover rounded-xl border border-slate-200 overflow-hidden"
+          emptyClassName="flex flex-col items-center justify-center w-full aspect-[2/1] rounded-xl border border-dashed border-slate-300 bg-slate-50 hover:border-rose-400 text-slate-400"
+          emptyLabel="Upload mobile banner"
+          emptyContent={
+            <>
+              <ImagePlus size={22} className="mb-1" />
+              <span className="text-xs font-semibold text-slate-600">Upload mobile / tablet 2:1 banner</span>
+            </>
+          }
+          onRemove={() => onBannerMobile('')}
+          onCroppedFile={onUploadMobile}
+        />
+        <p className="text-[11px] text-zinc-500 mt-1.5">
+          Phone &amp; tablet slider — {LANDING_PROMO_BANNER_MOBILE_SIZE_HINT}.
         </p>
       </div>
       <div>
@@ -590,6 +627,7 @@ export default function AdminMarketingPage() {
   const [editStartDate, setEditStartDate] = useState('');
   const [editEndDate, setEditEndDate] = useState('');
   const [editBanner, setEditBanner] = useState('');
+  const [editBannerMobile, setEditBannerMobile] = useState('');
   const [editAccent, setEditAccent] = useState('');
   const [uploadImage, { isLoading: uploadingBanner }] = useUploadImageMutation();
 
@@ -731,6 +769,7 @@ export default function AdminMarketingPage() {
     setEditStartDate('');
     setEditEndDate('');
     setEditBanner('');
+    setEditBannerMobile('');
     setEditAccent('');
     campaignForm.reset({ businessId: '', plan_id: '' });
   };
@@ -743,6 +782,7 @@ export default function AdminMarketingPage() {
     setEditStartDate(camp.start_date ? toDateInput(camp.start_date) : '');
     setEditEndDate(camp.end_date ? toDateInput(camp.end_date) : '');
     setEditBanner(camp.banner_image_url || '');
+    setEditBannerMobile(camp.banner_image_mobile_url || '');
     setEditAccent(camp.slider_accent_text || '');
     campaignForm.reset({
       businessId: String(camp.business_id || ''),
@@ -750,7 +790,11 @@ export default function AdminMarketingPage() {
     });
   };
 
-  const onUploadBanner = async (file: File | null) => {
+  const onUploadBannerField = async (
+    file: File | null,
+    setter: (url: string) => void,
+    label: string
+  ) => {
     if (!file) return;
     try {
       const fd = new FormData();
@@ -758,8 +802,8 @@ export default function AdminMarketingPage() {
       const res = await uploadImage(fd).unwrap();
       const url = extractUploadUrl(res);
       if (!url) throw new Error('Upload failed');
-      setEditBanner(url);
-      toast.success('Banner uploaded');
+      setter(url);
+      toast.success(`${label} uploaded`);
     } catch (err) {
       toast.error(extractApiError(err, 'Failed to upload banner'));
     }
@@ -788,7 +832,11 @@ export default function AdminMarketingPage() {
       if (editingCampaign) {
         const needsBanner = placementNeedsBanner(selectedPlan);
         if (needsBanner && !editBanner.trim()) {
-          toast.error('This plan shows a banner. Upload a 3:1 banner image.');
+          toast.error('This plan shows a banner. Upload a desktop 3:1 banner image.');
+          return;
+        }
+        if (needsBanner && !editBannerMobile.trim()) {
+          toast.error('This plan shows a banner. Upload a mobile / tablet 2:1 banner image.');
           return;
         }
         if (!editTitle.trim()) {
@@ -803,6 +851,7 @@ export default function AdminMarketingPage() {
           ...(editStartDate ? { start_date: editStartDate } : {}),
           ...(editEndDate ? { end_date: editEndDate } : {}),
           banner_image_url: editBanner,
+          banner_image_mobile_url: editBannerMobile,
           slider_accent_text: editAccent,
         }).unwrap();
         toast.success('Campaign updated');
@@ -1654,6 +1703,7 @@ export default function AdminMarketingPage() {
                     startDate={editStartDate}
                     endDate={editEndDate}
                     banner={editBanner}
+                    bannerMobile={editBannerMobile}
                     accent={editAccent}
                     uploading={uploadingBanner}
                     plan={
@@ -1665,8 +1715,12 @@ export default function AdminMarketingPage() {
                     onStart={setEditStartDate}
                     onEnd={setEditEndDate}
                     onBanner={setEditBanner}
+                    onBannerMobile={setEditBannerMobile}
                     onAccent={setEditAccent}
-                    onUpload={(file) => void onUploadBanner(file)}
+                    onUpload={(file) => void onUploadBannerField(file, setEditBanner, 'Desktop banner')}
+                    onUploadMobile={(file) =>
+                      void onUploadBannerField(file, setEditBannerMobile, 'Mobile banner')
+                    }
                   />
                 ) : null}
                 <button

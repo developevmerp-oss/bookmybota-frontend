@@ -181,7 +181,7 @@ function RelatedCard({
             {dateLine}
           </p>
         ) : null}
-        <h3 className="line-clamp-2 text-base font-bold leading-snug tracking-wide text-[#1C1C1C] sm:text-lg">
+        <h3 className="break-words text-base font-bold leading-snug tracking-wide text-[#1C1C1C] sm:text-lg">
           {event.name}
         </h3>
         {place ? (

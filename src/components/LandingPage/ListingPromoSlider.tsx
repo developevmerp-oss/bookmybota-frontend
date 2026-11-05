@@ -40,7 +40,10 @@ export type ListingPromoSlide = {
   title: string;
   year?: string;
   tagline?: string;
+  /** Desktop 3:1 creative */
   image: string;
+  /** Mobile / tablet 2:1 creative (falls back to `image`) */
+  imageMobile?: string;
   href: string;
   badge: string;
   dateLabel?: string;
@@ -210,7 +213,9 @@ function campaignToListingSlide(
   }
 ): ListingPromoSlide | null {
   const banner = resolveMediaUrl(promo.banner_image_url || "");
-  if (!banner) return null;
+  const bannerMobile =
+    resolveMediaUrl(promo.banner_image_mobile_url || "") || banner;
+  if (!banner && !bannerMobile) return null;
 
   const targetType = String(promo.target_type || "").toUpperCase();
   const targetId = promo.target_id ? String(promo.target_id) : "";
@@ -250,7 +255,8 @@ function campaignToListingSlide(
         linkedEvent?.about_event || linkedMovie?.description || linkedDining?.description || null,
         title
       ),
-    image: banner || base?.image || "",
+    image: banner || bannerMobile || base?.image || "",
+    imageMobile: bannerMobile || banner || base?.image || "",
     href:
       promotionClickHref(promo) ||
       (linkedDining ? restaurantHref(linkedDining) : "") ||
@@ -277,6 +283,45 @@ function taglineVisible(slide: ListingPromoSlide) {
   return true;
 }
 
+function PromoSlidePicture({
+  slide,
+  designedClass = false,
+}: {
+  slide: ListingPromoSlide;
+  designedClass?: boolean;
+}) {
+  const [failedDesktop, setFailedDesktop] = useState(false);
+  const [failedMobile, setFailedMobile] = useState(false);
+  const desktopSrc = slide.image;
+  const mobileSrc = slide.imageMobile || slide.image;
+  const showDesktop = Boolean(desktopSrc) && !failedDesktop;
+  const showMobile = Boolean(mobileSrc) && !failedMobile;
+
+  if (!showDesktop && !showMobile) {
+    return <div className="h-full w-full promo-slide-fallback" aria-hidden />;
+  }
+
+  return (
+    <picture>
+      {showDesktop ? <source media="(min-width: 1024px)" srcSet={desktopSrc} /> : null}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={showMobile ? mobileSrc : desktopSrc}
+        alt=""
+        aria-hidden
+        className={`promo-slide-photo h-full w-full object-cover object-center${
+          designedClass ? " promo-slide-photo--designed" : ""
+        }`}
+        draggable={false}
+        onError={() => {
+          setFailedMobile(true);
+          setFailedDesktop(true);
+        }}
+      />
+    </picture>
+  );
+}
+
 function SlideCard({
   slide,
   plainImage = false,
@@ -285,25 +330,12 @@ function SlideCard({
   /** Customer dining home: banner image only (no scrim / details / accent). */
   plainImage?: boolean;
 }) {
-  const [failed, setFailed] = useState(false);
-  const showImage = Boolean(slide.image) && !failed;
+  const hasImage = Boolean(slide.image || slide.imageMobile);
 
   if (plainImage) {
     return (
       <div className="absolute inset-0">
-        {showImage ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={slide.image}
-            alt=""
-            aria-hidden
-            className="promo-slide-photo h-full w-full object-cover"
-            draggable={false}
-            onError={() => setFailed(true)}
-          />
-        ) : (
-          <div className="h-full w-full promo-slide-fallback" aria-hidden />
-        )}
+        <PromoSlidePicture slide={slide} />
       </div>
     );
   }
@@ -311,29 +343,16 @@ function SlideCard({
   const hasMeta = Boolean(slide.dateLabel || slide.cityLabel);
   const showTagline = taglineVisible(slide);
   const showAccent = Boolean(slide.accent?.trim());
-  const isDesignedPoster = Boolean(slide.designed && showImage);
+  const isDesignedPoster = Boolean(slide.designed && hasImage);
 
   return (
     <>
       <div className="absolute inset-0">
-        {showImage ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={slide.image}
-            alt=""
-            aria-hidden
-            className={`promo-slide-photo h-full w-full object-cover ${isDesignedPoster ? "promo-slide-photo--designed" : ""
-              }`}
-            draggable={false}
-            onError={() => setFailed(true)}
-          />
-        ) : (
-          <div className="h-full w-full promo-slide-fallback" aria-hidden />
-        )}
+        <PromoSlidePicture slide={slide} designedClass={isDesignedPoster} />
         <div
           className={`pointer-events-none absolute inset-0 ${isDesignedPoster
             ? "promo-slide-scrim-designed"
-            : showImage
+            : hasImage
               ? "promo-slide-scrim-poster"
               : "promo-slide-scrim"
             }`}

@@ -67,9 +67,9 @@ import "./MovieLandingPage.css";
 import "@/components/DinningLandingPage/DiningHomePage.css";
 import "@/components/DinningLandingPage/DiningSearchPopup.css";
 
-/** Desktop / expanded grid columns — matches landing 4-up card proportions. */
+/** See All / expanded grid — 1-up mobile, 2-up tablet, 4-up desktop. */
 const MOVIE_GRID_COLS =
-  "grid-cols-2 gap-x-4 gap-y-5 sm:gap-x-[1.15rem] lg:grid-cols-4 lg:gap-x-6 lg:gap-y-6";
+  "grid-cols-1 gap-y-5 sm:grid-cols-2 sm:gap-x-[1.15rem] sm:gap-y-5 lg:grid-cols-4 lg:gap-x-6 lg:gap-y-6";
 const DISPLAY_ONE_ROW_COUNT = 4;
 
 const FORMATS = ["2D", "3D", "4DX", "IMAX 2D"] as const;
@@ -393,7 +393,7 @@ function MoviePromoFeatureCard({
       />
 
       <div className="absolute inset-x-0 bottom-0 z-10 p-3.5 text-center sm:p-4">
-        <h3 className="text-lg font-extrabold leading-snug text-white line-clamp-2 sm:text-xl">
+        <h3 className="text-lg font-extrabold leading-snug text-white break-words sm:text-xl">
           {slide.title}
         </h3>
         {slide.genres.length > 0 ? (
@@ -549,7 +549,7 @@ function MovieRail({
   );
 }
 
-/** Catalog grid sized to landing 4-up proportions (2-up mobile/tablet, 4-up desktop). */
+/** Catalog grid: 1-up mobile, 2-up tablet, 4-up desktop. */
 function MovieCardsGrid({ movies }: { movies: MovieCardData[] }) {
   return (
     <div className={`grid ${MOVIE_GRID_COLS}`}>

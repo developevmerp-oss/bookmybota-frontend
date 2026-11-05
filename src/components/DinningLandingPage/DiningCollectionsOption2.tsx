@@ -21,7 +21,7 @@ function CollectionCardOption2({
   return (
     <Link
       href={href}
-      className="relative shrink-0 snap-start block overflow-hidden rounded-2xl shadow-md transition-all duration-300 hover:-translate-y-1 hover:shadow-xl cursor-pointer group h-[248px] w-[calc((100vw-2.5rem)/1.38)] sm:h-[280px] sm:w-[calc((100vw-5rem)/2.2)] md:h-[300px] md:w-[calc((100vw-5rem)/3.35)] lg:h-[320px] lg:w-auto lg:flex-[0_0_calc((100%-3rem)/4)] xl:h-[330px]"
+      className="relative shrink-0 snap-start block overflow-hidden rounded-2xl shadow-md transition-all duration-300 hover:-translate-y-1 hover:shadow-xl cursor-pointer group h-[248px] w-[calc((100vw-2.5rem)/1.2)] sm:h-[280px] sm:w-[calc((100vw-5rem)/2.2)] md:h-[300px] md:w-[calc((100vw-5rem)/2.2)] lg:h-[320px] lg:w-auto lg:flex-[0_0_calc((100%-3rem)/4)] xl:h-[330px]"
     >
       <img
         src={

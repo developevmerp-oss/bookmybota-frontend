@@ -81,7 +81,7 @@ export function MovieNotifyCard({ movie }: { movie: MustWatchMovieCard }) {
 
         <div className="flex flex-col gap-1 px-3.5 pt-3 pb-3.5 min-w-0">
           <div className="flex items-start justify-between gap-2 min-w-0">
-            <h3 className="min-w-0 flex-1 text-base tracking-wide sm:text-lg font-bold text-[#1C1C1C] truncate leading-snug">
+            <h3 className="min-w-0 flex-1 text-base tracking-wide sm:text-lg font-bold text-[#1C1C1C] break-words leading-snug">
               {movie.title}
             </h3>
             {showRating ? (
@@ -112,7 +112,7 @@ export function MovieNotifyCard({ movie }: { movie: MustWatchMovieCard }) {
           </div>
 
           {metaLine ? (
-            <p className="min-w-0 text-sm tracking-wide text-gray-600 truncate leading-snug">
+            <p className="min-w-0 text-sm tracking-wide text-gray-600 break-words leading-snug">
               {metaLine}
             </p>
           ) : null}

@@ -84,7 +84,7 @@ function WishlistRestaurantCard({
 
       <Link href={restaurantHref(restaurant)} className="flex flex-col flex-1 p-4 min-w-0">
         <div className="flex items-start justify-between gap-2">
-          <h3 className="font-bold text-[#111111] text-base leading-snug line-clamp-2 group-hover:text-[#6900AA] transition-colors">
+          <h3 className="font-bold text-[#111111] text-base leading-snug break-words group-hover:text-[#6900AA] transition-colors">
             {restaurant.name}
           </h3>
           {Number(restaurant.rating) > 0 && (

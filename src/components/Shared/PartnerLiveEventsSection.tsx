@@ -71,7 +71,7 @@ function EventPosterCard({
           </p>
         ) : null}
         <h3
-          className={`text-sm font-bold leading-snug line-clamp-2 sm:text-base lg:min-h-[3rem] ${
+          className={`text-sm font-bold leading-snug break-words sm:text-base ${
             disabled ? "text-black/45" : "text-black"
           }`}
         >

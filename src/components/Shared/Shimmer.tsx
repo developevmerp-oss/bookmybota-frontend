@@ -377,7 +377,7 @@ export function EventListShimmer() {
   return (
     <Wrap>
       <div
-        className="grid w-full grid-cols-2 gap-4 lg:grid-cols-4 lg:gap-6"
+        className="grid w-full grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 lg:gap-6"
         aria-busy="true"
         aria-label="Loading events"
       >
@@ -925,7 +925,7 @@ export function MovieGridShimmer({ count = 8 }: { count?: number }) {
   return (
     <Wrap>
       <div
-        className="grid grid-cols-2 gap-x-4 gap-y-5 sm:gap-x-[1.15rem] lg:grid-cols-4 lg:gap-x-6 lg:gap-y-6"
+        className="grid grid-cols-1 gap-y-5 sm:grid-cols-2 sm:gap-x-[1.15rem] sm:gap-y-5 lg:grid-cols-4 lg:gap-x-6 lg:gap-y-6"
         aria-busy="true"
         aria-label="Loading movies"
       >

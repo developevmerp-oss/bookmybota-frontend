@@ -1,6 +1,7 @@
 .adaptive-card-row {
+  /* Phone: 1 full card + ~20% of the next */
   --adaptive-gap: 0.75rem;
-  --adaptive-visible: 2;
+  --adaptive-visible: 1.2;
   --adaptive-count: 1;
   display: flex;
   width: 100%;
@@ -24,55 +25,49 @@
   display: none;
 }
 
-/* Popular Dining / Raise a Glass — one roomy card + peek (content-heavy cards) */
-.adaptive-card-row--dining {
-  --adaptive-visible: 1.38;
-  --adaptive-gap: 1rem;
-  padding-right: 1.25rem;
-}
-
-/* Exact 4-up rails (events / sports / movies) — one roomy card + peek on phone */
+/* Dining / events / sports / movies — same peek cadence */
+.adaptive-card-row--dining,
 .adaptive-card-row--four {
-  --adaptive-visible: 1.38;
-  --adaptive-gap: 1rem;
+  --adaptive-visible: 1.2;
+  --adaptive-gap: 0.75rem;
   padding-left: 0;
-  padding-right: 1.25rem;
+  padding-right: 0;
 }
 
+/* Tablet: 2 full + ~20% peek */
 @media (min-width: 640px) {
-  .adaptive-card-row {
-    --adaptive-visible: 3;
+  .adaptive-card-row,
+  .adaptive-card-row--dining,
+  .adaptive-card-row--four {
+    --adaptive-visible: 2.2;
     --adaptive-gap: 1rem;
   }
+}
 
-  .adaptive-card-row--dining {
-    --adaptive-visible: 2.2;
-    --adaptive-gap: 1.15rem;
-    padding-right: 0;
-  }
-
+@media (min-width: 768px) and (max-width: 1023px) {
+  .adaptive-card-row,
+  .adaptive-card-row--dining,
   .adaptive-card-row--four {
     --adaptive-visible: 2.2;
     --adaptive-gap: 1.15rem;
-    padding-right: 0;
   }
 }
 
+/* Desktop: exact column count (pager arrows handle overflow) */
 @media (min-width: 1024px) {
   .adaptive-card-row {
     --adaptive-visible: var(--adaptive-min-visible, 5);
+    --adaptive-gap: 1.25rem;
   }
 
   .adaptive-card-row--dining {
     --adaptive-visible: var(--adaptive-min-visible, 4);
     --adaptive-gap: 1.5rem;
-    padding-right: 0;
   }
 
   .adaptive-card-row--four {
     --adaptive-visible: var(--adaptive-min-visible, 4);
     --adaptive-gap: 1.5rem;
-    padding-right: 0;
   }
 }
 

@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Compass, Sparkles, X } from "lucide-react";
+import { ArrowRight, Compass, ShoppingBag, Sparkles, Wallet, X } from "lucide-react";
 import { paymentSuccessCopy, type BookingPaymentModule } from "@/lib/paymentSuccess";
 import { lockBodyScroll } from "@/lib/lockBodyScroll";
 import ShinyBlackButton from "@/components/Shared/ShinyBlackButton";
@@ -13,14 +13,20 @@ type Props = {
   bookingId?: string | null;
   nextHref: string;
   title?: string;
-  subtitle?: string;
+  subtitle?: ReactNode;
   nextLabel?: string;
   exploreHref?: string;
   exploreLabel?: string;
+  /** Extra content under the subtitle (e.g. gift card code). */
+  children?: ReactNode;
+  /** Override or hide the small footer note. Pass `null` to hide. */
+  footerNote?: ReactNode | null;
   /** page = full route. modal = overlay on the review screen. */
   presentation?: "page" | "modal";
   /** Modal only: dismiss without navigating. */
   onClose?: () => void;
+  /** Optional explore action (e.g. reset form) instead of router.push. */
+  onExplore?: () => void;
 };
 
 /**
@@ -36,8 +42,11 @@ export default function PaymentSuccessView({
   nextLabel,
   exploreHref,
   exploreLabel,
+  children,
+  footerNote,
   presentation = "page",
   onClose,
+  onExplore,
 }: Props) {
   const router = useRouter();
   const copy = paymentSuccessCopy(module);
@@ -48,6 +57,15 @@ export default function PaymentSuccessView({
   const [phase, setPhase] = useState<"idle" | "play" | "done">("idle");
   const isModal = presentation === "modal";
   const heading = title || copy.title;
+  const isGiftCard = module === "gift_cards";
+  const resolvedFooter =
+    footerNote === null
+      ? null
+      : footerNote !== undefined
+        ? footerNote
+        : isGiftCard
+          ? "Keep this code safe — you’ll need it to redeem your gift card."
+          : "A confirmation has been prepared for you on the next screen.";
 
   useEffect(() => {
     setPhase("idle");
@@ -75,9 +93,10 @@ export default function PaymentSuccessView({
     };
   }, [isModal, onClose]);
 
-  const shortId = bookingId
-    ? `#${bookingId.replace(/-/g, "").slice(0, 8).toUpperCase()}`
-    : null;
+  const shortId =
+    bookingId && !isGiftCard
+      ? `#${bookingId.replace(/-/g, "").slice(0, 8).toUpperCase()}`
+      : null;
 
   const isPlaying = phase === "play";
   const isDone = phase === "done";
@@ -143,7 +162,7 @@ export default function PaymentSuccessView({
     <div
       className="relative mb-3 sm:mb-3.5 flex h-[5.75rem] w-[5.75rem] sm:h-[6.25rem] sm:w-[6.25rem] items-center justify-center"
       role="img"
-      aria-label="Booking successful"
+      aria-label={isGiftCard ? "Payment successful" : "Booking successful"}
     >
       {showMark && (
         <>
@@ -257,6 +276,12 @@ export default function PaymentSuccessView({
         </div>
       ) : null}
 
+      {children ? (
+        <div className={`${opts?.compact ? "mt-3.5" : "mt-4 sm:mt-5"} w-full`}>
+          {children}
+        </div>
+      ) : null}
+
       <div className={`${opts?.compact ? "mt-5" : "mt-6 sm:mt-7"} w-full space-y-2.5`}>
         <ShinyBlackButton
           type="button"
@@ -264,24 +289,45 @@ export default function PaymentSuccessView({
           className="w-full h-12 rounded-xl bg-[#111111] text-white text-[0.9375rem] font-bold"
         >
           <span className="inline-flex items-center justify-center gap-2">
+            {isGiftCard ? <Wallet size={17} strokeWidth={2.25} /> : null}
             {nextLabel || copy.nextLabel}
-            <ArrowRight size={18} strokeWidth={2.5} />
+            {isGiftCard ? null : <ArrowRight size={18} strokeWidth={2.5} />}
           </span>
         </ShinyBlackButton>
 
         <button
           type="button"
-          onClick={() => router.push(targetExploreHref)}
-          className="w-full inline-flex items-center justify-center gap-2 h-11 rounded-xl border border-slate-200 bg-white text-slate-800 hover:bg-slate-50 hover:border-slate-300 text-[0.875rem] font-semibold transition-all cursor-pointer active:scale-[0.99]"
+          onClick={() => {
+            if (onExplore) {
+              onExplore();
+              return;
+            }
+            router.push(targetExploreHref);
+          }}
+          className={`w-full inline-flex items-center justify-center gap-2 h-11 rounded-xl border bg-white text-[0.875rem] font-semibold transition-all cursor-pointer active:scale-[0.99] ${
+            isGiftCard
+              ? "border-[#6900AA]/45 text-[#6900AA] hover:bg-[#FAF5FF] hover:border-[#6900AA]"
+              : "border-slate-200 text-slate-800 hover:bg-slate-50 hover:border-slate-300"
+          }`}
         >
-          <Compass size={16} className="text-slate-700" />
+          {isGiftCard ? (
+            <ShoppingBag size={16} className="text-[#6900AA]" />
+          ) : (
+            <Compass size={16} className="text-slate-700" />
+          )}
           {targetExploreLabel}
         </button>
       </div>
 
-      <p className={`${opts?.compact ? "mt-3" : "mt-4"} text-[0.75rem] text-slate-400 leading-snug max-w-[18rem]`}>
-        A confirmation has been prepared for you on the next screen.
-      </p>
+      {resolvedFooter ? (
+        <p
+          className={`${
+            opts?.compact ? "mt-3" : "mt-4"
+          } text-[0.75rem] text-slate-400 leading-snug max-w-[18rem]`}
+        >
+          {resolvedFooter}
+        </p>
+      ) : null}
     </>
   );
 

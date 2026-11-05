@@ -976,6 +976,7 @@ export interface AdminEvent {
     start_date?: string | null;
     end_date?: string | null;
     banner_image_url?: string | null;
+    banner_image_mobile_url?: string | null;
     amount?: number | string | null;
     plan_name?: string | null;
     plan_price?: number | string | null;
@@ -1288,6 +1289,7 @@ export interface EventFormPayload {
     plan_id: number;
     title: string;
     banner_image_url?: string;
+    banner_image_mobile_url?: string;
     slider_accent_text?: string | null;
     start_date: string;
   } | null;
@@ -1816,6 +1818,8 @@ export interface MarketingCampaign {
   plan_id: number;
   title?: string | null;
   banner_image_url?: string | null;
+  /** Mobile / tablet 2:1 banner (phone + tablet below lg). */
+  banner_image_mobile_url?: string | null;
   /** Right-side script text on the landing hero slider */
   slider_accent_text?: string | null;
   cta_url?: string | null;
@@ -2791,7 +2795,7 @@ export const api = createApi({
   reducerPath: 'api',
   baseQuery,
 
-  tagTypes: ['Businesses', 'Tables', 'Bookings', 'DiningOfferRedemptions', 'DiningGiftCardRedemptions', 'AdminDiningGiftCardSettlements', 'EventBookings', 'BusinessSettings', 'BusinessOperatingDates', 'AdminStats', 'Analytics', 'Reviews', 'MarketingPlans', 'MarketingCampaigns', 'PublicMarketingPromotions', 'PlatformOffers', 'OfferRedemptions', 'PublicPlatformOffers', 'GiftCardProducts', 'GiftCardDesigns', 'GiftCardDesignCategories', 'GiftCardTerms', 'GiftCardFaqs', 'GiftCardSettings', 'PublicGiftCardProducts', 'MyGiftCards', 'DiningWishlist', 'MovieWishlist', 'CustomerProfile', 'AdminEvents', 'AdminCommission', 'OrganizerEvents', 'OrganizerTicketStats', 'OrganizerBookings', 'PublicEvents', 'EventMasters', 'DiningMasters', 'CityMasters', 'EventContracts', 'EventLayouts', 'EventLayoutRequests', 'EventReviews', 'MovieReviews', 'CinemaOffers', 'EventOffers', 'OrganizerLedger', 'OrganizerLedgerCustomers', 'OrganizerPayouts', 'OrganizerSettlements', 'CinemaSettlements', 'PartnerDocuments', 'AdminCustomers', 'EventInterests', 'VenueLayouts', 'VenueLayoutLogs', 'ArtistSlots', 'ArtistInquiries', 'VenueSlots', 'VenueInquiries', 'Movies', 'MovieMasters', 'CinemaScreens', 'MovieShowtimes', 'MovieContracts'],
+  tagTypes: ['Businesses', 'Tables', 'Bookings', 'DiningOfferRedemptions', 'DiningGiftCardRedemptions', 'AdminDiningGiftCardSettlements', 'EventBookings', 'BusinessSettings', 'BusinessOperatingDates', 'AdminStats', 'Analytics', 'Reviews', 'MarketingPlans', 'MarketingCampaigns', 'PublicMarketingPromotions', 'PlatformOffers', 'OfferRedemptions', 'PublicPlatformOffers', 'GiftCardProducts', 'GiftCardDesigns', 'GiftCardDesignCategories', 'GiftCardTerms', 'GiftCardFaqs', 'GiftCardSettings', 'PublicGiftCardProducts', 'MyGiftCards', 'DiningWishlist', 'MovieWishlist', 'CinemaWishlist', 'CustomerProfile', 'AdminEvents', 'AdminCommission', 'OrganizerEvents', 'OrganizerTicketStats', 'OrganizerBookings', 'PublicEvents', 'EventMasters', 'DiningMasters', 'CityMasters', 'EventContracts', 'EventLayouts', 'EventLayoutRequests', 'EventReviews', 'MovieReviews', 'CinemaOffers', 'EventOffers', 'OrganizerLedger', 'OrganizerLedgerCustomers', 'OrganizerPayouts', 'OrganizerSettlements', 'CinemaSettlements', 'PartnerDocuments', 'AdminCustomers', 'EventInterests', 'VenueLayouts', 'VenueLayoutLogs', 'ArtistSlots', 'ArtistInquiries', 'VenueSlots', 'VenueInquiries', 'Movies', 'MovieMasters', 'CinemaScreens', 'MovieShowtimes', 'MovieContracts'],
 
   endpoints: (builder) => ({
 
@@ -4931,6 +4935,9 @@ export const api = createApi({
       invalidatesTags: ['MovieWishlist'],
     }),
 
+    // Cinema wishlist is registered via cinemaWishlistApi.injectEndpoints below
+    // (overrideExisting) so HMR / runtime always has a valid endpoint definition.
+
     getMyGiftCard: builder.query<GiftCardMine, string>({
       query: (id) => `/gift-cards/mine/${id}`,
       transformResponse: (res: { data: GiftCardMine }) => res.data,
@@ -5245,6 +5252,7 @@ export const api = createApi({
         title?: string;
         category?: string;
         banner_image_url?: string;
+        banner_image_mobile_url?: string;
         slider_accent_text?: string;
       }
     >({
@@ -5265,6 +5273,7 @@ export const api = createApi({
         end_date?: string;
         title?: string;
         banner_image_url?: string;
+        banner_image_mobile_url?: string;
         slider_accent_text?: string;
         cta_url?: string;
         category?: string;
@@ -5316,6 +5325,7 @@ export const api = createApi({
         plan_id: number;
         title: string;
         banner_image_url?: string;
+        banner_image_mobile_url?: string;
         slider_accent_text?: string;
         cta_url?: string;
         category?: string;
@@ -5340,6 +5350,7 @@ export const api = createApi({
         campaignId: number;
         title: string;
         banner_image_url?: string;
+        banner_image_mobile_url?: string;
         slider_accent_text?: string;
         cta_url?: string;
         target_type?: string;
@@ -9209,6 +9220,56 @@ export const giftCardSettlementApi = api.injectEndpoints({
 });
 
 export const { useGetAdminGiftCardSettlementOverviewQuery } = giftCardSettlementApi;
+
+/** Cinema wishlist — injected so HMR can re-register with overrideExisting. */
+export const cinemaWishlistApi = api.injectEndpoints({
+  overrideExisting: true,
+  endpoints: (builder) => ({
+    getCinemaWishlist: builder.query<(Business & { wishlisted_at?: string })[], void>({
+      query: () => '/wishlist/cinemas',
+      transformResponse: (res: { data: (Business & { wishlisted_at?: string })[] }) =>
+        res.data || [],
+      providesTags: ['CinemaWishlist'],
+    }),
+
+    getCinemaWishlistIds: builder.query<string[], void>({
+      query: () => '/wishlist/cinemas/ids',
+      transformResponse: (res: { data: string[] }) => res.data || [],
+      providesTags: ['CinemaWishlist'],
+    }),
+
+    toggleCinemaWishlist: builder.mutation<
+      { message?: string; data: { business_id: string; wishlisted: boolean } },
+      { business_id: string }
+    >({
+      query: (body) => ({
+        url: '/wishlist/cinemas/toggle',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['CinemaWishlist'],
+    }),
+
+    syncCinemaWishlist: builder.mutation<
+      { message?: string; data: { added: number } },
+      { business_ids: string[] }
+    >({
+      query: (body) => ({
+        url: '/wishlist/cinemas/sync',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['CinemaWishlist'],
+    }),
+  }),
+});
+
+export const {
+  useGetCinemaWishlistQuery,
+  useGetCinemaWishlistIdsQuery,
+  useToggleCinemaWishlistMutation,
+  useSyncCinemaWishlistMutation,
+} = cinemaWishlistApi;
 
 /** Injected so HMR can re-register with overrideExisting against the same api instance. */
 export const eventInterestApi = api.injectEndpoints({

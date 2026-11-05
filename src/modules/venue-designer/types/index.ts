@@ -39,10 +39,11 @@ export type ObjectType =
   | "aisle"
   | "text_label"
   | "barrier"
-  | "shape";
+  | "shape"
+  | "block";
 
 /** Free shapes and ready-made venue elements (screen, exit, restroom ...) */
-export type ShapeKind = "rect" | "ellipse" | "triangle" | "diamond" | "line";
+export type ShapeKind = "rect" | "ellipse" | "triangle" | "diamond" | "line" | "curve" | "icon" | "polygon";
 
 export interface ShapePreset {
   id: string;
@@ -54,12 +55,28 @@ export interface ShapePreset {
   label: string;
 }
 
-/** A named seat type with its own colour and price, defined once per layout */
+/** How a seat is drawn: a rounded square, a wide recliner, a double couple seat, a wheelchair bay or a round seat */
+export type SeatShape = "square" | "round" | "recliner" | "couple" | "wheelchair";
+
+export const SEAT_SHAPES: Array<{ value: SeatShape; label: string; widthFactor: number }> = [
+  { value: "square", label: "Standard seat", widthFactor: 1 },
+  { value: "round", label: "Round seat", widthFactor: 1 },
+  { value: "recliner", label: "Recliner", widthFactor: 1.6 },
+  { value: "couple", label: "Couple seat", widthFactor: 2.1 },
+  { value: "wheelchair", label: "Wheelchair bay", widthFactor: 1.2 },
+];
+
+export function seatWidthFactor(shape?: SeatShape): number {
+  return SEAT_SHAPES.find((s) => s.value === shape)?.widthFactor ?? 1;
+}
+
+/** A named seat type with its own colour, price and drawn shape, defined once per layout */
 export interface SeatType {
   id: string;
   name: string;
   color: string;
   price: number;
+  shape?: SeatShape;
 }
 
 /** One row of a stand. Rows can have any label, seat count and seat type. */
@@ -68,16 +85,39 @@ export interface RowConfig {
   label: string;
   seatCount: number;
   seatTypeId?: string;
-  /** Seat positions (1-based) where an aisle gap is left in this row */
+  /**
+   * Seats in each block of the row, left to right, with an aisle between blocks.
+   * [10, 20, 10] is 10 seats, an aisle, 20 seats, an aisle, 10 seats. The row's seat count is their sum.
+   */
+  blocks?: number[];
+  /** Older layouts: seat positions (1-based) left empty for an aisle. Read as blocks. */
   gaps?: number[];
 }
 
 export type SeatCategory = "standard" | "vip" | "vvip" | "premium" | "wheelchair" | "companion" | "blocked";
 
-export interface UniversalSeat {
-  id: string; // unique: e.g. "SEC_N-A-12"
+/** A change to one seat: its own seat type or colour, or the seat taken out */
+export interface SeatOverride {
   seatTypeId?: string;
   color?: string;
+  removed?: boolean;
+}
+
+export interface UniversalSeat {
+  id: string; // unique: e.g. "SEC_N-A-12"
+  /** Which row and position along it this seat is, used to find it again on the canvas */
+  rowId?: string;
+  slotKey?: string;
+  /** Room this seat has along its row (grid stands), so a wide seat in a row of narrow ones is drawn to fit */
+  slotWidth?: number;
+  /** Drawn size of a standard seat in canvas pixels (it follows the block's seat gap) */
+  size?: number;
+  removed?: boolean;
+  seatTypeId?: string;
+  color?: string;
+  shape?: SeatShape;
+  /** Drawn width relative to a standard seat (recliners and couple seats are wider) */
+  widthFactor?: number;
   sectionId: string;
   rowLabel: string;
   seatNumber: string;
@@ -120,12 +160,55 @@ export interface UniversalVenueObject {
   startAngle?: number;
   sweepAngle?: number;
 
+  // Show the row names (A, B, C ...) at both ends of the rows, for admins and customers. On unless set to false.
+  showRowLabels?: boolean;
+  // Show the seat number inside each seat. On unless set to false.
+  showSeatNumbers?: boolean;
+  // Show the price and block name above the block, with a line under it. On unless set to false.
+  showTierHeading?: boolean;
+  // Where the row names go: "layout" (default) puts them in a column at the far left and right of the whole layout,
+  // "block" puts them right beside this block.
+  rowLabelPlacement?: "layout" | "block";
+  // The text above a grid block (price and name). Leave empty for the automatic "ETB 200  NAME".
+  headingText?: string;
+  // Move that text: pixels right (+) / down (+) from its normal place
+  headingOffsetX?: number;
+  headingOffsetY?: number;
+  headingAlign?: "left" | "center" | "right";
+  headingFontSize?: number;
+  // Free text (type "text_label"): style of the text. `label` holds the words, `textColor` the colour.
+  textBold?: boolean;
+  textItalic?: boolean;
+  textAlign?: "left" | "center" | "right";
+  // Width of an aisle between seat blocks, in seat widths (1 = one seat). Default 1.2.
+  aisleWidth?: number;
+  // Single-seat changes, keyed by "rowId#position" (see UniversalSeat.slotKey)
+  seatOverrides?: Record<string, SeatOverride>;
   // Custom rows (labels, seat counts and seat types per row). When set, they replace rowStart/rowEnd/seatsPerRow.
   rows?: RowConfig[];
   // Default seat type for seats that do not name one
   seatTypeId?: string;
+  // Stadium blocks and polygon shapes: corner points as [x1, y1, x2, y2 ...] relative to x / y
+  points?: number[];
+  // Stadium blocks: which stand it belongs to ("Lower stand", "Upper stand" ...) and how its rows run
+  level?: string;
+  blockRowMode?: "straight" | "arc";
+  blockArcCenter?: [number, number];
+  blockRowAngle?: number;
+  blockInset?: number;
+  blockStartRow?: string;
+  /** Stadium blocks: drawn seat size (the seat gap and row gap stay as set) */
+  seatSize?: number;
+  /** Stadium blocks: space between a row's end seat and its row name */
+  blockLabelGap?: number;
+  /** Stadium blocks: keep the row names inside the block's border instead of beyond the seats */
+  blockLabelsInside?: boolean;
   // Free shapes
   shapeKind?: ShapeKind;
+  /** Icon elements only: the sign shown inside the badge (an emoji such as a no-smoking or washroom sign) */
+  iconGlyph?: string;
+  /** Curved shapes only: how far the middle bows up, as a share of the height (0 flat, 1 deep) */
+  curveDepth?: number;
   cornerRadius?: number;
   strokeWidth?: number;
   textColor?: string;

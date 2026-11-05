@@ -14,6 +14,8 @@ interface TemplatePickerModalProps {
   savedTemplates?: LayoutStandardTemplate[];
   savedLoading?: boolean;
   savedError?: string | null;
+  /** Start from an empty white page */
+  onBlank?: () => void;
   onSelectSaved?: (template: LayoutStandardTemplate) => void;
   onDeleteSaved?: (template: LayoutStandardTemplate) => void;
   onToggleShareSaved?: (template: LayoutStandardTemplate) => void;
@@ -28,6 +30,7 @@ export default function TemplatePickerModal({
   savedTemplates = [],
   savedLoading = false,
   savedError = null,
+  onBlank,
   onSelectSaved,
   onDeleteSaved,
   onToggleShareSaved,
@@ -55,30 +58,30 @@ export default function TemplatePickerModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(2, 6, 23, 0.8)" }}>
-      <div role="dialog" aria-modal="true" aria-label="Choose a layout template" className="bg-slate-950 border border-slate-800 rounded-2xl w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden shadow-2xl">
-        <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between shrink-0 bg-slate-900/60">
+      <div role="dialog" aria-modal="true" aria-label="Choose a layout template" className="bg-white border border-slate-200 rounded-2xl w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden shadow-2xl">
+        <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between shrink-0 bg-slate-50">
           <div>
-            <h2 className="text-base font-bold text-white flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-amber-400" />
+            <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-amber-600" />
               <span>Start from a standard layout</span>
             </h2>
-            <p className="text-xs text-slate-400 mt-0.5">
+            <p className="text-xs text-slate-500 mt-0.5">
               Pick a built-in layout or one saved by you or your team. Everything stays editable after loading.
             </p>
           </div>
-          <button onClick={onClose} aria-label="Close" className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors">
+          <button onClick={onClose} aria-label="Close" className="p-1.5 text-slate-500 hover:text-slate-900 rounded-lg hover:bg-slate-100 transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Source tabs */}
-        <div className="px-6 pt-3 bg-slate-900/40 flex items-center gap-1 shrink-0">
+        <div className="px-6 pt-3 bg-slate-50 flex items-center gap-1 shrink-0">
           {sourceTabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setSource(tab.id)}
               className={`px-3 py-1.5 rounded-t-lg text-xs font-bold border-b-2 transition-colors ${
-                source === tab.id ? "border-red-500 text-white" : "border-transparent text-slate-400 hover:text-white"
+                source === tab.id ? "border-red-500 text-slate-900" : "border-transparent text-slate-500 hover:text-slate-900"
               }`}
             >
               {tab.label}
@@ -88,13 +91,13 @@ export default function TemplatePickerModal({
         </div>
 
         {/* Category filter */}
-        <div className="px-6 py-2.5 bg-slate-900/40 border-b border-slate-800 flex items-center gap-2 overflow-x-auto shrink-0">
+        <div className="px-6 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center gap-2 overflow-x-auto shrink-0">
           {[{ value: "all" as const, label: "All categories" }, ...LAYOUT_CATEGORIES].map((c) => (
             <button
               key={c.value}
               onClick={() => setCategory(c.value)}
               className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${
-                category === c.value ? "bg-red-600 text-white shadow-sm" : "bg-slate-800/80 text-slate-400 hover:text-white"
+                category === c.value ? "bg-red-600 text-white shadow-sm" : "bg-slate-100 text-slate-500 hover:text-white"
               }`}
             >
               {c.label}
@@ -104,10 +107,27 @@ export default function TemplatePickerModal({
 
         <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
           {source === "built_in" ? (
-            builtIn.length === 0 ? (
-              <p className="text-center text-sm text-slate-500 py-10">No built-in layout in this category yet.</p>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {onBlank && (
+                  <div
+                    onClick={() => {
+                      onBlank();
+                      onClose();
+                    }}
+                    className="p-4 rounded-xl border-2 border-dashed border-slate-300 bg-white hover:border-red-400 cursor-pointer transition-all flex flex-col justify-between group"
+                  >
+                    <div>
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-sky-50 text-sky-700 border border-sky-200">
+                        Start fresh
+                      </span>
+                      <h3 className="mt-2 font-bold text-sm text-slate-900 group-hover:text-red-600 transition-colors">Blank page</h3>
+                      <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                        An empty white canvas. Add rows, seats, shapes and colours yourself.
+                      </p>
+                    </div>
+                    <div className="mt-4 pt-3 border-t border-slate-200 text-xs text-red-600 font-bold">Start blank →</div>
+                  </div>
+                )}
                 {builtIn.map((tmpl) => (
                   <div
                     key={tmpl.id}
@@ -115,32 +135,31 @@ export default function TemplatePickerModal({
                       onSelectTemplate(tmpl);
                       onClose();
                     }}
-                    className="p-4 rounded-xl border border-slate-800 bg-slate-900/50 hover:border-red-500/60 cursor-pointer transition-all flex flex-col justify-between group"
+                    className="p-4 rounded-xl border border-slate-200 bg-slate-50 hover:border-red-500/60 cursor-pointer transition-all flex flex-col justify-between group"
                   >
                     <div>
                       <div className="flex items-center justify-between mb-2">
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-slate-800 text-slate-300 border border-slate-700">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-700 border border-slate-300">
                           {tmpl.badge}
                         </span>
-                        <span className="text-[11px] font-mono text-amber-400 font-bold">{tmpl.objects.length} Elements</span>
+                        <span className="text-[11px] font-mono text-amber-600 font-bold">{tmpl.objects.length} Elements</span>
                       </div>
-                      <h3 className="font-bold text-sm text-white group-hover:text-red-400 transition-colors">{tmpl.name}</h3>
-                      <p className="text-xs text-slate-400 mt-1 line-clamp-2 leading-relaxed">{tmpl.description}</p>
+                      <h3 className="font-bold text-sm text-slate-900 group-hover:text-red-500 transition-colors">{tmpl.name}</h3>
+                      <p className="text-xs text-slate-500 mt-1 line-clamp-2 leading-relaxed">{tmpl.description}</p>
                     </div>
-                    <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs">
+                    <div className="mt-4 pt-3 border-t border-slate-200/80 flex items-center justify-between text-xs">
                       <span className="text-slate-500 font-medium">Click to load</span>
-                      <span className="text-red-400 font-bold group-hover:translate-x-0.5 transition-transform">Load Template →</span>
+                      <span className="text-red-500 font-bold group-hover:translate-x-0.5 transition-transform">Load Template →</span>
                     </div>
                   </div>
                 ))}
               </div>
-            )
           ) : savedLoading ? (
-            <div className="flex items-center justify-center gap-2 py-10 text-sm text-slate-400">
+            <div className="flex items-center justify-center gap-2 py-10 text-sm text-slate-500">
               <Loader2 className="w-4 h-4 animate-spin" /> Loading saved layouts…
             </div>
           ) : savedError ? (
-            <p className="text-center text-sm text-red-400 py-10">{savedError}</p>
+            <p className="text-center text-sm text-red-500 py-10">{savedError}</p>
           ) : savedList.length === 0 ? (
             <div className="text-center py-10 text-sm text-slate-500 space-y-1">
               <p>{source === "mine" ? "You have not saved a layout yet." : "Nobody has shared a layout yet."}</p>
@@ -149,25 +168,25 @@ export default function TemplatePickerModal({
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {savedList.map((tmpl) => (
-                <div key={tmpl.id} className="p-4 rounded-xl border border-slate-800 bg-slate-900/50 hover:border-red-500/60 transition-all flex flex-col justify-between">
+                <div key={tmpl.id} className="p-4 rounded-xl border border-slate-200 bg-slate-50 hover:border-red-500/60 transition-all flex flex-col justify-between">
                   <div>
                     <div className="flex items-center justify-between mb-2">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-slate-800 text-slate-300 border border-slate-700">
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-700 border border-slate-300">
                         {LAYOUT_CATEGORIES.find((c) => c.value === tmpl.category)?.label || tmpl.category}
                       </span>
-                      <span className="text-[11px] font-mono text-amber-400 font-bold">{tmpl.objects_json.length} Elements</span>
+                      <span className="text-[11px] font-mono text-amber-600 font-bold">{tmpl.objects_json.length} Elements</span>
                     </div>
-                    <h3 className="font-bold text-sm text-white">{tmpl.name}</h3>
-                    {tmpl.description && <p className="text-xs text-slate-400 mt-1 line-clamp-2 leading-relaxed">{tmpl.description}</p>}
+                    <h3 className="font-bold text-sm text-slate-900">{tmpl.name}</h3>
+                    {tmpl.description && <p className="text-xs text-slate-500 mt-1 line-clamp-2 leading-relaxed">{tmpl.description}</p>}
                     <p className="text-[11px] text-slate-500 mt-1 font-mono">{tmpl.capacity.toLocaleString()} capacity</p>
                   </div>
-                  <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between gap-2 text-xs">
+                  <div className="mt-4 pt-3 border-t border-slate-200/80 flex items-center justify-between gap-2 text-xs">
                     <button
                       onClick={() => {
                         onSelectSaved?.(tmpl);
                         onClose();
                       }}
-                      className="text-red-400 font-bold hover:text-red-300"
+                      className="text-red-500 font-bold hover:text-red-500"
                     >
                       Use this layout →
                     </button>
@@ -175,7 +194,7 @@ export default function TemplatePickerModal({
                       <span className="flex items-center gap-1">
                         <button
                           onClick={() => onToggleShareSaved?.(tmpl)}
-                          className={`p-1.5 rounded ${tmpl.is_shared ? "text-emerald-400" : "text-slate-400 hover:text-white"}`}
+                          className={`p-1.5 rounded ${tmpl.is_shared ? "text-emerald-600" : "text-slate-500 hover:text-slate-900"}`}
                           title={tmpl.is_shared ? "Shared with everyone. Click to make private" : "Private. Click to share"}
                           aria-label={tmpl.is_shared ? "Make private" : "Share with everyone"}
                         >
@@ -183,7 +202,7 @@ export default function TemplatePickerModal({
                         </button>
                         <button
                           onClick={() => onDeleteSaved?.(tmpl)}
-                          className="p-1.5 rounded text-red-400 hover:text-red-300"
+                          className="p-1.5 rounded text-red-500 hover:text-red-500"
                           title="Delete template"
                           aria-label={`Delete ${tmpl.name}`}
                         >

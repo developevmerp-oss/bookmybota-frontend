@@ -46,36 +46,36 @@ function SaveTemplateForm({
   };
 
   const input =
-    "w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500";
+    "w-full bg-white border border-slate-300 rounded px-3 py-2 text-sm text-slate-900 focus:outline-none focus:border-red-500";
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center p-4" style={{ background: "rgba(2, 6, 23, 0.75)" }}>
-      <div role="dialog" aria-modal="true" aria-label="Save as standard layout" className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-950 shadow-2xl">
-        <div className="flex items-center justify-between border-b border-slate-800 px-5 py-4">
+      <div role="dialog" aria-modal="true" aria-label="Save as standard layout" className="w-full max-w-md rounded-2xl border border-slate-200 bg-white shadow-2xl">
+        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
           <div>
-            <h2 className="text-base font-bold text-white flex items-center gap-2">
-              <Save className="w-4 h-4 text-amber-400" /> Save as standard layout
+            <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+              <Save className="w-4 h-4 text-amber-600" /> Save as standard layout
             </h2>
-            <p className="text-xs text-slate-400 mt-0.5">
+            <p className="text-xs text-slate-500 mt-0.5">
               {elementCount} element{elementCount === 1 ? "" : "s"} · {capacity.toLocaleString()} capacity · seat types included
             </p>
           </div>
-          <button type="button" onClick={onClose} aria-label="Close" className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800">
+          <button type="button" onClick={onClose} aria-label="Close" className="p-1.5 text-slate-500 hover:text-slate-900 rounded-lg hover:bg-slate-100">
             <X className="w-5 h-5" />
           </button>
         </div>
 
         <div className="px-5 py-4 space-y-4 text-xs">
           <div>
-            <label className="text-slate-400 block mb-1" htmlFor="tmpl-name">
+            <label className="text-slate-500 block mb-1" htmlFor="tmpl-name">
               Template name
             </label>
             <input id="tmpl-name" value={name} onChange={(e) => setName(e.target.value)} className={input} placeholder="e.g. 200-seat cinema hall" autoFocus />
-            {touched && nameError && <p className="text-red-400 mt-1">{nameError}</p>}
+            {touched && nameError && <p className="text-red-500 mt-1">{nameError}</p>}
           </div>
 
           <div>
-            <label className="text-slate-400 block mb-1" htmlFor="tmpl-category">
+            <label className="text-slate-500 block mb-1" htmlFor="tmpl-category">
               Category
             </label>
             <select id="tmpl-category" value={category} onChange={(e) => setCategory(e.target.value as LayoutCategory)} className={input}>
@@ -88,7 +88,7 @@ function SaveTemplateForm({
           </div>
 
           <div>
-            <label className="text-slate-400 block mb-1" htmlFor="tmpl-desc">
+            <label className="text-slate-500 block mb-1" htmlFor="tmpl-desc">
               Description (optional)
             </label>
             <textarea id="tmpl-desc" value={description} onChange={(e) => setDescription(e.target.value)} rows={2} className={input} placeholder="When should this layout be used?" />
@@ -96,15 +96,15 @@ function SaveTemplateForm({
 
           <label className="flex items-start gap-2 cursor-pointer">
             <input type="checkbox" checked={isShared} onChange={(e) => setIsShared(e.target.checked)} className="mt-0.5 accent-red-600" />
-            <span className="text-slate-300">
+            <span className="text-slate-700">
               Share with everyone who uses the layout designer
               <span className="block text-slate-500">Others can start new layouts from it. Only you can delete it.</span>
             </span>
           </label>
         </div>
 
-        <div className="flex justify-end gap-2 border-t border-slate-800 px-5 py-3">
-          <button type="button" onClick={onClose} className="px-3 py-2 text-xs font-semibold text-slate-300 hover:text-white">
+        <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-3">
+          <button type="button" onClick={onClose} className="px-3 py-2 text-xs font-semibold text-slate-700 hover:text-slate-900">
             Cancel
           </button>
           <button

@@ -36,6 +36,7 @@ import { toast } from "sonner";
 import images from "@/Images";
 import { useSelectedCity } from "@/lib/useSelectedCity";
 import PaymentSuccessView from "@/components/Shared/PaymentSuccessView";
+import ShinyBlackButton from "@/components/Shared/ShinyBlackButton";
 import {
   useCreateEventBookingMutation,
   useCreateEventSeatHoldMutation,
@@ -127,12 +128,45 @@ type Props = {
   event: OrganizerEvent;
   open: boolean;
   initialShowtimeId?: string;
+  /** Restore checkout step from URL (`venue` | `tickets` | `mode` | `confirm` or 1–4). */
+  initialStep?: number;
   onClose: () => void;
   mode?: EventCheckoutMode;
   /** drawer = overlay panel (organizer); page = full booking route */
   variant?: "drawer" | "page";
   onOrganizerSuccess?: (result: EventCheckoutResult) => void;
 };
+
+const CHECKOUT_STEP_SLUG: Record<number, string> = {
+  1: "venue",
+  2: "tickets",
+  3: "mode",
+  4: "confirm",
+};
+
+function parseCheckoutStepParam(
+  raw: string | null | undefined,
+  isSingleVenue: boolean
+): number | null {
+  if (!raw) return null;
+  const key = String(raw).trim().toLowerCase();
+  const fromSlug: Record<string, number> = {
+    venue: 1,
+    showtimes: 1,
+    tickets: 2,
+    mode: 3,
+    confirm: 4,
+    review: 4,
+  };
+  let step = fromSlug[key];
+  if (!step) {
+    const n = Number(key);
+    if (Number.isFinite(n) && n >= 1 && n <= 4) step = n;
+  }
+  if (!step) return null;
+  if (isSingleVenue && step === 1) return 2;
+  return step;
+}
 
 function dateKey(iso: string) {
   return getVenueDateTimeParts(iso)?.dateKey || "";
@@ -206,6 +240,7 @@ export default function EventCheckout({
   event,
   open,
   initialShowtimeId,
+  initialStep,
   onClose,
   mode = "customer",
   variant = "drawer",
@@ -216,10 +251,19 @@ export default function EventCheckout({
   const eventPosterUrl = resolveMediaUrl(
     event.poster_vertical_url || event.poster_horizontal_url
   );
+  /** Prefer landscape art in the compact checkout header; fall back to vertical. */
+  const headerHorizontalUrl = resolveMediaUrl(event.poster_horizontal_url);
+  const headerPosterUrl =
+    headerHorizontalUrl || resolveMediaUrl(event.poster_vertical_url);
+  const headerUsesHorizontal = Boolean(headerHorizontalUrl);
   const dispatch = useAppDispatch();
   const selectedCity = useSelectedCity();
   const authUser = useAppSelector((state) => state.auth.user);
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(() =>
+    initialStep && initialStep >= 1 && initialStep <= 4 ? initialStep : 1
+  );
+  const stepRef = useRef(step);
+  stepRef.current = step;
   const [showtimeId, setShowtimeId] = useState("");
   const [selectedDateKey, setSelectedDateKey] = useState("");
   const [qtyByType, setQtyByType] = useState<Record<string, number>>({});
@@ -303,6 +347,7 @@ export default function EventCheckout({
     resetContactModal(getContactValues());
     setContactModalOpen(true);
   };
+  const checkoutScrollRef = useRef<HTMLDivElement | null>(null);
   const checkoutScrollFadeRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [checkoutScrollActive, setCheckoutScrollActive] = useState(false);
 
@@ -311,6 +356,12 @@ export default function EventCheckout({
     if (checkoutScrollFadeRef.current) clearTimeout(checkoutScrollFadeRef.current);
     checkoutScrollFadeRef.current = setTimeout(() => setCheckoutScrollActive(false), 900);
   };
+
+  useEffect(() => {
+    const el = checkoutScrollRef.current;
+    if (el) el.scrollTop = 0;
+    if (typeof window !== "undefined") window.scrollTo(0, 0);
+  }, [step]);
 
   useEffect(() => {
     return () => {
@@ -376,11 +427,15 @@ export default function EventCheckout({
     const ownHold = (activeLayoutData as any)?.data?.own_hold || (activeLayoutData as any)?.own_hold;
     if (!ownHold || ownHold.status !== "ACTIVE") return;
 
-    if (ownHold.id) {
-      setHoldId((curr) => curr || ownHold.id);
-    }
-    if (ownHold.expires_at) {
-      setExpiresAt((curr) => curr || resolveHoldExpiresAt({ expires_at: ownHold.expires_at }));
+    // Restore seat selection anytime, but only attach the booking countdown
+    // once the user reaches Review (after Continue to review).
+    if (step >= 4) {
+      if (ownHold.id) {
+        setHoldId((curr) => curr || ownHold.id);
+      }
+      if (ownHold.expires_at) {
+        setExpiresAt((curr) => curr || resolveHoldExpiresAt({ expires_at: ownHold.expires_at }));
+      }
     }
     if (ownHold.showtime_id) {
       setShowtimeId((curr) => curr || ownHold.showtime_id);
@@ -418,31 +473,10 @@ export default function EventCheckout({
         return Object.keys(next).length > 0 ? next : curr;
       });
     }
-  }, [activeLayoutData]);
+  }, [activeLayoutData, step]);
 
-  useEffect(() => {
-    if (typeof window === "undefined" || !isPage) return;
-    const handlePopState = () => {
-      setStep((curr) => {
-        if (curr === 4) return 3;
-        if (curr === 3) return 2;
-        if (curr === 2) return 1;
-        return curr;
-      });
-    };
-    window.addEventListener("popstate", handlePopState);
-    return () => window.removeEventListener("popstate", handlePopState);
-  }, [isPage]);
-
-  useEffect(() => {
-    if (typeof window === "undefined" || !isPage) return;
-    if (step > 1) {
-      window.history.pushState({ eventCheckoutStep: step }, "", window.location.href);
-    }
-  }, [step, isPage]);
-
-  const showtimes = event.showtimes || [];
-  const allTicketTypes = event.ticket_types || [];
+  const showtimes = useMemo(() => event.showtimes || [], [event.showtimes]);
+  const allTicketTypes = useMemo(() => event.ticket_types || [], [event.ticket_types]);
   const ticketTypes = useMemo(() => {
     if (!showtimeId) return allTicketTypes;
     const scoped = allTicketTypes.filter((t) => t.showtime_id === showtimeId);
@@ -618,6 +652,61 @@ export default function EventCheckout({
   }, [cityVenueGroups]);
   const isSingleVenue = totalVenuesCount === 1 || (totalVenuesCount === 0 && showtimes.length <= 1);
 
+  const syncCheckoutUrl = useCallback(
+    (nextStep: number, nextShowtimeId?: string, mode: "push" | "replace" = "replace") => {
+      if (!isPage || typeof window === "undefined") return;
+      const url = new URL(window.location.href);
+      url.searchParams.set("step", CHECKOUT_STEP_SLUG[nextStep] || String(nextStep));
+      const sid = nextShowtimeId ?? showtimeId;
+      if (sid) url.searchParams.set("showtime", sid);
+      else url.searchParams.delete("showtime");
+      const next = `${url.pathname}${url.search}${url.hash}`;
+      const curr = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+      if (next === curr) return;
+      if (mode === "push") {
+        window.history.pushState({ eventCheckoutStep: nextStep }, "", next);
+      } else {
+        window.history.replaceState({ eventCheckoutStep: nextStep }, "", next);
+      }
+    },
+    [isPage, showtimeId]
+  );
+
+  const prevUrlStepRef = useRef(step);
+  useEffect(() => {
+    if (!isPage) return;
+    const stepChanged = prevUrlStepRef.current !== step;
+    prevUrlStepRef.current = step;
+    // Push when the step changes so browser back moves between steps; replace for showtime-only updates.
+    syncCheckoutUrl(step, showtimeId, stepChanged ? "push" : "replace");
+  }, [isPage, step, showtimeId, syncCheckoutUrl]);
+
+  useEffect(() => {
+    if (!isPage || typeof window === "undefined") return;
+
+    const handlePopState = () => {
+      const params = new URLSearchParams(window.location.search);
+      const parsed = parseCheckoutStepParam(params.get("step"), isSingleVenue);
+      const curr = stepRef.current;
+
+      // Leaving Review via browser back — confirm before releasing the hold.
+      if (curr === 4 && (parsed == null || parsed < 4)) {
+        setCancelTxnAction("back");
+        setCancelTxnOpen(true);
+        syncCheckoutUrl(4, showtimeId, "push");
+        return;
+      }
+
+      if (parsed != null && parsed !== curr) {
+        setStep(parsed);
+        if (parsed !== 2) setIsMapFullscreen(false);
+      }
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [isPage, isSingleVenue, syncCheckoutUrl, showtimeId]);
+
   const effectiveSteps = useMemo(() => {
     if (isSingleVenue) {
       return [
@@ -638,8 +727,20 @@ export default function EventCheckout({
     if (!isOrganizer) dispatch(loadFromStorage());
   }, [dispatch, isOrganizer]);
 
+  const checkoutSeededEventRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      checkoutSeededEventRef.current = null;
+      return;
+    }
+    // Seed once per event open. URL step/showtime sync must NOT re-run this or
+    // selected seats + price get wiped on Review (0 tickets / 0 ETB).
+    if (checkoutSeededEventRef.current === event.id) return;
+    // Wait until showtimes are ready when the event has them.
+    if ((event.showtimes?.length ?? 0) > 0 && showtimes.length === 0) return;
+
+    checkoutSeededEventRef.current = event.id;
+
     const initial = initialShowtimeId
       ? showtimes.find((s) => s.id === initialShowtimeId)
       : undefined;
@@ -647,16 +748,32 @@ export default function EventCheckout({
     const pickedShowtime = initial || (showtimes.length === 1 ? showtimes[0] : (isSingleVenue ? showtimes[0] : undefined));
     setShowtimeId(pickedShowtime ? pickedShowtime.id : "");
     setSelectedDateKey(firstDate);
-    setStep(isSingleVenue && pickedShowtime ? 2 : 1);
+    const restoredStep =
+      initialStep && initialStep >= 1 && initialStep <= 4
+        ? isSingleVenue && initialStep === 1
+          ? 2
+          : initialStep
+        : isSingleVenue && pickedShowtime
+          ? 2
+          : 1;
+    setStep(restoredStep);
     setQtyByType({});
     setSelectedSeats([]);
     setDesiredSeatQty(null);
     setSeatCountPick(null);
     setSeatQtyModalOpen(false);
-    setIsMapFullscreen(false);
+    setIsMapFullscreen(restoredStep === 2);
     autoOpenedMapRef.current = false;
-    resetContact(emptyEventCheckoutContactValues());
-    resetContactModal(emptyEventCheckoutContactValues());
+    const seededContact =
+      !isOrganizer && authUser?.role === "customer"
+        ? {
+            name: profile?.name || authUser.name || "",
+            phone: sanitizePhoneInput(profile?.phone || authUser.phone || ""),
+            email: profile?.email || authUser.email || "",
+          }
+        : emptyEventCheckoutContactValues();
+    resetContact(seededContact);
+    resetContactModal(seededContact);
     setPromoInput("");
     setAppliedPromo(null);
     setGiftCardInput("");
@@ -670,7 +787,8 @@ export default function EventCheckout({
     setCancelTxnOpen(false);
     setTicketMode(defaultTicketModeForEvent(event.allowed_ticket_modes));
     resetDelivery(emptyEventCheckoutDeliveryValues(false));
-  }, [open, event.id, event.allowed_ticket_modes, initialShowtimeId, isSingleVenue, showtimes, dateOptions, resetContact, resetContactModal, resetDelivery]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-time seed per event open
+  }, [open, event.id, event.showtimes, showtimes, dateOptions, isSingleVenue]);
 
   useEffect(() => {
     if (!availableTicketModes.some((o) => o.id === ticketMode)) {
@@ -684,12 +802,21 @@ export default function EventCheckout({
 
   useEffect(() => {
     if (isOrganizer || authUser?.role !== "customer") return;
-    resetContact({
+    const next = {
       name: profile?.name || authUser.name || "",
       phone: sanitizePhoneInput(profile?.phone || authUser.phone || ""),
       email: profile?.email || authUser.email || "",
-    });
-  }, [authUser, profile, isOrganizer, resetContact]);
+    };
+    // Fill from auth/profile when form contact is still empty (e.g. profile loaded late).
+    const current = getContactValues();
+    if (!current.name?.trim() || !current.phone?.trim() || !current.email?.trim()) {
+      resetContact({
+        name: current.name?.trim() || next.name,
+        phone: current.phone?.trim() || next.phone,
+        email: current.email?.trim() || next.email,
+      });
+    }
+  }, [authUser, profile, isOrganizer, resetContact, getContactValues]);
 
   const timesForDate = useMemo(
     () => showtimes.filter((s) => dateKey(s.starts_at) === selectedDateKey),
@@ -975,7 +1102,11 @@ export default function EventCheckout({
         });
       }
 
-      const contact = getContactValues();
+      const contact = {
+        name: effectiveContact.name || getContactValues().name.trim(),
+        phone: effectiveContact.phone || sanitizePhoneInput(getContactValues().phone),
+        email: effectiveContact.email || getContactValues().email.trim(),
+      };
       const guest_name = contact.name.trim();
       const guest_phone = sanitizePhoneInput(contact.phone);
       const guest_email = contact.email.trim() || undefined;
@@ -1115,6 +1246,16 @@ export default function EventCheckout({
       setSeatQtyModalOpen(true);
     }
   }, [open, step, hasReservedSeats, showtimeHasSeatingLayout]);
+
+  // Keep desired qty in sync when seats exist but qty was never persisted
+  // (avoids "2/2 selected" UI while Continue still thinks qty is missing).
+  useEffect(() => {
+    if (!hasReservedSeats) return;
+    if (desiredSeatQty != null) return;
+    if (selectedSeats.length < 1) return;
+    setDesiredSeatQty(selectedSeats.length);
+    setSeatCountPick((curr) => curr ?? selectedSeats.length);
+  }, [hasReservedSeats, desiredSeatQty, selectedSeats.length]);
 
   const eventGridLayout = useMemo(() => {
     type GridSeat = {
@@ -1362,11 +1503,20 @@ export default function EventCheckout({
               ? "Choose how you want your tickets to continue."
               : "Choose how you want your tickets and sign in to continue."
           : "Review your order and confirm your booking.";
-  const contactDetailsReady = eventCheckoutContactSchema.isValidSync({
-    name,
-    phone,
-    email,
-  });
+  const effectiveContact = {
+    name: (
+      name ||
+      (!isOrganizer ? profile?.name || authUser?.name || "" : "")
+    ).trim(),
+    phone: sanitizePhoneInput(
+      phone || (!isOrganizer ? profile?.phone || authUser?.phone || "" : "")
+    ),
+    email: (
+      email ||
+      (!isOrganizer ? profile?.email || authUser?.email || "" : "")
+    ).trim(),
+  };
+  const contactDetailsReady = eventCheckoutContactSchema.isValidSync(effectiveContact);
   const detailsReady =
     contactDetailsReady && (isOrganizer || isCustomerLoggedIn);
   const hasPhysicalSeats = selectedSeats.some(isRealPhysicalSeat);
@@ -1496,18 +1646,40 @@ export default function EventCheckout({
     applySelectedSeats(seats);
   };
 
+  // If seats are already picked but qty was never saved (map used a display fallback),
+  // treat selected count as the intended qty so Continue isn't blocked incorrectly.
+  const effectiveDesiredSeatQty =
+    desiredSeatQty ??
+    (selectedSeats.length > 0 ? selectedSeats.length : null);
+
   const seatsReady = hasReservedSeats
-    ? desiredSeatQty != null && selectedSeats.length === desiredSeatQty
+    ? effectiveDesiredSeatQty != null &&
+      selectedSeats.length === effectiveDesiredSeatQty
     : ticketQty >= 1;
 
   const proceedFromTickets = () => {
     if (hasReservedSeats) {
-      if (!desiredSeatQty) {
+      const qty =
+        desiredSeatQty ??
+        seatCountPick ??
+        (selectedSeats.length > 0 ? selectedSeats.length : null);
+
+      if (!qty) {
         toast.error("Choose how many seats you need first.");
+        setSeatQtyModalOpen(true);
         return;
       }
-      if (selectedSeats.length !== desiredSeatQty) {
-        toast.error(`Please select exactly ${desiredSeatQty} seat${desiredSeatQty === 1 ? "" : "s"} on the map.`);
+
+      // Persist qty if it was only implied by the current selection / map fallback.
+      if (desiredSeatQty == null) {
+        setDesiredSeatQty(qty);
+        setSeatCountPick((curr) => curr ?? qty);
+      }
+
+      if (selectedSeats.length !== qty) {
+        toast.error(
+          `Please select exactly ${qty} seat${qty === 1 ? "" : "s"} on the map.`
+        );
         return;
       }
     } else if (ticketQty < 1) {
@@ -1534,6 +1706,9 @@ export default function EventCheckout({
       }
       return;
     }
+
+    // Persist resolved contact into the form so review/pay use the same values.
+    resetContact(effectiveContact);
 
     const physicalSeats = selectedSeats.filter(isRealPhysicalSeat);
 
@@ -1616,23 +1791,64 @@ export default function EventCheckout({
 
   const showtimeSummaryBar =
     selectedShowtime && step >= 2 ? (
-      <div className="shrink-0 bg-[#E8ECF0] border-y border-slate-200/80">
+      <div className="shrink-0 z-20 bg-[#F5F5F5] border-b border-slate-200/70">
         <div
-          className={`${isPage ? "max-w-[36rem] mx-auto" : ""
-            } px-3 sm:px-4 py-2.5 text-[0.9375rem] sm:text-[1rem] font-semibold text-slate-700 text-center leading-snug`}
+          className={`${
+            isPage ? "max-w-[36rem] mx-auto" : ""
+          } px-3 sm:px-4 py-2.5`}
         >
-          <span>{selectedShowtime.venue_name || "Venue"}</span>
-          <span className="mx-1.5 text-slate-400">|</span>
-          <span>
-            {dateChip(selectedShowtime.starts_at).day} {dateChip(selectedShowtime.starts_at).date} |{" "}
-            {formatTime12h(selectedShowtime.starts_at)}
-          </span>
-          {ticketQty > 0 && (
-            <>
-              <span className="mx-1.5 text-slate-400">|</span>
-              <span className="uppercase tracking-wide text-slate-600">Entry for {ticketQty}</span>
-            </>
-          )}
+          <div className="rounded-xl bg-[#E8ECF0] px-3.5 py-2.5 sm:px-4 sm:py-3 text-center">
+            <p className="text-[0.8125rem] sm:text-[0.875rem] font-semibold text-slate-800 leading-snug break-words [overflow-wrap:anywhere]">
+              {selectedShowtime.venue_name || "Venue"}
+            </p>
+            <p className="mt-1 flex flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5 text-[0.75rem] sm:text-[0.8125rem] font-semibold text-slate-600 leading-snug">
+              <span className="whitespace-nowrap">
+                {dateChip(selectedShowtime.starts_at).day}{" "}
+                {dateChip(selectedShowtime.starts_at).date}
+              </span>
+              <span className="text-slate-300" aria-hidden>
+                ·
+              </span>
+              <span className="whitespace-nowrap">
+                {formatTime12h(selectedShowtime.starts_at)}
+              </span>
+              {ticketQty > 0 ? (
+                <>
+                  <span className="text-slate-300" aria-hidden>
+                    ·
+                  </span>
+                  <span className="uppercase tracking-wide text-slate-600 whitespace-nowrap">
+                    Entry for {ticketQty}
+                  </span>
+                </>
+              ) : null}
+            </p>
+          </div>
+        </div>
+      </div>
+    ) : null;
+
+  /** Only show the booking timer on Review (after Continue to review) — fixed under header. */
+  const holdCountdownStickyBar =
+    step === 4 && holdId && secondsLeft !== null && secondsLeft > 0 && !timeOutOpen ? (
+      <div className="shrink-0 sticky top-0 z-20 bg-white/95 backdrop-blur-sm border-b border-slate-200/80 shadow-[0_1px_0_rgba(15,23,42,0.04)]">
+        <div
+          className={`${
+            isPage ? "max-w-6xl mx-auto" : ""
+          } px-3 sm:px-4 py-2 sm:py-2.5`}
+        >
+          <div
+            className={`rounded-xl px-3.5 py-2.5 text-center border ${
+              secondsLeft <= 60
+                ? "bg-rose-50 border-rose-200 text-rose-700"
+                : "bg-[#F3E8FF] border-[#E9D5FF] text-[#6B21A8]"
+            }`}
+          >
+            <span className="inline-flex items-center justify-center gap-2 text-[0.8125rem] sm:text-sm font-bold leading-none tabular-nums">
+              <Timer className="size-3.5 sm:size-4 shrink-0" />
+              Complete your booking in {formatHoldCountdown(secondsLeft)}
+            </span>
+          </div>
         </div>
       </div>
     ) : null;
@@ -1789,25 +2005,6 @@ export default function EventCheckout({
     return ticketAvail(available, total);
   };
 
-  const handleHeaderBack = () => {
-    if (step === 4) {
-      requestLeaveConfirmStep("back");
-    } else if (step === 3) {
-      setStep(2);
-      if (hasReservedSeats || showtimeHasSeatingLayout) {
-        setIsMapFullscreen(true);
-      }
-    } else if (step === 2) {
-      if (isSingleVenue) {
-        onClose();
-      } else {
-        setStep(1);
-      }
-    } else {
-      onClose();
-    }
-  };
-
   const panel = (
     <div
       className={
@@ -1817,8 +2014,8 @@ export default function EventCheckout({
       }
     >
       {isPage && (
-        <div className="z-30 bg-white border-b border-slate-200 shrink-0">
-          <div className="relative flex items-center min-h-[3.5rem] sm:min-h-[4rem] lg:min-h-[4.75rem]">
+        <div className="z-30 bg-white border-b border-slate-200 shrink-0 pt-[max(0.875rem,env(safe-area-inset-top,0px))]">
+          <div className="relative flex items-center">
             <Link
               href="/"
               className="absolute left-3 sm:left-5 hidden lg:flex shrink-0 items-center z-[1]"
@@ -1830,40 +2027,40 @@ export default function EventCheckout({
                 className="h-9 lg:h-11 w-auto object-contain object-left"
               />
             </Link>
-            <div className={`mx-auto flex w-full items-center px-4 sm:px-5 ${step === 4 ? "max-w-6xl" : "max-w-[40rem]"}`}>
-              <div className="relative flex w-full items-center justify-center py-2 sm:py-2.5">
-                <button
-                  type="button"
-                  onClick={handleHeaderBack}
-                  aria-label="Back"
-                  className="absolute left-0 z-[1] h-9 w-9 rounded-full text-[#111] flex items-center justify-center hover:bg-slate-100 cursor-pointer shrink-0 transition-colors"
-                >
-                  <ArrowLeft size={22} strokeWidth={2} />
-                </button>
-
-                <div className="flex items-center justify-center gap-2.5 sm:gap-3 px-10 min-w-0 max-w-full">
-                  {eventPosterUrl ? (
+            <div className={`mx-auto flex w-full items-center justify-center px-4 sm:px-5 ${step === 4 ? "max-w-6xl" : "max-w-[40rem]"}`}>
+              <div className="flex w-full items-center justify-center gap-3 sm:gap-3.5 py-2.5 sm:py-3 min-w-0">
+                {step !== 4 && headerPosterUrl ? (
+                  <span
+                    className={`relative shrink-0 overflow-hidden rounded-lg border border-slate-200/90 bg-slate-100 shadow-sm ${
+                      headerUsesHorizontal
+                        ? "aspect-[16/9] h-11 sm:h-12 w-auto"
+                        : "aspect-[2/3] h-14 sm:h-16 w-auto"
+                    }`}
+                  >
                     <img
-                      src={eventPosterUrl}
-                      alt={event.name}
-                      className="h-10 w-7.5 sm:h-12 sm:w-9 shrink-0 rounded-md object-cover shadow-sm border border-slate-200/90"
+                      src={headerPosterUrl}
+                      alt=""
+                      aria-hidden
+                      className={`absolute inset-0 h-full w-full object-cover ${
+                        headerUsesHorizontal ? "object-center" : "object-top"
+                      }`}
                     />
+                  </span>
+                ) : null}
+                <div className={`min-w-0 ${step === 4 ? "text-center max-w-full" : "text-left max-w-[min(100%,18rem)] sm:max-w-[min(100%,22rem)]"}`}>
+                  <h1 className="text-[1rem] sm:text-[1.125rem] font-bold leading-snug text-[#111] truncate">
+                    {step === 4 ? "Review your booking" : event.name}
+                  </h1>
+                  {step === 4 ? (
+                    <p className="text-xs sm:text-[0.8125rem] text-slate-500 font-medium truncate mt-0.5">
+                      {event.name}
+                    </p>
+                  ) : event.category_name ? (
+                    <p className="text-xs sm:text-[0.8125rem] text-slate-500 font-medium truncate mt-0.5">
+                      {event.category_name}
+                      {event.age_group ? ` · ${event.age_group}` : ""}
+                    </p>
                   ) : null}
-                  <div className="min-w-0 text-left">
-                    <h1 className="text-[1.05rem] sm:text-[1.2rem] font-bold leading-snug text-[#111] truncate">
-                      {step === 4 ? "Review your booking" : event.name}
-                    </h1>
-                    {step === 4 ? (
-                      <p className="text-xs text-slate-500 font-medium truncate">
-                        {event.name}
-                      </p>
-                    ) : event.category_name ? (
-                      <p className="text-xs text-slate-500 font-medium truncate">
-                        {event.category_name}
-                        {event.age_group ? ` · ${event.age_group}` : ""}
-                      </p>
-                    ) : null}
-                  </div>
                 </div>
               </div>
             </div>
@@ -1873,6 +2070,7 @@ export default function EventCheckout({
       )}
 
       {isPage && step >= 2 && step < 4 && showtimeSummaryBar}
+      {holdCountdownStickyBar}
 
       {!isPage && (
         <div className="px-5 pt-4 pb-4 border-b border-slate-100 shrink-0 bg-white">
@@ -1896,18 +2094,31 @@ export default function EventCheckout({
           </div>
 
           <div className="mt-3 flex items-center gap-2.5 pt-3 border-t border-slate-100">
-            {eventPosterUrl ? (
-              <img
-                src={eventPosterUrl}
-                alt={event.name}
-                className="h-10 w-7.5 shrink-0 rounded-md object-cover shadow-sm border border-slate-200/90"
-              />
+            {step !== 4 && headerPosterUrl ? (
+              <span
+                className={`relative shrink-0 overflow-hidden rounded-md border border-slate-200/90 bg-slate-100 shadow-sm ${
+                  headerUsesHorizontal
+                    ? "aspect-[16/9] h-10 w-auto"
+                    : "aspect-[2/3] h-10 w-auto"
+                }`}
+              >
+                <img
+                  src={headerPosterUrl}
+                  alt=""
+                  aria-hidden
+                  className={`absolute inset-0 h-full w-full object-cover ${
+                    headerUsesHorizontal ? "object-center" : "object-top"
+                  }`}
+                />
+              </span>
             ) : null}
             <div className="min-w-0">
               <h2 className="text-sm font-bold text-slate-900 truncate">
-                {event.name}
+                {step === 4 ? "Review your booking" : event.name}
               </h2>
-              {event.category_name ? (
+              {step === 4 ? (
+                <p className="text-xs text-slate-500 truncate">{event.name}</p>
+              ) : event.category_name ? (
                 <p className="text-xs text-slate-500 truncate">{event.category_name}</p>
               ) : null}
             </div>
@@ -1960,6 +2171,7 @@ export default function EventCheckout({
       )}
 
       <div
+        ref={checkoutScrollRef}
         onScroll={handleCheckoutScroll}
         className={
           isPage
@@ -1968,27 +2180,13 @@ export default function EventCheckout({
         }
       >
         {showStepHeader && (
-          <div className="mb-5">
-            <h3 className="text-[0.9375rem] md:text-[1.0625rem] font-semibold text-gray-800 tracking-tight">
+          <div className={step === 3 ? "mb-3" : "mb-3.5 sm:mb-4"}>
+            <h3 className="text-[1.0625rem] sm:text-[1.125rem] font-bold text-gray-900 tracking-tight">
               {stepTitle}
             </h3>
-            <p className="text-[0.9375rem] md:text-[1.0625rem] text-slate-500 mt-1.5 leading-relaxed">
+            <p className="text-[0.875rem] sm:text-[0.9375rem] text-slate-500 mt-1 leading-snug">
               {stepSubtitle}
             </p>
-          </div>
-        )}
-
-        {holdId && secondsLeft !== null && secondsLeft > 0 && !timeOutOpen && step < 4 && (
-          <div
-            className={`rounded-xl px-4 py-2.5 text-center text-sm font-bold border mb-4 ${secondsLeft <= 60
-                ? "bg-rose-50 border-rose-200 text-rose-700"
-                : "bg-[#F3E8FF] border-[#E9D5FF] text-[#6B21A8]"
-              }`}
-          >
-            <span className="inline-flex items-center gap-2">
-              <Timer className="size-4" />
-              Complete your booking in {formatHoldCountdown(secondsLeft)}
-            </span>
           </div>
         )}
 
@@ -2176,8 +2374,8 @@ export default function EventCheckout({
               <div className="bg-white border border-slate-200 rounded-xl p-5 text-center space-y-4">
                 <div>
                   <h4 className="text-[1.125rem] font-extrabold text-slate-900">
-                    {selectedSeats.length}/{desiredSeatQty || 2} seat
-                    {(desiredSeatQty || 2) === 1 ? "" : "s"} selected
+                    {selectedSeats.length}/{effectiveDesiredSeatQty ?? "—"} seat
+                    {(effectiveDesiredSeatQty ?? 0) === 1 ? "" : "s"} selected
                   </h4>
                   <p className="mt-1 text-[0.875rem] text-slate-500">
                     {seatsReady
@@ -2191,7 +2389,7 @@ export default function EventCheckout({
                   )}
                 </div>
                 <div className="flex flex-col sm:flex-row gap-2.5">
-                  <button
+                  <ShinyBlackButton
                     type="button"
                     onClick={() => {
                       setIsMapFullscreen(true);
@@ -2201,11 +2399,11 @@ export default function EventCheckout({
                         setSeatQtyModalOpen(true);
                       }
                     }}
-                    className={`flex-1 py-3 px-4 rounded-xl font-bold text-white ${accentBtn} cursor-pointer flex items-center justify-center gap-1.5`}
+                    className={`flex-1 py-3 px-4 rounded-xl font-bold text-white ${accentBtn}`}
                   >
                     <MapIcon className="size-4" />
                     <span>{seatsReady ? "Review seating map" : "Select seats on map"}</span>
-                  </button>
+                  </ShinyBlackButton>
                   {desiredSeatQty != null && (
                     <button
                       type="button"
@@ -2309,17 +2507,17 @@ export default function EventCheckout({
         )}
 
         {step === 3 && (
-          <div className="space-y-4 pb-2">
+          <div className="space-y-3.5 sm:space-y-4 pb-2">
             <div>
-              <p className="text-[0.9375rem] font-semibold text-gray-800 mb-1">
+              <p className="text-[0.9375rem] sm:text-[1rem] font-bold text-gray-900">
                 How do you want your tickets?
               </p>
               {availableTicketModes.length === 1 && (
-                <p className="text-[0.8125rem] text-slate-500">
+                <p className="mt-1 text-[0.8125rem] sm:text-[0.875rem] text-slate-500 leading-snug">
                   This event only offers {availableTicketModes[0].label.toLowerCase()}.
                 </p>
               )}
-              <div className="space-y-2.5 mt-3">
+              <div className="mt-3 space-y-2.5">
                 {availableTicketModes.map((option) => {
                   const Icon = ticketModeIcon(option.id);
                   const selected = ticketMode === option.id;
@@ -2328,7 +2526,7 @@ export default function EventCheckout({
                       key={option.id}
                       type="button"
                       onClick={() => setTicketMode(option.id)}
-                      className={`w-full text-left rounded-xl border p-4 transition-colors cursor-pointer ${selected
+                      className={`w-full text-left rounded-xl border p-3.5 sm:p-4 transition-colors cursor-pointer ${selected
                           ? "border-[#6900AA] bg-[#FBF6FF]"
                           : "border-slate-200 bg-white hover:border-slate-300"
                         }`}
@@ -2495,20 +2693,6 @@ export default function EventCheckout({
 
         {step === 4 && selectedShowtime && (
           <form id="event-checkout-form" onSubmit={handleConfirm} className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start">
-            {holdId && secondsLeft !== null && (
-              <div
-                className={`lg:col-span-12 rounded-xl px-4 py-2.5 text-center text-sm font-bold border ${secondsLeft <= 60
-                    ? "bg-rose-50 border-rose-200 text-rose-700"
-                    : "bg-[#F3E8FF] border-[#E9D5FF] text-[#6B21A8]"
-                  }`}
-              >
-                <span className="inline-flex items-center gap-2">
-                  <Timer className="size-4" />
-                  Complete your booking in {formatHoldCountdown(secondsLeft)}
-                </span>
-              </div>
-            )}
-
             <div className="lg:col-span-7 space-y-4">
               <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm">
                 <div className="flex items-start justify-between gap-4 sm:gap-6">
@@ -2813,21 +2997,23 @@ export default function EventCheckout({
                 </div>
               )}
 
-              <button
+              <ShinyBlackButton
                 type="submit"
                 disabled={!canConfirm || submitting}
-                aria-busy={submitting || undefined}
-                className="flex w-full items-center justify-between rounded-xl bg-black px-5 py-3.5 text-white disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+                ariaBusy={submitting || undefined}
+                className={`${isPage ? "hidden lg:flex" : "flex"} w-full items-center justify-between rounded-xl bg-[#111111] px-5 py-3.5 text-white disabled:opacity-50`}
               >
-                <span className="text-left">
-                  <span className="block text-sm font-bold">{formatMoney(grandTotal)}</span>
-                  <span className="block text-[10px] font-semibold tracking-wide text-white/70">TOTAL</span>
+                <span className="flex w-full items-center justify-between gap-3">
+                  <span className="text-left">
+                    <span className="block text-sm font-bold">{formatMoney(grandTotal)}</span>
+                    <span className="block text-[10px] font-semibold tracking-wide text-white/70">TOTAL</span>
+                  </span>
+                  <span className="text-sm font-bold inline-flex items-center gap-2">
+                    {submitting ? <Loader2 size={16} className="animate-spin" /> : null}
+                    {submitting ? "Confirming…" : isOrganizer ? "Confirm & Send" : "Pay now"}
+                  </span>
                 </span>
-                <span className="text-sm font-bold inline-flex items-center gap-2">
-                  {submitting ? <Loader2 size={16} className="animate-spin" /> : null}
-                  {submitting ? "Confirming…" : isOrganizer ? "Confirm & Send" : "Pay now"}
-                </span>
-              </button>
+              </ShinyBlackButton>
             </aside>
           </form>
         )}
@@ -2865,14 +3051,14 @@ export default function EventCheckout({
                           {formatMoney(ticketAmount, { compact: true })}
                         </p>
                       </div>
-                      <button
+                      <ShinyBlackButton
                         type="button"
                         disabled={!seatsReady}
                         onClick={proceedFromTickets}
-                        className={`w-full py-3 rounded-[0.5rem] ${accentBtn} disabled:bg-slate-300 disabled:text-white disabled:hover:bg-slate-300 text-white font-semibold text-[1.0625rem] cursor-pointer disabled:cursor-not-allowed`}
+                        className={`w-full py-3 rounded-[0.5rem] ${accentBtn} disabled:bg-slate-300 disabled:!opacity-100 text-white font-semibold text-[1.0625rem]`}
                       >
                         Continue
-                      </button>
+                      </ShinyBlackButton>
                     </div>
                   </div>
                 ) : isPage ? (
@@ -2922,15 +3108,15 @@ export default function EventCheckout({
                       >
                         <ArrowLeft size={14} /> Back
                       </button>
-                      <button
+                      <ShinyBlackButton
                         type="button"
                         disabled={!seatsReady}
                         onClick={proceedFromTickets}
-                        className={`flex-1 py-3 rounded-xl ${accentBtn} disabled:bg-slate-300 disabled:text-white disabled:hover:bg-slate-300 text-white font-semibold text-[1.0625rem] inline-flex items-center justify-center gap-1 cursor-pointer disabled:cursor-not-allowed`}
+                        className={`flex-1 py-3 rounded-xl ${accentBtn} disabled:bg-slate-300 disabled:!opacity-100 text-white font-semibold text-[1.0625rem]`}
                       >
                         Continue
                         <ChevronRight size={16} />
-                      </button>
+                      </ShinyBlackButton>
                     </div>
                   </>
                 )}
@@ -2949,23 +3135,23 @@ export default function EventCheckout({
                   <ArrowLeft size={14} /> Back
                 </button>
                 {!isOrganizer && !isCustomerLoggedIn ? (
-                  <button
+                  <ShinyBlackButton
                     type="button"
                     onClick={() => setAuthModalOpen(true)}
                     disabled={!ticketMode || !deliveryDetailsReady}
-                    className={`flex-1 py-3 ${accentBtn} disabled:bg-slate-300 disabled:text-white text-white font-semibold text-[1.0625rem] cursor-pointer disabled:cursor-not-allowed inline-flex items-center justify-center gap-2 ${
+                    className={`flex-1 py-3 ${accentBtn} disabled:bg-slate-300 disabled:!opacity-100 text-white font-semibold text-[1.0625rem] ${
                       isPage ? "rounded-[0.5rem]" : "rounded-xl"
                     }`}
                   >
                     Sign in
-                  </button>
+                  </ShinyBlackButton>
                 ) : (
-                  <button
+                  <ShinyBlackButton
                     type="button"
                     onClick={() => void proceedToReview()}
                     disabled={!canProceedFromTicketMode || holding}
-                    className={`flex-1 py-3 ${accentBtn} disabled:bg-slate-300 disabled:text-white disabled:hover:bg-slate-300 text-white font-semibold text-[1.0625rem] cursor-pointer disabled:cursor-not-allowed inline-flex items-center justify-center gap-2 ${
-                      isPage ? "rounded-[0.5rem]" : "rounded-xl disabled:bg-[#E3BCFF] disabled:hover:bg-[#E3BCFF]"
+                    className={`flex-1 py-3 ${accentBtn} disabled:bg-slate-300 disabled:!opacity-100 text-white font-semibold text-[1.0625rem] ${
+                      isPage ? "rounded-[0.5rem]" : "rounded-xl"
                     }`}
                   >
                     {holding ? (
@@ -2975,23 +3161,47 @@ export default function EventCheckout({
                     ) : (
                       "Continue to review"
                     )}
-                  </button>
+                  </ShinyBlackButton>
                 )}
               </div>
             )}
             {step === 4 && (
-              <div className="flex">
+              <div className="flex gap-3 items-stretch">
                 <button
                   type="button"
                   disabled={submitting}
-                  onClick={() => setStep(3)}
-                  className={`px-4 py-3 border text-slate-700 font-semibold text-[1rem] inline-flex items-center gap-1 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${isPage
-                      ? "rounded-[0.5rem] border-slate-300 bg-white"
+                  onClick={() => requestLeaveConfirmStep("back")}
+                  className={`shrink-0 px-4 py-3.5 border text-slate-700 font-semibold text-[1rem] inline-flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${isPage
+                      ? "rounded-xl border-slate-300 bg-white"
                       : "rounded-xl border-slate-200"
                     }`}
                 >
-                  <ArrowLeft size={14} /> Back
+                  <ArrowLeft size={16} /> Back
                 </button>
+                {isPage ? (
+                  <ShinyBlackButton
+                    type="submit"
+                    form="event-checkout-form"
+                    disabled={!canConfirm || submitting}
+                    ariaBusy={submitting || undefined}
+                    className={`lg:hidden flex-1 min-w-0 py-3 px-4 rounded-xl ${accentBtn} disabled:bg-slate-300 disabled:!opacity-100 text-white`}
+                  >
+                    <span className="flex w-full items-center justify-between gap-3">
+                      <span className="text-left min-w-0">
+                        <span className="block text-[0.9375rem] font-bold leading-tight truncate">
+                          {formatMoney(grandTotal)}
+                        </span>
+                        <span className="block text-[10px] font-semibold tracking-wide text-white/70 uppercase">
+                          Total
+                        </span>
+                      </span>
+                      <span className="shrink-0 text-[0.9375rem] font-bold inline-flex items-center gap-1.5">
+                        {submitting ? <Loader2 size={16} className="animate-spin" /> : null}
+                        {submitting ? "Confirming…" : isOrganizer ? "Confirm" : "Pay now"}
+                      </span>
+                    </span>
+                  </ShinyBlackButton>
+                ) : null}
               </div>
             )}
           </div>
@@ -3024,6 +3234,7 @@ export default function EventCheckout({
           module="events"
           bookingId={bookedSuccessId}
           nextHref={`/customer/event-bookings/confirmation?id=${bookedSuccessId}`}
+          onClose={() => setBookedSuccessId(null)}
         />
       ) : null}
       {isMapFullscreen && (
@@ -3087,19 +3298,8 @@ export default function EventCheckout({
                     </button>
                   </div>
                 )}
-                {holdId && secondsLeft !== null && secondsLeft > 0 && !timeOutOpen && (
-                  <span
-                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border ${secondsLeft <= 60
-                        ? "bg-rose-50 border-rose-200 text-rose-700"
-                        : "bg-[#F3E8FF] border-[#E9D5FF] text-[#6B21A8]"
-                      }`}
-                  >
-                    <Timer className="size-3.5" />
-                    {formatHoldCountdown(secondsLeft)}
-                  </span>
-                )}
                 <p className="text-[0.8125rem] md:max-lg:text-[1rem] lg:text-[0.8125rem] font-extrabold text-[#6900AA] tabular-nums">
-                  {selectedSeats.length}/{desiredSeatQty || 2}
+                  {selectedSeats.length}/{effectiveDesiredSeatQty ?? "—"}
                 </p>
                 {selectedSeats.length > 0 && (
                   <button
@@ -3316,8 +3516,8 @@ export default function EventCheckout({
                 <div className="flex items-center gap-2 flex-wrap">
                   <p className="text-[0.75rem] sm:text-[0.8125rem] md:max-lg:text-[0.9375rem] lg:text-[0.8125rem] text-slate-500 font-medium">
                     {selectedSeats.length === 0
-                      ? `Select ${desiredSeatQty || 2} seat${(desiredSeatQty || 2) === 1 ? "" : "s"}`
-                      : `${selectedSeats.length}/${desiredSeatQty || 2} selected`}
+                      ? `Select ${effectiveDesiredSeatQty ?? 2} seat${(effectiveDesiredSeatQty ?? 2) === 1 ? "" : "s"}`
+                      : `${selectedSeats.length}/${effectiveDesiredSeatQty ?? "—"} selected`}
                   </p>
                   {selectedSeats.length > 0 && (
                     <button
@@ -3344,11 +3544,26 @@ export default function EventCheckout({
                   {formatMoney(ticketAmount, { compact: true })}
                 </p>
               </div>
-              <button
+              <ShinyBlackButton
                 type="button"
-                disabled={selectedSeats.length !== (desiredSeatQty || 2)}
+                disabled={
+                  !effectiveDesiredSeatQty ||
+                  selectedSeats.length !== effectiveDesiredSeatQty
+                }
                 onClick={() => {
-                  const targetQty = desiredSeatQty || 2;
+                  const targetQty =
+                    desiredSeatQty ??
+                    seatCountPick ??
+                    (selectedSeats.length > 0 ? selectedSeats.length : null);
+                  if (!targetQty) {
+                    toast.error("Choose how many seats you need first.");
+                    setSeatQtyModalOpen(true);
+                    return;
+                  }
+                  if (desiredSeatQty == null) {
+                    setDesiredSeatQty(targetQty);
+                    setSeatCountPick((curr) => curr ?? targetQty);
+                  }
                   if (selectedSeats.length !== targetQty) {
                     toast.error(
                       `Please select exactly ${targetQty} seat${targetQty === 1 ? "" : "s"}.`
@@ -3358,10 +3573,13 @@ export default function EventCheckout({
                   setIsMapFullscreen(false);
                   proceedFromTickets();
                 }}
-                className={`shrink-0 min-w-[7.5rem] sm:min-w-[12rem] px-4 sm:px-5 py-3 sm:py-3.5 ${accentBtn} text-white font-bold text-[0.9375rem] sm:text-[1.0625rem] md:max-lg:text-[1.125rem] lg:text-[1.0625rem] rounded-xl cursor-pointer disabled:bg-slate-300 disabled:cursor-not-allowed`}
+                className={`shrink-0 min-w-[7.5rem] sm:min-w-[12rem] px-4 sm:px-5 py-3 sm:py-3.5 ${accentBtn} text-white font-bold text-[0.9375rem] sm:text-[1.0625rem] md:max-lg:text-[1.125rem] lg:text-[1.0625rem] rounded-xl disabled:bg-slate-300 disabled:!opacity-100`}
               >
-                {selectedSeats.length === (desiredSeatQty || 2) ? "Continue" : "Select seats"}
-              </button>
+                {effectiveDesiredSeatQty &&
+                selectedSeats.length === effectiveDesiredSeatQty
+                  ? "Continue"
+                  : "Select seats"}
+              </ShinyBlackButton>
             </div>
           </footer>
 
@@ -3566,12 +3784,12 @@ export default function EventCheckout({
                 *Terms &amp; Conditions
               </button>
 
-              <button
+              <ShinyBlackButton
                 type="submit"
-                className={`w-full py-3 rounded-[0.5rem] ${accentBtn} text-white text-[1.125rem] font-bold cursor-pointer`}
+                className={`w-full py-3 rounded-[0.5rem] ${accentBtn} text-white text-[1.125rem] font-bold`}
               >
                 Submit
-              </button>
+              </ShinyBlackButton>
             </form>
           </div>
         </div>

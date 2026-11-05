@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
+  ArrowLeft,
   Calendar,
   ChevronRight,
   Gift,
@@ -31,12 +32,19 @@ const NAV = [
 export default function CustomerAccountLayout({
   children,
   hideSidebarBelowLg = false,
+  hideMobileHeader = false,
+  customTitle,
 }: {
   children: React.ReactNode;
   /** Hide left account nav below lg (used by mobile-native profile UI). */
   hideSidebarBelowLg?: boolean;
+  /** Hide top mobile back-bar if child page provides its own */
+  hideMobileHeader?: boolean;
+  /** Custom mobile header title */
+  customTitle?: string;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const dispatch = useAppDispatch();
   const user = useAppSelector((state) => state.auth.user);
 
@@ -49,13 +57,31 @@ export default function CustomerAccountLayout({
     toast.success("Logged out successfully");
   };
 
+  const isProfileOverview = pathname === "/customer/profile";
+
+  const handleBack = () => {
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      router.back();
+    } else {
+      router.push("/customer/profile");
+    }
+  };
+
+  const currentNav = NAV.find(
+    (n) =>
+      !n.soon &&
+      (pathname === n.href ||
+        (n.href !== "/customer/dashboard" && pathname?.startsWith(n.href + "/")))
+  );
+  const mobileTitle = customTitle || currentNav?.label || "Back";
+
   return (
-    <div className="bg-[#f4f5f7] min-h-[calc(100vh-4rem)] pt-2 pb-4 sm:pt-3 sm:pb-6 lg:pt-4 lg:pb-8">
+    <div className="bg-[#f4f5f7] pt-2 pb-4 sm:pt-3 sm:pb-6 lg:pt-4 lg:pb-8">
       <div className="max-w-[1440px] mx-auto px-3 sm:px-6 lg:px-8">
         <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 items-start">
           <aside
-            className={`w-full lg:w-[260px] shrink-0 lg:sticky lg:top-20 lg:self-start${
-              hideSidebarBelowLg ? " hidden lg:block" : ""
+            className={`w-full lg:w-[260px] shrink-0 lg:sticky lg:top-20 lg:self-start ${
+              hideSidebarBelowLg || !isProfileOverview ? "hidden lg:block" : ""
             }`}
           >
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-3 flex flex-col h-fit">
@@ -122,7 +148,22 @@ export default function CustomerAccountLayout({
             </div>
           </aside>
 
-          <div className="flex-1 min-w-0 w-full">{children}</div>
+          <div className="flex-1 min-w-0 w-full">
+            {!isProfileOverview && !hideMobileHeader && (
+              <div className="lg:hidden flex items-center gap-3 px-1 mb-3.5">
+                <button
+                  type="button"
+                  onClick={handleBack}
+                  className="p-1 -ml-1 text-black cursor-pointer hover:opacity-75 transition-opacity"
+                  aria-label="Go back"
+                >
+                  <ArrowLeft size={22} />
+                </button>
+                <h1 className="text-xl font-bold text-black">{mobileTitle}</h1>
+              </div>
+            )}
+            {children}
+          </div>
         </div>
       </div>
     </div>

@@ -1,8 +1,9 @@
 /* Landing promo carousel — height for layout; width locks to partner crop aspect (3:1) */
 .promo-banner-swiper {
-  --promo-h: 200px; /* mobile only — slightly shorter than before */
+  /* Phone: slightly inset, height still follows the 3:1 creative. */
+  --promo-h: calc(100vw * 0.84 / 2.4);
   --promo-aspect: 3; /* must match LANDING_PROMO_BANNER_ASPECT / partner crop */
-  --promo-slide-w: min(92%, calc(var(--promo-h) * var(--promo-aspect)));
+  --promo-slide-w: min(84%, calc(var(--promo-h) * var(--promo-aspect)));
   --promo-peek-gap: 0.5rem;
   overflow-x: clip;
   overflow-y: visible;
@@ -14,16 +15,16 @@
 
 @media (min-width: 640px) {
   .promo-banner-swiper {
-    --promo-h: 300px;
-    --promo-slide-w: min(90%, calc(var(--promo-h) * var(--promo-aspect)));
+    --promo-h: calc(100vw * 0.82 / 2.4);
+    --promo-slide-w: min(82%, calc(var(--promo-h) * var(--promo-aspect)));
     --promo-peek-gap: 0.65rem;
   }
 }
 
 @media (min-width: 768px) {
   .promo-banner-swiper {
-    --promo-h: 340px;
-    --promo-slide-w: min(90%, calc(var(--promo-h) * var(--promo-aspect)));
+    --promo-h: calc(100vw * 0.82 / 2.4);
+    --promo-slide-w: min(82%, calc(var(--promo-h) * var(--promo-aspect)));
     --promo-peek-gap: 0.75rem;
   }
 }
@@ -66,6 +67,22 @@
   padding-left: 1rem; /* px-4 */
   padding-right: 1rem;
   box-sizing: border-box;
+}
+
+@media (max-width: 767px) {
+  .promo-banner-swiper.is-single {
+    --promo-slide-w: calc(100% - 1.5rem);
+    --promo-h: calc((100vw - 3.5rem) / 2.4);
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .promo-banner-swiper.is-single {
+    --promo-slide-w: calc(100% - 2rem);
+    --promo-h: calc((100vw - 4.5rem) / 2.4);
+    padding-left: 1.25rem; /* md:px-5 */
+    padding-right: 1.25rem;
+  }
 }
 
 @media (min-width: 768px) {

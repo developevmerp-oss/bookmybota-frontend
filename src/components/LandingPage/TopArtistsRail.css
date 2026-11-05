@@ -59,19 +59,31 @@
 
 @media (min-width: 640px) {
   .top-artists-rail {
-    --artists-visible: 3.2;
+    --artists-visible: 3.25;
     --artists-gap: 1.25rem;
     padding-right: 0;
   }
 
+  /* Fill the slot so side padding doesn’t look like a huge card gap */
   .top-artists-avatar {
-    max-width: 190px;
+    max-width: none;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .top-artists-rail {
+    --artists-visible: 3.5;
+    --artists-gap: 1.25rem;
   }
 }
 
 @media (min-width: 1024px) {
   .top-artists-rail {
     --artists-visible: 6;
-    --artists-gap: 1.25rem;
+    --artists-gap: 1.75rem;
+  }
+
+  .top-artists-avatar {
+    max-width: none;
   }
 }

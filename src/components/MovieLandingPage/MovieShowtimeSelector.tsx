@@ -46,6 +46,7 @@ import {
 } from "@/lib/filterUrlSync";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { ShowtimeListShimmer } from "@/components/Shared/Shimmer";
+import ShinyBlackButton from "@/components/Shared/ShinyBlackButton";
 import {
   formatDateCustomer,
   formatTime12h,
@@ -389,7 +390,7 @@ function BmsFilterDropdown({
             ref={menuRef}
             role="listbox"
             aria-multiselectable
-            className="fixed z-[200] max-h-[min(20rem,60vh)] overflow-y-auto rounded-xl border border-[#E8E8E8] bg-white py-1 shadow-[0_12px_28px_rgba(0,0,0,0.14)]"
+            className="fixed z-[200] max-h-[min(20rem,60vh)] overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-[0_12px_28px_rgba(0,0,0,0.14)]"
             style={{
               top: menuPos.top,
               left: menuPos.left,
@@ -397,7 +398,7 @@ function BmsFilterDropdown({
             }}
           >
             {options.length === 0 ? (
-              <li className="px-3.5 py-3 text-[12px] text-[#9CA3AF]">{emptyText}</li>
+              <li className="px-3.5 py-3 text-[12px] text-slate-400">{emptyText}</li>
             ) : (
               options.map((opt) => {
                 const checked = values.includes(opt.value);
@@ -411,7 +412,7 @@ function BmsFilterDropdown({
                       className={`w-full px-3.5 py-2.5 flex items-center gap-2.5 text-left text-[13px] ${
                         disabled
                           ? "cursor-not-allowed bg-white"
-                          : "text-[#333333] hover:bg-[#F7E9FF]/60 cursor-pointer"
+                          : "text-slate-800 hover:bg-slate-50 cursor-pointer"
                       }`}
                     >
                       {opt.icon ? (
@@ -424,7 +425,7 @@ function BmsFilterDropdown({
                       <span className="flex-1 min-w-0">
                         <span
                           className={`font-medium block ${
-                            disabled ? "text-[#B8B8B8]" : "text-[#333333]"
+                            disabled ? "text-slate-300" : "text-slate-800"
                           }`}
                         >
                           {opt.label}
@@ -432,7 +433,7 @@ function BmsFilterDropdown({
                         {opt.hint ? (
                           <span
                             className={`text-[11px] block mt-0.5 ${
-                              disabled ? "text-[#D0D0D0]" : "text-[#9CA3AF]"
+                              disabled ? "text-slate-300" : "text-slate-400"
                             }`}
                           >
                             {opt.hint}
@@ -442,10 +443,10 @@ function BmsFilterDropdown({
                       <span
                         className={`h-3.5 w-3.5 shrink-0 rounded-[2px] flex items-center justify-center ${
                           disabled
-                            ? "border-0 bg-[#E0E0E0]"
+                            ? "border-0 bg-slate-200"
                             : checked
-                              ? "border border-[#6900AA] bg-[#6900AA] text-white"
-                              : "border border-[#9CA3AF] bg-white"
+                              ? "border border-slate-900 bg-slate-900 text-white"
+                              : "border border-slate-300 bg-white"
                         }`}
                         aria-hidden
                       >
@@ -478,8 +479,8 @@ function BmsFilterDropdown({
         onClick={() => onOpenChange(!open)}
         className={`h-9 sm:h-10 px-2.5 sm:px-3.5 inline-flex items-center gap-1.5 sm:gap-2 rounded-xl border text-[12px] sm:text-[13px] font-medium cursor-pointer focus:outline-none transition-colors whitespace-nowrap ${
           active
-            ? "border-[#6900AA] text-[#6900AA] bg-[#F7E9FF]"
-            : "border-[#E5E5E5] text-[#4B5563] bg-white hover:border-[#6900AA]/45"
+            ? "border-slate-400 bg-slate-100 text-slate-900 font-semibold"
+            : "border-slate-200 text-slate-700 bg-white hover:border-slate-300"
         }`}
         aria-haspopup="listbox"
         aria-expanded={open}
@@ -489,7 +490,7 @@ function BmsFilterDropdown({
         <ChevronDown
           size={14}
           className={`shrink-0 transition-transform ${open ? "rotate-180" : ""} ${
-            active ? "text-[#6900AA]" : "text-[#9CA3AF]"
+            active ? "text-slate-900" : "text-slate-400"
           }`}
         />
       </button>
@@ -563,7 +564,7 @@ function SortByDropdown({
           <ul
             ref={menuRef}
             role="listbox"
-            className="fixed z-[200] rounded-xl border border-[#E8E8E8] bg-white py-1 shadow-[0_12px_28px_rgba(0,0,0,0.14)]"
+            className="fixed z-[200] rounded-xl border border-slate-200 bg-white py-1 shadow-[0_12px_28px_rgba(0,0,0,0.14)]"
             style={{
               top: menuPos.top,
               left: menuPos.left,
@@ -580,19 +581,19 @@ function SortByDropdown({
                       onChange(opt.value);
                       onOpenChange(false);
                     }}
-                    className="w-full px-3.5 py-2.5 flex items-center gap-3 text-left cursor-pointer hover:bg-[#F7E9FF]/60"
+                    className="w-full px-3.5 py-2.5 flex items-center gap-3 text-left cursor-pointer hover:bg-slate-50"
                   >
                     <span className="flex-1 min-w-0">
-                      <span className="block text-[13px] font-medium text-[#222222]">{opt.label}</span>
-                      <span className="block text-[11px] text-[#9CA3AF] mt-0.5">{opt.hint}</span>
+                      <span className="block text-[13px] font-medium text-slate-800">{opt.label}</span>
+                      <span className="block text-[11px] text-slate-400 mt-0.5">{opt.hint}</span>
                     </span>
                     <span
                       className={`h-4 w-4 shrink-0 rounded-full border-2 flex items-center justify-center ${
-                        selected ? "border-[#6900AA]" : "border-[#C4C4C4]"
+                        selected ? "border-slate-900" : "border-slate-300"
                       }`}
                       aria-hidden
                     >
-                      {selected ? <span className="h-2 w-2 rounded-full bg-[#6900AA]" /> : null}
+                      {selected ? <span className="h-2 w-2 rounded-full bg-slate-900" /> : null}
                     </span>
                   </button>
                 </li>
@@ -610,8 +611,8 @@ function SortByDropdown({
         onClick={() => onOpenChange(!open)}
         className={`h-9 sm:h-10 px-2.5 sm:px-3.5 inline-flex items-center gap-1.5 sm:gap-2 rounded-xl border text-[12px] sm:text-[13px] font-medium cursor-pointer focus:outline-none transition-colors whitespace-nowrap ${
           active
-            ? "border-[#6900AA] text-[#6900AA] bg-[#F7E9FF]"
-            : "border-[#E5E5E5] text-[#4B5563] bg-white hover:border-[#6900AA]/45"
+            ? "border-slate-400 bg-slate-100 text-slate-900 font-semibold"
+            : "border-slate-200 text-slate-700 bg-white hover:border-slate-300"
         }`}
         aria-haspopup="listbox"
         aria-expanded={open}
@@ -621,7 +622,7 @@ function SortByDropdown({
         <ChevronDown
           size={14}
           className={`shrink-0 transition-transform ${open ? "rotate-180" : ""} ${
-            active ? "text-[#6900AA]" : "text-[#9CA3AF]"
+            active ? "text-slate-900" : "text-slate-400"
           }`}
         />
       </button>
@@ -693,7 +694,7 @@ function MobileBottomSheet({
         onClick={onClose}
       />
       <div
-        className={`absolute inset-x-0 bottom-0 max-h-[88vh] overflow-y-auto rounded-t-2xl bg-white shadow-2xl ${
+        className={`absolute inset-x-0 bottom-0 max-h-[88vh] flex flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl ${
           exiting ? "mobile-filter-sheet-panel-out" : "mobile-filter-sheet-panel"
         } ${className}`}
         role="dialog"
@@ -1451,19 +1452,19 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
   };
 
   const mobilePillClass = (active: boolean) =>
-    `shrink-0 h-9 px-3 inline-flex items-center gap-1.5 rounded-full border text-[12px] font-semibold whitespace-nowrap cursor-pointer transition-colors ${
+    `shrink-0 h-9 px-3.5 inline-flex items-center gap-1.5 rounded-full border text-[13px] whitespace-nowrap cursor-pointer transition-colors ${
       active
-        ? "border-[#6900AA] text-[#6900AA] bg-[#F7E9FF]"
-        : "border-[#E5E5E5] text-[#333333] bg-white"
+        ? "border-slate-400 bg-slate-100 text-slate-900 font-semibold"
+        : "border-slate-200 text-slate-700 bg-white hover:border-slate-300 font-medium"
     }`;
 
   const filterChipClass = (active: boolean, disabled = false) =>
-    `inline-flex items-center justify-center rounded-full border px-3.5 py-2 text-[12px] font-semibold transition-colors ${
+    `inline-flex items-center justify-center rounded-full border px-4 py-2 text-[13px] font-semibold transition-all select-none ${
       disabled
-        ? "border-[#E8E8E8] text-[#C8C8C8] bg-white cursor-not-allowed"
+        ? "border-slate-200 text-slate-300 bg-slate-50 cursor-not-allowed opacity-60"
         : active
-          ? "border-[#6900AA] bg-[#6900AA] text-white cursor-pointer"
-          : "border-[#6900AA]/55 bg-white text-[#6900AA] cursor-pointer"
+          ? "border-slate-900 bg-slate-900 text-white shadow-sm cursor-pointer"
+          : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50 active:scale-[0.98] cursor-pointer"
     }`;
 
   return (
@@ -2232,13 +2233,13 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
                       >
                         Go back
                       </button>
-                      <button
+                      <ShinyBlackButton
                         type="button"
                         onClick={confirmLateEntryContinue}
-                        className="flex-1 h-11 rounded-xl bg-[#111111] text-white text-sm font-bold cursor-pointer hover:bg-black transition-colors"
+                        className="flex-1 h-11 rounded-xl bg-[#111111] text-white text-sm font-bold"
                       >
                         Continue booking
-                      </button>
+                      </ShinyBlackButton>
                     </div>
                   </div>
                 </div>
@@ -2251,14 +2252,30 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
 
       {/* Mobile: all filters sheet */}
       <MobileBottomSheet open={mobileSheet === "filters"} onClose={() => setMobileSheet(null)}>
-        <div className="px-4 pt-4 pb-3">
-          <h2 className="text-lg font-extrabold text-[#111111]">Filters</h2>
+        <div className="w-10 h-1 bg-slate-300 rounded-full mx-auto mt-2.5 shrink-0" />
+        <div className="flex items-center justify-between gap-3 px-5 py-3.5 border-b border-slate-200 shrink-0 bg-white">
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-bold text-slate-900 tracking-tight">Filters</h2>
+            {draftPriceFilters.length + draftFormatFilters.length + draftLanguageFilters.length + draftTimeFilters.length > 0 && (
+              <span className="inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full text-[11px] font-bold bg-slate-900 text-white">
+                {draftPriceFilters.length + draftFormatFilters.length + draftLanguageFilters.length + draftTimeFilters.length}
+              </span>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => setMobileSheet(null)}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors cursor-pointer"
+            aria-label="Close"
+          >
+            <X size={18} strokeWidth={2.25} />
+          </button>
         </div>
-        <div className="pb-24">
-          <div className="bg-[#F3F4F6] px-4 py-2 text-[11px] font-bold uppercase tracking-wide text-[#6B7280]">
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain pb-6">
+          <div className="bg-[#F8FAFC] px-5 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-500 border-b border-slate-100">
             Price Range
           </div>
-          <div className="flex flex-wrap gap-2 px-4 py-3">
+          <div className="flex flex-wrap gap-2.5 px-5 py-3.5">
             {PRICE_BAND_OPTIONS.map((opt) => (
               <button
                 key={opt.value}
@@ -2273,12 +2290,12 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
             ))}
           </div>
 
-          <div className="bg-[#F3F4F6] px-4 py-2 text-[11px] font-bold uppercase tracking-wide text-[#6B7280]">
+          <div className="bg-[#F8FAFC] px-5 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-500 border-y border-slate-100">
             Special Formats
           </div>
-          <div className="flex flex-wrap gap-2 px-4 py-3">
+          <div className="flex flex-wrap gap-2.5 px-5 py-3.5">
             {formatOptions.length === 0 ? (
-              <p className="text-[12px] text-[#9CA3AF]">No formats available</p>
+              <p className="text-[12px] text-slate-400">No formats available</p>
             ) : (
               formatOptions.map((opt) => (
                 <button
@@ -2295,12 +2312,12 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
             )}
           </div>
 
-          <div className="bg-[#F3F4F6] px-4 py-2 text-[11px] font-bold uppercase tracking-wide text-[#6B7280]">
+          <div className="bg-[#F8FAFC] px-5 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-500 border-y border-slate-100">
             Language
           </div>
-          <div className="flex flex-wrap gap-2 px-4 py-3">
+          <div className="flex flex-wrap gap-2.5 px-5 py-3.5">
             {languageOptions.length === 0 ? (
-              <p className="text-[12px] text-[#9CA3AF]">No languages available</p>
+              <p className="text-[12px] text-slate-400">No languages available</p>
             ) : (
               languageOptions.map((opt) => (
                 <button
@@ -2317,10 +2334,10 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
             )}
           </div>
 
-          <div className="bg-[#F3F4F6] px-4 py-2 text-[11px] font-bold uppercase tracking-wide text-[#6B7280]">
+          <div className="bg-[#F8FAFC] px-5 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-500 border-y border-slate-100">
             Preferred Time
           </div>
-          <div className="flex flex-wrap gap-2 px-4 py-3">
+          <div className="flex flex-wrap gap-2.5 px-5 py-3.5">
             {preferredTimeOptions.map((opt) => {
               const disabled = Boolean(opt.disabled);
               return (
@@ -2341,7 +2358,7 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
             })}
           </div>
         </div>
-        <div className="sticky bottom-0 inset-x-0 flex gap-3 border-t border-[#E8E8E8] bg-white px-4 py-3 safe-area-pb">
+        <div className="sticky bottom-0 inset-x-0 flex items-center gap-3 border-t border-slate-200 bg-white px-5 py-3 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-[0_-4px_16px_rgba(0,0,0,0.06)] shrink-0">
           <button
             type="button"
             onClick={() => {
@@ -2350,12 +2367,11 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
               setDraftFormatFilters([]);
               setDraftLanguageFilters([]);
             }}
-            className="flex-1 h-11 rounded-xl border border-[#6900AA] text-[#6900AA] text-sm font-bold cursor-pointer"
+            className="flex-1 h-11 inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-5 text-sm font-bold text-slate-800 hover:bg-slate-50 active:scale-[0.98] transition-all cursor-pointer"
           >
             Reset
           </button>
-          <button
-            type="button"
+          <ShinyBlackButton
             onClick={() => {
               setPriceFilters(draftPriceFilters);
               setTimeFilters(draftTimeFilters);
@@ -2363,26 +2379,37 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
               setLanguageFilters(draftLanguageFilters);
               setMobileSheet(null);
             }}
-            className="flex-[1.4] h-11 rounded-xl bg-[#6900AA] text-white text-sm font-bold cursor-pointer"
+            className="flex-[1.4] h-11 !rounded-full bg-[#111111] text-white text-sm font-bold shadow-md shadow-black/20"
           >
             Apply Filters
-          </button>
+          </ShinyBlackButton>
         </div>
       </MobileBottomSheet>
 
       {/* Mobile: language + format sheet */}
       <MobileBottomSheet open={mobileSheet === "langFormat"} onClose={() => setMobileSheet(null)}>
-        <div className="px-4 pt-4 pb-2">
-          <p className="text-[11px] font-semibold text-[#9CA3AF] truncate">{movie.title}</p>
-          <h2 className="mt-1 text-lg font-extrabold text-[#111111]">Select language and format</h2>
+        <div className="w-10 h-1 bg-slate-300 rounded-full mx-auto mt-2.5 shrink-0" />
+        <div className="flex items-center justify-between gap-3 px-5 py-3.5 border-b border-slate-200 shrink-0 bg-white">
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-semibold text-slate-400 truncate">{movie.title}</p>
+            <h2 className="mt-0.5 text-lg font-bold text-slate-900 tracking-tight">Select language and format</h2>
+          </div>
+          <button
+            type="button"
+            onClick={() => setMobileSheet(null)}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors cursor-pointer shrink-0"
+            aria-label="Close"
+          >
+            <X size={18} strokeWidth={2.25} />
+          </button>
         </div>
-        <div className="pb-24">
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain pb-6">
           {languageOptions.map((lang) => (
             <div key={lang.value}>
-              <div className="bg-[#F3F4F6] px-4 py-2 text-[11px] font-bold uppercase tracking-wide text-[#6B7280]">
+              <div className="bg-[#F8FAFC] px-5 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-500 border-y border-slate-100">
                 {lang.label}
               </div>
-              <div className="flex flex-wrap gap-2 px-4 py-3">
+              <div className="flex flex-wrap gap-2.5 px-5 py-3.5">
                 <button
                   type="button"
                   onClick={() =>
@@ -2411,40 +2438,48 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
             </div>
           ))}
           {languageOptions.length === 0 ? (
-            <p className="px-4 py-6 text-sm text-[#9CA3AF]">No languages available for this date.</p>
+            <p className="px-5 py-6 text-sm text-slate-400">No languages available for this date.</p>
           ) : null}
         </div>
-        <div className="sticky bottom-0 inset-x-0 flex gap-3 border-t border-[#E8E8E8] bg-white px-4 py-3 safe-area-pb">
+        <div className="sticky bottom-0 inset-x-0 flex items-center gap-3 border-t border-slate-200 bg-white px-5 py-3 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-[0_-4px_16px_rgba(0,0,0,0.06)] shrink-0">
           <button
             type="button"
             onClick={() => {
               setDraftLanguageFilters([]);
               setDraftFormatFilters([]);
             }}
-            className="flex-1 h-11 rounded-xl border border-[#6900AA] text-[#6900AA] text-sm font-bold cursor-pointer"
+            className="flex-1 h-11 inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-5 text-sm font-bold text-slate-800 hover:bg-slate-50 active:scale-[0.98] transition-all cursor-pointer"
           >
             Reset
           </button>
-          <button
-            type="button"
+          <ShinyBlackButton
             onClick={() => {
               setLanguageFilters(draftLanguageFilters);
               setFormatFilters(draftFormatFilters);
               setMobileSheet(null);
             }}
-            className="flex-[1.4] h-11 rounded-xl bg-[#6900AA] text-white text-sm font-bold cursor-pointer"
+            className="flex-[1.4] h-11 !rounded-full bg-[#111111] text-white text-sm font-bold shadow-md shadow-black/20"
           >
             Apply
-          </button>
+          </ShinyBlackButton>
         </div>
       </MobileBottomSheet>
 
       {/* Mobile: sort sheet */}
       <MobileBottomSheet open={mobileSheet === "sort"} onClose={() => setMobileSheet(null)}>
-        <div className="px-4 pt-4 pb-2">
-          <h2 className="text-lg font-extrabold text-[#111111]">Sort by</h2>
+        <div className="w-10 h-1 bg-slate-300 rounded-full mx-auto mt-2.5 shrink-0" />
+        <div className="flex items-center justify-between gap-3 px-5 py-3.5 border-b border-slate-200 shrink-0 bg-white">
+          <h2 className="text-lg font-bold text-slate-900 tracking-tight">Sort by</h2>
+          <button
+            type="button"
+            onClick={() => setMobileSheet(null)}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors cursor-pointer"
+            aria-label="Close"
+          >
+            <X size={18} strokeWidth={2.25} />
+          </button>
         </div>
-        <ul className="pb-6">
+        <ul className="flex-1 min-h-0 overflow-y-auto py-2">
           {SORT_OPTIONS.map((opt, idx) => {
             const selected = sortBy === opt.value;
             return (
@@ -2455,21 +2490,23 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
                     setSortBy(opt.value);
                     setMobileSheet(null);
                   }}
-                  className={`w-full flex items-center gap-3 px-4 py-3.5 text-left cursor-pointer ${
-                    idx > 0 ? "border-t border-[#F0F0F0]" : ""
+                  className={`w-full flex items-center gap-3 px-5 py-3.5 text-left cursor-pointer hover:bg-slate-50 transition-colors ${
+                    idx > 0 ? "border-t border-slate-100" : ""
                   }`}
                 >
                   <span className="min-w-0 flex-1">
-                    <span className="block text-[14px] font-bold text-[#111111]">{opt.label}</span>
-                    <span className="mt-0.5 block text-[12px] text-[#9CA3AF]">{opt.hint}</span>
+                    <span className={`block text-[14px] ${selected ? "font-bold text-slate-900" : "font-medium text-slate-700"}`}>
+                      {opt.label}
+                    </span>
+                    <span className="mt-0.5 block text-[12px] text-slate-400">{opt.hint}</span>
                   </span>
                   <span
                     className={`size-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                      selected ? "border-[#6900AA]" : "border-[#D1D5DB]"
+                      selected ? "border-slate-900" : "border-slate-300"
                     }`}
                     aria-hidden
                   >
-                    {selected ? <span className="size-2.5 rounded-full bg-[#6900AA]" /> : null}
+                    {selected ? <span className="size-2.5 rounded-full bg-slate-900" /> : null}
                   </span>
                 </button>
               </li>

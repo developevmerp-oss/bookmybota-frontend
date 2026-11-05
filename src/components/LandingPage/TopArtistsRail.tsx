@@ -98,9 +98,9 @@ export default function TopArtistsRail() {
   if (!isLoading && items.length === 0) return null;
 
   return (
-    <section className="w-full bg-white py-6 sm:py-0">
+    <section className="w-full bg-white pt-6 sm:pt-7 lg:pt-8">
       <div className="bmb-section-container">
-        <div className="mb-4 flex items-end justify-between gap-3">
+        <div className="mb-3 sm:mb-3.5 flex items-center justify-between gap-3">
           <h2 className="text-xl sm:text-2xl font-bold text-slate-800">
             Top Artists
           </h2>

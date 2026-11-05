@@ -5,6 +5,8 @@ export type TicketCardPdfAmountRow = {
   label: string;
   value: string;
   strong?: boolean;
+  /** Unit price under the line, e.g. "350 ETB each". */
+  labelDetail?: string;
 };
 
 export type TicketCardPdfOptions = {
@@ -24,6 +26,8 @@ export type TicketCardPdfOptions = {
   showQr?: boolean;
   cancellationNote?: string;
   totalFormatted?: string;
+  /** Under Total Amount, e.g. "Includes 80.50 ETB convenience fee & VAT". */
+  totalNote?: string;
   amountRows?: TicketCardPdfAmountRow[];
   logoUrl?: string;
 };
@@ -52,6 +56,57 @@ async function fetchAsDataUrl(url: string): Promise<string | null> {
 }
 
 /**
+ * object-fit: cover into a fixed PDF box so posters are not stretched.
+ * Returns a JPEG data URL cropped to targetW:targetH.
+ */
+export async function coverCropImageForPdf(
+  dataUrl: string,
+  targetW: number,
+  targetH: number,
+  outPx = 420
+): Promise<string | null> {
+  if (typeof window === "undefined" || !dataUrl) return null;
+  const ratio = targetW / Math.max(targetH, 0.01);
+  const outW = Math.max(1, Math.round(outPx * ratio));
+  const outH = Math.max(1, outPx);
+
+  return await new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = outW;
+        canvas.height = outH;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          resolve(null);
+          return;
+        }
+        const iw = img.naturalWidth || img.width;
+        const ih = img.naturalHeight || img.height;
+        if (!iw || !ih) {
+          resolve(null);
+          return;
+        }
+        const scale = Math.max(outW / iw, outH / ih);
+        const dw = iw * scale;
+        const dh = ih * scale;
+        const dx = (outW - dw) / 2;
+        const dy = (outH - dh) / 2;
+        ctx.fillStyle = "#F3F3F3";
+        ctx.fillRect(0, 0, outW, outH);
+        ctx.drawImage(img, dx, dy, dw, dh);
+        resolve(canvas.toDataURL("image/jpeg", 0.92));
+      } catch {
+        resolve(null);
+      }
+    };
+    img.onerror = () => resolve(null);
+    img.src = dataUrl;
+  });
+}
+
+/**
  * Builds a state-of-the-art PDF styled exactly like the BookMyBota ticket card
  * shown on screen (Image 2) with crisp base64 branding, balanced vertical ticket proportions,
  * clean perforations, and professional typography.
@@ -66,8 +121,20 @@ export async function buildTicketCardPdf(options: TicketCardPdfOptions): Promise
   doc.setFillColor(242, 242, 242);
   doc.rect(0, 0, pageW, pageH, "F");
 
-  // Load assets in parallel
-  const [posterData, qrDataUrl] = await Promise.all([
+  // Card geometry: 118mm width gives the exact vertical ticket proportions from Image 2
+  const cardW = 118; // mm
+  const cardX = (pageW - cardW) / 2; // centered (46mm margin on A4)
+  const centerX = cardX + cardW / 2;
+
+  // ── Measure Exact Card Height (fits content like Image 2, no extra gap) ────
+  const cardStartY = 16;
+  const pad = 5.5;
+  /** Match on-screen ticket poster aspect (2:3) — cover-crop, never stretch. */
+  const posterW = 20;
+  const posterH = 30;
+
+  // Load assets in parallel (poster cover-cropped to poster box)
+  const [posterRaw, qrDataUrl] = await Promise.all([
     options.posterUrl ? fetchAsDataUrl(options.posterUrl) : Promise.resolve(null),
     options.showQr && options.qrValue
       ? fetchAsDataUrl(
@@ -77,17 +144,9 @@ export async function buildTicketCardPdf(options: TicketCardPdfOptions): Promise
         )
       : Promise.resolve(null),
   ]);
-
-  // Card geometry: 118mm width gives the exact vertical ticket proportions from Image 2
-  const cardW = 118; // mm
-  const cardX = (pageW - cardW) / 2; // centered (46mm margin on A4)
-  const centerX = cardX + cardW / 2;
-
-  // ── Measure Exact Card Height (fits content like Image 2, no extra gap) ────
-  const cardStartY = 16;
-  const pad = 5.5;
-  const posterW = 22;
-  const posterH = 28;
+  const posterData = posterRaw
+    ? (await coverCropImageForPdf(posterRaw, posterW, posterH)) || posterRaw
+    : null;
 
   const topH = pad + posterH + pad;
 
@@ -101,7 +160,12 @@ export async function buildTicketCardPdf(options: TicketCardPdfOptions): Promise
   const hasAmount = Boolean(options.totalFormatted || options.amountRows?.length);
   if (hasAmount) {
     if (options.totalFormatted) bottomH += 5;
-    if (options.amountRows?.length) bottomH += options.amountRows.length * 4.5;
+    if (options.totalNote) bottomH += 4;
+    if (options.amountRows?.length) {
+      for (const row of options.amountRows) {
+        bottomH += row.labelDetail ? 7.6 : 4.5;
+      }
+    }
     bottomH += 5;
   }
   bottomH += 8.6 + 3 + 4 + 4; // BookMyBota logo + confirmation line
@@ -119,6 +183,8 @@ export async function buildTicketCardPdf(options: TicketCardPdfOptions): Promise
 
   if (posterData) {
     try {
+      doc.setFillColor(243, 243, 243);
+      doc.roundedRect(cardX + pad, curY, posterW, posterH, 1.5, 1.5, "F");
       doc.addImage(posterData, "JPEG", cardX + pad, curY, posterW, posterH);
       doc.setDrawColor(238, 238, 238);
       doc.setLineWidth(0.2);
@@ -291,7 +357,15 @@ export async function buildTicketCardPdf(options: TicketCardPdfOptions): Promise
     doc.setTextColor(17, 17, 17);
     doc.text("Total Amount", cardX + pad, curY);
     doc.text(options.totalFormatted, cardX + cardW - pad, curY, { align: "right" });
-    curY += 5;
+    curY += options.totalNote ? 3.6 : 5;
+    if (options.totalNote) {
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(6.2);
+      doc.setTextColor(119, 119, 119);
+      const noteLines = doc.splitTextToSize(options.totalNote, cardW - pad * 2 - 28);
+      doc.text(noteLines, cardX + pad, curY);
+      curY += Math.max(1, noteLines.length) * 3.2 + 2;
+    }
   }
 
   if (options.amountRows?.length) {
@@ -301,7 +375,14 @@ export async function buildTicketCardPdf(options: TicketCardPdfOptions): Promise
       doc.setTextColor(row.strong ? 17 : 102, row.strong ? 17 : 102, row.strong ? 17 : 102);
       doc.text(row.label, cardX + pad, curY);
       doc.text(row.value, cardX + cardW - pad, curY, { align: "right" });
-      curY += 4.5;
+      curY += row.labelDetail ? 3.4 : 4.5;
+      if (row.labelDetail) {
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(6.2);
+        doc.setTextColor(136, 136, 136);
+        doc.text(row.labelDetail, cardX + pad, curY);
+        curY += 4.2;
+      }
     }
   }
 

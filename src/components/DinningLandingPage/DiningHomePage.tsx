@@ -996,11 +996,11 @@ export default function Home() {
 
   const cuisinesRef = useRef<HTMLDivElement>(null);
   const filtersStickySentinelRef = useRef<HTMLDivElement>(null);
+  const loadMoreSentinelRef = useRef<HTMLDivElement>(null);
+  const pagingRef = useRef(false);
   const offersRef = useRef<HTMLDivElement>(null);
   const [isFiltersStuck, setIsFiltersStuck] = useState(false);
   const siteHeaderHeight = useStickyHeaderOffset();
-  const [diningSearchOpenSignal, setDiningSearchOpenSignal] = useState(0);
-
   const scrollCuisines = (direction: "left" | "right") => {
     const el = cuisinesRef.current;
     if (!el) return;
@@ -1092,6 +1092,9 @@ export default function Home() {
   const [locationError, setLocationError] = useState(false);
   const [showLocationDropdown, setShowLocationDropdown] = useState(false);
   const locationRef = useRef<HTMLDivElement>(null);
+  // Clear City removes storage before the URL drops ?city=. Ignore that stale
+  // param so hydration cannot put the city back and skip the all-cities fetch.
+  const suppressUrlCityRef = useRef(false);
 
   // Prefer URL ?city=, else keep the shared top-bar city from localStorage.
   // Never clear selected_city just because dining opened without a query param.
@@ -1118,18 +1121,17 @@ export default function Home() {
       setMealOccasion((prev) => (prev === "" ? prev : ""));
     }
 
-    const nextCity =
-      cityParam && cityParam !== "All Cities"
-        ? cityParam
-        : storedCity && storedCity !== "All Cities"
-          ? storedCity
-          : "";
+    const urlCity = cityParam && cityParam !== "All Cities" ? cityParam : "";
+    if (suppressUrlCityRef.current && !urlCity) suppressUrlCityRef.current = false;
+    const nextCity = suppressUrlCityRef.current
+      ? ""
+      : urlCity || (storedCity && storedCity !== "All Cities" ? storedCity : "");
 
     setLocationCity(nextCity);
     setLocationLabel(nextCity || "All Cities");
 
-    if (cityParam && cityParam !== "All Cities") {
-      localStorage.setItem("selected_city", cityParam);
+    if (!suppressUrlCityRef.current && urlCity) {
+      localStorage.setItem("selected_city", urlCity);
       window.dispatchEvent(new Event("selected_city_changed"));
     }
 
@@ -1158,6 +1160,7 @@ export default function Home() {
     const syncCity = () => {
       const stored = localStorage.getItem("selected_city") || "";
       const next = stored && stored !== "All Cities" ? stored : "";
+      suppressUrlCityRef.current = !next;
       setLocationCity(next);
       setLocationLabel(next || "All Cities");
     };
@@ -1230,10 +1233,9 @@ export default function Home() {
     data: cityBusinessesData,
     isLoading: cityBusinessesLoading,
     isFetching: cityBusinessesFetching,
-  } = useGetBusinessesPagedQuery({
-    ...diningListArgs,
-    city: activeCity,
-  });
+  } = useGetBusinessesPagedQuery(
+    activeCity ? { ...diningListArgs, city: activeCity } : diningListArgs
+  );
   const {
     data: allBusinessesData,
     isLoading: allBusinessesLoading,
@@ -1549,17 +1551,42 @@ export default function Home() {
   }, [sectionPool, cuisineOptions, cuisineMasters, activeCity]);
 
   const displayRestaurants = loadedRestaurants;
+  const listQueryKey = useMemo(
+    () =>
+      JSON.stringify({
+        searchQuery,
+        locationCity,
+        activeCategories,
+        mealOccasion,
+        cuisines: diningFilters.cuisines,
+        minRating: diningFilters.minRating,
+        offersOnly: diningFilters.offersOnly,
+        offerBucket: diningFilters.offerBucket,
+        pureVeg: diningFilters.pureVeg,
+        servesAlcohol: diningFilters.servesAlcohol,
+        maxCost: diningFilters.maxCost,
+        sort: diningFilters.sort,
+        bookTable: diningFilters.bookTable,
+      }),
+    [searchQuery, locationCity, activeCategories, mealOccasion, diningFilters]
+  );
+  const [listReadyKey, setListReadyKey] = useState("");
+  const listPending = listReadyKey !== listQueryKey;
 
   useEffect(() => {
     setCurrentPage(1);
-    setLoadedRestaurants([]);
-  }, [searchQuery, locationCity, activeCategories, diningFilters, mealOccasion]);
+  }, [listQueryKey]);
 
   useEffect(() => {
     if (!businessesData) return;
     const pageItems = businessesData.items ?? [];
+    const scopeChanged = listReadyKey !== listQueryKey;
+    // City/filter just changed. Wait until page 1 of that query has settled
+    // so a stale city page cannot be saved as the all-cities list.
+    if (scopeChanged && (currentPage > 1 || businessesFetching)) return;
     if (currentPage <= 1) {
       setLoadedRestaurants(pageItems);
+      setListReadyKey(listQueryKey);
       return;
     }
     setLoadedRestaurants((prev) => {
@@ -1567,15 +1594,36 @@ export default function Home() {
       const next = pageItems.filter((r) => !seen.has(r.id));
       return next.length ? [...prev, ...next] : prev;
     });
-  }, [businessesData, currentPage]);
+  }, [businessesData, businessesFetching, currentPage, listQueryKey, listReadyKey]);
 
   const hasMoreRestaurants = Boolean(businessesData?.meta?.has_next);
   const loadingMore = businessesFetching && currentPage > 1;
-  /** Initial load + filter/search refetch while list is empty — card-matched shimmer. */
+
+  useEffect(() => {
+    if (!businessesFetching) pagingRef.current = false;
+  }, [businessesFetching]);
+
+  useEffect(() => {
+    const node = loadMoreSentinelRef.current;
+    if (!node || !hasMoreRestaurants || businessesFetching || pagingRef.current) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries[0]?.isIntersecting || pagingRef.current) return;
+        pagingRef.current = true;
+        setCurrentPage((page) => page + 1);
+      },
+      { root: null, rootMargin: "360px 0px", threshold: 0 }
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [hasMoreRestaurants, businessesFetching, displayRestaurants.length]);
+  /** Initial load + city/filter refetch — card-matched shimmer, never demo cards. */
   const showRestaurantShimmer =
-    loadedRestaurants.length === 0 &&
-    currentPage <= 1 &&
-    (businessesLoading || businessesFetching);
+    listPending ||
+    (loadedRestaurants.length === 0 &&
+      currentPage <= 1 &&
+      (businessesLoading || businessesFetching));
 
   const hasActiveFilters =
     Boolean(searchQuery) ||
@@ -1605,8 +1653,11 @@ export default function Home() {
     activeCategories.length === 1 &&
     activeCategories[0].trim().toLowerCase() === "bar";
   const canShowCatalogFallback =
+    !listPending &&
     !businessesLoading &&
+    !businessesFetching &&
     displayRestaurants.length === 0 &&
+    (businessesData?.meta?.total ?? 0) === 0 &&
     !searchQuery &&
     !mealOccasion &&
     diningFiltersAreDefault &&
@@ -2036,8 +2087,8 @@ export default function Home() {
         className="w-full bg-white"
         style={{ scrollMarginTop: Math.max(siteHeaderHeight, 96) + 8 }}
       >
-        <div className="bmb-section-container pt-2 sm:pt-3 pb-3">
-          <h2 className="text-lg sm:text-xl md:text-2xl font-semibold text-slate-900 mb-3 sm:mb-4 tracking-tight">
+        <div className="bmb-section-container pt-6 sm:pt-7 lg:pt-8 pb-0">
+          <h2 className="text-lg sm:text-xl md:text-2xl font-semibold text-slate-900 mb-3 sm:mb-3.5 tracking-tight">
             Explore Dining
           </h2>
           <ExploreDiningCardOption2
@@ -2073,9 +2124,9 @@ export default function Home() {
       {/* Explore Cuisines — only after Restaurant is selected in Explore Dining */}
       {exploreCardId === "restaurant" && cuisineCards.length > 0 && (
         <div className="w-full bg-white border-b border-slate-100">
-          <div className="bmb-section-container py-5 sm:py-6">
+          <div className="bmb-section-container pt-6 sm:pt-7 lg:pt-8 pb-4 sm:pb-5">
             <section id="explore-cuisines" className="scroll-mt-24">
-              <div className="flex items-center justify-between gap-3 mb-3 sm:mb-4 md:mb-5">
+              <div className="flex items-center justify-between gap-3 mb-3 sm:mb-3.5">
                 <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-slate-900 tracking-tight min-w-0 truncate">
                   Explore Cuisines
                 </h2>
@@ -2172,7 +2223,7 @@ export default function Home() {
               isFiltersStuck ? "is-stuck" : ""
             }`}
           >
-            <div className="bmb-section-container pt-4 pb-1">
+            <div className="bmb-section-container py-2 sm:mb-1.5 lg:mb-2">
               <DiningFiltersBar
                 cuisines={cuisineOptions}
                 filters={diningFilters}
@@ -2190,8 +2241,6 @@ export default function Home() {
                   scrollToDiningBrowseViewport();
                 }}
                 showSearch
-                searchButtonClassName="hidden lg:inline-flex"
-                openSearchSignal={diningSearchOpenSignal}
                 searchValue={searchInput}
                 onSearchChange={setSearchInput}
                 onSearchSubmit={(value) => {
@@ -2232,7 +2281,7 @@ export default function Home() {
           </div>
         </section>
 
-      <div className="bmb-section-container pt-2 pb-5">
+      <div className="bmb-section-container pt-0 pb-5">
         <div >
           {/* ── 5. Offer Section (commented out) ───────────────────────────── */}
           {/* {showHomeExtras && homeOfferCards.length > 0 && (
@@ -2299,7 +2348,7 @@ export default function Home() {
 
           {/* ── 6. Restaurant section ───────────────────────────────────────── */}
           <section id="restaurant-listings" className={`pb-3 ${showHomeExtras ? "" : "pt-0"}`}>
-          <div className="pt-1 pb-4 flex items-start justify-between gap-3">
+          <div className="pt-0 pb-3 flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
               <h2 className="text-lg sm:text-xl md:text-2xl font-semibold text-slate-900 tracking-tight">
                 {getFilteredSectionTitle()}
@@ -2326,14 +2375,6 @@ export default function Home() {
                 </p>
               )}
             </div>
-            <button
-              type="button"
-              onClick={() => setDiningSearchOpenSignal((n) => n + 1)}
-              className="dining-search-trigger lg:hidden shrink-0 inline-flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-full bg-white text-slate-700 cursor-pointer mt-0.5"
-              aria-label="Search restaurants"
-            >
-              <Search size={18} strokeWidth={1.75} />
-            </button>
           </div>
 
           {showRestaurantShimmer ? (
@@ -2396,19 +2437,8 @@ export default function Home() {
             </div>
             {/* ========== END UI OPTION TWO ========== */}
               {hasMoreRestaurants && (
-                <div className="mt-8 flex justify-center">
-                  <button
-                    type="button"
-                    onClick={() => setCurrentPage((p) => p + 1)}
-                    disabled={loadingMore}
-                    className="inline-flex items-center justify-center gap-2 min-w-[160px] px-8 py-3 rounded-full bg-[#6900AA] text-white text-sm font-semibold hover:bg-[#57008E] disabled:opacity-60 transition-colors"
-                  >
-                    {loadingMore ? (
-                      <Loader2 size={16} className="animate-spin" aria-label="Loading more restaurants" />
-                    ) : (
-                      "Load More"
-                    )}
-                  </button>
+                <div ref={loadMoreSentinelRef} className="mt-6">
+                  {loadingMore ? <DiningHomeRestaurantShimmer count={4} /> : <div className="h-10" aria-hidden />}
                 </div>
               )}
             </>
@@ -2416,9 +2446,9 @@ export default function Home() {
         </section>
 
           {showHomeExtras && (
-            <section className="w-full pt-8 sm:pt-10 pb-2">
+            <section className="w-full pt-6 sm:pt-7 lg:pt-8 pb-6 sm:pb-7 lg:pb-8">
               {/* Collections — after restaurant listings */}
-              <div className="lg:hidden mb-2">
+              <div className="lg:hidden">
                 <div className="flex items-center justify-between gap-2">
                   <h2 className="text-lg sm:text-xl md:text-2xl font-semibold text-slate-900 shrink-0 tracking-tight">Collections</h2>
                   <Link

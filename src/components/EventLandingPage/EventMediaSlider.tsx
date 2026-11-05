@@ -35,7 +35,7 @@ export default function EventMediaSlider({
 
   if (slides.length === 0) {
     return (
-      <div className="rounded-lg sm:rounded-xl bg-[#F3F4F6] aspect-[4/3] sm:aspect-[16/9] lg:aspect-[2/1] 2xl:aspect-[21/9] flex items-center justify-center text-slate-300">
+      <div className="rounded-lg sm:rounded-xl bg-[#F3F4F6] aspect-[16/9] flex items-center justify-center text-slate-300">
         <EventImageFallback size={40} />
       </div>
     );
@@ -44,7 +44,7 @@ export default function EventMediaSlider({
   const showNav = slides.length > 1;
 
   return (
-    <div className="event-media-swiper relative rounded-lg sm:rounded-xl overflow-hidden bg-black aspect-[4/3] sm:aspect-[16/9] lg:aspect-[2/1] 2xl:aspect-[21/9]">
+    <div className="event-media-swiper relative rounded-lg sm:rounded-xl overflow-hidden bg-black aspect-[16/9]">
       <Swiper
         modules={[Navigation, Pagination]}
         navigation={showNav}

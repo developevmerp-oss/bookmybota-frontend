@@ -1854,3 +1854,66 @@ html.admin-theme .admin-dashboard-layout table .portal-table-muted {
   background: rgba(71, 85, 105, 0.75);
 }
 
+/* Dining / shared rich-text policy editor — restore lists (Tailwind preflight clears them) */
+.simple-rte-body:empty:before {
+  content: attr(data-placeholder);
+  color: #9ca3af;
+  pointer-events: none;
+}
+.simple-rte-body ul {
+  list-style-type: disc !important;
+  list-style-position: outside;
+  padding-left: 1.35rem !important;
+  margin: 0.4rem 0 !important;
+}
+.simple-rte-body ol {
+  list-style-type: decimal !important;
+  list-style-position: outside;
+  padding-left: 1.35rem !important;
+  margin: 0.4rem 0 !important;
+}
+.simple-rte-body li {
+  display: list-item !important;
+  margin: 0.2rem 0;
+}
+.simple-rte-body p {
+  margin: 0.35rem 0;
+}
+.simple-rte-body ul ul {
+  list-style-type: circle !important;
+}
+.simple-rte-body ol ol {
+  list-style-type: lower-alpha !important;
+}
+
+.dining-policy-html ul {
+  list-style-type: disc !important;
+  list-style-position: outside;
+  padding-left: 1.35rem !important;
+  margin: 0.5rem 0 0.75rem !important;
+}
+.dining-policy-html ol {
+  list-style-type: decimal !important;
+  list-style-position: outside;
+  padding-left: 1.35rem !important;
+  margin: 0.5rem 0 0.75rem !important;
+}
+.dining-policy-html li {
+  display: list-item !important;
+  margin: 0.45rem 0;
+  color: #333333;
+}
+.dining-policy-html li::marker {
+  color: #111111;
+}
+.dining-policy-html p {
+  margin: 0 0 0.75rem;
+}
+.dining-policy-html p:last-child {
+  margin-bottom: 0;
+}
+.dining-policy-html strong {
+  font-weight: 600;
+  color: #111111;
+}
+

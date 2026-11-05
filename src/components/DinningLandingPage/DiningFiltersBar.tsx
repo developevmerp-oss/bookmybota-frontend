@@ -60,6 +60,8 @@ interface DiningFiltersBarProps {
 }
 
 const ACCENT = "#6900AA";
+/** Filter modal chrome / controls — black, not brand purple */
+const FILTER_UI = "#111111";
 const EMPTY_CATEGORIES: string[] = [];
 const PANEL_TITLE = "text-sm font-medium text-slate-400 mb-1";
 const PANEL_VALUE = "text-xl font-bold text-slate-900 mb-6";
@@ -127,17 +129,17 @@ function RadioRow({
     <button
       type="button"
       onClick={onSelect}
-      className="w-full flex items-center justify-between gap-3 py-3.5 text-left cursor-pointer"
+      className="w-full flex items-center justify-between gap-3 py-2.5 sm:py-3 text-left cursor-pointer rounded-lg hover:bg-slate-50/80 transition-colors px-1 -mx-1"
     >
-      <span className={`text-base ${selected ? "font-semibold text-slate-800" : "text-slate-600"}`}>
+      <span className={`text-[15px] sm:text-base ${selected ? "font-semibold text-slate-900" : "font-medium text-slate-600"}`}>
         {label}
       </span>
       <span
-        className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
-          selected ? "border-[#6900AA]" : "border-slate-300"
+        className={`w-[1.125rem] h-[1.125rem] rounded-full border-2 flex items-center justify-center shrink-0 ${
+          selected ? "border-slate-900" : "border-slate-300"
         }`}
       >
-        {selected && <span className="w-2.5 h-2.5 rounded-full bg-[#6900AA]" />}
+        {selected && <span className="w-2 h-2 rounded-full bg-slate-900" />}
       </span>
     </button>
   );
@@ -156,17 +158,17 @@ function CheckboxRow({
     <button
       type="button"
       onClick={onToggle}
-      className="w-full min-w-0 flex items-center justify-between gap-2 py-3 text-left cursor-pointer"
+      className="w-full min-w-0 flex items-center justify-between gap-2 py-2.5 sm:py-3 text-left cursor-pointer rounded-lg hover:bg-slate-50/80 transition-colors px-1 -mx-1"
     >
-      <span className={`text-base truncate ${checked ? "font-semibold text-slate-800" : "text-slate-600"}`}>
+      <span className={`text-[15px] sm:text-base truncate ${checked ? "font-semibold text-slate-900" : "font-medium text-slate-600"}`}>
         {label}
       </span>
       <span
-        className={`w-5 h-5 rounded-[4px] border flex items-center justify-center shrink-0 ${
-          checked ? "border-[#6900AA] bg-[#6900AA]" : "border-slate-300 bg-white"
+        className={`w-[1.125rem] h-[1.125rem] rounded-[4px] border flex items-center justify-center shrink-0 ${
+          checked ? "border-slate-900 bg-slate-900" : "border-slate-300 bg-white"
         }`}
       >
-        {checked && <Check size={13} strokeWidth={3} className="text-white" />}
+        {checked && <Check size={12} strokeWidth={3} className="text-white" />}
       </span>
     </button>
   );
@@ -232,7 +234,7 @@ function RatingSlider({
         <div className="relative h-1.5 rounded-full bg-slate-200">
           <div
             className="absolute top-0 bottom-0 left-0 rounded-full"
-            style={{ width: `${pct}%`, backgroundColor: ACCENT }}
+            style={{ width: `${pct}%`, backgroundColor: FILTER_UI }}
           />
           {RATING_STOPS.map((stop, i) => {
             const left = (i / (RATING_STOPS.length - 1)) * 100;
@@ -250,7 +252,7 @@ function RatingSlider({
                   className={`block rounded-full border-[3px] border-white shadow-md transition-transform ${
                     isActive ? "w-5 h-5" : "w-3.5 h-3.5 opacity-70"
                   }`}
-                  style={{ backgroundColor: ACCENT }}
+                  style={{ backgroundColor: FILTER_UI }}
                 />
               </button>
             );
@@ -310,12 +312,12 @@ function CostRangeSlider({
             style={{
               left: `${leftPct}%`,
               width: `${Math.max(0, rightPct - leftPct)}%`,
-              backgroundColor: ACCENT,
+              backgroundColor: FILTER_UI,
             }}
           />
           <span
             className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-5 h-5 rounded-full border-[3px] border-white shadow-md z-[5]"
-            style={{ left: `${leftPct}%`, backgroundColor: ACCENT }}
+            style={{ left: `${leftPct}%`, backgroundColor: FILTER_UI }}
             aria-hidden
           />
           {COST_STOPS.map((stop, i) => {
@@ -346,7 +348,7 @@ function CostRangeSlider({
                   className={`block rounded-full border-[3px] border-white shadow-md transition-transform ${
                     i === 0 || isRight ? "w-5 h-5" : "w-3.5 h-3.5 opacity-70"
                   }`}
-                  style={{ backgroundColor: ACCENT }}
+                  style={{ backgroundColor: FILTER_UI }}
                 />
               </button>
             );
@@ -656,8 +658,8 @@ export default function DiningFiltersBar({
   };
 
   return (
-    <div className="mb-2">
-      <div className="flex items-center gap-2 pb-1 -mx-1 px-1">
+    <div>
+      <div className="flex items-center gap-2 -mx-1 px-1">
         <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto scrollbar-hide">
         <button
           type="button"
@@ -734,8 +736,7 @@ export default function DiningFiltersBar({
                     <button
                       type="button"
                       onClick={applySort}
-                      className="text-sm sm:text-base lg:text-sm font-bold"
-                      style={{ color: ACCENT }}
+                      className="text-sm sm:text-base lg:text-sm font-bold text-slate-900 cursor-pointer"
                     >
                       Apply
                     </button>
@@ -994,29 +995,34 @@ export default function DiningFiltersBar({
       {showFilter &&
         typeof document !== "undefined" &&
         createPortal(
-        <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center">
+        <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-0 sm:p-4">
           <button
             type="button"
             aria-label="Close filters"
-            className="absolute inset-0 bg-black/40"
+            className="absolute inset-0 bg-black/45 backdrop-blur-[1px]"
             onClick={() => setShowFilter(false)}
           />
-          <div className="relative w-full sm:w-[min(92vw,720px)] h-[min(88vh,540px)] bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-              <h3 className="text-xl font-bold text-slate-900">Filter</h3>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Filter"
+            className="relative w-full sm:w-[min(92vw,720px)] h-[min(90vh,560px)] sm:h-[min(88vh,540px)] bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+          >
+            <div className="flex items-center justify-between gap-3 px-5 sm:px-6 py-3.5 sm:py-4 border-b border-slate-200 shrink-0 bg-white">
+              <h3 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">Filter</h3>
               <button
                 type="button"
                 onClick={() => setShowFilter(false)}
-                className="p-1 rounded-full hover:bg-slate-100"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors cursor-pointer"
                 aria-label="Close"
               >
-                <X size={20} />
+                <X size={18} strokeWidth={2.25} />
               </button>
             </div>
 
             <div className="flex flex-col sm:flex-row min-h-0 flex-1 overflow-hidden">
-              <div className="sm:w-[34%] bg-slate-100 border-b sm:border-b-0 sm:border-r border-slate-200 overflow-x-auto sm:overflow-y-auto shrink-0 sm:h-full">
-                <div className="flex sm:flex-col">
+              <div className="sm:w-[32%] bg-[#F4F5F7] border-b sm:border-b-0 sm:border-r border-slate-200 overflow-x-auto sm:overflow-y-auto shrink-0 sm:h-full scrollbar-hide">
+                <div className="flex sm:flex-col sm:py-1">
                   {tabs.map((item) => {
                     const active = tab === item.id;
                     const sortHint =
@@ -1028,21 +1034,27 @@ export default function DiningFiltersBar({
                         key={item.id}
                         type="button"
                         onClick={() => setTab(item.id)}
-                        className={`relative shrink-0 text-left px-4 py-3.5 text-base whitespace-nowrap transition-colors ${
+                        className={`relative shrink-0 text-left px-4 sm:px-5 py-3 sm:py-3.5 text-[15px] sm:text-base whitespace-nowrap transition-colors cursor-pointer ${
                           active
                             ? "font-semibold text-slate-900 bg-white"
-                            : "font-medium text-slate-600 bg-transparent hover:bg-slate-50/80"
+                            : "font-medium text-slate-600 bg-transparent hover:bg-white/60"
                         }`}
                       >
                         {active && (
                           <span
-                            className="absolute left-0 top-0 bottom-0 w-[3px] hidden sm:block"
-                            style={{ backgroundColor: ACCENT }}
+                            className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full hidden sm:block"
+                            style={{ backgroundColor: FILTER_UI }}
+                          />
+                        )}
+                        {active && (
+                          <span
+                            className="absolute left-3 right-3 bottom-0 h-[2px] rounded-full sm:hidden"
+                            style={{ backgroundColor: FILTER_UI }}
                           />
                         )}
                         <span className="block">{item.label}</span>
                         {sortHint && (
-                          <span className="block text-sm font-medium mt-0.5" style={{ color: ACCENT }}>
+                          <span className="block text-xs sm:text-sm font-medium mt-0.5 text-slate-700">
                             {sortHint}
                           </span>
                         )}
@@ -1052,25 +1064,27 @@ export default function DiningFiltersBar({
                 </div>
               </div>
 
-              <div className="flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-5 py-4 min-h-0 h-full bg-white">
+              <div className="flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-5 sm:px-6 py-4 sm:py-5 min-h-0 h-full bg-white">
                 {tab === "sort" && (
                   <div>
-                    <p className="text-lg font-bold text-slate-900 mb-2">Sort by</p>
-                    {SORT_OPTIONS.map((opt) => (
-                      <RadioRow
-                        key={opt.value}
-                        label={opt.label}
-                        selected={draft.sort === opt.value}
-                        onSelect={() => setDraft({ ...draft, sort: opt.value })}
-                      />
-                    ))}
+                    <p className="text-base sm:text-lg font-bold text-slate-900 mb-3">Sort by</p>
+                    <div className="divide-y divide-slate-100">
+                      {SORT_OPTIONS.map((opt) => (
+                        <RadioRow
+                          key={opt.value}
+                          label={opt.label}
+                          selected={draft.sort === opt.value}
+                          onSelect={() => setDraft({ ...draft, sort: opt.value })}
+                        />
+                      ))}
+                    </div>
                   </div>
                 )}
 
                 {tab === "category" && (
                   <div>
-                    <p className="text-lg font-bold text-slate-900 mb-2">Category</p>
-                    <div className="grid grid-cols-2 gap-x-4">
+                    <p className="text-base sm:text-lg font-bold text-slate-900 mb-3">Category</p>
+                    <div className="grid grid-cols-2 gap-x-3 sm:gap-x-4">
                       {normalizedCategories.map((c) => {
                         const label = c.toLowerCase() === "all" ? "All Dining" : c;
                         const checked = draftCategories.some(
@@ -1097,8 +1111,8 @@ export default function DiningFiltersBar({
 
                 {tab === "cuisine" && (
                   <div>
-                    <p className="text-lg font-bold text-slate-900 mb-2">Cuisine</p>
-                    <div className="grid grid-cols-2 gap-x-4">
+                    <p className="text-base sm:text-lg font-bold text-slate-900 mb-3">Cuisine</p>
+                    <div className="grid grid-cols-2 gap-x-3 sm:gap-x-4">
                       {cuisineList.map((c) => (
                         <CheckboxRow
                           key={c}
@@ -1167,7 +1181,7 @@ export default function DiningFiltersBar({
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-6 px-5 py-3.5 border-t border-slate-100 shrink-0">
+            <div className="flex items-center justify-end gap-2.5 sm:gap-3 px-5 sm:px-6 pt-3.5 pb-[max(1rem,env(safe-area-inset-bottom))] sm:py-4 border-t border-slate-200 shrink-0 bg-white">
               <button
                 type="button"
                 onClick={() => {
@@ -1176,16 +1190,14 @@ export default function DiningFiltersBar({
                   if (!onCategoriesChange) onCategoryChange?.("All");
                   setShowFilter(false);
                 }}
-                className="text-base font-bold cursor-pointer"
-                style={{ color: ACCENT }}
+                className="inline-flex min-h-11 items-center justify-center rounded-full border border-slate-300 bg-white px-5 sm:px-6 text-sm sm:text-[15px] font-bold text-slate-900 hover:bg-slate-50 transition-colors cursor-pointer"
               >
                 Reset
               </button>
               <button
                 type="button"
                 onClick={applyDraft}
-                className="text-base font-bold cursor-pointer"
-                style={{ color: ACCENT }}
+                className="inline-flex min-h-11 items-center justify-center rounded-full bg-slate-900 px-6 sm:px-7 text-sm sm:text-[15px] font-bold text-white shadow-[0_6px_16px_rgba(15,23,42,0.22)] hover:bg-black active:scale-[0.98] transition-all cursor-pointer"
               >
                 Apply
               </button>

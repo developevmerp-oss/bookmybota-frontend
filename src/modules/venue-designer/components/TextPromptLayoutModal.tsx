@@ -52,27 +52,27 @@ export default function TextPromptLayoutModal({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-      <div className="bg-slate-950 border border-slate-800 rounded-2xl w-full max-w-xl overflow-hidden shadow-2xl">
-        <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/60">
+      <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-xl overflow-hidden shadow-2xl">
+        <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
           <div className="flex items-center gap-2">
-            <Wand2 className="w-5 h-5 text-purple-400" />
-            <h2 className="text-sm font-bold text-white">Generate Venue Layout from Description</h2>
+            <Wand2 className="w-5 h-5 text-purple-600" />
+            <h2 className="text-sm font-bold text-slate-900">Generate Venue Layout from Description</h2>
           </div>
           <button
             onClick={onClose}
-            className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800"
+            className="p-1 text-slate-500 hover:text-slate-900 rounded-lg hover:bg-slate-100"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         <div className="p-6 space-y-4">
-          <p className="text-xs text-slate-400 leading-relaxed">
+          <p className="text-xs text-slate-500 leading-relaxed">
             Describe the venue you want to build in plain English. The rule-based geometry engine will parse your requirements, stands, tables, stage, and gates, and construct a customizable draft layout.
           </p>
 
           <div>
-            <label className="text-xs font-bold text-slate-300 block mb-1.5">
+            <label className="text-xs font-bold text-slate-700 block mb-1.5">
               Venue Description Prompt
             </label>
             <textarea
@@ -80,13 +80,13 @@ export default function TextPromptLayoutModal({
               onChange={(e) => setPrompt(e.target.value)}
               placeholder="e.g. Create a wedding hall with a central stage, 16 round tables, 10 seats per table, and a central dance floor..."
               rows={4}
-              className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-purple-500 font-sans custom-scrollbar placeholder:text-slate-500"
+              className="w-full bg-white border border-slate-300 rounded-xl p-3 text-sm text-slate-900 focus:outline-none focus:border-purple-500 font-sans custom-scrollbar placeholder:text-slate-500"
             />
           </div>
 
           {/* Quick Examples */}
           <div className="space-y-1.5">
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
               Quick Starting Examples:
             </span>
             <div className="space-y-1 max-h-36 overflow-y-auto custom-scrollbar">
@@ -94,17 +94,17 @@ export default function TextPromptLayoutModal({
                 <button
                   key={idx}
                   onClick={() => setPrompt(q)}
-                  className="w-full text-left p-2 rounded-lg bg-slate-900/50 hover:bg-slate-850 border border-slate-800 hover:border-slate-700 text-xs text-slate-300 hover:text-white transition-colors flex items-center justify-between group"
+                  className="w-full text-left p-2 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 hover:border-slate-300 text-xs text-slate-700 hover:text-slate-900 transition-colors flex items-center justify-between group"
                 >
                   <span className="truncate pr-2">{q}</span>
-                  <ArrowRight className="w-3.5 h-3.5 text-purple-400 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <ArrowRight className="w-3.5 h-3.5 text-purple-600 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </button>
               ))}
             </div>
           </div>
         </div>
 
-        <div className="px-6 py-3.5 bg-slate-900/60 border-t border-slate-800 flex items-center justify-between">
+        <div className="px-6 py-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
           <span className="text-[11px] text-slate-500">
             Rule-based geometry generator • 100% offline &amp; private
           </span>
@@ -112,7 +112,7 @@ export default function TextPromptLayoutModal({
           <div className="flex items-center gap-2">
             <button
               onClick={onClose}
-              className="px-4 py-2 rounded-lg text-slate-400 hover:text-white text-xs font-medium"
+              className="px-4 py-2 rounded-lg text-slate-500 hover:text-slate-900 text-xs font-medium"
             >
               Cancel
             </button>

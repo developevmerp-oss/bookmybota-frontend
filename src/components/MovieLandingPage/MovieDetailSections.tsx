@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import Link from "next/link";
 import {
   ChevronLeft,
@@ -27,6 +27,9 @@ import {
   type MoviePerson,
 } from "@/components/MovieLandingPage/movieCatalog";
 import MovieReviewsSection from "@/components/MovieLandingPage/MovieReviewsSection";
+import AdaptiveCardRow from "@/components/LandingPage/AdaptiveCardRow";
+import { MovieNotifyCard } from "@/components/LandingPage/MovieNotifyCard";
+import type { MustWatchMovieCard } from "@/components/LandingPage/useMustWatchMoviesCatalog";
 import "@/components/LandingPage/RecommendedMoviesRail.css";
 
 const BRAND = "#6900AA";
@@ -47,7 +50,7 @@ function SectionShell({
   muted?: boolean;
 }) {
   return (
-    <section className={`py-8 sm:py-10 lg:py-10 ${muted ? "bg-slate-50" : "bg-white"} ${className}`}>
+    <section className={`py-3.5 sm:py-5 lg:py-6 ${muted ? "bg-slate-50" : "bg-white"} ${className}`}>
       <div className="bmb-section-container">{children}</div>
     </section>
   );
@@ -61,7 +64,7 @@ function SectionHeading({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 mb-4 sm:mb-5">
+    <div className="flex items-center justify-between gap-3 mb-2.5 sm:mb-3.5">
       <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-[#111111]">{title}</h2>
       {action}
     </div>
@@ -275,8 +278,8 @@ function OffersSection({ offers }: { offers: MovieOfferItem[] }) {
 
   return (
     <SectionShell>
-      <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 lg:p-8">
-        <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-[#111111] mb-4 sm:mb-5">
+      <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 lg:p-6 shadow-xs">
+        <h2 className="text-base sm:text-lg md:text-xl font-bold text-[#111111] mb-3 sm:mb-4">
           Top offers for you
         </h2>
         <div className="relative z-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:w-4/5">
@@ -288,17 +291,17 @@ function OffersSection({ offers }: { offers: MovieOfferItem[] }) {
             return (
               <div
                 key={offer.id}
-                className={`text-left rounded-2xl ${tone.card} px-4 py-3.5 sm:px-5 sm:py-4 ${
-                  isLast ? "lg:translate-x-8" : ""
+                className={`text-left rounded-xl sm:rounded-2xl ${tone.card} p-3.5 sm:p-4 border border-black/5 ${
+                  isLast ? "lg:translate-x-6" : ""
                 }`}
               >
-                <span className="flex items-start gap-3">
+                <div className="flex items-start gap-3">
                   <span
-                    className={`mt-0.5 inline-flex size-9 sm:size-10 shrink-0 items-center justify-center rounded-lg ${tone.icon}`}
+                    className={`mt-0.5 inline-flex size-9 sm:size-10 shrink-0 items-center justify-center rounded-xl shadow-xs ${tone.icon}`}
                   >
                     <Icon className="size-4 sm:size-5" />
                   </span>
-                  <span className="min-w-0 flex-1">
+                  <div className="min-w-0 flex-1">
                     <span className="block text-sm sm:text-base font-bold text-[#111111] leading-snug">
                       {offer.title}
                     </span>
@@ -311,7 +314,7 @@ function OffersSection({ offers }: { offers: MovieOfferItem[] }) {
                       <button
                         type="button"
                         onClick={() => copyCode(code)}
-                        className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs sm:text-sm font-semibold text-slate-800 hover:bg-slate-50 cursor-pointer"
+                        className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-800 hover:bg-slate-50 cursor-pointer shadow-xs active:scale-95 transition-all"
                       >
                         <span className="font-mono">{code}</span>
                         <Copy className="size-3.5" style={{ color: BRAND }} />
@@ -323,8 +326,8 @@ function OffersSection({ offers }: { offers: MovieOfferItem[] }) {
                     >
                       Use code at checkout
                     </span>
-                  </span>
-                </span>
+                  </div>
+                </div>
               </div>
             );
           })}
@@ -333,7 +336,7 @@ function OffersSection({ offers }: { offers: MovieOfferItem[] }) {
           src="/images/movies/offers-popcorn.png"
           alt=""
           aria-hidden
-          className="pointer-events-none mx-auto mt-4 w-2/3 sm:w-1/2 lg:z-0 lg:m-0 lg:absolute lg:-right-8 lg:bottom-0 lg:top-7 lg:w-[400px] lg:object-contain lg:object-right"
+          className="hidden lg:block pointer-events-none absolute -right-6 bottom-0 top-6 w-[360px] object-contain object-right"
         />
       </div>
     </SectionShell>
@@ -343,7 +346,7 @@ function OffersSection({ offers }: { offers: MovieOfferItem[] }) {
 function AboutSection({ text }: { text: string }) {
   return (
     <SectionShell>
-      <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-[#111111] mb-3 sm:mb-4">
+      <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-[#111111] mb-2 sm:mb-2.5">
         About
       </h2>
       <p className="text-sm sm:text-base text-slate-600 leading-relaxed whitespace-pre-wrap">
@@ -531,82 +534,31 @@ function CrewSection({ crew }: { crew: MoviePerson[] }) {
   );
 }
 
-function RelatedMovieCard({ movie }: { movie: Movie }) {
-  const [mobileExpanded, setMobileExpanded] = useState(false);
-  const languages = parseLanguageList(movie.languages);
-  const multiLang = languages.length > 1;
-  const certification = movie.certificate?.trim() || undefined;
-  const title = formatMovieCardTitle(movie.title, movie.release_date);
-  const poster = resolveMediaUrl(movie.poster_url);
-  const promoted = isMoviePromoted(movie.is_promoted);
-  const comingSoon = movie.status === "coming_soon";
-  const summaryMeta = formatMovieCardMeta(certification, languages);
-  const fullMeta = [certification, languages.join(", ")].filter(Boolean).join(" | ");
-  const href = movieDetailPath({ id: movie.id, slug: movie.slug });
-
-  return (
-    <div className="movies-rail-slot">
-      <article className="group flex h-full flex-col overflow-hidden rounded-[10px] bg-white border border-[#E5E5E5]">
-        <Link href={href} className="relative shrink-0 overflow-hidden bg-[#111111] block">
-          <div className="movies-rail-poster">
-            {poster ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={poster}
-                alt={title}
-                className="movies-rail-poster-img"
-                loading="lazy"
-              />
-            ) : (
-              <div className="movies-rail-poster-img bg-slate-200" />
-            )}
-          </div>
-          {comingSoon ? (
-            <span className="movies-rail-badge movies-rail-badge--soon">Coming Soon</span>
-          ) : promoted ? (
-            <span className="movies-rail-badge movies-rail-badge--promoted">Promoted</span>
-          ) : null}
-        </Link>
-
-        <div className="movies-rail-meta shrink-0 px-3 pt-2.5 pb-3">
-          <Link href={href}>
-            <h3 className="movies-rail-title text-[13px] sm:text-[14px] font-bold text-[#111111] line-clamp-2 leading-snug group-hover:text-[#6900AA] transition-colors">
-              {title}
-            </h3>
-          </Link>
-
-          {/* Desktop: summary with language count; hover reveals full language list */}
-          <p className="movies-rail-subtitle mt-0.5 text-[11px] sm:text-[12px] text-[#6B7280] leading-snug line-clamp-1 max-md:hidden group-hover:hidden">
-            {summaryMeta || "\u00A0"}
-          </p>
-          <p className="movies-rail-subtitle mt-0.5 text-[11px] sm:text-[12px] text-[#6B7280] leading-snug max-md:hidden hidden group-hover:block">
-            {fullMeta || "\u00A0"}
-          </p>
-
-          {/* Mobile: collapsed summary; tap expands to full languages */}
-          <div className="md:hidden">
-            <p
-              className={`movies-rail-subtitle mt-0.5 text-[11px] text-[#6B7280] leading-snug ${
-                mobileExpanded && multiLang ? "" : "line-clamp-1"
-              }`}
-            >
-              {(mobileExpanded && multiLang ? fullMeta : summaryMeta) || "\u00A0"}
-            </p>
-            {multiLang ? (
-              <button
-                type="button"
-                className="mt-1 text-[10px] font-semibold text-[#6900AA] cursor-pointer"
-                aria-expanded={mobileExpanded}
-                onClick={() => setMobileExpanded((open) => !open)}
-              >
-                {mobileExpanded ? "Show less" : `+${languages.length - 1} more languages`}
-              </button>
-            ) : null}
-          </div>
-        </div>
-      </article>
-    </div>
-  );
+function toMustWatchMovie(m: Movie): MustWatchMovieCard {
+  const ratingNum = m.rating != null ? Number(m.rating) : NaN;
+  const reviewsCount = Number(m.reviews_count) || 0;
+  const languages = parseLanguageList(m.languages);
+  const genres = Array.isArray(m.genres)
+    ? m.genres
+    : typeof m.genres === "string"
+      ? (m.genres as string).split(",").map((s) => s.trim()).filter(Boolean)
+      : [];
+  return {
+    id: String(m.id),
+    title: m.title,
+    displayTitle: formatMovieCardTitle(m.title, m.release_date),
+    poster: resolveMediaUrl(m.poster_url),
+    certification: m.certificate?.trim() || undefined,
+    languages,
+    genres,
+    formats: [],
+    rating: Number.isFinite(ratingNum) && ratingNum > 0 ? ratingNum : null,
+    reviewsCount,
+    comingSoon: m.status === "coming_soon",
+    promoted: isMoviePromoted(m.is_promoted),
+    href: movieDetailPath({ id: m.id, slug: m.slug }),
+    fromPrice: null,
+  };
 }
 
 function YouMightAlsoLike({ idOrSlug, currentId }: { idOrSlug: string; currentId: string }) {
@@ -615,20 +567,17 @@ function YouMightAlsoLike({ idOrSlug, currentId }: { idOrSlug: string; currentId
     { skip: !idOrSlug }
   );
 
-  const list = related.filter((m) => m.id !== currentId);
+  const list = useMemo(() => related.filter((m) => m.id !== currentId), [related, currentId]);
   if (isLoading || !list.length) return null;
 
   return (
-    <SectionShell className="pb-12 sm:pb-16">
+    <SectionShell className="pb-3 sm:pb-4 lg:pb-6">
       <SectionHeading title="You might also like" action={<ViewAllButton label="View all" href="/movies" />} />
-      <HScroll
-        trackClassName="movies-rail"
-        trackStyle={{ ["--movies-visible" as string]: 5 } as CSSProperties}
-      >
+      <AdaptiveCardRow minVisible={4} className="adaptive-card-row--four">
         {list.map((m) => (
-          <RelatedMovieCard key={m.id} movie={m} />
+          <MovieNotifyCard key={m.id} movie={toMustWatchMovie(m)} />
         ))}
-      </HScroll>
+      </AdaptiveCardRow>
     </SectionShell>
   );
 }

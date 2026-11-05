@@ -115,6 +115,8 @@ export interface Business {
   approved_at?: string | null;
   grace_time_minutes?: number;
   slot_interval_minutes?: number;
+  booking_terms?: string | null;
+  cancellation_policy?: string | null;
   latitude?: number | string | null;
   longitude?: number | string | null;
 }
@@ -198,6 +200,8 @@ export interface BusinessSettings {
   logo_url?: string;
   grace_time_minutes?: number;
   slot_interval_minutes?: number;
+  booking_terms?: string | null;
+  cancellation_policy?: string | null;
   online_allocation_percentage?: number;
   latitude?: number | string | null;
   longitude?: number | string | null;
@@ -3351,6 +3355,11 @@ export const api = createApi({
     getBusinessPublic: builder.query<Business, string>({
       query: (id) => `/businesses/${id}/public`,
       transformResponse: (res: { data: Business }) => res.data,
+      providesTags: (result, _error, id) => [
+        { type: 'Businesses', id: `public-${id}` },
+        ...(result?.id ? [{ type: 'Businesses' as const, id: `public-${result.id}` }] : []),
+        ...(result?.slug ? [{ type: 'Businesses' as const, id: `public-${result.slug}` }] : []),
+      ],
     }),
 
     // ── Business Settings (Admin/Business Portal) ─────────────────────────────
@@ -3391,6 +3400,7 @@ export const api = createApi({
       },
       invalidatesTags: (_result, _error, { bizId }) => [
         { type: 'BusinessSettings', id: bizId },
+        { type: 'Businesses', id: `public-${bizId}` },
         'Businesses',
         'DiningMasters',
       ],

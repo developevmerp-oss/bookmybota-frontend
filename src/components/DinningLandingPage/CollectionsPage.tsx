@@ -1,7 +1,6 @@
 "use client";
 import { Suspense, useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
-import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useGetCollectionsQuery } from "@/services/api";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
@@ -22,18 +21,10 @@ function CollectionsContent() {
   const { data: collections = [], isLoading } = useGetCollectionsQuery();
 
   return (
-    <div className="min-h-screen bg-slate-50 pt-6 pb-16">
+    <div className="min-h-screen bg-slate-50 pt-4 pb-16">
       <div className="bmb-section-container">
-        
-        {/* ── Breadcrumbs ─────────────────────────────────────────────────── */}
-        <div className="text-xs text-slate-400 mb-6 flex items-center gap-1.5 font-semibold tracking-wider uppercase">
-          <Link href="/" className="hover:text-rose-600 transition-colors">Home</Link>
-          <ChevronRight size={10} />
-          <span className="text-slate-500">Collections</span>
-        </div>
-
         {/* ── Hero Header Section ─────────────────────────────────────────── */}
-        <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 rounded-3xl p-8 md:p-12 text-white shadow-xl relative overflow-hidden mb-10 border border-slate-750">
+        <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 rounded-3xl p-8 md:p-12 text-white shadow-xl relative overflow-hidden mb-6 sm:mb-7 border border-slate-750">
           {/* Subtle design element */}
           <div className="absolute inset-0 bg-cover bg-center opacity-10" style={{ backgroundImage: "url(https://images.unsplash.com/photo-1544025162-d76694265947?w=800&q=80)" }} />
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_120%,rgba(244,63,94,0.15),transparent_60%)]" />

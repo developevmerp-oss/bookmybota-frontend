@@ -36,6 +36,8 @@ export type ConfirmationAmountRow = {
   label: string;
   value: string;
   strong?: boolean;
+  /** Unit price under the line, e.g. "350 ETB each". */
+  labelDetail?: string;
 };
 
 export type ConfirmationPageUI1ShellProps = {
@@ -256,7 +258,7 @@ export default function ConfirmationPageUI1Shell(props: ConfirmationPageUI1Shell
     totalFormatted,
     totalNote,
     amountRows = [],
-    cancellationNote = "Cancellation unavailable : cut-off time of 20 minutes before showtime has passed",
+    cancellationNote,
     supportHref = "/customer/help",
     mTicketLabel = "M-Ticket",
     onDownloadPdf,
@@ -435,26 +437,33 @@ export default function ConfirmationPageUI1Shell(props: ConfirmationPageUI1Shell
         {totalFormatted || amountRows.length > 0 ? (
           <div className="space-y-2.5 text-[0.8125rem] text-[#666] mb-5">
             {totalFormatted ? (
-              <div className="flex justify-between gap-3 text-[0.9375rem] font-bold text-[#111]">
-                <div>
+              <div className="flex justify-between items-start gap-3 text-[0.9375rem] font-bold text-[#111]">
+                <div className="min-w-0">
                   <span>Total Amount</span>
                   {totalNote ? (
-                    <p className="text-[11px] text-[#777] font-normal">{totalNote}</p>
+                    <p className="text-[11px] text-[#777] font-normal leading-snug">{totalNote}</p>
                   ) : null}
                 </div>
-                <span className="tabular-nums">{totalFormatted}</span>
+                <span className="tabular-nums whitespace-nowrap shrink-0">{totalFormatted}</span>
               </div>
             ) : null}
 
             {amountRows.map((row, idx) => (
               <div
                 key={`${row.label}-${idx}`}
-                className={`flex justify-between gap-3 ${
+                className={`flex justify-between items-start gap-3 ${
                   row.strong ? "text-[#111] font-bold text-[0.9375rem]" : ""
                 }`}
               >
-                <span>{row.label}</span>
-                <span className="tabular-nums">{row.value}</span>
+                <span className="min-w-0 leading-snug">
+                  <span className="block">{row.label}</span>
+                  {row.labelDetail ? (
+                    <span className="mt-0.5 block text-[11px] text-[#888] font-normal whitespace-nowrap">
+                      {row.labelDetail}
+                    </span>
+                  ) : null}
+                </span>
+                <span className="tabular-nums whitespace-nowrap shrink-0">{row.value}</span>
               </div>
             ))}
           </div>
@@ -592,14 +601,16 @@ export default function ConfirmationPageUI1Shell(props: ConfirmationPageUI1Shell
         ) : null}
 
         {totalFormatted ? (
-          <div className="flex items-center justify-between gap-3 py-4 text-[0.9375rem] text-[#111]">
-            <div>
+          <div className="flex items-start justify-between gap-3 py-4 text-[0.9375rem] text-[#111]">
+            <div className="min-w-0">
               <span className="font-medium">Total Amount</span>
               {totalNote ? (
-                <p className="text-[11px] text-[#777] font-normal">{totalNote}</p>
+                <p className="text-[11px] text-[#777] font-normal leading-snug">{totalNote}</p>
               ) : null}
             </div>
-            <span className="font-bold tabular-nums">{totalFormatted}</span>
+            <span className="font-bold tabular-nums whitespace-nowrap shrink-0">
+              {totalFormatted}
+            </span>
           </div>
         ) : (
           <div className="h-4" />
@@ -764,25 +775,38 @@ export default function ConfirmationPageUI1Shell(props: ConfirmationPageUI1Shell
               {amountRows.length || totalFormatted ? (
                 <div className="space-y-2.5 text-[0.8125rem] text-[#666]">
                   {totalFormatted ? (
-                    <div className="flex justify-between gap-3 text-[0.9375rem] font-bold text-[#111]">
-                      <div>
+                    <div className="flex justify-between items-start gap-3 text-[0.9375rem] font-bold text-[#111]">
+                      <div className="min-w-0">
                         <span>Total Amount</span>
                         {totalNote ? (
-                          <p className="text-[11px] text-[#777] font-normal">{totalNote}</p>
+                          <p className="text-[11px] text-[#777] font-normal leading-snug">
+                            {totalNote}
+                          </p>
                         ) : null}
                       </div>
-                      <span className="tabular-nums">{totalFormatted}</span>
+                      <span className="tabular-nums whitespace-nowrap shrink-0">
+                        {totalFormatted}
+                      </span>
                     </div>
                   ) : null}
                   {amountRows.map((row, idx) => (
                     <div
                       key={`${row.label}-${idx}`}
-                      className={`flex justify-between gap-3 ${
+                      className={`flex justify-between items-start gap-3 ${
                         row.strong ? "text-[#111] font-medium" : ""
                       }`}
                     >
-                      <span>{row.label}</span>
-                      <span className="tabular-nums">{row.value}</span>
+                      <span className="min-w-0 leading-snug">
+                        <span className="block">{row.label}</span>
+                        {row.labelDetail ? (
+                          <span className="mt-0.5 block text-[11px] text-[#888] font-normal whitespace-nowrap">
+                            {row.labelDetail}
+                          </span>
+                        ) : null}
+                      </span>
+                      <span className="tabular-nums whitespace-nowrap shrink-0">
+                        {row.value}
+                      </span>
                     </div>
                   ))}
                 </div>

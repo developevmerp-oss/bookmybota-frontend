@@ -191,7 +191,7 @@ export default function CustomerDashboard() {
       href: `/customer/event-bookings/confirmation?id=${b.id}`,
       address: [b.venue_name, b.venue_address].filter(Boolean).join(", ") || undefined,
       extra: b.ticket_qty ? `${b.ticket_qty} ticket${b.ticket_qty === 1 ? "" : "s"}` : undefined,
-      image: b.poster_horizontal_url || b.poster_vertical_url,
+      image: b.poster_vertical_url || b.poster_horizontal_url || DEFAULT_EVENT_IMAGE,
       canCancel: eventUpcoming(b),
       ticketQty: b.ticket_qty,
       createdAt: String((b as any).created_at || b.starts_at || ""),
@@ -207,7 +207,11 @@ export default function CustomerDashboard() {
       extra: b.ticket_qty
         ? `${b.ticket_qty} seat${b.ticket_qty === 1 ? "" : "s"}`
         : undefined,
-      image: (b as any).movie_poster || DEFAULT_MOVIE_IMAGE,
+      image:
+        (b as any).movie_poster ||
+        (b as any).cover_image ||
+        (b as any).cinema_image ||
+        DEFAULT_MOVIE_IMAGE,
       canCancel: false,
       ticketQty: b.ticket_qty,
       createdAt: String((b as any).created_at || (b as any).showtime_starts_at || ""),
@@ -277,7 +281,7 @@ export default function CustomerDashboard() {
     <CustomerAccountLayout>
       <div className="bg-white rounded-2xl border border-slate-100 shadow-[0_8px_30px_rgba(15,23,42,0.04)] p-5 sm:p-6 lg:p-8">
         <div className="mb-6">
-          <h1 className="text-2xl sm:text-3xl font-bold text-[#0F172A] leading-tight">
+          <h1 className="hidden lg:block text-2xl sm:text-3xl font-bold text-[#0F172A] leading-tight">
             My Orders / Reservations
           </h1>
           <p className="text-slate-500 text-sm sm:text-base mt-1.5">
@@ -333,26 +337,79 @@ export default function CustomerDashboard() {
             <Calendar className="mx-auto text-slate-300 mb-3" size={32} />
             <p className="text-slate-500 mb-4">
               {kind === "sports"
-                ? "No sports bookings yet."
+                ? filter === "all"
+                  ? "No sports bookings yet."
+                  : `No ${filter} sports bookings.`
                 : kind === "all"
-                  ? `No ${filter} bookings.`
-                  : `No ${filter} ${kind} bookings.`}
+                  ? filter === "all"
+                    ? "No bookings yet."
+                    : `No ${filter} bookings.`
+                  : filter === "all"
+                    ? `No ${kind} bookings yet.`
+                    : `No ${filter} ${kind} bookings.`}
             </p>
             <div className="flex flex-wrap items-center justify-center gap-3">
-              <button
-                type="button"
-                onClick={() => router.push("/")}
-                className="inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-[#6900AA] text-white text-sm font-semibold cursor-pointer"
-              >
-                Find a Table
-              </button>
-              <button
-                type="button"
-                onClick={() => router.push("/events")}
-                className="inline-flex items-center justify-center px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-semibold cursor-pointer"
-              >
-                Browse events
-              </button>
+              {kind === "dining" && (
+                <button
+                  type="button"
+                  onClick={() => router.push("/dining")}
+                  className="inline-flex items-center justify-center px-5 py-2.5 rounded-xl bg-[#6900AA] text-white text-sm font-semibold hover:bg-[#550088] transition-colors cursor-pointer"
+                >
+                  Find a Table
+                </button>
+              )}
+              {kind === "movie" && (
+                <button
+                  type="button"
+                  onClick={() => router.push("/movies")}
+                  className="inline-flex items-center justify-center px-5 py-2.5 rounded-xl bg-[#6900AA] text-white text-sm font-semibold hover:bg-[#550088] transition-colors cursor-pointer"
+                >
+                  Browse Movies
+                </button>
+              )}
+              {kind === "event" && (
+                <button
+                  type="button"
+                  onClick={() => router.push("/events")}
+                  className="inline-flex items-center justify-center px-5 py-2.5 rounded-xl bg-[#6900AA] text-white text-sm font-semibold hover:bg-[#550088] transition-colors cursor-pointer"
+                >
+                  Browse Events
+                </button>
+              )}
+              {kind === "sports" && (
+                <button
+                  type="button"
+                  onClick={() => router.push("/events?category=sports")}
+                  className="inline-flex items-center justify-center px-5 py-2.5 rounded-xl bg-[#6900AA] text-white text-sm font-semibold hover:bg-[#550088] transition-colors cursor-pointer"
+                >
+                  Browse Sports
+                </button>
+              )}
+              {kind === "all" && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => router.push("/movies")}
+                    className="inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-[#6900AA] text-white text-sm font-semibold hover:bg-[#550088] transition-colors cursor-pointer"
+                  >
+                    Browse Movies
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => router.push("/dining")}
+                    className="inline-flex items-center justify-center px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-[#111111] hover:bg-slate-50 transition-colors cursor-pointer"
+                  >
+                    Find a Table
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => router.push("/events")}
+                    className="inline-flex items-center justify-center px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-[#111111] hover:bg-slate-50 transition-colors cursor-pointer"
+                  >
+                    Browse Events
+                  </button>
+                </>
+              )}
             </div>
           </div>
         ) : (
@@ -373,13 +430,13 @@ export default function CustomerDashboard() {
                 <Link
                   key={`${b.kind}-${b.id}`}
                   href={b.href}
-                  className="group flex flex-col sm:flex-row sm:items-start gap-4 py-5 first:pt-2 last:pb-1 hover:bg-slate-50/70 -mx-2 px-2 sm:-mx-3 sm:px-3 rounded-xl transition-colors"
+                  className="group flex flex-row items-start gap-3.5 sm:gap-4.5 py-4 sm:py-5 first:pt-2 last:pb-1 hover:bg-slate-50/70 -mx-2 px-2 sm:-mx-3 sm:px-3 rounded-xl transition-colors"
                 >
-                  <span className="shrink-0 inline-flex max-w-full h-[100px] sm:h-[108px] lg:h-[118px] sm:max-w-[168px] lg:max-w-[188px] rounded-xl overflow-hidden leading-none">
+                  <span className="shrink-0 relative w-[88px] sm:w-[115px] lg:w-[130px] aspect-[3/4] rounded-xl overflow-hidden bg-slate-100 shadow-sm leading-none">
                     <img
                       src={resolveMediaUrl(b.image) || fallbackImage}
                       alt={b.title}
-                      className="block h-full w-full object-cover"
+                      className="block h-full w-full object-cover object-top sm:object-center"
                       onError={(e) => {
                         const el = e.currentTarget;
                         if (el.dataset.fallbackApplied === "1") return;
@@ -389,53 +446,57 @@ export default function CustomerDashboard() {
                     />
                   </span>
 
-                  <div className="flex-1 min-w-0">
-                    <span
-                      className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider ${kindBadgeStyles(b.kind)}`}
-                    >
-                      {kindLabel}
-                    </span>
-                    <h3 className="text-base sm:text-lg font-bold text-[#0F172A] mt-1.5 truncate group-hover:text-[#6900AA] transition-colors">
-                      {b.title}
-                    </h3>
-                    {b.address ? (
-                      <p className="mt-1.5 text-sm text-slate-500 flex items-start gap-1.5">
-                        <MapPin size={14} className="shrink-0 mt-0.5 text-slate-400" />
-                        <span className="line-clamp-1">{b.address}</span>
-                      </p>
-                    ) : null}
-                    {dateTimeLine ? (
-                      <p className="mt-1 text-sm text-slate-500 flex items-start gap-1.5">
-                        <Calendar size={14} className="shrink-0 mt-0.5 text-slate-400" />
-                        <span className="line-clamp-1">{dateTimeLine}</span>
-                      </p>
-                    ) : null}
-                  </div>
+                  <div className="flex-1 min-w-0 flex flex-col justify-between self-stretch">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider ${kindBadgeStyles(b.kind)}`}
+                        >
+                          {kindLabel}
+                        </span>
+                      </div>
+                      <h3 className="text-[15px] sm:text-lg font-bold text-[#0F172A] mt-1 line-clamp-2 leading-snug group-hover:text-[#6900AA] transition-colors">
+                        {b.title}
+                      </h3>
+                      {b.address ? (
+                        <p className="mt-1 text-xs sm:text-sm text-slate-500 flex items-start gap-1.5">
+                          <MapPin size={13} className="shrink-0 mt-0.5 text-slate-400" />
+                          <span className="line-clamp-1">{b.address}</span>
+                        </p>
+                      ) : null}
+                      {dateTimeLine ? (
+                        <p className="mt-1 text-xs sm:text-sm text-slate-500 flex items-start gap-1.5">
+                          <Calendar size={13} className="shrink-0 mt-0.5 text-slate-400" />
+                          <span className="line-clamp-1">{dateTimeLine}</span>
+                        </p>
+                      ) : null}
+                    </div>
 
-                  <div className="shrink-0 flex flex-row sm:flex-col items-center sm:items-end justify-between sm:justify-start gap-2 sm:gap-3 sm:pt-0.5">
-                    <span
-                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wide ${statusBadgeStyles(b.status)}`}
-                    >
-                      <span className={`w-1.5 h-1.5 rounded-full ${statusDotStyles(b.status)}`} />
-                      {b.status}
-                    </span>
-                    <p className="text-sm text-slate-500 flex items-center gap-1.5 sm:justify-end">
-                      <QtyIcon size={14} className="shrink-0 text-slate-400" />
-                      <span>{formatPartyLine(b)}</span>
-                    </p>
-                    {b.canCancel ? (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          handleCancel(b);
-                        }}
-                        className="inline-flex items-center justify-center min-w-[88px] px-4 py-1.5 rounded-lg border border-red-300 bg-white text-sm font-semibold text-red-500 hover:bg-red-50 cursor-pointer"
+                    <div className="mt-2.5 pt-2 border-t border-slate-100 sm:border-0 sm:mt-2 sm:pt-0 flex items-center justify-between sm:justify-start gap-2.5 flex-wrap">
+                      <span
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-[11px] font-bold uppercase tracking-wide ${statusBadgeStyles(b.status)}`}
                       >
-                        Cancel
-                      </button>
-                    ) : null}
+                        <span className={`w-1.5 h-1.5 rounded-full ${statusDotStyles(b.status)}`} />
+                        {b.status}
+                      </span>
+                      <p className="text-xs sm:text-sm text-slate-500 flex items-center gap-1">
+                        <QtyIcon size={13} className="shrink-0 text-slate-400" />
+                        <span>{formatPartyLine(b)}</span>
+                      </p>
+                      {b.canCancel ? (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleCancel(b);
+                          }}
+                          className="inline-flex items-center justify-center px-3 py-1 rounded-lg border border-red-300 bg-white text-xs font-semibold text-red-500 hover:bg-red-50 cursor-pointer sm:ml-auto"
+                        >
+                          Cancel
+                        </button>
+                      ) : null}
+                    </div>
                   </div>
                 </Link>
               );

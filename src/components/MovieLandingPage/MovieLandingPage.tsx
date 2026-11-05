@@ -16,6 +16,7 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   Clapperboard,
   Search,
   SlidersHorizontal,
@@ -42,7 +43,7 @@ import CitySectionEmptyNotice from "@/components/LandingPage/CitySectionEmptyNot
 import ListingPromoSlider, {
   useListingPromoCampaigns,
 } from "@/components/LandingPage/ListingPromoSlider";
-import { MovieGridShimmer } from "@/components/Shared/Shimmer";
+import { CustomerRailShimmer, MovieGridShimmer } from "@/components/Shared/Shimmer";
 import ListingNoResultsState from "@/components/Shared/ListingNoResultsState";
 import {
   formatMovieCardTitle,
@@ -56,12 +57,20 @@ import {
 } from "@/data/showcaseMovieCards";
 import SafeCoverImage, { MovieImageFallback } from "@/components/Shared/SafeCoverImage";
 import { getEmbedVideoUrl } from "@/components/MovieLandingPage/MovieTrailerModal";
+import AdaptiveCardRow from "@/components/LandingPage/AdaptiveCardRow";
 import { MovieNotifyCard } from "@/components/LandingPage/MovieNotifyCard";
+import { RailPagerNav } from "@/components/LandingPage/RailChrome";
 import type { MustWatchMovieCard } from "@/components/LandingPage/useMustWatchMoviesCatalog";
+import { scrollRailBy, useHorizontalScrollEdges } from "@/lib/useHorizontalScrollEdges";
 import { useStickyHeaderOffset } from "@/lib/useStickyHeaderOffset";
 import "./MovieLandingPage.css";
 import "@/components/DinningLandingPage/DiningHomePage.css";
 import "@/components/DinningLandingPage/DiningSearchPopup.css";
+
+/** Desktop / expanded grid columns — matches landing 4-up card proportions. */
+const MOVIE_GRID_COLS =
+  "grid-cols-2 gap-x-4 gap-y-5 sm:gap-x-[1.15rem] lg:grid-cols-4 lg:gap-x-6 lg:gap-y-6";
+const DISPLAY_ONE_ROW_COUNT = 4;
 
 const FORMATS = ["2D", "3D", "4DX", "IMAX 2D"] as const;
 const CONTAINER = "bmb-section-container";
@@ -134,25 +143,27 @@ function ChipButton({
   );
 }
 
+const FILTER_UI = "#111111";
+
 function SelectionMark({ selected, multi }: { selected: boolean; multi?: boolean }) {
   if (multi) {
     return (
       <span
-        className={`w-5 h-5 rounded-[4px] border flex items-center justify-center shrink-0 ${
-          selected ? "border-[#6900AA] bg-[#6900AA]" : "border-slate-300 bg-white"
+        className={`w-[1.125rem] h-[1.125rem] rounded-[4px] border flex items-center justify-center shrink-0 ${
+          selected ? "border-slate-900 bg-slate-900" : "border-slate-300 bg-white"
         }`}
       >
-        {selected ? <Check size={13} strokeWidth={3} className="text-white" /> : null}
+        {selected ? <Check size={12} strokeWidth={3} className="text-white" /> : null}
       </span>
     );
   }
   return (
     <span
-      className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
-        selected ? "border-[#6900AA]" : "border-slate-300"
+      className={`w-[1.125rem] h-[1.125rem] rounded-full border-2 flex items-center justify-center shrink-0 ${
+        selected ? "border-slate-900" : "border-slate-300"
       }`}
     >
-      {selected ? <span className="w-2.5 h-2.5 rounded-full bg-[#6900AA]" /> : null}
+      {selected ? <span className="w-2 h-2 rounded-full bg-slate-900" /> : null}
     </span>
   );
 }
@@ -172,9 +183,13 @@ function FilterOptionRow({
     <button
       type="button"
       onClick={onSelect}
-      className="w-full min-w-0 flex items-center justify-between gap-2 py-3 text-left cursor-pointer"
+      className="w-full min-w-0 flex items-center justify-between gap-3 py-2.5 sm:py-3 text-left cursor-pointer rounded-lg hover:bg-slate-50/80 transition-colors px-1 -mx-1"
     >
-      <span className={`text-base truncate ${selected ? "font-semibold text-slate-800" : "text-slate-600"}`}>
+      <span
+        className={`text-[15px] sm:text-base truncate ${
+          selected ? "font-semibold text-slate-900" : "font-medium text-slate-600"
+        }`}
+      >
         {label}
       </span>
       <SelectionMark selected={selected} multi={multi} />
@@ -197,8 +212,6 @@ type MovieCardData = {
   comingSoon?: boolean;
   href?: string;
 };
-
-type ViewAllKey = "now-showing" | "coming-soon" | "top-rated" | null;
 
 type MovieHeroSlide = {
   id: string;
@@ -447,39 +460,104 @@ function MovieCard({ movie }: { movie: MovieCardData }) {
   return <MovieNotifyCard movie={toLandingMovieCard(movie)} />;
 }
 
+/** Same See All / Show Less expand pattern as EventsListPage (rail → grid). */
 function MovieRail({
   title,
   movies,
-  onSeeAll,
+  expanded,
+  onToggle,
 }: {
   title: string;
   movies: MovieCardData[];
-  onSeeAll: () => void;
+  expanded: boolean;
+  onToggle: () => void;
 }) {
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const scrollEdges = useHorizontalScrollEdges(scrollerRef, [movies.length, expanded]);
+  const canToggle = movies.length > DISPLAY_ONE_ROW_COUNT;
+
   if (!movies.length) return null;
-  // Same grid as Only in Theatres so card width/height match exactly.
+
   return (
     <div>
       <div className="flex items-center justify-between gap-3 mb-3 sm:mb-4">
         <h2 className="text-lg sm:text-xl md:text-2xl font-semibold text-slate-900 tracking-tight">
           {title}
         </h2>
-        <button
-          type="button"
-          onClick={onSeeAll}
-          className="inline-flex items-center gap-0.5 text-sm sm:text-base font-semibold text-[#6900AA] hover:text-[#57008E] cursor-pointer shrink-0"
-        >
-          See All
-          <ChevronRight className="size-4" />
-        </button>
+        {canToggle ? (
+          <button
+            type="button"
+            onClick={onToggle}
+            className="inline-flex items-center gap-1 text-sm sm:text-base font-semibold text-[#6900AA] hover:text-[#57008E] transition-colors cursor-pointer shrink-0"
+          >
+            <span>{expanded ? "Show Less" : "See All"}</span>
+            {expanded ? (
+              <ChevronUp className="size-4" />
+            ) : (
+              <ChevronRight className="size-4" />
+            )}
+          </button>
+        ) : null}
       </div>
-      <div className="grid grid-cols-2 gap-x-3 gap-y-5 md:gap-x-4 md:gap-y-6 lg:grid-cols-5">
-        {movies.map((movie) => (
-          <div key={movie.id} className="min-w-0">
-            <MovieCard movie={movie} />
+      {!expanded ? (
+        <>
+          <AdaptiveCardRow
+            minVisible={4}
+            scrollerRef={scrollerRef}
+            className="adaptive-card-row--four"
+          >
+            {movies.map((movie) => (
+              <MovieCard key={movie.id} movie={movie} />
+            ))}
+          </AdaptiveCardRow>
+          <div className="hidden lg:block">
+            <RailPagerNav
+              canPrev={scrollEdges.left}
+              canNext={scrollEdges.right}
+              pageCount={scrollEdges.pageCount}
+              activePage={scrollEdges.activePage}
+              onPrev={() => {
+                const el = scrollerRef.current;
+                if (el) scrollRailBy(el, -1);
+              }}
+              onNext={() => {
+                const el = scrollerRef.current;
+                if (el) scrollRailBy(el, 1);
+              }}
+              label={title}
+            />
           </div>
-        ))}
-      </div>
+        </>
+      ) : (
+        <>
+          <MovieCardsGrid movies={movies} />
+          {canToggle ? (
+            <div className="mt-8 sm:mt-10 flex justify-center">
+              <button
+                type="button"
+                onClick={onToggle}
+                className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full border border-slate-200 bg-white text-sm font-semibold text-[#6900AA] hover:bg-[#FAF5FF] hover:border-[#6900AA]/30 shadow-sm transition-all cursor-pointer"
+              >
+                <span>Show Less</span>
+                <ChevronUp className="size-4" />
+              </button>
+            </div>
+          ) : null}
+        </>
+      )}
+    </div>
+  );
+}
+
+/** Catalog grid sized to landing 4-up proportions (2-up mobile/tablet, 4-up desktop). */
+function MovieCardsGrid({ movies }: { movies: MovieCardData[] }) {
+  return (
+    <div className={`grid ${MOVIE_GRID_COLS}`}>
+      {movies.map((movie) => (
+        <div key={movie.id} className="min-w-0">
+          <MovieCard movie={movie} />
+        </div>
+      ))}
     </div>
   );
 }
@@ -491,61 +569,86 @@ function MovieReleasesGrid({
   title: string;
   movies: MovieCardData[];
 }) {
-  const pageSize = 4;
-  const showPager = movies.length > pageSize;
-  const pageCount = Math.max(1, Math.ceil(movies.length / pageSize));
-  const [page, setPage] = useState(0);
+  const [expanded, setExpanded] = useState(false);
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const scrollEdges = useHorizontalScrollEdges(scrollerRef, [movies.length, expanded]);
+  const canToggle = movies.length > DISPLAY_ONE_ROW_COUNT;
+  const moviesKey = movies.map((movie) => movie.id).join(",");
 
   useEffect(() => {
-    setPage((current) => Math.min(current, pageCount - 1));
-  }, [pageCount]);
+    setExpanded(false);
+  }, [moviesKey]);
 
   if (!movies.length) return null;
 
-  const visibleMovies = showPager
-    ? movies.slice(page * pageSize, page * pageSize + pageSize)
-    : movies;
-
   return (
-    <section className="bg-white pt-6 sm:pt-8 pb-2">
+    <section className="bg-white pt-6 sm:pt-7 lg:pt-8">
       <div className="bmb-section-container">
-        <h2 className="mb-3 text-lg sm:text-xl md:text-2xl font-semibold text-slate-900 tracking-tight sm:mb-4">
-          {title}
-        </h2>
-        <div className="grid grid-cols-2 gap-x-3 gap-y-5 md:gap-x-4 md:gap-y-6 lg:grid-cols-5">
-          {visibleMovies.map((movie) => (
-            <div key={movie.id} className="min-w-0">
-              <MovieCard movie={movie} />
-            </div>
-          ))}
-        </div>
-        {showPager ? (
-          <div className="mt-5 flex items-center justify-center gap-3 sm:mt-6">
-            <div className="flex items-center gap-1.5" role="tablist" aria-label="Upcoming movies pages">
-              {Array.from({ length: pageCount }, (_, index) => (
-                <button
-                  key={index}
-                  type="button"
-                  role="tab"
-                  aria-label={`Page ${index + 1}`}
-                  aria-selected={index === page}
-                  onClick={() => setPage(index)}
-                  className={`size-1.5 rounded-full transition-colors cursor-pointer ${
-                    index === page ? "bg-slate-900" : "bg-slate-300"
-                  }`}
-                />
-              ))}
-            </div>
+        <div className="mb-3 flex items-center justify-between gap-3 sm:mb-3.5">
+          <h2 className="text-lg sm:text-xl md:text-2xl font-semibold text-slate-900 tracking-tight">
+            {title}
+          </h2>
+          {canToggle ? (
             <button
               type="button"
-              aria-label="Next upcoming movies"
-              onClick={() => setPage((current) => (current + 1) % pageCount)}
-              className="flex size-8 items-center justify-center rounded-full border border-slate-300 text-slate-600 transition-colors hover:border-slate-400 hover:text-slate-800 cursor-pointer"
+              onClick={() => setExpanded((prev) => !prev)}
+              className="inline-flex items-center gap-1 text-sm sm:text-base font-semibold text-[#6900AA] hover:text-[#57008E] transition-colors cursor-pointer shrink-0"
             >
-              <ChevronRight className="size-4" />
+              <span>{expanded ? "Show Less" : "See All"}</span>
+              {expanded ? (
+                <ChevronUp className="size-4" />
+              ) : (
+                <ChevronRight className="size-4" />
+              )}
             </button>
-          </div>
-        ) : null}
+          ) : null}
+        </div>
+        {!expanded ? (
+          <>
+            <AdaptiveCardRow
+              minVisible={4}
+              scrollerRef={scrollerRef}
+              className="adaptive-card-row--four"
+            >
+              {movies.map((movie) => (
+                <MovieCard key={movie.id} movie={movie} />
+              ))}
+            </AdaptiveCardRow>
+            <div className="hidden lg:block">
+              <RailPagerNav
+                canPrev={scrollEdges.left}
+                canNext={scrollEdges.right}
+                pageCount={scrollEdges.pageCount}
+                activePage={scrollEdges.activePage}
+                onPrev={() => {
+                  const el = scrollerRef.current;
+                  if (el) scrollRailBy(el, -1);
+                }}
+                onNext={() => {
+                  const el = scrollerRef.current;
+                  if (el) scrollRailBy(el, 1);
+                }}
+                label={title}
+              />
+            </div>
+          </>
+        ) : (
+          <>
+            <MovieCardsGrid movies={movies} />
+            {canToggle ? (
+              <div className="mt-8 sm:mt-10 flex justify-center">
+                <button
+                  type="button"
+                  onClick={() => setExpanded(false)}
+                  className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full border border-slate-200 bg-white text-sm font-semibold text-[#6900AA] hover:bg-[#FAF5FF] hover:border-[#6900AA]/30 shadow-sm transition-all cursor-pointer"
+                >
+                  <span>Show Less</span>
+                  <ChevronUp className="size-4" />
+                </button>
+              </div>
+            ) : null}
+          </>
+        )}
       </div>
     </section>
   );
@@ -581,6 +684,7 @@ export default function MovieLandingPage() {
   const [titleSearch, setTitleSearch] = useState(() => searchParams.get("q") || "");
   const [showMovieSearchPopup, setShowMovieSearchPopup] = useState(false);
   const [movieSearchDraft, setMovieSearchDraft] = useState("");
+  const [movieSuggestionTerm, setMovieSuggestionTerm] = useState("");
   const [movieRecentSearches, setMovieRecentSearches] = useState<string[]>([]);
   const movieSearchInputRef = useRef<HTMLInputElement>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -590,7 +694,9 @@ export default function MovieLandingPage() {
   const [draftFormats, setDraftFormats] = useState<string[]>([]);
   const headerOffset = useStickyHeaderOffset();
   const [isFiltersStuck, setIsFiltersStuck] = useState(false);
-  const [viewAll, setViewAll] = useState<ViewAllKey>(null);
+  const [isMoviesExpanded, setIsMoviesExpanded] = useState(false);
+  const [isTopRatedExpanded, setIsTopRatedExpanded] = useState(false);
+  const moviesRailRef = useRef<HTMLDivElement>(null);
   const [heroSlideIndex, setHeroSlideIndex] = useState(0);
   const [heroSlideTransition, setHeroSlideTransition] = useState(true);
   const [mobilePromoIndex, setMobilePromoIndex] = useState(0);
@@ -741,6 +847,35 @@ export default function MovieLandingPage() {
     isLoading: allMoviesLoading,
     isFetching: allMoviesFetching,
   } = useGetPublicMoviesQuery(unscopedMoviesQueryArg, { skip: !hasCity });
+
+  const typedMovieSearch = movieSearchDraft.trim();
+  useEffect(() => {
+    if (!showMovieSearchPopup) {
+      setMovieSuggestionTerm("");
+      return;
+    }
+    const handle = window.setTimeout(() => setMovieSuggestionTerm(typedMovieSearch), 200);
+    return () => window.clearTimeout(handle);
+  }, [showMovieSearchPopup, typedMovieSearch]);
+
+  const movieSuggestionQueryArg = useMemo(
+    () => ({
+      page: 1,
+      limit: 6,
+      ...(hasCity ? { city } : {}),
+      ...(movieSuggestionTerm ? { q: movieSuggestionTerm } : {}),
+    }),
+    [hasCity, city, movieSuggestionTerm]
+  );
+  const { data: movieSuggestionData, isFetching: movieSuggestionsLoading } =
+    useGetPublicMoviesQuery(movieSuggestionQueryArg, {
+      skip: !showMovieSearchPopup || movieSuggestionTerm.length < 1,
+    });
+  const suggestionMovies =
+    movieSuggestionTerm.length > 0 ? movieSuggestionData?.items ?? EMPTY_MOVIES : EMPTY_MOVIES;
+  const movieSuggestionsPending =
+    typedMovieSearch.length > 0 &&
+    (typedMovieSearch !== movieSuggestionTerm || movieSuggestionsLoading);
 
   const cityMovieItems = cityMoviesData?.items ?? EMPTY_MOVIES;
   const allMovieItems = allMoviesData?.items ?? EMPTY_MOVIES;
@@ -1106,33 +1241,48 @@ export default function MovieLandingPage() {
     [selectedLanguages, selectedGenres, selectedFormats, scrollToMoviesListing]
   );
 
-  const openViewAll = (key: Exclude<ViewAllKey, null>) => {
-    setViewAll(key);
-    scrollToMoviesListing();
-  };
+  const canToggleSeeAllMovies =
+    !isLoading && movies.length > DISPLAY_ONE_ROW_COUNT;
 
-  const viewAllTitle =
-    viewAll === "now-showing"
-      ? "Only in Theatres"
-      : viewAll === "coming-soon"
-        ? "Upcoming Movies"
-        : viewAll === "top-rated"
-          ? "Top Rated Movies"
-          : "";
+  const moviesScrollEdges = useHorizontalScrollEdges(moviesRailRef, [
+    movies.length,
+    isMoviesExpanded,
+    isLoading,
+  ]);
 
-  const viewAllMovies =
-    viewAll === "now-showing"
-      ? movies
-      : viewAll === "coming-soon"
-        ? comingSoonMovies
-        : viewAll === "top-rated"
-          ? topRatedMovies
-          : [];
+  const toggleSeeAllMovies = useCallback(() => {
+    setIsMoviesExpanded((prev) => {
+      const next = !prev;
+      if (!next && typeof window !== "undefined") {
+        const el = moviesListingRef.current;
+        if (el) {
+          const top = el.getBoundingClientRect().top + window.scrollY - (headerOffset + 12);
+          window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+        }
+      }
+      return next;
+    });
+  }, [headerOffset]);
+
+  const toggleTopRatedExpanded = useCallback(() => {
+    setIsTopRatedExpanded((prev) => !prev);
+  }, []);
+
+  useEffect(() => {
+    setIsMoviesExpanded(false);
+    setIsTopRatedExpanded(false);
+  }, [
+    city,
+    titleSearch,
+    selectedLanguages,
+    selectedGenres,
+    selectedFormats,
+  ]);
 
   const districtFilterModalBody = (
     <div className="flex flex-col sm:flex-row min-h-0 flex-1 overflow-hidden">
-      <div className="sm:w-[34%] bg-slate-100 border-b sm:border-b-0 sm:border-r border-slate-200 overflow-x-auto sm:overflow-y-auto shrink-0 sm:h-full">
-        <div className="flex sm:flex-col">
+      <div className="sm:w-[32%] bg-[#F4F5F7] border-b sm:border-b-0 sm:border-r border-slate-200 overflow-x-auto sm:overflow-y-auto shrink-0 sm:h-full scrollbar-hide">
+        <div className="flex sm:flex-col sm:py-1">
           {MOVIE_FILTER_MODAL_TABS.map((tab) => {
             const active = filterModalTab === tab.id;
             return (
@@ -1140,14 +1290,23 @@ export default function MovieLandingPage() {
                 key={tab.id}
                 type="button"
                 onClick={() => setFilterModalTab(tab.id)}
-                className={`relative shrink-0 text-left px-4 py-3.5 text-base whitespace-nowrap transition-colors cursor-pointer ${
+                className={`relative shrink-0 text-left px-4 sm:px-5 py-3 sm:py-3.5 text-[15px] sm:text-base whitespace-nowrap transition-colors cursor-pointer ${
                   active
                     ? "font-semibold text-slate-900 bg-white"
-                    : "font-medium text-slate-600 bg-transparent hover:bg-slate-50/80"
+                    : "font-medium text-slate-600 bg-transparent hover:bg-white/60"
                 }`}
               >
                 {active ? (
-                  <span className="absolute left-0 top-0 bottom-0 w-[3px] hidden sm:block bg-[#6900AA]" />
+                  <span
+                    className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full hidden sm:block"
+                    style={{ backgroundColor: FILTER_UI }}
+                  />
+                ) : null}
+                {active ? (
+                  <span
+                    className="absolute left-3 right-3 bottom-0 h-[2px] rounded-full sm:hidden"
+                    style={{ backgroundColor: FILTER_UI }}
+                  />
                 ) : null}
                 <span className="block">{tab.label}</span>
               </button>
@@ -1156,11 +1315,11 @@ export default function MovieLandingPage() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-5 py-4 min-h-0 h-full bg-white">
+      <div className="flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-5 sm:px-6 py-4 sm:py-5 min-h-0 h-full bg-white">
         {filterModalTab === "language" ? (
           <div>
-            <p className="text-lg font-bold text-slate-900 mb-2">Language</p>
-            <div className="grid grid-cols-2 gap-x-4">
+            <p className="text-base sm:text-lg font-bold text-slate-900 mb-3">Language</p>
+            <div className="grid grid-cols-2 gap-x-3 sm:gap-x-4">
               {languageOptions.map((lang) => (
                 <FilterOptionRow
                   key={lang}
@@ -1176,8 +1335,8 @@ export default function MovieLandingPage() {
 
         {filterModalTab === "genre" ? (
           <div>
-            <p className="text-lg font-bold text-slate-900 mb-2">Genre</p>
-            <div className="grid grid-cols-2 gap-x-4">
+            <p className="text-base sm:text-lg font-bold text-slate-900 mb-3">Genre</p>
+            <div className="grid grid-cols-2 gap-x-3 sm:gap-x-4">
               {genreOptions.map((genre) => (
                 <FilterOptionRow
                   key={genre}
@@ -1193,8 +1352,8 @@ export default function MovieLandingPage() {
 
         {filterModalTab === "format" ? (
           <div>
-            <p className="text-lg font-bold text-slate-900 mb-2">Format</p>
-            <div className="grid grid-cols-2 gap-x-4">
+            <p className="text-base sm:text-lg font-bold text-slate-900 mb-3">Format</p>
+            <div className="grid grid-cols-2 gap-x-3 sm:gap-x-4">
               {formatOptions.map((format) => (
                 <FilterOptionRow
                   key={format}
@@ -1403,11 +1562,11 @@ export default function MovieLandingPage() {
       <section
         ref={moviesListingRef}
         id="movies-listing"
-        className="bg-white pt-6 sm:pt-8 pb-12 sm:pb-16"
+        className="bg-white pt-6 sm:pt-7 lg:pt-8 pb-6 sm:pb-7 lg:pb-8"
         style={{ scrollMarginTop: headerOffset + 8 }}
       >
         <div className={CONTAINER}>
-          <div className="mb-4 flex flex-col gap-3 sm:mb-5 sm:flex-row sm:items-end sm:justify-between">
+          <div className="mb-2 flex items-center justify-between gap-3 sm:mb-2.5">
             <div className="min-w-0">
               <h2 className="text-lg sm:text-xl md:text-2xl font-semibold text-slate-900 tracking-tight">
                 Only in Theatres
@@ -1415,22 +1574,36 @@ export default function MovieLandingPage() {
               {hasCity && !isLoading && cityMovieItems.length === 0 ? (
                 <CitySectionEmptyNotice message="No movies available in your city yet." />
               ) : null}
+              <Link
+                href={cinemasHref}
+                className="mt-1.5 inline-flex w-fit items-center gap-2 text-sm font-semibold text-[#6900AA] hover:text-[#57008E]"
+              >
+                <Ticket className="size-4" />
+                Browse by Cinemas
+              </Link>
             </div>
-            <Link
-              href={cinemasHref}
-              className="inline-flex w-fit items-center gap-2 text-sm font-semibold text-[#6900AA] hover:text-[#57008E]"
-            >
-              <Ticket className="size-4" />
-              Browse by Cinemas
-            </Link>
+            {canToggleSeeAllMovies ? (
+              <button
+                type="button"
+                onClick={toggleSeeAllMovies}
+                className="inline-flex items-center gap-1 text-sm sm:text-base font-semibold text-[#6900AA] hover:text-[#57008E] transition-colors cursor-pointer shrink-0"
+              >
+                <span>{isMoviesExpanded ? "Show Less" : "See All"}</span>
+                {isMoviesExpanded ? (
+                  <ChevronUp className="size-4" />
+                ) : (
+                  <ChevronRight className="size-4" />
+                )}
+              </button>
+            ) : null}
           </div>
         </div>
 
         <div ref={filtersStickySentinelRef} className="h-px w-full" aria-hidden />
         <section className="sticky z-30 w-full bg-transparent" style={{ top: headerOffset }}>
           <div className={`dining-filters-sticky w-full ${isFiltersStuck ? "is-stuck" : ""}`}>
-            <div className={`${CONTAINER} pt-4 pb-1`}>
-              <div className="mb-2">
+            <div className={`${CONTAINER} pt-1 pb-1`}>
+              <div className="mb-0.5">
                 <div className="flex items-center gap-2 sm:gap-3 pb-1 -mx-1 px-1">
                   <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto scrollbar-hide">
                     <button
@@ -1540,14 +1713,11 @@ export default function MovieLandingPage() {
                   <Search size={20} strokeWidth={1.75} className="text-slate-500 shrink-0" />
                   <input
                     ref={movieSearchInputRef}
-                    type="text"
+                    type="search"
+                    enterKeyHint="search"
+                    autoComplete="off"
                     value={movieSearchDraft}
-                    onChange={(e) => {
-                      const next = e.target.value;
-                      setMovieSearchDraft(next);
-                      setTitleSearch(next);
-                      scrollToMoviesListing();
-                    }}
+                    onChange={(e) => setMovieSearchDraft(e.target.value)}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {
                         e.preventDefault();
@@ -1563,8 +1733,6 @@ export default function MovieLandingPage() {
                       type="button"
                       onClick={() => {
                         setMovieSearchDraft("");
-                        setTitleSearch("");
-                        scrollToMoviesListing();
                         movieSearchInputRef.current?.focus();
                       }}
                       className="shrink-0 p-1 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer"
@@ -1575,40 +1743,124 @@ export default function MovieLandingPage() {
                   ) : null}
                 </div>
 
-                <div className="dining-search-popup__results border-t border-slate-100">
+                <div className="dining-search-popup__results border-t border-slate-100 max-h-[min(52vh,420px)] overflow-y-auto">
                   <div className="px-5 sm:px-6 pt-4 pb-5">
-                    <p className="text-[15px] font-bold text-slate-900 mb-1">Recent Searches</p>
-                    {movieRecentSearches.length === 0 ? (
-                      <p className="py-3 text-sm text-slate-400">No recent searches yet</p>
+                    {typedMovieSearch ? (
+                      <>
+                        <p className="text-[15px] font-bold text-slate-900 mb-1">Movies</p>
+                        {movieSuggestionsPending && suggestionMovies.length === 0 ? (
+                          <ul className="divide-y divide-slate-50" aria-busy="true" aria-label="Searching movies">
+                            {Array.from({ length: 3 }).map((_, i) => (
+                              <li key={i} className="flex items-center gap-3 py-3">
+                                <span className="h-11 w-11 shrink-0 rounded-lg bg-slate-100 animate-pulse" />
+                                <span className="min-w-0 flex-1 space-y-2">
+                                  <span className="block h-3.5 w-2/3 rounded bg-slate-100 animate-pulse" />
+                                  <span className="block h-3 w-1/2 rounded bg-slate-100 animate-pulse" />
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : suggestionMovies.length === 0 ? (
+                          <p className="py-3 text-sm text-slate-400">No movies found</p>
+                        ) : (
+                          <ul className="divide-y divide-slate-50">
+                            {suggestionMovies.map((movie) => {
+                              const cover = resolveMediaUrl(movie.poster_url || "");
+                              const detail = [
+                                ...(movie.genres || []).slice(0, 2),
+                                movie.certificate,
+                              ]
+                                .filter(Boolean)
+                                .join(" · ");
+                              return (
+                                <li key={movie.id}>
+                                  <Link
+                                    href={`/movies/${movie.slug || movie.id}`}
+                                    onClick={() => {
+                                      const term = typedMovieSearch;
+                                      if (term) {
+                                        const updated = [
+                                          term,
+                                          ...readMovieRecentSearches().filter(
+                                            (item) => item.toLowerCase() !== term.toLowerCase()
+                                          ),
+                                        ];
+                                        writeMovieRecentSearches(updated);
+                                      }
+                                      setShowMovieSearchPopup(false);
+                                    }}
+                                    className="flex w-full items-center gap-3 py-3 text-left cursor-pointer group"
+                                  >
+                                    {cover ? (
+                                      // eslint-disable-next-line @next/next/no-img-element
+                                      <img
+                                        src={cover}
+                                        alt=""
+                                        className="h-11 w-11 shrink-0 rounded-lg object-cover bg-slate-100"
+                                      />
+                                    ) : (
+                                      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-400">
+                                        <Clapperboard size={16} />
+                                      </span>
+                                    )}
+                                    <span className="min-w-0">
+                                      <span className="block truncate text-[15px] font-semibold text-slate-800 group-hover:text-[#6900AA]">
+                                        {movie.title}
+                                      </span>
+                                      {detail ? (
+                                        <span className="block truncate text-sm text-slate-500">{detail}</span>
+                                      ) : null}
+                                    </span>
+                                  </Link>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => commitMovieSearch(typedMovieSearch)}
+                          className="mt-2 w-full rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-[#6900AA] hover:bg-[#faf5ff] cursor-pointer"
+                        >
+                          See all results for “{typedMovieSearch}”
+                        </button>
+                      </>
                     ) : (
-                      <ul className="divide-y divide-slate-50">
-                        {movieRecentSearches.map((term) => (
-                          <li key={term} className="flex items-center gap-3 py-3">
-                            <button
-                              type="button"
-                              onClick={() => commitMovieSearch(term)}
-                              className="flex min-w-0 flex-1 items-center gap-3 text-left cursor-pointer group"
-                            >
-                              <Search
-                                size={16}
-                                strokeWidth={1.75}
-                                className="text-slate-400 shrink-0 group-hover:text-slate-500"
-                              />
-                              <span className="truncate text-[15px] text-slate-500 group-hover:text-slate-700">
-                                {term}
-                              </span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => removeMovieRecentSearch(term)}
-                              className="shrink-0 p-1 rounded-full text-slate-300 hover:text-slate-500 hover:bg-slate-100 cursor-pointer"
-                              aria-label={`Remove ${term}`}
-                            >
-                              <X size={14} />
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
+                      <>
+                        <p className="text-[15px] font-bold text-slate-900 mb-1">Recent Searches</p>
+                        {movieRecentSearches.length === 0 ? (
+                          <p className="py-3 text-sm text-slate-400">No recent searches yet</p>
+                        ) : (
+                          <ul className="divide-y divide-slate-50">
+                            {movieRecentSearches.map((term) => (
+                              <li key={term} className="flex items-center gap-3 py-3">
+                                <button
+                                  type="button"
+                                  onClick={() => commitMovieSearch(term)}
+                                  className="flex min-w-0 flex-1 items-center gap-3 text-left cursor-pointer group"
+                                >
+                                  <Search
+                                    size={16}
+                                    strokeWidth={1.75}
+                                    className="text-slate-400 shrink-0 group-hover:text-slate-500"
+                                  />
+                                  <span className="truncate text-[15px] text-slate-500 group-hover:text-slate-700">
+                                    {term}
+                                  </span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => removeMovieRecentSearch(term)}
+                                  className="shrink-0 p-1 rounded-full text-slate-300 hover:text-slate-500 hover:bg-slate-100 cursor-pointer"
+                                  aria-label={`Remove ${term}`}
+                                >
+                                  <X size={14} />
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
@@ -1617,129 +1869,137 @@ export default function MovieLandingPage() {
             document.body
           )}
 
-        <div className={`${CONTAINER} pt-5`}>
-          {viewAll ? (
-            <div>
-              <button
-                type="button"
-                onClick={() => setViewAll(null)}
-                className="mb-4 inline-flex cursor-pointer items-center gap-1 text-sm font-semibold text-[#6900AA] hover:text-[#57008E] sm:text-base"
-              >
-                <ChevronLeft className="size-4" />
-                Back
-              </button>
-              <h3 className="mb-4 text-lg sm:text-xl md:text-2xl font-semibold text-slate-900 tracking-tight sm:mb-5">
-                {viewAllTitle}
-              </h3>
-              {viewAllMovies.length === 0 ? (
-                <ListingNoResultsState
-                  kind="movies"
-                  title="No movies found"
-                  description={
-                    hasActiveFilters
-                      ? "We couldn’t find any movies matching these filters. Try clearing filters or choosing another language."
-                      : "Check back soon for the latest titles in cinemas."
-                  }
-                  actionLabel={hasActiveFilters ? "Clear filters" : undefined}
-                  onAction={hasActiveFilters ? clearAll : undefined}
-                />
+        <div className={`${CONTAINER} pt-3 sm:pt-3.5`}>
+          <div className="space-y-8 sm:space-y-10">
+            {isLoading ? (
+              isMoviesExpanded ? (
+                <MovieGridShimmer count={8} />
               ) : (
-                <div className="grid grid-cols-2 gap-x-3 gap-y-5 md:gap-x-4 md:gap-y-6 lg:grid-cols-5">
-                  {viewAllMovies.map((movie) => (
-                    <div key={movie.id} className="min-w-0">
-                      <MovieCard movie={movie} />
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="space-y-8 sm:space-y-10">
-              {isLoading ? (
-                <MovieGridShimmer count={10} />
-              ) : noCinemasInCity && !useStaticMovies ? (
-                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-10 text-center">
-                  <p className="text-sm font-semibold text-slate-800">No cinemas in {headingCity} yet</p>
-                  <p className="mt-1 text-sm text-slate-500">
-                    Try another city or browse cinemas near you.
-                  </p>
-                  <Link
-                    href={cinemasHref}
-                    className="mt-4 inline-flex text-sm font-semibold text-[#6900AA] hover:text-[#57008E]"
-                  >
-                    Browse by Cinemas
-                  </Link>
-                </div>
-              ) : movies.length === 0 ? (
-                <ListingNoResultsState
-                  kind="movies"
-                  title="No movies found"
-                  description={
-                    hasActiveFilters
-                      ? "We couldn’t find any movies matching these filters. Try clearing filters or choosing another language."
-                      : "Check back soon for the latest titles in cinemas."
-                  }
-                  actionLabel={hasActiveFilters ? "Clear filters" : undefined}
-                  onAction={hasActiveFilters ? clearAll : undefined}
-                  dimmed={isFetching}
-                />
-              ) : (
-                <div className={isFetching ? "opacity-70 transition-opacity" : ""}>
-                  <div className="grid grid-cols-2 gap-x-3 gap-y-5 md:gap-x-4 md:gap-y-6 lg:grid-cols-5">
-                    {movies.map((movie) => (
-                      <div key={movie.id} className="min-w-0">
-                        <MovieCard movie={movie} />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div id="coming-soon" className="scroll-mt-28" />
-
-              <MovieRail
-                title="Top Rated Movies"
-                movies={topRatedMovies}
-                onSeeAll={() => openViewAll("top-rated")}
+                <CustomerRailShimmer count={4} variant="movie" />
+              )
+            ) : noCinemasInCity && !useStaticMovies ? (
+              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-10 text-center">
+                <p className="text-sm font-semibold text-slate-800">No cinemas in {headingCity} yet</p>
+                <p className="mt-1 text-sm text-slate-500">
+                  Try another city or browse cinemas near you.
+                </p>
+                <Link
+                  href={cinemasHref}
+                  className="mt-4 inline-flex text-sm font-semibold text-[#6900AA] hover:text-[#57008E]"
+                >
+                  Browse by Cinemas
+                </Link>
+              </div>
+            ) : movies.length === 0 ? (
+              <ListingNoResultsState
+                kind="movies"
+                title="No movies found"
+                description={
+                  hasActiveFilters
+                    ? "We couldn’t find any movies matching these filters. Try clearing filters or choosing another language."
+                    : "Check back soon for the latest titles in cinemas."
+                }
+                actionLabel={hasActiveFilters ? "Clear filters" : undefined}
+                onAction={hasActiveFilters ? clearAll : undefined}
+                dimmed={isFetching}
               />
-            </div>
-          )}
+            ) : !isMoviesExpanded ? (
+              <div className={isFetching ? "opacity-70 transition-opacity" : ""}>
+                <AdaptiveCardRow
+                  minVisible={4}
+                  scrollerRef={moviesRailRef}
+                  className="adaptive-card-row--four"
+                >
+                  {movies.map((movie) => (
+                    <MovieCard key={movie.id} movie={movie} />
+                  ))}
+                </AdaptiveCardRow>
+                <div className="hidden lg:block">
+                  <RailPagerNav
+                    canPrev={moviesScrollEdges.left}
+                    canNext={moviesScrollEdges.right}
+                    pageCount={moviesScrollEdges.pageCount}
+                    activePage={moviesScrollEdges.activePage}
+                    onPrev={() => {
+                      const el = moviesRailRef.current;
+                      if (el) scrollRailBy(el, -1);
+                    }}
+                    onNext={() => {
+                      const el = moviesRailRef.current;
+                      if (el) scrollRailBy(el, 1);
+                    }}
+                    label="movies"
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className={isFetching ? "opacity-70 transition-opacity" : ""}>
+                <MovieCardsGrid movies={movies} />
+                {canToggleSeeAllMovies ? (
+                  <div className="mt-8 sm:mt-10 flex justify-center">
+                    <button
+                      type="button"
+                      onClick={toggleSeeAllMovies}
+                      className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full border border-slate-200 bg-white text-sm font-semibold text-[#6900AA] hover:bg-[#FAF5FF] hover:border-[#6900AA]/30 shadow-sm transition-all cursor-pointer"
+                    >
+                      <span>Show Less</span>
+                      <ChevronUp className="size-4" />
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            )}
+
+            <div id="coming-soon" className="scroll-mt-28" />
+
+            <MovieRail
+              title="Top Rated Movies"
+              movies={topRatedMovies}
+              expanded={isTopRatedExpanded}
+              onToggle={toggleTopRatedExpanded}
+            />
+          </div>
         </div>
       </section>
 
       {filtersOpen ? (
-        <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center">
+        <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-0 sm:p-4">
           <button
             type="button"
             aria-label="Close filters"
-            className="absolute inset-0 cursor-pointer bg-black/40"
+            className="absolute inset-0 cursor-pointer bg-black/45 backdrop-blur-[1px]"
             onClick={() => setFiltersOpen(false)}
           />
-          <div className="relative w-full sm:w-[min(92vw,720px)] h-[min(88vh,540px)] bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-              <h3 className="text-xl font-bold text-slate-900">Filter</h3>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Filter"
+            className="relative w-full sm:w-[min(92vw,720px)] h-[min(90vh,560px)] sm:h-[min(88vh,540px)] bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+          >
+            <div className="flex items-center justify-between gap-3 px-5 sm:px-6 py-3.5 sm:py-4 border-b border-slate-200 shrink-0 bg-white">
+              <h3 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">Filter</h3>
               <button
                 type="button"
                 onClick={() => setFiltersOpen(false)}
-                className="p-1 rounded-full hover:bg-slate-100 cursor-pointer"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors cursor-pointer"
                 aria-label="Close"
               >
-                <X size={20} />
+                <X size={18} strokeWidth={2.25} />
               </button>
             </div>
             {districtFilterModalBody}
-            <div className="flex items-center justify-end gap-6 px-5 py-3.5 border-t border-slate-100 shrink-0">
+            <div className="flex items-center justify-end gap-2.5 sm:gap-3 px-5 sm:px-6 pt-3.5 pb-[max(1rem,env(safe-area-inset-bottom))] sm:py-4 border-t border-slate-200 shrink-0 bg-white">
               <button
                 type="button"
                 onClick={resetDraftFilters}
-                className="text-base font-bold text-[#6900AA] cursor-pointer"
+                className="inline-flex min-h-11 items-center justify-center rounded-full border border-slate-300 bg-white px-5 sm:px-6 text-sm sm:text-[15px] font-bold text-slate-900 hover:bg-slate-50 transition-colors cursor-pointer"
               >
                 Reset
               </button>
               <button
                 type="button"
                 onClick={applyFiltersAndClose}
-                className="text-base font-bold text-[#6900AA] cursor-pointer"
+                className="inline-flex min-h-11 items-center justify-center rounded-full bg-slate-900 px-6 sm:px-7 text-sm sm:text-[15px] font-bold text-white shadow-[0_6px_16px_rgba(15,23,42,0.22)] hover:bg-black active:scale-[0.98] transition-all cursor-pointer"
               >
                 Apply
               </button>

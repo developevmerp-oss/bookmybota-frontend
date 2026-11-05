@@ -16,9 +16,15 @@ type Props = {
   /** Visual style for portal themes */
   variant?: "light" | "portal";
   className?: string;
+  /** Hide the "Change password" header & icon below lg (e.g. mobile/tablet customer view) */
+  hideHeaderBelowLg?: boolean;
 };
 
-export default function ChangePasswordForm({ variant = "light", className = "" }: Props) {
+export default function ChangePasswordForm({
+  variant = "light",
+  className = "",
+  hideHeaderBelowLg = false,
+}: Props) {
   const [changePassword, { isLoading }] = useChangePasswordMutation();
   const inputVariant = variant === "portal" ? "input-field" : "light";
 
@@ -62,15 +68,17 @@ export default function ChangePasswordForm({ variant = "light", className = "" }
 
   return (
     <form onSubmit={handleSubmit(onValid)} className={`space-y-4 ${className}`} noValidate>
-      <div className="flex items-center gap-2 mb-1">
-        <Lock size={18} className="text-rose-600" />
-        <h3 className={variant === "portal" ? "portal-heading font-semibold" : "font-semibold text-slate-800"}>
-          Change password
-        </h3>
+      <div className={hideHeaderBelowLg ? "hidden lg:block" : ""}>
+        <div className="flex items-center gap-2 mb-1">
+          <Lock size={18} className="text-rose-600" />
+          <h3 className={variant === "portal" ? "portal-heading font-semibold" : "font-semibold text-slate-800"}>
+            Change password
+          </h3>
+        </div>
+        <p className={variant === "portal" ? "text-sm portal-muted" : "text-sm text-slate-500"}>
+          Enter your current password, then choose a strong new password.
+        </p>
       </div>
-      <p className={variant === "portal" ? "text-sm portal-muted" : "text-sm text-slate-500"}>
-        Enter your current password, then choose a strong new password.
-      </p>
 
       <PasswordInput
         mode="login"

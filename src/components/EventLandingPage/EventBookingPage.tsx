@@ -16,6 +16,22 @@ export default function EventBookingPage({
   const router = useRouter();
   const searchParams = useSearchParams();
   const initialShowtimeId = searchParams.get("showtime") || "";
+  const stepParam = searchParams.get("step");
+  const initialStep = useMemo(() => {
+    if (!stepParam) return undefined;
+    const key = stepParam.trim().toLowerCase();
+    const fromSlug: Record<string, number> = {
+      venue: 1,
+      showtimes: 1,
+      tickets: 2,
+      mode: 3,
+      confirm: 4,
+      review: 4,
+    };
+    if (fromSlug[key]) return fromSlug[key];
+    const n = Number(key);
+    return Number.isFinite(n) && n >= 1 && n <= 4 ? n : undefined;
+  }, [stepParam]);
 
   const { data: event, isLoading, isError } = useGetPublicEventQuery(id);
 
@@ -63,6 +79,7 @@ export default function EventBookingPage({
         open
         variant="page"
         initialShowtimeId={initialShowtimeId || undefined}
+        initialStep={initialStep}
         onClose={() => router.push(`/events/${id}`)}
       />
     </div>

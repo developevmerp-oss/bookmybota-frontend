@@ -139,7 +139,30 @@ export default function MovieReviewsSection({
   const meta = data?.meta;
   const [createReview, { isLoading: submitting }] = useCreateMovieReviewMutation();
   const [reviewsModalOpen, setReviewsModalOpen] = useState(false);
-  const [expandedReviewId, setExpandedReviewId] = useState<string | null>(null);
+  const INITIAL_BATCH = 6;
+  const BATCH_INCREMENT = 6;
+  const [modalVisibleCount, setModalVisibleCount] = useState(INITIAL_BATCH);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+
+  useEffect(() => {
+    if (reviewsModalOpen) {
+      setModalVisibleCount(INITIAL_BATCH);
+      setIsLoadingMore(false);
+    }
+  }, [reviewsModalOpen]);
+
+  const handleModalScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const { scrollTop, clientHeight, scrollHeight } = e.currentTarget;
+    if (scrollTop + clientHeight >= scrollHeight - 30) {
+      if (modalVisibleCount < reviews.length && !isLoadingMore) {
+        setIsLoadingMore(true);
+        setTimeout(() => {
+          setModalVisibleCount((c) => Math.min(c + BATCH_INCREMENT, reviews.length));
+          setIsLoadingMore(false);
+        }, 250);
+      }
+    }
+  };
 
   useEffect(() => {
     if (!reviewsModalOpen) return;
@@ -214,7 +237,7 @@ export default function MovieReviewsSection({
   });
 
   return (
-    <section className="py-8 sm:py-10 bg-white border-t border-slate-100">
+    <section className="py-3.5 sm:py-5 lg:py-6 bg-white border-t border-slate-100">
       <div className="bmb-section-container">
         <div className="flex items-center justify-between gap-3 mb-1">
           <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-[#111111]">
@@ -232,7 +255,7 @@ export default function MovieReviewsSection({
             </button>
           ) : null}
         </div>
-        <p className="text-sm sm:text-base text-slate-500 mb-4 sm:mb-5">
+        <p className="text-sm sm:text-base text-slate-500 mb-3 sm:mb-4">
           {displayCount > 0
             ? `Summary of ${countLabel}${avgFromList > 0 ? ` · ${avgFromList.toFixed(1)}/5` : ""}.`
             : "Be the first to rate this movie after your show ends on BookMyBota."}
@@ -366,7 +389,6 @@ export default function MovieReviewsSection({
               aria-label="Close reviews"
               onClick={() => {
                 setReviewsModalOpen(false);
-                setExpandedReviewId(null);
               }}
             />
             <div className="relative w-full sm:max-w-lg max-h-[85vh] sm:max-h-[80vh] bg-white rounded-t-2xl sm:rounded-2xl shadow-xl flex flex-col overflow-hidden">
@@ -381,7 +403,6 @@ export default function MovieReviewsSection({
                   type="button"
                   onClick={() => {
                     setReviewsModalOpen(false);
-                    setExpandedReviewId(null);
                   }}
                   className="w-9 h-9 rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-100 cursor-pointer"
                   aria-label="Close"
@@ -391,65 +412,38 @@ export default function MovieReviewsSection({
               </div>
               <div
                 data-scroll-lock-container
-                className="overflow-y-auto flex-1 px-5 sm:px-6 py-2 pr-6 sm:pr-7 overscroll-contain"
+                onScroll={handleModalScroll}
+                className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 space-y-3 pb-[max(1.25rem,env(safe-area-inset-bottom))]"
               >
-                {reviews.map((review: MovieReview) => {
-                  const name = review.user_name || "Guest";
-                  const ratingNum = Number(review.rating) || 0;
-                  const text = (review.text || "").trim();
-                  const timeLabel = timeAgo(review.created_at);
-                  const expanded = expandedReviewId === String(review.id);
-                  const needsMore = text.length > 180;
-                  return (
-                    <article
-                      key={review.id}
-                      className="py-4 border-b border-slate-100 last:border-b-0"
-                    >
-                      <div className="flex items-start gap-2.5 pr-1">
-                        <span className="inline-flex size-9 items-center justify-center rounded-full bg-slate-100 text-sm font-bold text-slate-600 shrink-0">
-                          {name.slice(0, 1).toUpperCase()}
-                        </span>
-                        <div className="min-w-0 flex-1 flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <p className="text-sm font-semibold text-[#111111] truncate leading-snug">
-                              {name}
-                            </p>
-                            {timeLabel ? (
-                              <p className="mt-0.5 text-xs text-slate-400 leading-snug">
-                                {timeLabel}
-                              </p>
-                            ) : null}
-                          </div>
-                          <span className="shrink-0 inline-flex items-center gap-1 rounded-md bg-[#1B7A3D] px-2.5 py-1 text-xs font-bold text-white leading-none mt-0.5">
-                            <Star size={10} className="fill-white text-white" />
-                            {Math.round(ratingNum)}
-                          </span>
-                        </div>
-                      </div>
-                      {text ? (
-                        <div className="mt-2.5 relative pl-0">
-                          <p
-                            className={`text-sm text-[#111111] leading-relaxed whitespace-pre-wrap ${
-                              expanded || !needsMore ? "" : "line-clamp-4"
-                            }`}
-                          >
-                            {text}
-                          </p>
-                          {needsMore && !expanded ? (
-                            <button
-                              type="button"
-                              onClick={() => setExpandedReviewId(String(review.id))}
-                              className="absolute bottom-0 right-0 pl-8 bg-gradient-to-l from-white via-white to-transparent text-sm font-semibold cursor-pointer"
-                              style={{ color: BRAND }}
-                            >
-                              Read More
-                            </button>
-                          ) : null}
-                        </div>
-                      ) : null}
-                    </article>
-                  );
-                })}
+                {reviews.length === 0 ? (
+                  <p className="text-center text-sm text-slate-500 py-8">
+                    No reviews yet. Be the first to review!
+                  </p>
+                ) : (
+                  reviews.slice(0, modalVisibleCount).map((review: MovieReview, idx: number) => {
+                    const name = review.user_name || "Guest";
+                    const ratingNum = Number(review.rating) || 0;
+                    const booked = Boolean(review.booked_on_platform);
+                    const accent = REVIEW_ACCENTS[idx % REVIEW_ACCENTS.length] || BRAND;
+                    return (
+                      <CustomerReviewCard
+                        key={review.id || idx}
+                        name={name}
+                        rating={ratingNum}
+                        text={review.text}
+                        timeLabel={timeAgo(review.created_at)}
+                        bookedOnPlatform={booked}
+                        accentColor={accent}
+                        className="rounded-xl p-4 shadow-none"
+                      />
+                    );
+                  })
+                )}
+                {isLoadingMore && (
+                  <div className="flex items-center justify-center py-2.5 text-slate-500">
+                    <Loader2 className="size-5 animate-spin text-[#6900AA]" />
+                  </div>
+                )}
               </div>
             </div>
           </div>,

@@ -58,6 +58,7 @@ import {
   preferCityOrAll,
   prioritizeEvents,
 } from "@/components/LandingPage/homeUtils";
+import AdaptiveCardRow from "@/components/LandingPage/AdaptiveCardRow";
 import CitySectionEmptyNotice from "@/components/LandingPage/CitySectionEmptyNotice";
 import ListingPromoSlider from "@/components/LandingPage/ListingPromoSlider";
 import { RailPagerNav } from "@/components/LandingPage/RailChrome";
@@ -455,25 +456,27 @@ function weekendFriSunRange(now = new Date()) {
   return { from: iso(fri), to: iso(sun) };
 }
 
+const FILTER_UI = "#111111";
+
 function SelectionMark({ selected, multi }: { selected: boolean; multi?: boolean }) {
   if (multi) {
     return (
       <span
-        className={`w-5 h-5 rounded-[4px] border flex items-center justify-center shrink-0 ${
-          selected ? "border-[#6900AA] bg-[#6900AA]" : "border-slate-300 bg-white"
+        className={`w-[1.125rem] h-[1.125rem] rounded-[4px] border flex items-center justify-center shrink-0 ${
+          selected ? "border-slate-900 bg-slate-900" : "border-slate-300 bg-white"
         }`}
       >
-        {selected ? <Check size={13} strokeWidth={3} className="text-white" /> : null}
+        {selected ? <Check size={12} strokeWidth={3} className="text-white" /> : null}
       </span>
     );
   }
   return (
     <span
-      className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
-        selected ? "border-[#6900AA]" : "border-slate-300"
+      className={`w-[1.125rem] h-[1.125rem] rounded-full border-2 flex items-center justify-center shrink-0 ${
+        selected ? "border-slate-900" : "border-slate-300"
       }`}
     >
-      {selected ? <span className="w-2.5 h-2.5 rounded-full bg-[#6900AA]" /> : null}
+      {selected ? <span className="w-2 h-2 rounded-full bg-slate-900" /> : null}
     </span>
   );
 }
@@ -493,9 +496,13 @@ function FilterOptionRow({
     <button
       type="button"
       onClick={onSelect}
-      className="w-full flex items-center justify-between gap-3 py-3.5 text-left cursor-pointer"
+      className="w-full min-w-0 flex items-center justify-between gap-3 py-2.5 sm:py-3 text-left cursor-pointer rounded-lg hover:bg-slate-50/80 transition-colors px-1 -mx-1"
     >
-      <span className={`text-base ${selected ? "font-semibold text-slate-800" : "text-slate-600"}`}>
+      <span
+        className={`text-[15px] sm:text-base truncate ${
+          selected ? "font-semibold text-slate-900" : "font-medium text-slate-600"
+        }`}
+      >
         {label}
       </span>
       <SelectionMark selected={selected} multi={multi} />
@@ -748,6 +755,7 @@ export default function PublicEventsPage() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [searchPopupOpen, setSearchPopupOpen] = useState(false);
   const [searchDraft, setSearchDraft] = useState("");
+  const [suggestionTerm, setSuggestionTerm] = useState("");
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [heroSlideIndex, setHeroSlideIndex] = useState(0);
@@ -847,6 +855,7 @@ export default function PublicEventsPage() {
   const commitEventSearch = useCallback(
     (raw: string) => {
       const next = raw.trim();
+      setSearchDraft(next);
       setSearchInput(next);
       setSearch(next);
       if (next) {
@@ -859,6 +868,16 @@ export default function PublicEventsPage() {
     },
     [scrollToEventsViewport]
   );
+
+  const typedEventSearch = searchDraft.trim();
+  useEffect(() => {
+    if (!searchPopupOpen) {
+      setSuggestionTerm("");
+      return;
+    }
+    const handle = window.setTimeout(() => setSuggestionTerm(typedEventSearch), 200);
+    return () => window.clearTimeout(handle);
+  }, [searchPopupOpen, typedEventSearch]);
 
   useEffect(() => {
     if (!searchPopupOpen) return;
@@ -1187,6 +1206,24 @@ export default function PublicEventsPage() {
   const { data: eventsData, isLoading, isFetching, isUninitialized } =
     useGetPublicEventsQuery(queryArg);
   const events = eventsData ?? EMPTY_EVENTS;
+
+  const suggestionQueryArg = useMemo(
+    () => ({
+      q: suggestionTerm,
+      ...(city ? { city } : {}),
+      ...(selectedSlugs.length ? { category: selectedSlugs.join(",") } : {}),
+    }),
+    [suggestionTerm, city, selectedSlugs]
+  );
+  const { data: suggestionEventsData, isFetching: suggestionsLoading } =
+    useGetPublicEventsQuery(suggestionQueryArg, {
+      skip: !searchPopupOpen || suggestionTerm.length < 1,
+    });
+  const suggestionEvents =
+    suggestionTerm.length > 0 ? (suggestionEventsData ?? EMPTY_EVENTS).slice(0, 6) : EMPTY_EVENTS;
+  const suggestionsPending =
+    typedEventSearch.length > 0 &&
+    (typedEventSearch !== suggestionTerm || suggestionsLoading);
 
   const unscopedQueryArg = useMemo(() => {
     const { city: _city, ...rest } = queryArg;
@@ -2090,8 +2127,8 @@ export default function PublicEventsPage() {
 
   const districtFilterModalBody = (
     <div className="flex flex-col sm:flex-row min-h-0 flex-1 overflow-hidden">
-      <div className="sm:w-[34%] bg-slate-100 border-b sm:border-b-0 sm:border-r border-slate-200 overflow-x-auto sm:overflow-y-auto shrink-0 sm:h-full">
-        <div className="flex sm:flex-col">
+      <div className="sm:w-[32%] bg-[#F4F5F7] border-b sm:border-b-0 sm:border-r border-slate-200 overflow-x-auto sm:overflow-y-auto shrink-0 sm:h-full scrollbar-hide">
+        <div className="flex sm:flex-col sm:py-1">
           {FILTER_MODAL_TABS.map((tab) => {
             const active = filterModalTab === tab.id;
             const sortHint =
@@ -2103,18 +2140,29 @@ export default function PublicEventsPage() {
                 key={tab.id}
                 type="button"
                 onClick={() => setFilterModalTab(tab.id)}
-                className={`relative shrink-0 text-left px-4 py-3.5 text-base whitespace-nowrap transition-colors cursor-pointer ${
+                className={`relative shrink-0 text-left px-4 sm:px-5 py-3 sm:py-3.5 text-[15px] sm:text-base whitespace-nowrap transition-colors cursor-pointer ${
                   active
                     ? "font-semibold text-slate-900 bg-white"
-                    : "font-medium text-slate-600 bg-transparent hover:bg-slate-50/80"
+                    : "font-medium text-slate-600 bg-transparent hover:bg-white/60"
                 }`}
               >
                 {active ? (
-                  <span className="absolute left-0 top-0 bottom-0 w-[3px] hidden sm:block bg-[#6900AA]" />
+                  <span
+                    className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full hidden sm:block"
+                    style={{ backgroundColor: FILTER_UI }}
+                  />
+                ) : null}
+                {active ? (
+                  <span
+                    className="absolute left-3 right-3 bottom-0 h-[2px] rounded-full sm:hidden"
+                    style={{ backgroundColor: FILTER_UI }}
+                  />
                 ) : null}
                 <span className="block">{tab.label}</span>
                 {sortHint ? (
-                  <span className="block text-sm font-medium mt-0.5 text-[#6900AA]">{sortHint}</span>
+                  <span className="block text-xs sm:text-sm font-medium mt-0.5 text-slate-700">
+                    {sortHint}
+                  </span>
                 ) : null}
               </button>
             );
@@ -2122,50 +2170,54 @@ export default function PublicEventsPage() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-5 py-4 min-h-0 h-full bg-white">
+      <div className="flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-5 sm:px-6 py-4 sm:py-5 min-h-0 h-full bg-white">
         {filterModalTab === "sort" ? (
           <div>
-            <p className="text-lg font-bold text-slate-900 mb-2">Sort by</p>
-            {SORT_OPTIONS.map((opt) => (
-              <FilterOptionRow
-                key={opt.id}
-                label={opt.label}
-                selected={draftSort === opt.id}
-                onSelect={() => setDraftSort(opt.id)}
-              />
-            ))}
+            <p className="text-base sm:text-lg font-bold text-slate-900 mb-3">Sort by</p>
+            <div className="divide-y divide-slate-100">
+              {SORT_OPTIONS.map((opt) => (
+                <FilterOptionRow
+                  key={opt.id}
+                  label={opt.label}
+                  selected={draftSort === opt.id}
+                  onSelect={() => setDraftSort(opt.id)}
+                />
+              ))}
+            </div>
           </div>
         ) : null}
 
         {filterModalTab === "date" ? (
           <div>
-            <p className="text-lg font-bold text-slate-900 mb-2">Date</p>
-            {datePresets.map((d) => (
-              <FilterOptionRow
-                key={d.id}
-                label={d.label}
-                selected={draftDatePreset === d.id}
-                onSelect={() => {
-                  setDraftDatePreset((p) => (p === d.id ? "" : d.id));
-                  setDraftDateFrom("");
-                  setDraftDateTo("");
-                  setDraftUseDateRange(false);
-                }}
-              />
-            ))}
+            <p className="text-base sm:text-lg font-bold text-slate-900 mb-3">Date</p>
+            <div className="divide-y divide-slate-100">
+              {datePresets.map((d) => (
+                <FilterOptionRow
+                  key={d.id}
+                  label={d.label}
+                  selected={draftDatePreset === d.id}
+                  onSelect={() => {
+                    setDraftDatePreset((p) => (p === d.id ? "" : d.id));
+                    setDraftDateFrom("");
+                    setDraftDateTo("");
+                    setDraftUseDateRange(false);
+                  }}
+                />
+              ))}
+            </div>
           </div>
         ) : null}
 
         {filterModalTab === "genre" ? (
           <div>
-            <p className="text-lg font-bold text-slate-900 mb-2">
+            <p className="text-base sm:text-lg font-bold text-slate-900 mb-3">
               {isCategoryBrowse ? "Genre" : "Category"}
             </p>
             {isCategoryBrowse ? (
               categoryMastersLoading ? (
                 <div className="flex flex-wrap gap-2 py-2" aria-busy="true" aria-label="Loading genres">{Array.from({ length: 6 }).map((_, i) => <span key={i} className="h-8 w-20 rounded-full bg-slate-100 animate-pulse" />)}</div>
               ) : categoryGenreOptions.length ? (
-                <div className="grid grid-cols-2 gap-x-4">
+                <div className="grid grid-cols-2 gap-x-3 sm:gap-x-4">
                   {categoryGenreOptions.map((g) => (
                     <FilterOptionRow
                       key={g.id}
@@ -2180,7 +2232,7 @@ export default function PublicEventsPage() {
                 <p className="py-2 text-sm text-slate-500">No genres configured for this category.</p>
               )
             ) : (
-              <div className="grid grid-cols-2 gap-x-4">
+              <div className="grid grid-cols-2 gap-x-3 sm:gap-x-4">
                 {categoryFilters.map((cat) => (
                   <FilterOptionRow
                     key={cat.slug}
@@ -2199,8 +2251,8 @@ export default function PublicEventsPage() {
 
         {filterModalTab === "language" ? (
           <div>
-            <p className="text-lg font-bold text-slate-900 mb-2">Language</p>
-            <div className="grid grid-cols-2 gap-x-4">
+            <p className="text-base sm:text-lg font-bold text-slate-900 mb-3">Language</p>
+            <div className="grid grid-cols-2 gap-x-3 sm:gap-x-4">
               {languageOptions.map((lang) => (
                 <FilterOptionRow
                   key={lang}
@@ -2216,16 +2268,18 @@ export default function PublicEventsPage() {
 
         {filterModalTab === "pricing" ? (
           <div>
-            <p className="text-lg font-bold text-slate-900 mb-2">Pricing</p>
-            {priceBands.map((band) => (
-              <FilterOptionRow
-                key={band.id}
-                label={band.label}
-                selected={draftPriceBands.includes(band.id)}
-                multi
-                onSelect={() => toggleIn(draftPriceBands, band.id, setDraftPriceBands)}
-              />
-            ))}
+            <p className="text-base sm:text-lg font-bold text-slate-900 mb-3">Pricing</p>
+            <div className="divide-y divide-slate-100">
+              {priceBands.map((band) => (
+                <FilterOptionRow
+                  key={band.id}
+                  label={band.label}
+                  selected={draftPriceBands.includes(band.id)}
+                  multi
+                  onSelect={() => toggleIn(draftPriceBands, band.id, setDraftPriceBands)}
+                />
+              ))}
+            </div>
           </div>
         ) : null}
       </div>
@@ -2347,8 +2401,9 @@ export default function PublicEventsPage() {
     <section
       ref={allEventsRef}
       id="all-events"
-      className={`${isCategoryBrowse ? "pt-4 sm:pt-5" : "pt-5 sm:pt-6"} ${
-        isAllEventsExpanded ? "pb-8 sm:pb-10" : "pb-2 sm:pb-3"
+      className={`pt-6 sm:pt-7 lg:pt-8 ${
+        /* Category pages end here (no Artists below) — keep a tight footer gap */
+        isCategoryBrowse ? "pb-4 sm:pb-5" : isAllEventsExpanded ? "pb-4 sm:pb-5" : "pb-0"
       }`}
       style={{ scrollMarginTop: headerOffset + 8 }}
     >
@@ -2482,9 +2537,13 @@ export default function PublicEventsPage() {
         </div>
       </section>
 
-      <div className={`${CONTAINER} pt-3 sm:pt-3.5`}>
+      <div className={`${CONTAINER} pt-3 sm:pt-3.5 ${isCategoryBrowse ? "pb-0" : ""}`}>
         {catalogPending ? (
-          <EventListShimmer />
+          isAllEventsExpanded ? (
+            <EventListShimmer />
+          ) : (
+            <CustomerRailShimmer count={4} variant="poster" />
+          )
         ) : visibleEvents.length === 0 ? (
           hasNonCityFilters || Boolean(search.trim()) ? (
             <ListingNoResultsState
@@ -2509,45 +2568,43 @@ export default function PublicEventsPage() {
               ) : null}
               {!isAllEventsExpanded ? (
                 <>
-                  <div
-                    ref={allEventsRailRef}
-                    className="flex items-stretch gap-4 sm:gap-5 overflow-x-auto scrollbar-none snap-x snap-mandatory pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                  <AdaptiveCardRow
+                    minVisible={4}
+                    scrollerRef={allEventsRailRef}
+                    className="adaptive-card-row--four"
                   >
                     {emptyShowcaseCards.map((event) => (
-                      <div
+                      <ShowcaseEventPosterCard
                         key={event.id}
-                        className="shrink-0 w-[min(78vw,19rem)] sm:w-[calc((100%-1.25rem)/2)] md:w-[calc((100%-2.5rem)/3)] lg:w-[calc((100%-3.75rem)/4)] snap-start flex flex-col"
-                      >
-                        <ShowcaseEventPosterCard
-                          title={event.title}
-                          image={event.image}
-                          showDate={event.showDate}
-                          place={event.place}
-                          eventType={event.eventType}
-                          href={event.href}
-                          fullWidth
-                        />
-                      </div>
+                        title={event.title}
+                        image={event.image}
+                        showDate={event.showDate}
+                        place={event.place}
+                        eventType={event.eventType}
+                        href={event.href}
+                      />
                     ))}
+                  </AdaptiveCardRow>
+                  <div className="hidden lg:block">
+                    <RailPagerNav
+                      canPrev={allEventsScrollEdges.left}
+                      canNext={allEventsScrollEdges.right}
+                      pageCount={allEventsScrollEdges.pageCount}
+                      activePage={allEventsScrollEdges.activePage}
+                      onPrev={() => {
+                        const el = allEventsRailRef.current;
+                        if (el) scrollRailBy(el, -1);
+                      }}
+                      onNext={() => {
+                        const el = allEventsRailRef.current;
+                        if (el) scrollRailBy(el, 1);
+                      }}
+                      label="events"
+                    />
                   </div>
-                  <RailPagerNav
-                    canPrev={allEventsScrollEdges.left}
-                    canNext={allEventsScrollEdges.right}
-                    pageCount={allEventsScrollEdges.pageCount}
-                    activePage={allEventsScrollEdges.activePage}
-                    onPrev={() => {
-                      const el = allEventsRailRef.current;
-                      if (el) scrollRailBy(el, -1);
-                    }}
-                    onNext={() => {
-                      const el = allEventsRailRef.current;
-                      if (el) scrollRailBy(el, 1);
-                    }}
-                    label="events"
-                  />
                 </>
               ) : (
-                <div className="mx-auto grid w-full grid-cols-1 gap-5 md:max-w-none md:grid-cols-2 md:gap-4 lg:grid-cols-4 lg:gap-5">
+                <div className="mx-auto grid w-full grid-cols-2 gap-4 lg:grid-cols-4 lg:gap-6">
                   {emptyShowcaseCards.map((event) => (
                     <ShowcaseEventPosterCard
                       key={event.id}
@@ -2564,45 +2621,44 @@ export default function PublicEventsPage() {
               )}
             </div>
           ) : (
-            <EventListShimmer />
+            <CustomerRailShimmer count={4} variant="poster" />
           )
         ) : !isAllEventsExpanded ? (
           <>
-            <div
-              ref={allEventsRailRef}
-              className="flex items-stretch gap-4 sm:gap-5 overflow-x-auto scrollbar-none snap-x snap-mandatory pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            <AdaptiveCardRow
+              minVisible={4}
+              scrollerRef={allEventsRailRef}
+              className="adaptive-card-row--four"
             >
               {railEvents.map((event) => (
-                <div
+                <DistrictEventCard
                   key={event.id}
-                  className="shrink-0 w-[min(78vw,19rem)] sm:w-[calc((100%-1.25rem)/2)] md:w-[calc((100%-2.5rem)/3)] lg:w-[calc((100%-3.75rem)/4)] snap-start flex flex-col"
-                >
-                  <DistrictEventCard
-                    event={event}
-                    cityLabel={city || undefined}
-                    promoted={isPromotedHere(event)}
-                  />
-                </div>
+                  event={event}
+                  cityLabel={city || undefined}
+                  promoted={isPromotedHere(event)}
+                />
               ))}
+            </AdaptiveCardRow>
+            <div className="hidden lg:block">
+              <RailPagerNav
+                canPrev={allEventsScrollEdges.left}
+                canNext={allEventsScrollEdges.right}
+                pageCount={allEventsScrollEdges.pageCount}
+                activePage={allEventsScrollEdges.activePage}
+                onPrev={() => {
+                  const el = allEventsRailRef.current;
+                  if (el) scrollRailBy(el, -1);
+                }}
+                onNext={() => {
+                  const el = allEventsRailRef.current;
+                  if (el) scrollRailBy(el, 1);
+                }}
+                label="events"
+              />
             </div>
-            <RailPagerNav
-              canPrev={allEventsScrollEdges.left}
-              canNext={allEventsScrollEdges.right}
-              pageCount={allEventsScrollEdges.pageCount}
-              activePage={allEventsScrollEdges.activePage}
-              onPrev={() => {
-                const el = allEventsRailRef.current;
-                if (el) scrollRailBy(el, -1);
-              }}
-              onNext={() => {
-                const el = allEventsRailRef.current;
-                if (el) scrollRailBy(el, 1);
-              }}
-              label="events"
-            />
           </>
         ) : (
-          <div className="grid w-full grid-cols-1 gap-5 md:grid-cols-2 md:gap-4 lg:grid-cols-4 lg:gap-5 items-stretch">
+          <div className="grid w-full grid-cols-2 gap-4 lg:grid-cols-4 lg:gap-6 items-stretch">
             {visibleEvents.map((event) => (
               <DistrictEventCard
                 key={event.id}
@@ -2645,7 +2701,7 @@ export default function PublicEventsPage() {
   );
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="bg-white">
       {/* Top promo — same marketing + city logic / banner UI as dining & landing */}
       <ListingPromoSlider
         category={listingPromoCategory}
@@ -2844,9 +2900,9 @@ export default function PublicEventsPage() {
         <>
           {/* 2) Explore Events — option 2 horizontal pastel cards */}
           {catalogPending ? (
-            <section className="pt-8 sm:pt-10 pb-3 bg-white">
+            <section className="pt-6 sm:pt-7 lg:pt-8 bg-white">
               <div className={CONTAINER}>
-                <div className="min-w-0 pb-4">
+                <div className="min-w-0 mb-3 sm:mb-3.5">
                   <h2 className="text-lg sm:text-xl md:text-2xl font-semibold text-slate-800">
                     Explore Events
                   </h2>
@@ -3067,9 +3123,9 @@ export default function PublicEventsPage() {
 
       {!isCategoryBrowse ? (
         /* 4) Artists */
-        <section className="pt-4 sm:pt-5 pb-10 sm:pb-14 bg-white border-t border-slate-100">
+        <section className="pt-6 sm:pt-7 lg:pt-8 pb-5 sm:pb-6 bg-white border-t border-slate-100">
           <div className={CONTAINER}>
-            <div className="flex items-center justify-between gap-3 mb-3 sm:mb-4">
+            <div className="flex items-center justify-between gap-3 mb-3 sm:mb-3.5">
               <h2 className="text-lg sm:text-xl md:text-2xl font-semibold text-slate-800">
                 {city ? `Artists in ${headingCity}` : "Artists"}
               </h2>
@@ -3115,38 +3171,43 @@ export default function PublicEventsPage() {
       ) : null}
 
       {filtersOpen ? (
-        <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center">
+        <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-0 sm:p-4">
           <button
             type="button"
             aria-label="Close filters"
-            className="absolute inset-0 bg-black/40 cursor-pointer"
+            className="absolute inset-0 bg-black/45 backdrop-blur-[1px] cursor-pointer"
             onClick={closeFiltersModal}
           />
-          <div className="relative w-full sm:w-[min(92vw,720px)] h-[min(88vh,540px)] bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-              <h3 className="text-xl font-bold text-slate-900">Filter</h3>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Filter"
+            className="relative w-full sm:w-[min(92vw,720px)] h-[min(90vh,560px)] sm:h-[min(88vh,540px)] bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+          >
+            <div className="flex items-center justify-between gap-3 px-5 sm:px-6 py-3.5 sm:py-4 border-b border-slate-200 shrink-0 bg-white">
+              <h3 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">Filter</h3>
               <button
                 type="button"
                 onClick={closeFiltersModal}
-                className="p-1 rounded-full hover:bg-slate-100 cursor-pointer"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors cursor-pointer"
                 aria-label="Close"
               >
-                <X size={20} />
+                <X size={18} strokeWidth={2.25} />
               </button>
             </div>
             {districtFilterModalBody}
-            <div className="flex items-center justify-end gap-6 px-5 py-3.5 border-t border-slate-100 shrink-0">
+            <div className="flex items-center justify-end gap-2.5 sm:gap-3 px-5 sm:px-6 pt-3.5 pb-[max(1rem,env(safe-area-inset-bottom))] sm:py-4 border-t border-slate-200 shrink-0 bg-white">
               <button
                 type="button"
                 onClick={clearModalFiltersAndApply}
-                className="text-base font-bold text-[#6900AA] cursor-pointer"
+                className="inline-flex min-h-11 items-center justify-center rounded-full border border-slate-300 bg-white px-5 sm:px-6 text-sm sm:text-[15px] font-bold text-slate-900 hover:bg-slate-50 transition-colors cursor-pointer"
               >
                 Reset
               </button>
               <button
                 type="button"
                 onClick={applyFiltersAndClose}
-                className="text-base font-bold text-[#6900AA] cursor-pointer"
+                className="inline-flex min-h-11 items-center justify-center rounded-full bg-slate-900 px-6 sm:px-7 text-sm sm:text-[15px] font-bold text-white shadow-[0_6px_16px_rgba(15,23,42,0.22)] hover:bg-black active:scale-[0.98] transition-all cursor-pointer"
               >
                 Apply
               </button>
@@ -3175,7 +3236,9 @@ export default function PublicEventsPage() {
                 <Search size={20} strokeWidth={1.75} className="text-slate-500 shrink-0" />
                 <input
                   ref={searchInputRef}
-                  type="text"
+                  type="search"
+                  enterKeyHint="search"
+                  autoComplete="off"
                   value={searchDraft}
                   onChange={(e) => setSearchDraft(e.target.value)}
                   onKeyDown={(e) => {
@@ -3203,44 +3266,127 @@ export default function PublicEventsPage() {
                 ) : null}
               </div>
 
-              <div className="dining-search-popup__results border-t border-slate-100">
+              <div className="dining-search-popup__results border-t border-slate-100 max-h-[min(52vh,420px)] overflow-y-auto">
                 <div className="px-5 sm:px-6 pt-4 pb-5">
-                  <p className="text-[15px] font-bold text-slate-900 mb-1">Recent Searches</p>
-                  {recentSearches.length === 0 ? (
-                    <p className="py-3 text-sm text-slate-400">No recent searches yet</p>
+                  {typedEventSearch ? (
+                    <>
+                      <p className="text-[15px] font-bold text-slate-900 mb-1">Events</p>
+                      {suggestionsPending && suggestionEvents.length === 0 ? (
+                        <ul className="divide-y divide-slate-50" aria-busy="true" aria-label="Searching events">
+                          {Array.from({ length: 3 }).map((_, i) => (
+                            <li key={i} className="flex items-center gap-3 py-3">
+                              <span className="h-11 w-11 shrink-0 rounded-lg bg-slate-100 animate-pulse" />
+                              <span className="min-w-0 flex-1 space-y-2">
+                                <span className="block h-3.5 w-2/3 rounded bg-slate-100 animate-pulse" />
+                                <span className="block h-3 w-1/2 rounded bg-slate-100 animate-pulse" />
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : suggestionEvents.length === 0 ? (
+                        <p className="py-3 text-sm text-slate-400">No events found</p>
+                      ) : (
+                        <ul className="divide-y divide-slate-50">
+                          {suggestionEvents.map((event) => {
+                            const cover = resolveMediaUrl(
+                              event.poster_vertical_url || event.poster_horizontal_url || ""
+                            );
+                            const detail = [event.category_name, event.city_name || event.venue_name]
+                              .filter(Boolean)
+                              .join(" · ");
+                            return (
+                              <li key={event.id}>
+                                <Link
+                                  href={`/events/${event.id}`}
+                                  onClick={() => {
+                                    const term = typedEventSearch;
+                                    if (term) {
+                                      const updated = [
+                                        term,
+                                        ...readEventRecentSearches().filter(
+                                          (t) => t.toLowerCase() !== term.toLowerCase()
+                                        ),
+                                      ];
+                                      writeEventRecentSearches(updated);
+                                    }
+                                    setSearchPopupOpen(false);
+                                  }}
+                                  className="flex w-full items-center gap-3 py-3 text-left cursor-pointer group"
+                                >
+                                  {cover ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img
+                                      src={cover}
+                                      alt=""
+                                      className="h-11 w-11 shrink-0 rounded-lg object-cover bg-slate-100"
+                                    />
+                                  ) : (
+                                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-400">
+                                      <Search size={16} />
+                                    </span>
+                                  )}
+                                  <span className="min-w-0">
+                                    <span className="block truncate text-[15px] font-semibold text-slate-800 group-hover:text-[#6900AA]">
+                                      {event.name}
+                                    </span>
+                                    {detail ? (
+                                      <span className="block truncate text-sm text-slate-500">{detail}</span>
+                                    ) : null}
+                                  </span>
+                                </Link>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => commitEventSearch(typedEventSearch)}
+                        className="mt-2 w-full rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-[#6900AA] hover:bg-[#faf5ff] cursor-pointer"
+                      >
+                        See all results for “{typedEventSearch}”
+                      </button>
+                    </>
                   ) : (
-                    <ul className="divide-y divide-slate-50">
-                      {recentSearches.map((term) => (
-                        <li key={term} className="flex items-center gap-3 py-3">
-                          <button
-                            type="button"
-                            onClick={() => commitEventSearch(term)}
-                            className="flex min-w-0 flex-1 items-center gap-3 text-left cursor-pointer group"
-                          >
-                            <Search
-                              size={16}
-                              strokeWidth={1.75}
-                              className="text-slate-400 shrink-0 group-hover:text-slate-500"
-                            />
-                            <span className="truncate text-[15px] text-slate-500 group-hover:text-slate-700">
-                              {term}
-                            </span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const updated = recentSearches.filter((t) => t !== term);
-                              writeEventRecentSearches(updated);
-                              setRecentSearches(updated);
-                            }}
-                            className="shrink-0 p-1 rounded-full text-slate-300 hover:text-slate-500 hover:bg-slate-100 cursor-pointer"
-                            aria-label={`Remove ${term}`}
-                          >
-                            <X size={14} />
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
+                    <>
+                      <p className="text-[15px] font-bold text-slate-900 mb-1">Recent Searches</p>
+                      {recentSearches.length === 0 ? (
+                        <p className="py-3 text-sm text-slate-400">No recent searches yet</p>
+                      ) : (
+                        <ul className="divide-y divide-slate-50">
+                          {recentSearches.map((term) => (
+                            <li key={term} className="flex items-center gap-3 py-3">
+                              <button
+                                type="button"
+                                onClick={() => commitEventSearch(term)}
+                                className="flex min-w-0 flex-1 items-center gap-3 text-left cursor-pointer group"
+                              >
+                                <Search
+                                  size={16}
+                                  strokeWidth={1.75}
+                                  className="text-slate-400 shrink-0 group-hover:text-slate-500"
+                                />
+                                <span className="truncate text-[15px] text-slate-500 group-hover:text-slate-700">
+                                  {term}
+                                </span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const updated = recentSearches.filter((t) => t !== term);
+                                  writeEventRecentSearches(updated);
+                                  setRecentSearches(updated);
+                                }}
+                                className="shrink-0 p-1 rounded-full text-slate-300 hover:text-slate-500 hover:bg-slate-100 cursor-pointer"
+                                aria-label={`Remove ${term}`}
+                              >
+                                <X size={14} />
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </>
                   )}
                 </div>
               </div>

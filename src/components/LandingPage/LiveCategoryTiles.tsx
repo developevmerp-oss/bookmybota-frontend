@@ -49,9 +49,9 @@ export default function LiveCategoryTiles({ city }: { city: string }) {
   );
 
   return (
-    <section className="relative z-10 bg-white py-5 sm:py-6 lg:pt-5">
+    <section className="relative z-10 bg-white pt-6 sm:pt-7 lg:pt-8">
       <div className="bmb-section-container">
-        <h2 className="text-xl sm:text-2xl font-bold text-slate-800 mb-3 sm:mb-4 lg:mb-3">
+        <h2 className="text-xl sm:text-2xl font-bold text-slate-800 mb-2 sm:mb-3">
           The Best of Live Events
         </h2>
 

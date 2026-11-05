@@ -628,24 +628,27 @@ export async function buildEventTicketPdf(
   const totalTickets =
     booking.items?.reduce((acc, it) => acc + Number(it.qty || 0), 0) || 1;
 
-  // Group items by ticket type
-  const map = new Map<string, { ticket_type: string; qty: number; totalPrice: number }>();
+  // Group same ticket type + unit price → "General Admission × 2"
+  const map = new Map<string, { ticket_type: string; qty: number; unit: number; totalPrice: number }>();
   for (const item of booking.items || []) {
-    const type = item.ticket_type || "Ticket";
+    const type = String(item.ticket_type || "Ticket").trim() || "Ticket";
     const qty = Number(item.qty || 0);
-    const total = Number(item.unit_price || 0) * qty;
-    const existing = map.get(type);
+    const unit = Number(item.unit_price || 0);
+    if (qty <= 0) continue;
+    const key = `${type.toLowerCase()}|${unit.toFixed(2)}`;
+    const existing = map.get(key);
     if (existing) {
       existing.qty += qty;
-      existing.totalPrice += total;
+      existing.totalPrice += unit * qty;
     } else {
-      map.set(type, { ticket_type: type, qty, totalPrice: total });
+      map.set(key, { ticket_type: type, qty, unit, totalPrice: unit * qty });
     }
   }
 
   const amountRows: TicketCardPdfAmountRow[] = [
     ...Array.from(map.values()).map((item) => ({
       label: `${item.ticket_type} × ${item.qty}`,
+      labelDetail: `${formatMoney(item.unit)} each`,
       value: formatMoney(item.totalPrice),
     })),
   ];
@@ -697,6 +700,10 @@ export async function buildEventTicketPdf(
     showQr: true,
     cancellationNote: ticketModeConfirmationMessage(mode),
     totalFormatted: formatMoney(booking.grand_total),
+    totalNote:
+      Number(booking.convenience_fee_total) > 0
+        ? `Includes ${formatMoney(booking.convenience_fee_total)} convenience fee & VAT`
+        : undefined,
     amountRows,
   });
 }

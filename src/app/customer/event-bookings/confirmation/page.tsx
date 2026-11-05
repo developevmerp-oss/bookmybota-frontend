@@ -128,17 +128,22 @@ function ConfirmationContent() {
 
   const groupedItems = useMemo(() => {
     if (!booking?.items?.length) return [];
-    const map = new Map<string, { ticket_type: string; qty: number; totalPrice: number }>();
+    const map = new Map<
+      string,
+      { ticket_type: string; qty: number; unit: number; totalPrice: number }
+    >();
     for (const item of booking.items) {
-      const type = item.ticket_type || "Ticket";
+      const type = String(item.ticket_type || "Ticket").trim() || "Ticket";
       const qty = Number(item.qty || 0);
-      const total = Number(item.unit_price || 0) * qty;
-      const existing = map.get(type);
+      const unit = Number(item.unit_price || 0);
+      if (qty <= 0) continue;
+      const key = `${type.toLowerCase()}|${unit.toFixed(2)}`;
+      const existing = map.get(key);
       if (existing) {
         existing.qty += qty;
-        existing.totalPrice += total;
+        existing.totalPrice += unit * qty;
       } else {
-        map.set(type, { ticket_type: type, qty, totalPrice: total });
+        map.set(key, { ticket_type: type, qty, unit, totalPrice: unit * qty });
       }
     }
     return Array.from(map.values());
@@ -264,20 +269,22 @@ function ConfirmationContent() {
       ? `${booking.ticket_qty} ticket${booking.ticket_qty === 1 ? "" : "s"}`
       : "Ticket";
 
+  const feeTotal = Number(booking.convenience_fee_total) || 0;
+  const discountTotal = Number(booking.discount_amount) || 0;
   const amountRows = [
     ...groupedItems.map((item) => ({
       label: `${item.ticket_type} × ${item.qty}`,
+      labelDetail: `${formatMoney(item.unit)} each`,
       value: formatMoney(item.totalPrice),
     })),
-    {
-      label: "Convenience fee",
-      value: formatMoney(booking.convenience_fee_total),
-    },
-    ...(Number(booking.discount_amount) > 0
+    ...(feeTotal > 0
+      ? [{ label: "Convenience fee", value: formatMoney(feeTotal) }]
+      : []),
+    ...(discountTotal > 0
       ? [
           {
             label: "Discount",
-            value: `− ${formatMoney(booking.discount_amount)}`,
+            value: `− ${formatMoney(discountTotal)}`,
             strong: true as const,
           },
         ]
@@ -309,6 +316,11 @@ function ConfirmationContent() {
         bookingCode={displayCode}
         qrValue={eventBookingQrValue(booking)}
         totalFormatted={formatMoney(booking.grand_total)}
+        totalNote={
+          feeTotal > 0
+            ? `Includes ${formatMoney(feeTotal)} convenience fee & VAT`
+            : undefined
+        }
         amountRows={amountRows}
         mTicketLabel="E-Ticket"
         cancellationNote={ticketModeConfirmationMessage(ticketMode)}

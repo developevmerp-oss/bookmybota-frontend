@@ -1,22 +1,10 @@
 "use client";
-import { useState, useEffect, Suspense, useMemo } from "react";
+import { useState, useEffect, Suspense, useMemo, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import {
-  EqualApproximately,
-  MapPin,
-  Loader2,
-  X,
-  UtensilsCrossed,
-  Tag,
-  ArrowRight,
-} from "lucide-react";
-import Link from "next/link";
+import { Loader2, X } from "lucide-react";
 import { useGetBusinessesPagedQuery, useGetCollectionsQuery, useGetMoodsQuery, Business } from "@/services/api";
 import DiningFiltersBar from "@/components/DinningLandingPage/DiningFiltersBar";
-import DiningWishlistButton from "@/components/DinningLandingPage/DiningWishlistButton";
-import DiningDistanceLabel from "@/components/DinningLandingPage/DiningDistanceLabel";
-import { formatMoney } from "@/lib/currencyFormat";
-import { listingOfferLabel } from "@/lib/diningOffers";
+import DiningRestaurantCardOption2 from "@/components/DinningLandingPage/DiningRestaurantCardOption2";
 import {
   DEFAULT_DINING_FILTERS,
   DiningFilterState,
@@ -27,162 +15,10 @@ import {
 } from "@/lib/diningFilters";
 import { stableSearchParamsString } from "@/lib/filterUrlSync";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
-import { restaurantHref } from "@/lib/businessPublicPath";
-import { DiningSearchShimmer } from "@/components/Shared/Shimmer";
+import { DiningHomeRestaurantShimmer } from "@/components/Shared/Shimmer";
 import ListingNoResultsState from "@/components/Shared/ListingNoResultsState";
 
 const DINING_LIST_LIMIT = 12;
-
-// ─── Sub-components ───────────────────────────────────────────────────────────
-
-function RestaurantCard({ restaurant }: { restaurant: Business }) {
-  const getFallbackImageForType = (type?: string) => {
-    const lower = type?.toLowerCase() || "";
-    if (lower.includes("cafe")) return "https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=500&q=80";
-    if (lower.includes("bar") || lower.includes("pub")) return "https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?w=500&q=80";
-    return "https://images.unsplash.com/photo-1541518763669-27fef04b14ea?w=500&q=80";
-  };
-
-  const imageSrc =
-    resolveMediaUrl(restaurant.cover_image_url) || getFallbackImageForType(restaurant.type_name);
-  const reviewsCount = Number(restaurant.reviews_count) || 0;
-  const parsedRating = Number(restaurant.rating);
-  const hasRating =
-    reviewsCount > 0 && Number.isFinite(parsedRating) && parsedRating > 0;
-  const ratingLabel = hasRating ? `${parsedRating.toFixed(1)}+` : "New";
-  const cuisine =
-    restaurant.cuisine ||
-    restaurant.type_name ||
-    "Italian, Chinese, Continental";
-  const cuisineLine = cuisine
-    .split(",")
-    .map((c) => c.trim())
-    .filter(Boolean)
-    .slice(0, 2)
-    .join(" • ");
-
-  const getLocality = (addr: string) => {
-    const parts = addr.split(",");
-    if (parts.length >= 2) {
-      return `${parts[0].trim()}, ${parts[1].trim()}`;
-    }
-    return addr;
-  };
-
-  const idHash =
-    typeof restaurant.id === "number"
-      ? restaurant.id
-      : restaurant.id
-        ? restaurant.id.toString().split("").reduce((acc, char) => acc + char.charCodeAt(0), 0)
-        : 0;
-
-  const priceForTwo = restaurant.average_cost
-    ? `${formatMoney(restaurant.average_cost, { compact: true })} for two`
-    : (() => {
-        const bases = [1200, 1500, 2000, 2400, 1800];
-        return `${formatMoney(bases[idHash % bases.length], { compact: true })} for two`;
-      })();
-
-  const isPromoted = !!restaurant.is_promoted;
-  const offerLabel = listingOfferLabel(restaurant.dining_offers);
-
-  return (
-    <div className="group flex h-full flex-col bg-[#F5F5F5] rounded-2xl border border-[#E5E5E5] shadow-sm hover:shadow-xl transition-shadow duration-300 p-3">
-      <div className="relative h-52 sm:h-56 shrink-0 overflow-hidden rounded-2xl bg-slate-100">
-        <Link href={restaurantHref(restaurant)} className="absolute inset-0 block">
-          <img
-            src={imageSrc}
-            alt={restaurant.name}
-            className="w-full h-full object-cover"
-            onError={(e) => {
-              (e.target as HTMLImageElement).src =
-                "https://images.unsplash.com/photo-1541518763669-27fef04b14ea?w=500&q=80";
-            }}
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent pointer-events-none" />
-        </Link>
-
-        {isPromoted && (
-          <span className="absolute top-3 left-3 z-[1] bg-white/80 text-[#6900AA] text-xs font-semibold px-2.5 py-1 rounded-md shadow-sm">
-            Promoted
-          </span>
-        )}
-
-        <DiningWishlistButton businessId={String(restaurant.id)} />
-
-        {offerLabel && (
-          <span
-            className="absolute bottom-3 left-3 z-[1] inline-flex max-w-[calc(100%-1.5rem)] items-center gap-1.5 rounded-full text-[#9F1239] text-xs font-bold px-3 py-1.5 shadow-md pointer-events-none"
-            style={{
-              background: "linear-gradient(90deg, #FFF1F2 0%, #FFE4E6 45%, #FECDD3 100%)",
-            }}
-          >
-            <Tag
-              size={13}
-              className="shrink-0 fill-[#9F1239] text-[#9F1239]"
-              strokeWidth={0}
-            />
-            <span className="truncate">{offerLabel}</span>
-          </span>
-        )}
-      </div>
-
-      <Link
-        href={restaurantHref(restaurant)}
-        className="flex flex-col flex-1 px-0.5 pt-3.5 pb-1 min-w-0 min-h-0 bg-[#F5F5F5]"
-      >
-        <div className="flex justify-between items-start gap-2 mb-2">
-          <h3 className="font-bold text-[#292929] text-lg sm:text-xl leading-tight truncate flex-1 group-hover:text-[#6900AA] transition-colors">
-            {restaurant.name}
-          </h3>
-          <div
-            className={`shrink-0 inline-flex items-center gap-0.5 text-xs font-bold px-1.5 py-0.5 rounded-md ${
-              hasRating
-                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                : "bg-slate-100 text-slate-600 border border-slate-200"
-            }`}
-          >
-            {hasRating ? <span className="text-[10px]">★</span> : null}
-            <span>{ratingLabel}</span>
-          </div>
-        </div>
-
-        <div className="space-y-1.5 text-sm text-[#292929]">
-          <p className="flex items-center gap-1.5 min-w-0">
-            <UtensilsCrossed size={14} className="shrink-0 text-[#6900AA]" />
-            <span className="truncate font-medium">{cuisineLine}</span>
-          </p>
-          <div className="flex items-start justify-between gap-2 min-w-0">
-            <p className="flex items-center gap-1.5 min-w-0 flex-1">
-              <MapPin size={14} className="shrink-0 text-[#6900AA]" />
-              <span className="truncate font-medium">{getLocality(restaurant.address)}</span>
-            </p>
-            <DiningDistanceLabel
-              latitude={restaurant.latitude}
-              longitude={restaurant.longitude}
-              placeCity={restaurant.city_name}
-              suffix=" away"
-              className="shrink-0 font-medium whitespace-nowrap text-[#292929]"
-            />
-          </div>
-          <p className="flex items-center gap-1.5 min-w-0">
-            <EqualApproximately size={14} strokeWidth={2} className="shrink-0 text-[#6900AA]" aria-hidden />
-            <span className="truncate font-medium">{priceForTwo}</span>
-          </p>
-        </div>
-
-        <div className="mt-auto pt-7 w-full">
-          <span
-            className="inline-flex w-full items-center justify-between gap-2 rounded-xl border border-[#6900AA] bg-[#F5F5F5] px-3.5 py-2.5 text-sm font-semibold text-[#6900AA] group-hover:bg-[#EFEFEF] transition-colors [transform:translateZ(0)] [backface-visibility:hidden]"
-          >
-            <span>View Booking</span>
-            <ArrowRight size={16} className="shrink-0" />
-          </span>
-        </div>
-      </Link>
-    </div>
-  );
-}
 
 // ─── Main Content component inside Suspense ──────────────────────────────────
 
@@ -202,31 +38,36 @@ function SearchContent() {
   const queryParam = searchParams.get("search") || "";
   const cityParam = searchParams.get("city") || "";
   const searchParamsKey = searchParams.toString();
+  const [searchInput, setSearchInput] = useState(queryParam);
 
   const [diningFilters, setDiningFilters] = useState<DiningFilterState>(() =>
     diningFiltersFromSearchParams(searchParams)
   );
   const [currentPage, setCurrentPage] = useState(1);
   const [loadedRestaurants, setLoadedRestaurants] = useState<Business[]>([]);
+  // Clear filters navigates to /search. Ignore a stale collection/mood/search/city
+  // write that would put the empty collection back on the URL.
+  const clearedListingRef = useRef(false);
 
   useEffect(() => {
     const next = diningFiltersFromSearchParams(searchParams);
     setDiningFilters((prev) => (diningFiltersEqual(prev, next) ? prev : next));
+    setSearchInput((prev) => (prev === queryParam ? prev : queryParam));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- searchParamsKey drives URL hydration
   }, [searchParamsKey]);
 
   useEffect(() => {
     const params = new URLSearchParams();
+    const keepContext = !clearedListingRef.current;
     // Preserve listing context keys from the current URL.
-    if (collectionParam) params.set("collection", collectionParam);
-    else params.delete("collection");
-    if (moodParam) params.set("mood", moodParam);
-    else params.delete("mood");
-    if (queryParam) params.set("search", queryParam);
-    else params.delete("search");
-    if (cityParam) params.set("city", cityParam);
-    else params.delete("city");
+    if (keepContext && collectionParam) params.set("collection", collectionParam);
+    if (keepContext && moodParam) params.set("mood", moodParam);
+    if (keepContext && queryParam) params.set("search", queryParam);
+    if (keepContext && cityParam && cityParam !== "All Cities") params.set("city", cityParam);
     writeDiningFiltersToSearchParams(params, diningFilters);
+    if (!collectionParam && !moodParam && !queryParam && !(cityParam && cityParam !== "All Cities")) {
+      clearedListingRef.current = false;
+    }
     if (stableSearchParamsString(params) === stableSearchParamsString(searchParams)) return;
     const qs = params.toString();
     router.replace(qs ? `/search?${qs}` : "/search", { scroll: false });
@@ -264,12 +105,28 @@ function SearchContent() {
     [loadedRestaurants]
   );
 
-  const filteredRestaurants = loadedRestaurants;
+  const listQueryKey = useMemo(
+    () =>
+      JSON.stringify({
+        collectionParam,
+        moodParam,
+        queryParam,
+        cityParam,
+        cuisines: diningFilters.cuisines,
+        minRating: diningFilters.minRating,
+        offersOnly: diningFilters.offersOnly,
+        offerBucket: diningFilters.offerBucket,
+        pureVeg: diningFilters.pureVeg,
+        servesAlcohol: diningFilters.servesAlcohol,
+        maxCost: diningFilters.maxCost,
+        sort: diningFilters.sort,
+      }),
+    [collectionParam, moodParam, queryParam, cityParam, diningFilters]
+  );
 
   useEffect(() => {
     setCurrentPage(1);
-    setLoadedRestaurants([]);
-  }, [collectionParam, moodParam, queryParam, cityParam, diningFilters]);
+  }, [listQueryKey]);
 
   useEffect(() => {
     if (!businessesData) return;
@@ -283,7 +140,11 @@ function SearchContent() {
       const next = pageItems.filter((r) => !seen.has(r.id));
       return next.length ? [...prev, ...next] : prev;
     });
-  }, [businessesData, currentPage]);
+  }, [businessesData, currentPage, listQueryKey]);
+
+  const queryItems = businessesData?.items ?? [];
+  // Page 1 always follows the live query so Clear filters cannot leave a wiped list.
+  const displayRestaurants = currentPage <= 1 ? queryItems : loadedRestaurants;
 
   const hasMoreRestaurants = Boolean(businessesData?.meta?.has_next);
   const isLoadingMore = loadingMore && currentPage > 1;
@@ -327,53 +188,35 @@ function SearchContent() {
   const handleClearFilter = (key: "collection" | "mood" | "search" | "city") => {
     const params = new URLSearchParams(searchParams.toString());
     params.delete(key);
-    router.push(`/search?${params.toString()}`);
+    const qs = params.toString();
+    router.push(qs ? `/search?${qs}` : "/search");
   };
 
-  return (
-    <div className="min-h-screen bg-slate-50 pt-6 pb-16">
-      <div className="bmb-section-container">
-        
-        {/* ── Breadcrumbs ─────────────────────────────────────────────────── */}
-        <div className="text-xs text-slate-400 mb-3 flex items-center gap-1.5 font-medium tracking-wide">
-          <Link href="/" className="hover:text-rose-600 transition-colors">Home</Link>
-          <span>/</span>
-          {cityParam ? (
-            <Link href={`/search?city=${cityParam}`} className="capitalize hover:text-rose-600 transition-colors">
-              {cityParam}
-            </Link>
-          ) : (
-            <span className="capitalize">All Cities</span>
-          )}
-          
-          {collectionParam && (
-            <>
-              <span>/</span>
-              <Link href="/" className="hover:text-rose-600 transition-colors">Collections</Link>
-              <span>/</span>
-              <span className="text-slate-500 font-semibold">{banner.title}</span>
-            </>
-          )}
-          {moodParam && (
-            <>
-              <span>/</span>
-              <Link href="/" className="hover:text-rose-600 transition-colors">Cuisines</Link>
-              <span>/</span>
-              <span className="text-slate-500 font-semibold">{banner.title}</span>
-            </>
-          )}
-          {!collectionParam && !moodParam && queryParam && (
-            <>
-              <span>/</span>
-              <span className="hover:text-slate-650">Search</span>
-              <span>/</span>
-              <span className="text-slate-500 font-semibold">"{queryParam}"</span>
-            </>
-          )}
-        </div>
+  const clearListingFilters = () => {
+    clearedListingRef.current = true;
+    setDiningFilters(DEFAULT_DINING_FILTERS);
+    setSearchInput("");
+    setCurrentPage(1);
+    router.push("/search");
+  };
 
+  const applySearch = (value: string) => {
+    const next = value.trim();
+    setSearchInput(next);
+    const params = new URLSearchParams(searchParams.toString());
+    if (next) params.set("search", next);
+    else params.delete("search");
+    const qs = params.toString();
+    router.push(qs ? `/search?${qs}` : "/search");
+  };
+
+  const hasQuickFilters = Boolean(collectionParam || moodParam || queryParam || cityParam);
+
+  return (
+    <div className="min-h-screen bg-slate-50 pt-4 pb-16">
+      <div className="bmb-section-container">
         {/* ── 1. Hero Dynamic Banner (Zomato-Style) ───────────────────────── */}
-        <div className="relative overflow-hidden rounded-2xl bg-slate-900 text-white h-72 md:h-80 shadow-md flex items-center border border-slate-100/50 mb-8">
+        <div className="relative overflow-hidden rounded-2xl bg-slate-900 text-white h-72 md:h-80 shadow-md flex items-center border border-slate-100/50 mb-4">
           {/* Background image */}
           <img
             src={banner.image}
@@ -397,7 +240,8 @@ function SearchContent() {
               </p>
             </div>
             <span className="text-xs md:text-sm font-bold text-white/95 mt-3 block">
-              {filteredRestaurants.length} Place{filteredRestaurants.length !== 1 ? "s" : ""}
+              {businessesData?.meta?.total ?? displayRestaurants.length} Place
+              {(businessesData?.meta?.total ?? displayRestaurants.length) !== 1 ? "s" : ""}
             </span>
           </div>
 
@@ -428,24 +272,24 @@ function SearchContent() {
       <div className="bmb-section-container">
         
         {/* Header stats & quick clear chips */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 mb-2">
           <div>
             <h2 className="text-xl font-bold text-slate-800">
               {cityParam ? `Restaurants in ${cityParam}` : "Discover Restaurants"}
             </h2>
-            <p className="text-sm text-slate-500 mt-1">
+            <p className="text-sm text-slate-500 mt-0.5">
               {loadingBusinesses ? (
                 <span
                   className="mt-1 inline-block h-3.5 w-36 rounded bg-slate-200 animate-pulse"
                   aria-label="Finding restaurants"
                 />
               ) : (
-                `${businessesData?.meta?.total ?? filteredRestaurants.length} venue${(businessesData?.meta?.total ?? filteredRestaurants.length) !== 1 ? "s" : ""} available`
+                `${businessesData?.meta?.total ?? displayRestaurants.length} venue${(businessesData?.meta?.total ?? displayRestaurants.length) !== 1 ? "s" : ""} available`
               )}
             </p>
           </div>
 
-          {/* Active filters chips list */}
+          {hasQuickFilters ? (
           <div className="flex flex-wrap items-center gap-2">
             {collectionParam && (
               <div className="flex items-center gap-1.5 bg-rose-50 border border-rose-100 text-rose-600 px-3.5 py-1.5 rounded-full text-xs font-bold shadow-sm">
@@ -495,43 +339,46 @@ function SearchContent() {
               </div>
             )}
 
-            {(collectionParam || moodParam || queryParam || cityParam) && (
-              <button
-                onClick={() => router.push("/search")}
-                className="text-xs text-rose-600 hover:text-rose-700 font-bold px-2 py-1.5 transition-colors cursor-pointer"
-              >
-                Clear All
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={clearListingFilters}
+              className="text-xs text-rose-600 hover:text-rose-700 font-bold px-2 py-1.5 transition-colors cursor-pointer"
+            >
+              Clear All
+            </button>
           </div>
+          ) : null}
         </div>
 
-        <DiningFiltersBar
-          cuisines={cuisineOptions}
-          filters={diningFilters}
-          onChange={setDiningFilters}
-          onReset={() => setDiningFilters(DEFAULT_DINING_FILTERS)}
-        />
+        <div className="mb-4 sm:mb-5 md:mb-6">
+          <DiningFiltersBar
+            cuisines={cuisineOptions}
+            filters={diningFilters}
+            onChange={setDiningFilters}
+            onReset={() => setDiningFilters(DEFAULT_DINING_FILTERS)}
+            showSearch
+            searchValue={searchInput}
+            onSearchChange={setSearchInput}
+            onSearchSubmit={applySearch}
+          />
+        </div>
 
         {/* ── 3. Listings Grid ─────────────────────────────────────────────── */}
-        {loadingBusinesses && loadedRestaurants.length === 0 ? (
-          <DiningSearchShimmer count={6} />
-        ) : filteredRestaurants.length === 0 ? (
+        {(loadingBusinesses || loadingMore) && displayRestaurants.length === 0 ? (
+          <DiningHomeRestaurantShimmer count={8} />
+        ) : displayRestaurants.length === 0 ? (
           <ListingNoResultsState
             kind="dining"
             title="No restaurants found"
             description="We couldn’t find any listings matching your active filters. Try clearing filters or searching for another place."
             actionLabel="Clear filters"
-            onAction={() => {
-              setDiningFilters(DEFAULT_DINING_FILTERS);
-              router.push("/search");
-            }}
+            onAction={clearListingFilters}
           />
         ) : (
           <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredRestaurants.map((restaurant) => (
-                <RestaurantCard key={restaurant.id} restaurant={restaurant} />
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5 w-full">
+              {displayRestaurants.map((restaurant) => (
+                <DiningRestaurantCardOption2 key={restaurant.id} place={restaurant} />
               ))}
             </div>
             {hasMoreRestaurants && (
@@ -561,7 +408,7 @@ function SearchContent() {
 
 export default function SearchPage() {
   return (
-    <Suspense fallback={<DiningSearchShimmer count={6} />}>
+    <Suspense fallback={<DiningHomeRestaurantShimmer count={8} />}>
       <SearchContent />
     </Suspense>
   );

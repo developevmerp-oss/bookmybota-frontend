@@ -318,9 +318,10 @@ export default function ConfirmationPageUI1({
     booking?.booking_code || booking?.id.slice(0, 8).toUpperCase() || "";
 
   const alreadyReviewed = Boolean(reviewMeta?.already_reviewed || myReview);
-  const previewRating = myReview ? Number(myReview.rating) || 0 : 0;  // Determine if the show has completed according to panel/backend logic
+  const previewRating = myReview ? Number(myReview.rating) || 0 : 0;
+
+  // Review card is only shown once the booked movie show has actually ended/completed
   const isShowEnded = useMemo(() => {
-    if (reviewMeta?.show_ended) return true;
     const startsAt = booking?.showtime_starts_at;
     if (!startsAt) return false;
     try {
@@ -333,18 +334,25 @@ export default function ConfirmationPageUI1({
         const endTime = new Date(rawEnd.includes("T") ? rawEnd : `${rawEnd}T00:00:00`).getTime();
         if (!Number.isNaN(endTime)) return Date.now() >= endTime;
       }
-      // Fallback 2 hours duration
-      return Date.now() >= startTime + 2 * 60 * 60 * 1000;
+      // Fallback: starts_at + movie duration in minutes (or 2 hours)
+      const durationMin = Number(booking?.movie_duration) || 120;
+      return Date.now() >= startTime + durationMin * 60 * 1000;
     } catch {
       return false;
     }
   }, [
-    reviewMeta?.show_ended,
     booking?.showtime_starts_at,
     booking?.showtime_ends_at,
+    booking?.movie_duration,
   ]);
 
-  const canShowReview = isShowEnded && !alreadyReviewed;
+  const hasConfirmedBooking =
+    Boolean(booking?.id) &&
+    (booking?.status === "CONFIRMED" ||
+      booking?.status === "USED" ||
+      Boolean(booking?.booking_code));
+
+  const canShowReview = hasConfirmedBooking && isShowEnded && !alreadyReviewed;
 
   const handleDownloadPdf = async () => {
     if (!booking) return;
@@ -406,12 +414,29 @@ export default function ConfirmationPageUI1({
 
   const amountRows = useMemo(() => {
     if (!booking) return [];
-    const rows = [
-      {
-        label: "Net Ticket(s) Price",
-        value: formatMoney(Number(booking.ticket_amount) || 0),
-      },
-    ];
+    const seats = booking.seats || [];
+    const grouped = new Map<string, { label: string; qty: number; unit: number }>();
+    for (const seat of seats) {
+      const label = String(seat.tier_name || "Ticket").trim() || "Ticket";
+      const unit = Number(seat.unit_price) || 0;
+      const key = `${label.toLowerCase()}|${unit.toFixed(2)}`;
+      const prev = grouped.get(key);
+      if (prev) prev.qty += 1;
+      else grouped.set(key, { label, qty: 1, unit });
+    }
+    const rows =
+      grouped.size > 0
+        ? [...grouped.values()].map((g) => ({
+            label: `${g.label} × ${g.qty}`,
+            labelDetail: `${formatMoney(g.unit)} each`,
+            value: formatMoney(g.unit * g.qty),
+          }))
+        : [
+            {
+              label: "Net Ticket(s) Price",
+              value: formatMoney(Number(booking.ticket_amount) || 0),
+            },
+          ];
     if (Number(booking.beverage_total) > 0) {
       rows.push({
         label: "Snacks & beverages",
@@ -508,7 +533,6 @@ export default function ConfirmationPageUI1({
             : undefined
         }
         amountRows={amountRows}
-        cancellationNote="Cancellation unavailable : cut-off time of 20 minutes before showtime has passed"
         supportHref="/customer/help"
         mTicketLabel="M-Ticket"
         onDownloadPdf={handleDownloadPdf}

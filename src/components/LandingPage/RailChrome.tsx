@@ -103,7 +103,7 @@ export function RailPagerNav({
 
   return (
     <div
-      className="mt-4 sm:mt-5 flex items-center justify-center gap-2.5"
+      className="mt-3 sm:mt-3.5 mb-0 flex items-center justify-center gap-2.5"
       role="group"
       aria-label={`${label} navigation`}
     >

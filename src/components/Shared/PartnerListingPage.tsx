@@ -147,7 +147,7 @@ export default function PartnerListingPage({ kind }: { kind: PartnerListingKind 
     <div className="min-h-screen bg-[#faf7fc]">
       <h1 className="sr-only">{kind === "artist" ? "Artists" : "Venues"}</h1>
       <div className="bg-white border-b border-[#F3E8FF]">
-        <div className="bmb-section-container py-5 sm:py-6">
+        <div className="bmb-section-container pt-3 pb-3 sm:pt-3.5 sm:pb-3.5">
           <div className="relative">
             <Search
               size={16}
@@ -174,7 +174,7 @@ export default function PartnerListingPage({ kind }: { kind: PartnerListingKind 
         </div>
       </div>
 
-      <section id="partners" className="scroll-mt-24 py-8 md:py-10">
+      <section id="partners" className="scroll-mt-24 pt-3 sm:pt-3.5 pb-8 md:pb-10">
         <div className="bmb-section-container">
           {initialLoading ? (
             <div className={GRID_CLASS}>

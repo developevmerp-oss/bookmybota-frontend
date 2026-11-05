@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
+  Building2,
   Clapperboard,
   Film,
   Heart,
@@ -14,6 +15,7 @@ import { toast } from "sonner";
 import {
   useGetDiningWishlistQuery,
   useGetMovieWishlistQuery,
+  useGetPublicRegisteredCinemasQuery,
   useSyncDiningWishlistMutation,
   useSyncMovieWishlistMutation,
   useToggleDiningWishlistMutation,
@@ -36,9 +38,122 @@ import {
   clearGuestMovieWishlistIds,
   readGuestMovieWishlistIds,
 } from "@/lib/movieWishlist";
+import {
+  readCinemaFavoriteIds,
+  readCinemaFavoriteItems,
+  toggleCinemaFavorite,
+  isCinemaFavorited,
+  type SavedCinemaItem,
+} from "@/lib/cinemaWishlist";
 import { movieDetailPath } from "@/components/MovieLandingPage/movieCatalog";
-import { restaurantHref } from "@/lib/businessPublicPath";
+import { cinemaHref, restaurantHref } from "@/lib/businessPublicPath";
 import { CustomerPageShimmer } from "@/components/Shared/Shimmer";
+
+const SHOWCASE_CINEMAS = [
+  {
+    id: "c1",
+    name: "PVR: Palladium Mall, Addis Ababa",
+    address: "4th floor, Palladium Mall, Bole Road, Addis Ababa, Ethiopia",
+    cover_image_url: "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=500&q=80",
+    slug: "pvr-palladium-mall",
+  },
+  {
+    id: "c2",
+    name: "Cinepolis: City Centre, Addis Ababa",
+    address: "City Centre Mall, Mexico Square, Addis Ababa, Ethiopia",
+    cover_image_url: "https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?w=500&q=80",
+    slug: "cinepolis-city-centre",
+  },
+  {
+    id: "c3",
+    name: "Edna Mall Cinema, Addis Ababa",
+    address: "Edna Mall, Bole Medhanialem, Addis Ababa, Ethiopia",
+    cover_image_url: "https://images.unsplash.com/photo-1595769816263-9b910be24d5f?w=500&q=80",
+    slug: "edna-mall-cinema",
+  },
+];
+
+function WishlistCinemaCard({
+  cinema,
+  onRemoved,
+}: {
+  cinema: { id: string; name: string; address?: string; cover_image_url?: string; slug?: string; href?: string };
+  onRemoved?: () => void;
+}) {
+  const imageSrc =
+    resolveMediaUrl(cinema.cover_image_url) ||
+    "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=500&q=80";
+
+  const handleRemove = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    toggleCinemaFavorite(
+      {
+        id: cinema.id,
+        name: cinema.name,
+        address: cinema.address,
+        cover_image_url: cinema.cover_image_url,
+        slug: cinema.slug,
+        href: cinema.href || cinemaHref(cinema),
+      },
+      [cinema.id, cinema.slug || "", cinema.name]
+    );
+    toast.success(`Removed ${cinema.name} from your favorite cinemas`);
+    onRemoved?.();
+  };
+
+  const href = cinema.href || cinemaHref(cinema);
+
+  return (
+    <div className="group flex h-full flex-col bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow overflow-hidden">
+      <div className="relative h-44 shrink-0 bg-slate-100">
+        <Link href={href} className="absolute inset-0 block">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={imageSrc}
+            alt={cinema.name}
+            className="w-full h-full object-cover"
+            onError={(e) => {
+              (e.target as HTMLImageElement).src =
+                "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=500&q=80";
+            }}
+          />
+        </Link>
+        <button
+          type="button"
+          onClick={handleRemove}
+          aria-label="Remove from favourites"
+          className="absolute top-3 right-3 z-[2] w-9 h-9 rounded-full bg-white shadow-md flex items-center justify-center hover:bg-slate-50 transition-colors cursor-pointer"
+        >
+          <Heart size={18} className="fill-[#E11D48] text-[#E11D48]" strokeWidth={2.25} />
+        </button>
+      </div>
+
+      <div className="flex flex-1 flex-col p-4 justify-between gap-3">
+        <div>
+          <Link href={href}>
+            <h3 className="text-base font-bold text-slate-900 group-hover:text-[#6900AA] transition-colors truncate">
+              {cinema.name}
+            </h3>
+          </Link>
+          {cinema.address && (
+            <p className="flex items-start gap-1 text-xs text-slate-500 mt-1 line-clamp-2">
+              <MapPin size={13} className="shrink-0 mt-0.5 text-slate-400" />
+              <span>{cinema.address}</span>
+            </p>
+          )}
+        </div>
+
+        <Link
+          href={href}
+          className="w-full inline-flex items-center justify-center py-2 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-black transition-colors"
+        >
+          View Showtimes
+        </Link>
+      </div>
+    </div>
+  );
+}
 
 function WishlistRestaurantCard({
   restaurant,
@@ -282,6 +397,9 @@ export default function CustomerWishlistPage() {
   const [syncMovieWishlist] = useSyncMovieWishlistMutation();
   const [syncDiningWishlist] = useSyncDiningWishlistMutation();
 
+  const [cinemaFavorites, setCinemaFavorites] = useState<string[]>([]);
+  const [savedCinemaItems, setSavedCinemaItems] = useState<SavedCinemaItem[]>([]);
+
   const {
     data: movies = [],
     isLoading: moviesLoading,
@@ -294,15 +412,115 @@ export default function CustomerWishlistPage() {
     isError: diningError,
     refetch: refetchDining,
   } = useGetDiningWishlistQuery(undefined, { refetchOnMountOrArgChange: true });
+  const {
+    data: registeredCinemas = [],
+    isLoading: cinemasLoading,
+    refetch: refetchCinemas,
+  } = useGetPublicRegisteredCinemasQuery(undefined, { refetchOnMountOrArgChange: true });
 
   useEffect(() => {
     dispatch(loadFromStorage());
   }, [dispatch]);
 
   useEffect(() => {
+    const updateCinemas = () => {
+      setCinemaFavorites(readCinemaFavoriteIds());
+      setSavedCinemaItems(readCinemaFavoriteItems());
+    };
+    updateCinemas();
+    window.addEventListener("movie_cinema_favorites_changed", updateCinemas);
+    window.addEventListener("storage", updateCinemas);
+    return () => {
+      window.removeEventListener("movie_cinema_favorites_changed", updateCinemas);
+      window.removeEventListener("storage", updateCinemas);
+    };
+  }, []);
+
+  const allCinemas = useMemo(() => {
+    const list: Array<{
+      id: string;
+      name: string;
+      address?: string;
+      cover_image_url?: string;
+      slug?: string;
+      href?: string;
+    }> = [];
+    const seen = new Set<string>();
+
+    const addIfNew = (c: {
+      id: string;
+      name: string;
+      address?: string;
+      cover_image_url?: string;
+      slug?: string;
+      href?: string;
+    }) => {
+      const idKey = c.id ? c.id.toLowerCase() : "";
+      const slugKey = c.slug ? c.slug.toLowerCase() : "";
+      const nameKey = c.name ? c.name.toLowerCase() : "";
+      if (idKey && seen.has(idKey)) return;
+      if (slugKey && seen.has(slugKey)) return;
+      if (nameKey && seen.has(nameKey)) return;
+
+      if (idKey) seen.add(idKey);
+      if (slugKey) seen.add(slugKey);
+      if (nameKey) seen.add(nameKey);
+
+      list.push(c);
+    };
+
+    // 1. Registered cinemas from API
+    registeredCinemas.forEach((c) => {
+      addIfNew({
+        id: c.id,
+        name: c.name,
+        address: c.address,
+        cover_image_url: c.cover_image_url,
+        slug: c.slug,
+        href: cinemaHref(c),
+      });
+    });
+
+    // 2. Saved items stored directly in localStorage
+    savedCinemaItems.forEach((c) => {
+      addIfNew({
+        id: c.id,
+        name: c.name,
+        address: c.address,
+        cover_image_url: c.cover_image_url,
+        slug: c.slug,
+        href: c.href || cinemaHref(c),
+      });
+    });
+
+    // 3. Showcase mock cinemas
+    SHOWCASE_CINEMAS.forEach((c) => {
+      addIfNew({
+        ...c,
+        href: cinemaHref(c),
+      });
+    });
+
+    return list;
+  }, [registeredCinemas, savedCinemaItems]);
+
+  const savedCinemas = useMemo(() => {
+    if (cinemaFavorites.length === 0 && savedCinemaItems.length === 0) return [];
+    return allCinemas.filter((c) =>
+      isCinemaFavorited([c.id, c.slug || "", c.name], cinemaFavorites) ||
+      savedCinemaItems.some((item) =>
+        item.id.toLowerCase() === c.id.toLowerCase() ||
+        (item.slug && c.slug && item.slug.toLowerCase() === c.slug.toLowerCase()) ||
+        item.name.toLowerCase() === c.name.toLowerCase()
+      )
+    );
+  }, [allCinemas, cinemaFavorites, savedCinemaItems]);
+
+  useEffect(() => {
     void refetchMovies();
     void refetchDining();
-  }, [refetchMovies, refetchDining]);
+    void refetchCinemas();
+  }, [refetchMovies, refetchDining, refetchCinemas]);
 
   useEffect(() => {
     if (guestWishlistSyncOnPage) return;
@@ -329,19 +547,19 @@ export default function CustomerWishlistPage() {
     })();
   }, [syncMovieWishlist, syncDiningWishlist, refetchMovies, refetchDining]);
 
-  const isLoading = moviesLoading || diningLoading;
+  const isLoading = moviesLoading || diningLoading || cinemasLoading;
 
   return (
     <CustomerAccountLayout>
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 sm:p-6">
-        <div className="mb-8">
-          <h2 className="text-2xl font-extrabold text-[#111111]">My Favourite</h2>
+        <div className="mb-4 lg:mb-8">
+          <h2 className="hidden lg:block text-2xl font-extrabold text-[#111111]">My Favourite</h2>
           <p className="text-sm text-slate-500 mt-1">
-            Movies and restaurants you saved for later
+            Movies, cinemas, and restaurants you saved for later
           </p>
         </div>
 
-        {isLoading && movies.length === 0 && restaurants.length === 0 ? (
+        {isLoading && movies.length === 0 && restaurants.length === 0 && savedCinemas.length === 0 ? (
           <CustomerPageShimmer rows={6} />
         ) : (
           <div className="space-y-10">
@@ -361,6 +579,33 @@ export default function CustomerWishlistPage() {
               <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4">
                 {movies.map((movie) => (
                   <WishlistMovieCard key={movie.id} movie={movie} />
+                ))}
+              </div>
+            </WishlistSection>
+
+            <WishlistSection
+              title="Saved Cinemas"
+              count={savedCinemas.length}
+              browseHref="/movies/cinemas"
+              browseLabel="Browse cinemas"
+              browseIcon={Building2}
+              isLoading={cinemasLoading && allCinemas.length === 0}
+              isError={false}
+              onRetry={() => void refetchCinemas()}
+              emptyIcon={Building2}
+              emptyTitle="No cinemas saved yet"
+              emptyDescription="Tap the heart icon on any cinema page to add it here."
+            >
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                {savedCinemas.map((cinema) => (
+                  <WishlistCinemaCard
+                    key={cinema.id}
+                    cinema={cinema}
+                    onRemoved={() => {
+                      setCinemaFavorites(readCinemaFavoriteIds());
+                      setSavedCinemaItems(readCinemaFavoriteItems());
+                    }}
+                  />
                 ))}
               </div>
             </WishlistSection>

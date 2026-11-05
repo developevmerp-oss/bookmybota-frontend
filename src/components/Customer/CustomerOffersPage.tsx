@@ -199,8 +199,8 @@ export default function CustomerOffersPage() {
   return (
     <CustomerAccountLayout>
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 sm:p-6 lg:p-8">
-        <div className="mb-5">
-          <h2 className="text-2xl sm:text-3xl font-extrabold text-[#111111] leading-tight">
+        <div className="mb-4 lg:mb-5">
+          <h2 className="hidden lg:block text-2xl sm:text-3xl font-extrabold text-[#111111] leading-tight">
             Offers
           </h2>
           <p className="mt-1.5 text-sm sm:text-base text-slate-500">

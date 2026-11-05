@@ -178,10 +178,10 @@ export default function CustomerReviewCard({
           </span>
 
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-bold text-[#111111] truncate leading-snug">
+            <p className="text-[0.9375rem] font-semibold text-[#111111] truncate leading-tight">
               {displayName}
             </p>
-            <p className="mt-0.5 flex items-center gap-1.5 text-sm sm:text-[0.9375rem] text-gray-800 leading-none">
+            <p className="mt-0.5 flex items-center gap-1 text-xs text-gray-600 leading-none">
               <span className="shrink-0">
                 {bookedOnPlatform ? "Booked on" : "Customer on"}
               </span>
@@ -189,7 +189,7 @@ export default function CustomerReviewCard({
               <img
                 src={logoSrc()}
                 alt="Book My Bota"
-                className="h-5 sm:h-7 w-auto object-contain"
+                className="h-3.5 w-auto max-w-[5.5rem] object-contain object-left"
               />
             </p>
           </div>

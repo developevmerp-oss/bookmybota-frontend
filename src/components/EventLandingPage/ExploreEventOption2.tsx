@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 
@@ -39,9 +39,22 @@ const imgSpring = {
   damping: 14,
 };
 
+function useDesktopHover() {
+  const [enabled, setEnabled] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const sync = () => setEnabled(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
+  return enabled;
+}
+
 /**
  * Explore Events — horizontal pastel cards (icon left, title + CTA right).
  * Object motion + scroll layout aligned with dining explore cards.
+ * Hover lift is desktop-only (lg+) so touch/tablet scrolls are not clipped.
  */
 export default function ExploreEventOption2({
   title = "Explore Events",
@@ -50,12 +63,14 @@ export default function ExploreEventOption2({
   emptyNotice,
   className = "",
 }: ExploreEventOption2Props) {
+  const desktopHover = useDesktopHover();
+
   if (!categories.length) return null;
 
   return (
-    <section className={`pt-8 sm:pt-10 pb-3 bg-white ${className}`}>
+    <section className={`pt-6 sm:pt-7 lg:pt-8 bg-white ${className}`}>
       <div className="bmb-section-container">
-        <div className="min-w-0 pb-4">
+        <div className="min-w-0 mb-3 sm:mb-3.5">
           <motion.h2
             className="text-lg sm:text-xl md:text-2xl font-semibold text-slate-800"
             initial={{ opacity: 0, y: 12 }}
@@ -69,7 +84,9 @@ export default function ExploreEventOption2({
         </div>
 
         <motion.div
-          className="flex gap-3 sm:gap-4 md:gap-5 overflow-x-auto px-0.5 pt-2 pb-6 snap-x snap-mandatory [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          className={`flex gap-3 sm:gap-4 md:gap-5 overflow-x-auto px-0.5 snap-x snap-mandatory [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
+            desktopHover ? "pt-4 pb-3 -mt-1.5" : "pb-1"
+          }`}
           initial="hidden"
           whileInView="show"
           viewport={{ once: true, amount: 0.35 }}
@@ -86,7 +103,9 @@ export default function ExploreEventOption2({
               type="button"
               aria-label={`${cat.label} — Explore events`}
               onClick={() => onCategoryClick(cat.key)}
-              className="group flex shrink-0 snap-start items-center gap-3 sm:gap-3.5 rounded-[1.25rem] sm:rounded-[1.5rem] px-3.5 py-3 sm:px-4 sm:py-3.5 text-left cursor-pointer border border-black/[0.04] shadow-[0_4px_16px_rgba(15,23,42,0.06)] w-[min(78vw,15.5rem)] sm:w-[15.5rem] md:w-[16.25rem] lg:w-[17rem]"
+              className={`group flex shrink-0 snap-start items-center gap-3 sm:gap-3.5 rounded-[1.25rem] sm:rounded-[1.5rem] px-3.5 py-3 sm:px-4 sm:py-3.5 text-left cursor-pointer border border-black/[0.04] shadow-[0_4px_16px_rgba(15,23,42,0.06)] w-[min(78vw,15.5rem)] sm:w-[15.5rem] md:w-[16.25rem] lg:w-[17rem] ${
+                desktopHover ? "" : "touch-manipulation"
+              }`}
               style={{ background: cat.background }}
               variants={{
                 hidden: { opacity: 0, y: 24, scale: 0.92 },
@@ -96,19 +115,27 @@ export default function ExploreEventOption2({
                   scale: 1,
                   transition: cardSpring,
                 },
-                hover: {
-                  y: -8,
-                  scale: 1.03,
-                  boxShadow: "0 10px 24px rgba(15,23,42,0.1)",
-                  transition: hoverSpring,
-                },
+                ...(desktopHover
+                  ? {
+                      hover: {
+                        y: -8,
+                        scale: 1.03,
+                        boxShadow: "0 10px 24px rgba(15,23,42,0.1)",
+                        transition: hoverSpring,
+                      },
+                    }
+                  : {}),
               }}
-              whileHover="hover"
-              whileTap={{
-                scale: 0.97,
-                y: -2,
-                transition: { type: "spring", stiffness: 520, damping: 28 },
-              }}
+              whileHover={desktopHover ? "hover" : undefined}
+              whileTap={
+                desktopHover
+                  ? {
+                      scale: 0.97,
+                      y: -2,
+                      transition: { type: "spring", stiffness: 520, damping: 28 },
+                    }
+                  : undefined
+              }
             >
               <span className="relative flex h-[3.75rem] w-[3.75rem] sm:h-[4.25rem] sm:w-[4.25rem] md:h-[4.5rem] md:w-[4.5rem] shrink-0 items-center justify-center overflow-visible">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -131,12 +158,16 @@ export default function ExploreEventOption2({
                         delay: 0.05,
                       },
                     },
-                    hover: {
-                      y: -6,
-                      rotate: -2,
-                      scale: 1.08,
-                      transition: imgSpring,
-                    },
+                    ...(desktopHover
+                      ? {
+                          hover: {
+                            y: -6,
+                            rotate: -2,
+                            scale: 1.08,
+                            transition: imgSpring,
+                          },
+                        }
+                      : {}),
                   }}
                 />
               </span>
@@ -145,10 +176,16 @@ export default function ExploreEventOption2({
                 <span className="text-[1rem] sm:text-[1.0625rem] font-bold text-slate-900 leading-tight truncate">
                   {cat.label}
                 </span>
-                <span className="inline-flex items-center gap-1 text-[0.8125rem] sm:text-[0.875rem] font-medium text-slate-500 group-hover:text-[#6900AA] transition-colors">
+                <span
+                  className={`inline-flex items-center gap-1 text-[0.8125rem] sm:text-[0.875rem] font-medium text-slate-500 transition-colors ${
+                    desktopHover ? "group-hover:text-[#6900AA]" : ""
+                  }`}
+                >
                   Explore events
                   <ArrowRight
-                    className="h-3.5 w-3.5 shrink-0 transition-transform group-hover:translate-x-0.5"
+                    className={`h-3.5 w-3.5 shrink-0 transition-transform ${
+                      desktopHover ? "group-hover:translate-x-0.5" : ""
+                    }`}
                     strokeWidth={2.25}
                   />
                 </span>

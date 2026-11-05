@@ -219,30 +219,42 @@ export default function CitySelectModal({
 
   const modal = (
     <div
-      className="fixed inset-0 z-[80] flex items-start justify-center px-3 sm:px-4 py-6 sm:py-10"
+      className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center"
       data-scroll-lock-container
     >
       <button
         type="button"
         aria-label="Close city picker"
-        className="absolute inset-0 bg-black/50 cursor-pointer"
+        className="absolute inset-0 bg-black/40 cursor-pointer"
         onClick={onClose}
       />
 
-      <div className="relative w-full max-w-[960px] max-h-[90vh] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden">
-        <div className="flex items-center justify-between px-5 sm:px-8 pt-5 sm:pt-6 pb-2 shrink-0">
-          <h2 className="text-xl sm:text-2xl font-bold text-slate-900">Select Location</h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-9 h-9 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-500 cursor-pointer"
-            aria-label="Close"
-          >
-            <X size={20} />
-          </button>
+      <div className="relative w-full sm:w-[min(92vw,960px)] h-[min(92dvh,760px)] sm:h-auto sm:max-h-[min(88vh,820px)] bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+        <div className="flex items-center justify-between gap-3 px-5 sm:px-8 py-4 border-b border-slate-100 shrink-0">
+          <h2 className="text-xl font-bold text-slate-900">Select Location</h2>
+          <div className="flex items-center gap-3 shrink-0">
+            {selected ? (
+              <button
+                type="button"
+                onClick={clearCity}
+                className="text-sm sm:text-base font-bold cursor-pointer"
+                style={{ color: ACCENT }}
+              >
+                Clear City
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-1 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-500 cursor-pointer"
+              aria-label="Close"
+            >
+              <X size={20} />
+            </button>
+          </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-5 sm:px-8 pb-6 sm:pb-8">
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-5 sm:px-8 pt-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
           <div className="relative">
             <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
@@ -368,17 +380,6 @@ export default function CitySelectModal({
                 )}
               </section>
 
-              {selected ? (
-                <div className="mt-6 pt-4 border-t border-slate-100 flex justify-center">
-                  <button
-                    type="button"
-                    onClick={clearCity}
-                    className="text-sm font-medium text-slate-500 hover:text-slate-800 underline underline-offset-2 cursor-pointer"
-                  >
-                    Clear City
-                  </button>
-                </div>
-              ) : null}
             </>
           )}
         </div>

@@ -37,6 +37,8 @@ import BusinessLandingPage from "@/components/DiningAdminPanel/BusinessLandingPa
 import { AdminListShimmer, ListYourShowLandingShimmer } from "@/components/Shared/Shimmer";
 import { extractApiError } from "@/lib/apiErrors";
 import { formatDate } from "@/lib/dateFormat";
+import SimpleRichTextEditor from "@/components/Shared/SimpleRichTextEditor";
+import { hasDiningPolicyContent } from "@/lib/diningPolicyHtml";
 
 const MEAL_KEYS = ["breakfast", "lunch", "dinner"] as const;
 
@@ -378,6 +380,8 @@ function BusinessDashboard() {
   const [allocation, setAllocation] = useState<number | "">(50);
   const [latitude, setLatitude] = useState<string>("");
   const [longitude, setLongitude] = useState<string>("");
+  const [bookingTerms, setBookingTerms] = useState("");
+  const [cancellationPolicy, setCancellationPolicy] = useState("");
 
   const range = useMemo(() => monthBounds(calYear, calMonth), [calYear, calMonth]);
   const datesQueryArg = useMemo(
@@ -443,12 +447,18 @@ function BusinessDashboard() {
     setAllocation((prev) => (prev === nextAlloc ? prev : nextAlloc));
     setLatitude((prev) => (prev === nextLat ? prev : nextLat));
     setLongitude((prev) => (prev === nextLng ? prev : nextLng));
+    const nextTerms = settings.booking_terms || "";
+    const nextPolicy = settings.cancellation_policy || "";
+    setBookingTerms((prev) => (prev === nextTerms ? prev : nextTerms));
+    setCancellationPolicy((prev) => (prev === nextPolicy ? prev : nextPolicy));
   }, [
     settings?.grace_time_minutes,
     settings?.slot_interval_minutes,
     settings?.online_allocation_percentage,
     settings?.latitude,
     settings?.longitude,
+    settings?.booking_terms,
+    settings?.cancellation_policy,
   ]);
 
   useEffect(() => {
@@ -525,6 +535,10 @@ function BusinessDashboard() {
           online_allocation_percentage: allocation === "" ? 50 : allocation,
           latitude: latitude.trim() === "" ? null : Number(latitude),
           longitude: longitude.trim() === "" ? null : Number(longitude),
+          booking_terms: hasDiningPolicyContent(bookingTerms) ? bookingTerms : null,
+          cancellation_policy: hasDiningPolicyContent(cancellationPolicy)
+            ? cancellationPolicy
+            : null,
         },
       }).unwrap();
       toast.success("Global settings saved.");
@@ -908,6 +922,38 @@ function BusinessDashboard() {
               for walk-ins or manual bookings.
             </span>
           </div>
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-sm font-bold text-slate-800" htmlFor="booking-terms">
+            Terms &amp; Conditions
+          </label>
+          <p className="text-xs text-slate-500">
+            Shown on your restaurant booking page exactly as formatted here. Leave blank to hide the Terms &amp; Conditions button for guests.
+          </p>
+          <SimpleRichTextEditor
+            id="booking-terms"
+            value={bookingTerms}
+            onChange={setBookingTerms}
+            placeholder="Add booking terms guests should agree to…"
+            minHeight="160px"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-sm font-bold text-slate-800" htmlFor="cancellation-policy">
+            Cancellation Policy
+          </label>
+          <p className="text-xs text-slate-500">
+            Shown when a guest opens Cancellation Policy, with the same formatting. Leave blank to hide that button.
+          </p>
+          <SimpleRichTextEditor
+            id="cancellation-policy"
+            value={cancellationPolicy}
+            onChange={setCancellationPolicy}
+            placeholder="Add your cancellation and refund rules…"
+            minHeight="160px"
+          />
         </div>
 
         <div className="p-4 border border-slate-200 rounded-2xl flex gap-3">

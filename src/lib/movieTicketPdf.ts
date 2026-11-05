@@ -84,12 +84,28 @@ export async function buildMovieTicketPdf(booking: MovieTicketPdfBooking): Promi
   const bookingCode = booking.booking_code || booking.id.slice(0, 8).toUpperCase();
   const ticketCount = booking.ticket_qty || booking.seats?.length || 1;
 
-  const amountRows: TicketCardPdfAmountRow[] = [
-    {
-      label: "Net Ticket(s) Price",
-      value: formatMoney(Number(booking.ticket_amount || booking.grand_total) || 0),
-    },
-  ];
+  const seatGroups = new Map<string, { label: string; qty: number; unit: number }>();
+  for (const seat of booking.seats || []) {
+    const label = String(seat.tier_name || "Ticket").trim() || "Ticket";
+    const unit = Number(seat.unit_price) || 0;
+    const key = `${label.toLowerCase()}|${unit.toFixed(2)}`;
+    const prev = seatGroups.get(key);
+    if (prev) prev.qty += 1;
+    else seatGroups.set(key, { label, qty: 1, unit });
+  }
+  const amountRows: TicketCardPdfAmountRow[] =
+    seatGroups.size > 0
+      ? [...seatGroups.values()].map((g) => ({
+          label: `${g.label} × ${g.qty}`,
+          labelDetail: `${formatMoney(g.unit)} each`,
+          value: formatMoney(g.unit * g.qty),
+        }))
+      : [
+          {
+            label: "Net Ticket(s) Price",
+            value: formatMoney(Number(booking.ticket_amount || booking.grand_total) || 0),
+          },
+        ];
 
   if (Number(booking.beverage_total) > 0) {
     amountRows.push({
@@ -127,8 +143,11 @@ export async function buildMovieTicketPdf(booking: MovieTicketPdfBooking): Promi
     bookingCode,
     qrValue: qrRaw,
     showQr: true,
-    cancellationNote: "Cancellation unavailable : cut-off time of 20 minutes before showtime has passed",
     totalFormatted: formatMoney(Number(booking.grand_total) || 0),
+    totalNote:
+      Number(booking.convenience_fee_total) > 0
+        ? `Includes ${formatMoney(Number(booking.convenience_fee_total))} convenience fee & VAT`
+        : undefined,
     amountRows,
   });
 }

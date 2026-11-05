@@ -10,7 +10,7 @@ const UniversalVenueDesigner = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="w-full h-[calc(100vh-60px)] flex flex-col items-center justify-center bg-slate-950 text-white gap-3">
+      <div className="w-full h-[calc(100vh-60px)] flex flex-col items-center justify-center bg-white text-slate-900 gap-3">
         <Loader2 className="w-8 h-8 animate-spin text-red-500" aria-label="Loading venue designer" />
       </div>
     ),
@@ -19,10 +19,10 @@ const UniversalVenueDesigner = dynamic(
 
 export default function AdminVenueDesignerPage() {
   return (
-    <div className="w-full h-[calc(100vh-56px)] overflow-hidden bg-slate-950 flex flex-col">
+    <div className="w-full h-[calc(100vh-56px)] overflow-hidden bg-white flex flex-col">
       <Suspense
         fallback={
-          <div className="w-full h-full flex items-center justify-center bg-slate-950 text-white">
+          <div className="w-full h-full flex items-center justify-center bg-white text-slate-900">
             <Loader2 className="w-8 h-8 animate-spin text-red-500" />
           </div>
         }

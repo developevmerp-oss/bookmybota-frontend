@@ -37,6 +37,7 @@ import { parseEventLanguages } from "@/lib/eventValidation";
 import { formatMoney, formatOfferDiscount } from "@/lib/currencyFormat";
 import { artistHref } from "@/lib/businessPublicPath";
 import { useStickyHeaderOffset } from "@/lib/useStickyHeaderOffset";
+import { useStickyCtaAboveFooter } from "@/lib/useStickyCtaAboveFooter";
 import { readSessionForRole } from "@/lib/authStorage";
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
@@ -54,6 +55,8 @@ import EventGallerySection from "@/components/EventLandingPage/EventGallerySecti
 import EventVenuesModal from "@/components/EventLandingPage/EventVenuesModal";
 import CustomerAuthModal from "@/components/Shared/CustomerAuthModal";
 import Footer from "@/components/LandingPage/Footer";
+import { eventPlaceLine } from "@/components/LandingPage/homeUtils";
+import ShinyBlackButton from "@/components/Shared/ShinyBlackButton";
 
 const BRAND = "#6900AA";
 type StaticArtist = {
@@ -125,30 +128,104 @@ function MetaRow({ icon, children }: { icon: ReactNode; children: ReactNode }) {
   );
 }
 
-function RelatedCard({ event }: { event: PublicEvent }) {
+/** Same shell + body layout as event landing / Popular Events poster cards. */
+function relatedDateLine(iso?: string) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const weekday = d.toLocaleString("en-GB", { weekday: "short" });
+  const dateLabel = formatDateCustomer(iso);
+  const time = formatTime12h(iso);
+  if (!dateLabel || dateLabel === "—") return "";
+  return `${weekday}, ${dateLabel}, ${time}`;
+}
+
+function RelatedCard({
+  event,
+  className = "",
+}: {
+  event: Pick<
+    PublicEvent,
+    | "id"
+    | "name"
+    | "poster_vertical_url"
+    | "poster_horizontal_url"
+    | "category_name"
+    | "next_showtime"
+  > &
+    Partial<Pick<PublicEvent, "venue_name" | "city_name">>;
+  className?: string;
+}) {
   const image = resolveMediaUrl(event.poster_vertical_url || event.poster_horizontal_url);
-  const subtitle = event.category_name || formatLongDate(event.next_showtime);
+  const dateLine = relatedDateLine(event.next_showtime);
+  const place = eventPlaceLine(event as PublicEvent);
+  const eventType = event.category_name?.trim() || "";
+
   return (
     <Link
       href={`/events/${event.id}`}
-      className="snap-start shrink-0 w-[148px] sm:w-[176px] lg:w-[196px] 2xl:w-[210px] group"
+      className={`group flex h-full min-w-0 w-full flex-col overflow-hidden rounded-2xl border border-[#E5E5E5] bg-white shadow-[0_1px_3px_rgba(17,17,17,0.06)] transition-[box-shadow,transform] duration-300 lg:hover:-translate-y-0.5 lg:hover:shadow-[0_8px_24px_rgba(17,17,17,0.1)] ${className}`}
     >
-      <div className="relative h-[208px] sm:h-[248px] lg:h-[264px] 2xl:h-[280px] rounded-xl overflow-hidden bg-[#F3F4F6]">
+      <div className="relative aspect-[3/4] w-full shrink-0 overflow-hidden bg-slate-100">
         <SafeCoverImage
           src={image}
           alt={event.name}
-          className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-          fallbackClassName="absolute inset-0 flex items-center justify-center bg-[#F3F4F6] text-slate-300"
+          className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.04]"
+          fallbackClassName="absolute inset-0 flex h-full w-full items-center justify-center bg-[#F3F4F6] text-slate-300"
           fallback={<EventImageFallback size={32} />}
         />
       </div>
-      <p className="mt-2 sm:mt-2.5 font-bold text-[#1A1A1A] text-[1rem] sm:text-[1.0625rem] leading-snug line-clamp-2">
-        {event.name}
-      </p>
-      {subtitle && (
-        <p className="mt-1 text-[0.875rem] sm:text-[1rem] text-[#6B6B6B] line-clamp-1">{subtitle}</p>
-      )}
+      <div className="flex-1 space-y-1 px-3.5 py-3 sm:px-4 sm:py-3.5">
+        {dateLine ? (
+          <p className="truncate text-sm font-semibold leading-snug tracking-wide text-[#B59B2A]">
+            {dateLine}
+          </p>
+        ) : null}
+        <h3 className="line-clamp-2 text-base font-bold leading-snug tracking-wide text-[#1C1C1C] sm:text-lg">
+          {event.name}
+        </h3>
+        {place ? (
+          <p className="truncate text-sm font-medium leading-snug tracking-wide text-gray-600">
+            {place}
+          </p>
+        ) : null}
+        {eventType ? (
+          <p className="truncate text-sm font-medium leading-snug tracking-wide text-gray-600">
+            {eventType}
+          </p>
+        ) : null}
+      </div>
     </Link>
+  );
+}
+
+/** Collapse oversized blank lines in about copy into tighter paragraphs. */
+function AboutBody({
+  text,
+  trailing,
+}: {
+  text: string;
+  trailing?: ReactNode;
+}) {
+  const paragraphs = text
+    .split(/\n\s*\n/)
+    .map((p) => p.replace(/\n+/g, " ").trim())
+    .filter(Boolean);
+
+  if (paragraphs.length === 0) return null;
+
+  return (
+    <div className="space-y-2.5 sm:space-y-3">
+      {paragraphs.map((para, index) => (
+        <p
+          key={index}
+          className="text-[1rem] sm:text-[1.0625rem] lg:text-[1rem] leading-6 sm:leading-[1.55] text-[#5A5A5A]"
+        >
+          {para}
+          {index === paragraphs.length - 1 ? trailing : null}
+        </p>
+      ))}
+    </div>
   );
 }
 
@@ -203,6 +280,10 @@ export default function PublicEventDetailPage({
   const relatedRef = useRef<HTMLDivElement>(null);
   const stickyHeaderOffset = useStickyHeaderOffset(72);
   const bookingCardTop = stickyHeaderOffset + 12;
+  /** Event pages own their Footer (layout hides it on /events) — enable after load. */
+  const { stickyCtaBottom, stickyCtaHidden } = useStickyCtaAboveFooter(
+    !isLoading && Boolean(event)
+  );
 
   useEffect(() => {
     const syncAuth = () => {
@@ -640,17 +721,16 @@ export default function PublicEventDetailPage({
             <p className="mt-1 text-[0.8125rem] sm:text-[0.875rem] font-semibold text-red-600">Sold out</p>
           )}
         </div>
-        <button
+        <ShinyBlackButton
           type="button"
           disabled={!canBook}
           onClick={() => openCheckout()}
-          className={`shrink-0 px-3.5 sm:px-4 py-2.5 sm:py-3 rounded-[0.5rem] font-bold text-[0.875rem] sm:text-[0.9375rem] ${
-            canBook ? "text-white cursor-pointer" : "bg-slate-200 text-slate-500 cursor-not-allowed"
+          className={`shrink-0 px-3.5 sm:px-4 py-2.5 sm:py-3 rounded-[0.5rem] text-[0.875rem] sm:text-[0.9375rem] ${
+            canBook ? "bg-[#111111] text-white" : "bg-slate-200 text-slate-500 !opacity-100"
           }`}
-          style={canBook ? { backgroundColor: "#111111" } : undefined}
-          >
+        >
           {bookLabel}
-        </button>
+        </ShinyBlackButton>
       </div>
     </div>
   );
@@ -682,7 +762,7 @@ export default function PublicEventDetailPage({
         </div>
       </div>
 
-      <div className="bmb-section-container pt-4 sm:pt-6 lg:pt-7 pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:pb-10">
+      <div className="bmb-section-container pt-4 sm:pt-6 lg:pt-7 pb-[calc(6.5rem+env(safe-area-inset-bottom))] lg:pb-10">
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] 2xl:grid-cols-[minmax(0,1fr)_360px] gap-x-5 sm:gap-x-6 lg:gap-x-8 2xl:gap-x-10 gap-y-5 sm:gap-y-6 lg:gap-y-0">
           <div className="hidden lg:flex items-center justify-between gap-3 mb-3 sm:mb-4 lg:mb-5 lg:col-start-1">
             <h1 className="min-w-0 flex-1 text-[1.75rem] sm:text-[2rem] lg:text-[2.2rem] 2xl:text-[2.2rem] font-bold text-[#1A1A1A] leading-tight tracking-tight break-words">
@@ -710,16 +790,8 @@ export default function PublicEventDetailPage({
               youtubeUrl={event.youtube_url}
             />
 
-            <div className="mt-3 sm:mt-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-4">
-              <div
-                className={`flex min-w-0 flex-nowrap items-center gap-2 sm:gap-3 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden `}
-                //   ${
-                //   saved
-                //     ? "md:max-w-[min(100%,28rem)] xl:max-w-[52rem] 2xl:max-w-[36rem]"
-                //     : "md:max-w-[min(100%,34rem)] xl:max-w-[60rem] 2xl:max-w-[44rem]"
-                // }
-                
-              >
+            <div className="mt-4 sm:mt-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-4">
+              <div className="flex min-w-0 flex-nowrap items-center gap-2 sm:gap-3 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 {categoryBadges.map((badge) => (
                   <span
                     key={badge}
@@ -784,25 +856,27 @@ export default function PublicEventDetailPage({
 
             {aboutText && (
               <section className="mt-6 sm:mt-8 lg:mt-9">
-                <h2 className="text-[1.25rem] sm:text-[1.375rem] lg:text-[1.4rem] font-semibold text-[#1A1A1A] mb-2.5 sm:mb-2">
+                <h2 className="text-[1.25rem] sm:text-[1.375rem] lg:text-[1.4rem] font-semibold text-[#1A1A1A] mb-2 sm:mb-2.5">
                   About The Event
                 </h2>
-                <p className="text-[1rem] sm:text-[1.0625rem] lg:text-[1rem] leading-7 sm:leading-[1.7] lg:leading-6 text-[#5A5A5A] whitespace-pre-wrap">
-                  {displayAbout}
-                  {aboutLong && (
-                    <>
-                      {" "}
-                      <button
-                        type="button"
-                        onClick={() => setAboutExpanded((v) => !v)}
-                        className="font-semibold cursor-pointer hover:underline"
-                        style={{ color: BRAND }}
-                      >
-                        {aboutExpanded ? "Read Less" : "Read More"}
-                      </button>
-                    </>
-                  )}
-                </p>
+                <AboutBody
+                  text={displayAbout}
+                  trailing={
+                    aboutLong ? (
+                      <>
+                        {" "}
+                        <button
+                          type="button"
+                          onClick={() => setAboutExpanded((v) => !v)}
+                          className="font-semibold cursor-pointer hover:underline"
+                          style={{ color: BRAND }}
+                        >
+                          {aboutExpanded ? "Read Less" : "Read More"}
+                        </button>
+                      </>
+                    ) : undefined
+                  }
+                />
               </section>
             )}
 
@@ -922,28 +996,35 @@ export default function PublicEventDetailPage({
             )}
 
             {related.length > 0 && (
-              <section className="mt-8 sm:mt-10 pt-5 sm:pt-6 border-t border-slate-200">
-                <h2 className="text-[1.25rem] sm:text-[1.375rem] lg:text-[1.4rem] font-semibold text-[#1A1A1A] mb-2.5 sm:mb-2">
+              <section className="mt-8 sm:mt-10 pt-6 sm:pt-7 border-t border-slate-200">
+                <h2 className="text-[1.25rem] sm:text-[1.375rem] lg:text-[1.4rem] font-semibold text-[#1A1A1A]">
                   You May Also Like
                 </h2>
-                <p className="text-[1rem] sm:text-[1.0625rem] text-[#6B6B6B] mt-1 mb-3 sm:mb-4">
+                <p className="text-[0.9375rem] sm:text-[1rem] text-[#6B6B6B] mt-1 mb-3.5 sm:mb-4">
                   Events around you, book now.
                 </p>
                 <div className="relative">
                   <div
                     ref={relatedRef}
-                    className="flex gap-3 sm:gap-4 overflow-x-auto scroll-smooth pb-1 -mx-5 px-5 sm:mx-0 sm:px-0 snap-x snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                    className="flex gap-3 sm:gap-4 overflow-x-auto scroll-smooth pb-1 -mx-5 px-5 sm:mx-0 sm:px-0 snap-x snap-mandatory scroll-pl-5 scroll-pr-5 sm:scroll-pl-0 sm:scroll-pr-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                   >
                     {related.map((e) => (
-                      <RelatedCard key={e.id} event={e} />
+                      <div
+                        key={e.id}
+                        className="shrink-0 snap-start w-[min(72vw,15.5rem)] sm:w-[200px] md:w-[220px] lg:w-[240px]"
+                      >
+                        <RelatedCard event={e} />
+                      </div>
                     ))}
-              </div>
+                    {/* Trailing spacer so the last card can snap with right inset on mobile */}
+                    <span className="w-px shrink-0 sm:hidden" aria-hidden />
+                  </div>
                   {related.length > 3 && (
                     <button
                       type="button"
                       aria-label="Next recommendations"
-                      onClick={() => relatedRef.current?.scrollBy({ left: 220, behavior: "smooth" })}
-                      className="hidden lg:flex absolute -right-2 2xl:-right-3 top-[98px] sm:top-[118px] lg:top-[126px] 2xl:top-[134px] -translate-y-1/2 w-9 h-9 2xl:w-10 2xl:h-10 rounded-full bg-[#3A3A3A] text-white items-center justify-center cursor-pointer"
+                      onClick={() => relatedRef.current?.scrollBy({ left: 240, behavior: "smooth" })}
+                      className="hidden lg:flex absolute -right-2 2xl:-right-3 top-[42%] -translate-y-1/2 w-9 h-9 2xl:w-10 2xl:h-10 rounded-full bg-[#3A3A3A] text-white items-center justify-center cursor-pointer"
                     >
                       <ChevronRight size={16} />
                     </button>
@@ -966,32 +1047,38 @@ export default function PublicEventDetailPage({
         </div>
       </div>
 
-      <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-sm border-t border-slate-200 px-3 sm:px-4 pt-2.5 sm:pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] flex items-center gap-4">
-        <div className="min-w-0 flex-1 overflow-hidden">
-          {minPrice != null && Number.isFinite(minPrice) && (
-            <p className="text-[0.9375rem] sm:text-[1rem] leading-tight whitespace-nowrap">
-              <span className="font-bold text-[#1A1A1A]">
-                {formatMoney(minPrice, { compact: true })}
-              </span>{" "}
-              <span className="font-semibold text-gray-400">onwards</span>
-            </p>
-          )}
-          {fillingFast && (
-            <p className="mt-0.5 text-[0.8125rem] sm:text-[0.875rem] font-semibold text-[#C47A2C]">Filling Fast</p>
-          )}
-        </div>
-        <button
-          type="button"
-          disabled={!canBook}
-          onClick={() => openCheckout()}
-          className={`shrink-0 min-w-[7.5rem] px-5 sm:px-6 py-2.5 rounded-[0.5rem] font-bold text-[0.9375rem] sm:text-[1rem] ${
-            canBook ? "text-white cursor-pointer" : "bg-slate-200 text-slate-500 cursor-not-allowed"
-          }`}
-          style={canBook ? { backgroundColor: "#111111" } : undefined}
+      {!stickyCtaHidden ? (
+        <div
+          className="lg:hidden fixed inset-x-0 z-40 bg-white/95 backdrop-blur-sm border-t border-slate-200 px-3 sm:px-4 pt-2.5 sm:pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] flex items-center gap-4"
+          style={{ bottom: stickyCtaBottom }}
         >
-          {bookLabel}
-        </button>
-      </div>
+          <div className="min-w-0 flex-1 overflow-hidden">
+            {minPrice != null && Number.isFinite(minPrice) && (
+              <p className="text-[0.9375rem] sm:text-[1rem] leading-tight whitespace-nowrap">
+                <span className="font-bold text-[#1A1A1A]">
+                  {formatMoney(minPrice, { compact: true })}
+                </span>{" "}
+                <span className="font-semibold text-gray-400">onwards</span>
+              </p>
+            )}
+            {fillingFast && (
+              <p className="mt-0.5 text-[0.8125rem] sm:text-[0.875rem] font-semibold text-[#C47A2C]">
+                Filling Fast
+              </p>
+            )}
+          </div>
+          <ShinyBlackButton
+            type="button"
+            disabled={!canBook}
+            onClick={() => openCheckout()}
+            className={`shrink-0 min-w-[7.5rem] px-5 sm:px-6 py-2.5 rounded-[0.5rem] text-[0.9375rem] sm:text-[1rem] ${
+              canBook ? "bg-[#111111] text-white" : "bg-slate-200 text-slate-500 !opacity-100"
+            }`}
+          >
+            {bookLabel}
+          </ShinyBlackButton>
+        </div>
+      ) : null}
 
       {shareOpen && (
         <div className="fixed inset-0 z-[70] bg-black/40 p-3 sm:p-4" onClick={() => setShareOpen(false)} role="presentation">
@@ -1100,7 +1187,7 @@ export default function PublicEventDetailPage({
               {event ? (
                 <div className="mt-5 sm:mt-6">
                   <p className="text-[1.125rem] font-bold text-[#1A1A1A]">Events</p>
-                  <div className="mt-3">
+                  <div className="mt-3 w-[min(72vw,15.5rem)] sm:w-[200px]">
                     <RelatedCard
                       event={{
                         id: event.id,
@@ -1109,6 +1196,7 @@ export default function PublicEventDetailPage({
                         poster_horizontal_url: event.poster_horizontal_url,
                         category_name: event.category_name,
                         next_showtime: nextShowtime?.starts_at,
+                        venue_name: nextShowtime?.venue_name,
                       }}
                     />
                   </div>

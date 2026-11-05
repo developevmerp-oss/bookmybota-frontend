@@ -29,9 +29,9 @@ export default function NotifyMoviesRail() {
   };
 
   return (
-    <section className="bg-white py-6 sm:py-8 lg:pb-5">
+    <section className="bg-white pt-6 sm:pt-7 lg:pt-8">
       <div className="bmb-section-container">
-        <div className="flex items-end justify-between gap-3 sm:gap-4 mb-4 sm:mb-5">
+        <div className="flex items-center justify-between gap-3 sm:gap-4 mb-0.3 sm:mb-0.5">
           <div className="min-w-0">
             <h2 className="text-xl sm:text-2xl font-bold text-slate-800">
               Must-Watch Movies

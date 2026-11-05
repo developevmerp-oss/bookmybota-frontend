@@ -57,12 +57,15 @@ import { lockBodyScroll } from '@/lib/lockBodyScroll';
 import { useSelectedCity } from '@/lib/useSelectedCity';
 import PaymentSuccessView from '@/components/Shared/PaymentSuccessView';
 import { RestaurantDetailShimmer } from '@/components/Shared/Shimmer';
+import ShinyBlackButton from '@/components/Shared/ShinyBlackButton';
+import { useStickyCtaAboveFooter } from '@/lib/useStickyCtaAboveFooter';
 import { getPhoneValidationError, isValidPhone, sanitizePhoneInput } from '@/lib/validation';
 import GuestTableAnimation from './GuestTableAnimation';
 import BookingSuccessCheckAnimation from './BookingSuccessCheckAnimation';
 import DiningBookingPolicyModal, {
   type DiningBookingPolicySection,
 } from './DiningBookingPolicyModal';
+import { hasDiningPolicyContent } from '@/lib/diningPolicyHtml';
 import {
   confirmBookingSchema,
   type ConfirmBookingValues,
@@ -595,102 +598,6 @@ const DETAIL_SECTION_TABS = [
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-/**
- * Universal Shiny & Tactile Black Button with:
- * 1. Immediate shining light beam sweep animation once on page render
- * 2. Premium top bevel line & hover glow
- * 3. Tactile click sensation with active scale depression + interactive ripple fill effect
- */
-function ShinyBlackButton({
-  type = "button",
-  disabled = false,
-  onClick,
-  className = "",
-  children,
-  ariaBusy,
-}: {
-  type?: "button" | "submit" | "reset";
-  disabled?: boolean;
-  onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void;
-  className?: string;
-  children: React.ReactNode;
-  ariaBusy?: boolean;
-}) {
-  const [ripples, setRipples] = useState<{ id: number; x: number; y: number; size: number }[]>([]);
-
-  const handlePointerDown = (e: React.MouseEvent<HTMLButtonElement>) => {
-    if (disabled) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const size = Math.max(rect.width, rect.height) * 2.2;
-    const x = e.clientX ? e.clientX - rect.left - size / 2 : rect.width / 2 - size / 2;
-    const y = e.clientY ? e.clientY - rect.top - size / 2 : rect.height / 2 - size / 2;
-    const id = Date.now() + Math.random();
-
-    setRipples((prev) => [...prev, { id, x, y, size }]);
-    setTimeout(() => {
-      setRipples((prev) => prev.filter((r) => r.id !== id));
-    }, 650);
-  };
-
-  return (
-    <button
-      type={type}
-      disabled={disabled}
-      aria-busy={ariaBusy}
-      onMouseDown={handlePointerDown}
-      onClick={onClick}
-      className={`bmb-shiny-btn group relative overflow-hidden rounded-xl font-bold transition-all duration-200 select-none ${disabled
-          ? "cursor-not-allowed opacity-60"
-          : "active:scale-[0.98] active:brightness-90 hover:bg-black hover:shadow-lg hover:shadow-black/25 cursor-pointer"
-        } ${className}`}
-    >
-      {/* Shining beam of light sweeping across the button once on page render */}
-      {!disabled && (
-        <span
-          className="pointer-events-none absolute inset-0 -translate-x-full animate-bmb-shine bg-gradient-to-r from-transparent via-white/35 to-transparent skew-x-[-20deg]"
-          aria-hidden="true"
-        />
-      )}
-
-      {/* Top bevel edge line for premium physical depth */}
-      {!disabled && (
-        <span
-          className="pointer-events-none absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/25 to-transparent"
-          aria-hidden="true"
-        />
-      )}
-
-      {/* Hover background sheen */}
-      {!disabled && (
-        <span
-          className="pointer-events-none absolute inset-0 bg-white/0 group-hover:bg-white/[0.06] transition-colors duration-200"
-          aria-hidden="true"
-        />
-      )}
-
-      {/* Click Ripple Fill Effect */}
-      {ripples.map((ripple) => (
-        <span
-          key={ripple.id}
-          className="bmb-shiny-ripple"
-          style={{
-            left: ripple.x,
-            top: ripple.y,
-            width: ripple.size,
-            height: ripple.size,
-          }}
-          aria-hidden="true"
-        />
-      ))}
-
-      {/* Button Content */}
-      <span className="relative z-10 flex items-center justify-center gap-2 tracking-wide w-full">
-        {children}
-      </span>
-    </button>
-  );
-}
-
 function ShinyBookTableCTAButton({
   onClick,
   className = "",
@@ -777,8 +684,6 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
   const authUser = useAppSelector((state) => state.auth.user);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [reviewsModalOpen, setReviewsModalOpen] = useState(false);
-  const [expandedReviewId, setExpandedReviewId] = useState<string | null>(null);
-
   useEffect(() => {
     if (!reviewsModalOpen) return;
     const unlock = lockBodyScroll();
@@ -823,6 +728,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
   const hideSiteNav = titlePast;
   const showRestaurantSticky = titlePast;
   const isBookTableFlow = activeTab === "Book a Table";
+  const { stickyCtaBottom, stickyCtaHidden } = useStickyCtaAboveFooter(!isLoading && Boolean(profile));
   const [isMobileViewport, setIsMobileViewport] = useState(() =>
     typeof window !== "undefined" ? window.matchMedia("(max-width: 767px)").matches : false
   );
@@ -1286,8 +1192,15 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
         setArrivalDropdownOpen(false);
       }
     };
+    const handleClose = () => setArrivalDropdownOpen(false);
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('scroll', handleClose, { passive: true, capture: true });
+    window.addEventListener('resize', handleClose);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('scroll', handleClose, true);
+      window.removeEventListener('resize', handleClose);
+    };
   }, [arrivalDropdownOpen]);
 
   useEffect(() => {
@@ -1410,6 +1323,11 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [currentPhotoIdx, setCurrentPhotoIdx] = useState(0);
   const [lightboxItems, setLightboxItems] = useState<string[]>([]);
+  const [heroPhotoIdx, setHeroPhotoIdx] = useState(0);
+  const heroSwipeRef = useRef<{ x: number; y: number } | null>(null);
+  const heroSuppressClickRef = useRef(false);
+  const lightboxSwipeRef = useRef<{ x: number; y: number } | null>(null);
+  const lightboxSuppressClickRef = useRef(false);
 
   const uploadedPhotos = [];
   if (profile?.cover_image_url) {
@@ -1424,10 +1342,22 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
   const photos = profile ? resolveValidMediaUrls(uploadedPhotos) : [];
   const venueGalleryPhotos = resolveValidMediaUrls(uploadedPhotos);
 
+  useEffect(() => {
+    setHeroPhotoIdx(0);
+  }, [profile?.id]);
+
+  useEffect(() => {
+    if (photos.length === 0) {
+      setHeroPhotoIdx(0);
+      return;
+    }
+    setHeroPhotoIdx((prev) => Math.min(prev, photos.length - 1));
+  }, [photos.length]);
+
   const openLightbox = (index: number, items?: string[]) => {
     const list = items && items.length > 0 ? items : photos;
     setLightboxItems(list);
-    setCurrentPhotoIdx(index);
+    setCurrentPhotoIdx(Math.max(0, Math.min(index, list.length - 1)));
     setIsLightboxOpen(true);
   };
 
@@ -1435,12 +1365,62 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
     setIsLightboxOpen(false);
   };
 
-  const nextPhoto = () => {
+  const nextPhoto = useCallback(() => {
     setCurrentPhotoIdx((prev) => (prev + 1) % (lightboxItems.length || 1));
+  }, [lightboxItems.length]);
+
+  const prevPhoto = useCallback(() => {
+    setCurrentPhotoIdx((prev) => (prev - 1 + (lightboxItems.length || 1)) % (lightboxItems.length || 1));
+  }, [lightboxItems.length]);
+
+  const nextHeroPhoto = useCallback(() => {
+    if (photos.length < 2) return;
+    setHeroPhotoIdx((prev) => (prev + 1) % photos.length);
+  }, [photos.length]);
+
+  const prevHeroPhoto = useCallback(() => {
+    if (photos.length < 2) return;
+    setHeroPhotoIdx((prev) => (prev - 1 + photos.length) % photos.length);
+  }, [photos.length]);
+
+  const onHeroTouchStart = (e: React.TouchEvent) => {
+    const t = e.touches[0];
+    if (!t) return;
+    heroSwipeRef.current = { x: t.clientX, y: t.clientY };
   };
 
-  const prevPhoto = () => {
-    setCurrentPhotoIdx((prev) => (prev - 1 + (lightboxItems.length || 1)) % (lightboxItems.length || 1));
+  const onHeroTouchEnd = (e: React.TouchEvent) => {
+    const start = heroSwipeRef.current;
+    heroSwipeRef.current = null;
+    if (!start || photos.length < 2) return;
+    const t = e.changedTouches[0];
+    if (!t) return;
+    const dx = t.clientX - start.x;
+    const dy = t.clientY - start.y;
+    if (Math.abs(dx) < 48 || Math.abs(dx) < Math.abs(dy) * 1.15) return;
+    heroSuppressClickRef.current = true;
+    if (dx < 0) nextHeroPhoto();
+    else prevHeroPhoto();
+  };
+
+  const onLightboxTouchStart = (e: React.TouchEvent) => {
+    const t = e.touches[0];
+    if (!t) return;
+    lightboxSwipeRef.current = { x: t.clientX, y: t.clientY };
+  };
+
+  const onLightboxTouchEnd = (e: React.TouchEvent) => {
+    const start = lightboxSwipeRef.current;
+    lightboxSwipeRef.current = null;
+    if (!start || lightboxItems.length < 2) return;
+    const t = e.changedTouches[0];
+    if (!t) return;
+    const dx = t.clientX - start.x;
+    const dy = t.clientY - start.y;
+    if (Math.abs(dx) < 48 || Math.abs(dx) < Math.abs(dy) * 1.15) return;
+    lightboxSuppressClickRef.current = true;
+    if (dx < 0) nextPhoto();
+    else prevPhoto();
   };
 
   useEffect(() => {
@@ -1460,7 +1440,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
       };
     }
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isLightboxOpen, lightboxItems.length]);
+  }, [isLightboxOpen, lightboxItems.length, nextPhoto, prevPhoto]);
 
   // Find if selected day is closed (calendar date row is source of truth)
   const selectedOpDay = operatingByDate.get(toLocalDateKey(bookingDates[selectedDateIndex]));
@@ -1849,7 +1829,19 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
     { key: "saturday", label: "Saturday" },
     { key: "sunday", label: "Sunday" },
   ] as const;
-  const todayWeekdayKey = WEEKDAY_ROWS[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1].key;
+  const ethiopiaWeekday = new Intl.DateTimeFormat("en-US", {
+    weekday: "long",
+    timeZone: "Africa/Addis_Ababa",
+  }).format(new Date()).toLowerCase();
+  const todayWeekdayIndex = Math.max(
+    0,
+    WEEKDAY_ROWS.findIndex((row) => row.key === ethiopiaWeekday)
+  );
+  const todayWeekdayKey = WEEKDAY_ROWS[todayWeekdayIndex].key;
+  const orderedWeekdays = [
+    ...WEEKDAY_ROWS.slice(todayWeekdayIndex),
+    ...WEEKDAY_ROWS.slice(0, todayWeekdayIndex),
+  ];
   const hoursByWeekdayKey = (() => {
     const map = new Map<string, { open: string; close: string; closed: boolean }>();
     for (const [dateKey, row] of operatingByDate.entries()) {
@@ -1865,7 +1857,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
     }
     return map;
   })();
-  const openingHourRows = WEEKDAY_ROWS.map(({ key, label }) => {
+  const openingHourRows = orderedWeekdays.map(({ key, label }) => {
     const weekly = profile.operating_hours?.[key];
     const fromCalendar = hoursByWeekdayKey.get(key);
     const dayHours =
@@ -1945,7 +1937,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
     .join(" | ");
 
   return (
-    <div className="min-h-screen bg-white text-slate-700">
+    <div className={`${isBookTableFlow ? "" : "min-h-screen"} bg-white text-slate-700`}>
 
       {/* ── 1. Breadcrumbs (keep on success; hide on immersive mobile/tablet book) ── */}
       {/* <div
@@ -1971,9 +1963,13 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
       </div> */}
 
       <div
-        className={`bmb-section-container pb-24 md:pb-16 ${isBookTableFlow
+        className={`bmb-section-container ${isBookTableFlow
             ? "max-lg:px-0 max-lg:pt-0 max-lg:pb-0 py-0 lg:pt-0 lg:pb-16"
-            : "max-md:px-0 max-md:pt-0 pt-7"
+            : `max-md:px-0 max-md:pt-0 pt-7 md:pb-16 ${
+                !hideBookingSidebar
+                  ? "max-md:pb-[calc(5.75rem+env(safe-area-inset-bottom))]"
+                  : "max-md:pb-4"
+              }`
           }`}
       >
         {/* ── Header: title + icon actions + rating (hidden on book flow + success) ── */}
@@ -2062,18 +2058,29 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
               }`}
           >
             <div ref={titleSentinelRef} className="h-px w-full" aria-hidden />
-            {/* Mobile full-bleed hero — taller, edge-to-edge, no top gap */}
-            <div className="md:hidden relative w-full h-[62vw] min-h-[280px] max-h-[440px] overflow-hidden bg-[#F3F4F6]">
-              {photos[0] ? (
+            {/* Mobile full-bleed hero — swipe to change photos */}
+            <div
+              className="md:hidden relative w-full h-[62vw] min-h-[280px] max-h-[440px] overflow-hidden bg-[#F3F4F6] touch-pan-y"
+              onTouchStart={onHeroTouchStart}
+              onTouchEnd={onHeroTouchEnd}
+            >
+              {photos.length > 0 ? (
                 <button
                   type="button"
                   className="absolute inset-0 w-full h-full cursor-pointer"
-                  onClick={() => openLightbox(0)}
+                  onClick={() => {
+                    if (heroSuppressClickRef.current) {
+                      heroSuppressClickRef.current = false;
+                      return;
+                    }
+                    openLightbox(heroPhotoIdx);
+                  }}
                   aria-label="View gallery"
                 >
                   <SafeCoverImage
-                    src={photos[0]}
-                    alt={profile.name}
+                    key={photos[heroPhotoIdx] || heroPhotoIdx}
+                    src={photos[heroPhotoIdx] || photos[0]}
+                    alt={`${profile.name} photo ${heroPhotoIdx + 1}`}
                     className="w-full h-full object-cover"
                     fallbackClassName="flex h-full w-full items-center justify-center bg-[#F3F4F6] text-slate-300"
                     fallback={<DiningImageFallback size={36} />}
@@ -2110,11 +2117,11 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
               {photos.length > 0 ? (
                 <button
                   type="button"
-                  onClick={() => openLightbox(0)}
+                  onClick={() => openLightbox(heroPhotoIdx)}
                   className="absolute bottom-3 right-3 z-20 bg-black/65 text-white text-xs font-semibold px-2.5 py-1 rounded-md cursor-pointer"
-                  aria-label={`View gallery, ${photos.length} photos`}
+                  aria-label={`View gallery, photo ${heroPhotoIdx + 1} of ${photos.length}`}
                 >
-                  1 / {photos.length}
+                  {heroPhotoIdx + 1} / {photos.length}
                 </button>
               ) : null}
             </div>
@@ -2284,6 +2291,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                 <p className="text-sm text-slate-500 leading-snug">{profile.address.trim()}</p>
               ) : null}
 
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
               {infoCostText ? (
                 <p className="inline-flex items-center gap-1 text-sm font-medium text-slate-700">
                   <EqualApproximately size={14} strokeWidth={2} className="shrink-0 text-slate-600" aria-hidden />
@@ -2294,7 +2302,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
               <button
                 type="button"
                 onClick={() => setVenueInfoModal("hours")}
-                className="inline-flex items-center gap-1.5 cursor-pointer text-sm"
+                className="inline-flex items-center gap-1.5 cursor-pointer text-sm shrink-0"
                 aria-label="Show opening hours"
               >
                 <span className={`font-semibold ${isOpenNow ? "text-emerald-600" : "text-[#C2410C]"}`}>
@@ -2308,8 +2316,9 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                 ) : null}
                 <ChevronDown size={15} className="text-slate-700" strokeWidth={2.25} />
               </button>
+              </div>
 
-              <div className="flex flex-wrap gap-2.5 pt-1">
+              <div className="flex flex-wrap gap-2.5 pt-0.5">
                 {profile.address?.trim() ||
                   (Number.isFinite(Number(profile.latitude)) &&
                     Number.isFinite(Number(profile.longitude))) ? (
@@ -2503,16 +2512,16 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
           >
             <div
               id="tab-panel-start"
-              className={`space-y-4 scroll-mt-[7.5rem] md:scroll-mt-[8rem] lg:scroll-mt-[9rem] xl:scroll-mt-[9.25rem] ${isBookTableFlow ? "pt-0" : "pt-4 max-md:px-5"
+              className={`space-y-2 scroll-mt-[7.5rem] md:scroll-mt-[8rem] lg:scroll-mt-[9rem] xl:scroll-mt-[9.25rem] ${isBookTableFlow ? "pt-0" : "pt-2 max-md:px-5"
                 }`}
             >
 
               {/* Single-page Overview with scroll-spy sections (District-style) */}
               {activeTab !== "Book a Table" && (
-                <div className="space-y-4">
+                <div className="space-y-2">
 
                   {/* Overview — Dining Offers + About (Overview tab highlights for both) */}
-                  <div id="section-overview" className="scroll-mt-[7.5rem] md:scroll-mt-[8rem] lg:scroll-mt-[9rem] xl:scroll-mt-[9.25rem] space-y-4 pb-5">
+                  <div id="section-overview" className="scroll-mt-[7.5rem] md:scroll-mt-[8rem] lg:scroll-mt-[9rem] xl:scroll-mt-[9.25rem] space-y-3 pb-1">
                     {visibleOffers.length > 0 ? (
                       <section className="bg-white p-0 sm:p-0">
                         <h3 className="text-2xl sm:text-3xl lg:text-xl font-bold text-zinc-800">
@@ -2614,7 +2623,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                     ) : null}
 
                     {/* About Venue — Cost + Cuisines */}
-                    <section className="bg-white p-0 sm:py-7">
+                    <section className="bg-white p-0">
                       <h3 className="text-2xl sm:text-3xl lg:text-xl font-bold text-zinc-800 mb-2">
                         About the restaurant
                       </h3>
@@ -2658,7 +2667,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                           <h4 className="text-lg sm:text-xl lg:text-base font-bold text-zinc-800 mt-5 mb-3">
                             Available Facilities
                           </h4>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 space-y-2 ">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
                             {profile.amenities.map((info: string) => (
                               <div
                                 key={info}
@@ -2677,7 +2686,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                   {/* Menu — stack preview → lightbox */}
                   <section
                     id="section-menu"
-                    className="bg-white p-0 sm:p-0 scroll-mt-[7.5rem] md:scroll-mt-[8rem] lg:scroll-mt-[9rem] xl:scroll-mt-[9.25rem] py-7"
+                    className="bg-white p-0 scroll-mt-[7.5rem] md:scroll-mt-[8rem] lg:scroll-mt-[9rem] xl:scroll-mt-[9.25rem] pt-3 pb-1"
                   >
                     <div className="flex items-center justify-between gap-3 mb-3">
                       <h3 className="text-2xl sm:text-3xl lg:text-xl font-bold text-zinc-800">Menu</h3>
@@ -2708,7 +2717,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                   {/* Photos Gallery — max 3; 3rd gets “View all photos” overlay when more exist */}
                   <section
                     id="section-photos"
-                    className="bg-white  scroll-mt-[7.5rem] md:scroll-mt-[8rem] lg:scroll-mt-[9rem] xl:scroll-mt-[9.25rem] py-7"
+                    className="bg-white scroll-mt-[7.5rem] md:scroll-mt-[8rem] lg:scroll-mt-[9rem] xl:scroll-mt-[9.25rem] pt-3 pb-1"
                   >
                     <h3 className="text-xl sm:text-2xl lg:text-lg font-bold text-slate-800 mb-3">Photos Gallery</h3>
                     <VenuePhotosGallery
@@ -2720,11 +2729,11 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                   {/* Reviews — same UI as before, shown in Overview scroll */}
                   <div
                     id="section-reviews"
-                    className="space-y-4 scroll-mt-[7.5rem] md:scroll-mt-[8rem] lg:scroll-mt-[9rem] xl:scroll-mt-[9.25rem] py-7"
+                    className="space-y-3 scroll-mt-[7.5rem] md:scroll-mt-[8rem] lg:scroll-mt-[9rem] xl:scroll-mt-[9.25rem] pt-3 pb-1"
                   >
                     {/* Write Review Form — gated like movies: login + booking + visit ended */}
-                    <section className="bg-white  py-7">
-                      <h3 className="text-lg sm:text-xl lg:text-base font-bold text-slate-800 mb-3">Write a Review</h3>
+                    <section className="bg-white">
+                      <h3 className="text-lg font-bold leading-tight text-slate-800 mb-1">Write a Review</h3>
                       {!isCustomerLoggedIn ? (
                         <div className="flex flex-wrap items-center justify-between gap-3">
                           <p className="text-sm text-slate-600">
@@ -2813,8 +2822,8 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
 
                     {/* Ratings & reviews — review carousel */}
                     <section className="bg-white p-0 sm:p-0">
-                      <div className="flex items-center justify-between gap-3 mb-3">
-                        <h3 className="text-lg sm:text-xl lg:text-lg font-bold text-[#111111]">
+                      <div className={`flex items-center justify-between gap-3 ${reviews.length > 0 ? "mb-4" : "mb-1"}`}>
+                        <h3 className="text-lg font-bold leading-tight text-[#111111]">
                           Ratings &amp; reviews
                         </h3>
                         {reviews.length > 0 ? (
@@ -2830,7 +2839,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                       </div>
 
                       {reviews.length === 0 ? (
-                        <p className="text-sm text-slate-500 py-4">
+                        <p className="text-sm text-slate-500">
                           No reviews yet. Be the first to leave one after your visit!
                         </p>
                       ) : (
@@ -3001,8 +3010,12 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
             <X size={22} className="text-white" strokeWidth={2.25} />
           </button>
 
-          {/* Image stage */}
-          <div className="flex-1 flex flex-col items-center justify-center min-h-0 px-0 sm:px-5 md:px-6 relative">
+          {/* Image stage — swipe on mobile/touch */}
+          <div
+            className="flex-1 flex flex-col items-center justify-center min-h-0 px-0 sm:px-5 md:px-6 relative touch-pan-y"
+            onTouchStart={onLightboxTouchStart}
+            onTouchEnd={onLightboxTouchEnd}
+          >
             {lightboxItems.length > 1 ? (
               <button
                 type="button"
@@ -3019,9 +3032,14 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                 key={lightboxItems[currentPhotoIdx] + "-" + currentPhotoIdx}
                 src={lightboxItems[currentPhotoIdx]}
                 alt={`Gallery image ${currentPhotoIdx + 1}`}
+                draggable={false}
                 className="max-h-[78vh] w-full sm:w-auto sm:max-w-[min(920px,90vw)] object-contain select-none animate-diningLightboxSlideUp"
                 onClick={(e) => {
                   e.stopPropagation();
+                  if (lightboxSuppressClickRef.current) {
+                    lightboxSuppressClickRef.current = false;
+                    return;
+                  }
                   if (lightboxItems.length > 1) nextPhoto();
                 }}
               />
@@ -3067,7 +3085,11 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
       {/* ── 8. Book a Table flow (inline in Book a Table tab via portal) ── */}
       {activeTab === "Book a Table" && bookTableSlot && createPortal(
         <div
-          className="w-full bg-white flex flex-col pb-12 sm:pb-16"
+          className={`w-full bg-white flex flex-col md:pb-16 ${
+            drawerStep === 1 || drawerStep === 3
+              ? "max-md:min-h-[100dvh] max-md:pb-[4.75rem]"
+              : ""
+          }`}
           style={
             isBookTableFlow && isLgViewport
               ? { paddingTop: (restaurantStickyHeight || 96) + 12 }
@@ -3096,7 +3118,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
           ) : null}
 
           {/* Panel Content */}
-          <div className={`${drawerStep === 4 ? '' : drawerStep === 3 ? 'p-4 sm:p-6 bg-white lg:pt-0' : drawerStep === 1 ? 'pt-0 pb-2 bg-white px-4 sm:px-5 lg:px-0' : 'p-5 bg-white'}`}>
+          <div className={`${drawerStep === 4 ? '' : drawerStep === 3 ? 'p-4 sm:p-6 bg-white lg:pt-0' : drawerStep === 1 ? 'pt-0 pb-1 md:pb-2 bg-white px-4 sm:px-5 lg:px-0' : 'p-5 bg-white'}`}>
             {drawerStep === 1 && (() => {
               const mealsConfig: DiningMealsConfig = selectedOpDay?.meals || {
                 breakfast: { open: '08:00', close: '11:00', active: true },
@@ -3844,6 +3866,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                   </div>
                 ) : (
                   <form
+                    id="dining-confirm-booking-form"
                     onSubmit={handleConfirmSubmit(onConfirmBooking, (formErrors) => {
                       if (formErrors.name) setConfirmFocus('name');
                       else if (formErrors.phone) setConfirmFocus('phone');
@@ -3954,9 +3977,9 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                       </div>
 
                       {/* Right — editable guest form */}
-                      <div>
+                      <div className="relative z-20 overflow-visible">
                         <h3 className="text-base font-bold text-zinc-900 mb-3">Your details</h3>
-                        <div className="rounded-xl bg-zinc-50 p-3.5 space-y-3">
+                        <div className="rounded-xl bg-zinc-50 p-3.5 space-y-3 overflow-visible">
                           <div>
                             <label className={`rounded-none border-b border-zinc-200 px-3 py-2 flex items-center gap-2.5 cursor-text transition-colors ${confirmErrors.name ? 'border-red-400' : 'border-zinc-200'} focus-within:border-[#6900AA]`}>
                               <User size={16} className="text-primary shrink-0" />
@@ -4017,7 +4040,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                             )}
                           </div>
 
-                          <div ref={arrivalFieldRef} className="relative">
+                          <div ref={arrivalFieldRef} className="relative z-[70]">
                             <div className={`rounded-none border-b border-zinc-200 px-3 py-2 flex items-center gap-2.5 transition-colors ${confirmErrors.arrivalTime ? 'border-red-400' : 'border-zinc-200'} focus-within:border-[#6900AA]`}>
                               <Clock size={16} className="text-primary shrink-0" />
                               <button
@@ -4041,7 +4064,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                               <ul
                                 role="listbox"
                                 aria-label="Approx. Arrival"
-                                className="absolute left-0 right-0 top-full mt-1.5 z-30 bg-white border border-zinc-200 rounded-xl shadow-[0_8px_24px_rgba(15,23,42,0.12)] p-1.5"
+                                className="absolute left-0 right-0 bottom-full mb-1.5 z-[80] max-h-56 overflow-y-auto bg-white border border-zinc-200 rounded-xl shadow-[0_8px_24px_rgba(15,23,42,0.18)] p-1.5"
                               >
                                 {[
                                   { value: 'On time', label: 'On time' },
@@ -4083,7 +4106,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                       </div>
                     </div>
 
-                    <div className="flex flex-col items-start gap-3">
+                    <div className="hidden md:flex flex-col items-start gap-3">
                       <ShinyBlackButton
                         type="submit"
                         disabled={isSubmittingBooking || isCreatingBooking}
@@ -4102,14 +4125,6 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                           "Confirm Booking"
                         )}
                       </ShinyBlackButton>
-                      <button
-                        type="button"
-                        onClick={() => setDrawerStep(1)}
-                        className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-600 hover:text-[#6900AA] transition-colors cursor-pointer"
-                      >
-                        <ChevronLeft size={18} />
-                        Back
-                      </button>
                     </div>
                   </form>
                 )}
@@ -4377,8 +4392,11 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
 
             {/* Step 1 footer — terms row + proceed */}
             {drawerStep === 1 && (
-              <div className="mt-4 md:mt-4 max-md:sticky max-md:bottom-0 max-md:z-40 max-md:-mx-5 max-md:px-5 max-md:pt-3 max-md:pb-[max(0.75rem,env(safe-area-inset-bottom))] max-md:bg-white max-md:border-t max-md:border-slate-200 space-y-3 md:space-y-4 md:max-w-sm lg:max-w-md">
+              <div className="mt-4 space-y-3 md:space-y-4 md:max-w-sm lg:max-w-md">
+                {(hasDiningPolicyContent(profile.booking_terms) ||
+                  hasDiningPolicyContent(profile.cancellation_policy)) && (
                 <div className="flex flex-wrap items-center gap-2 pt-1">
+                  {hasDiningPolicyContent(profile.booking_terms) ? (
                   <button
                     type="button"
                     onClick={() => {
@@ -4390,6 +4408,8 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                     <span>Terms &amp; Conditions</span>
                     <ChevronRight size={13} strokeWidth={2.25} className="text-black shrink-0" />
                   </button>
+                  ) : null}
+                  {hasDiningPolicyContent(profile.cancellation_policy) ? (
                   <button
                     type="button"
                     onClick={() => {
@@ -4401,7 +4421,9 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                     <span>Cancellation Policy</span>
                     <ChevronRight size={13} strokeWidth={2.25} className="text-black shrink-0" />
                   </button>
+                  ) : null}
                 </div>
+                )}
 
                 {/* Desktop terms checkbox — temporarily hidden
                 <label className="hidden lg:flex items-start gap-2.5 cursor-pointer select-none">
@@ -4448,7 +4470,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                     proceedChecking
                   }
                   onClick={() => void proceedToBooking()}
-                  className={`w-full px-6 sm:px-8 py-3.5 rounded-xl text-base ${selectedTime &&
+                  className={`hidden md:inline-flex w-full items-center justify-center px-6 sm:px-8 py-3.5 rounded-xl text-base ${selectedTime &&
                       selectedSlotIsAvailable &&
                       !slotsInitialLoading &&
                       !proceedChecking
@@ -4471,9 +4493,81 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
         </div>
         , bookTableSlot)}
 
+      {isBookTableFlow && drawerStep === 1 && !bookingPolicyOpen && !isLightboxOpen && !stickyCtaHidden ? (
+        <div
+          className="md:hidden fixed inset-x-0 z-40 border-t border-slate-200 bg-white px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+          style={{ bottom: stickyCtaBottom }}
+        >
+          <ShinyBlackButton
+            type="button"
+            disabled={
+              !selectedTime ||
+              !selectedSlotIsAvailable ||
+              slotsInitialLoading ||
+              proceedChecking
+            }
+            onClick={() => void proceedToBooking()}
+            className={`w-full inline-flex items-center justify-center px-6 py-3.5 rounded-xl text-base ${selectedTime &&
+                selectedSlotIsAvailable &&
+                !slotsInitialLoading &&
+                !proceedChecking
+                ? "bg-[#111111] text-white"
+                : "bg-[#cfcfcf] text-white"
+              }`}
+          >
+            {proceedChecking ? (
+              <>
+                <Loader2 size={16} className="animate-spin" />
+                Checking availability…
+              </>
+            ) : (
+              "Proceed to book"
+            )}
+          </ShinyBlackButton>
+        </div>
+      ) : null}
+
+      {isBookTableFlow &&
+      drawerStep === 3 &&
+      availabilityStatus !== "unavailable" &&
+      !bookingPolicyOpen &&
+      !isLightboxOpen &&
+      !stickyCtaHidden ? (
+        <div
+          className="md:hidden fixed inset-x-0 z-40 border-t border-slate-200 bg-white px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+          style={{ bottom: stickyCtaBottom }}
+        >
+          <ShinyBlackButton
+            type="submit"
+            form="dining-confirm-booking-form"
+            disabled={isSubmittingBooking || isCreatingBooking}
+            ariaBusy={isSubmittingBooking || isCreatingBooking || undefined}
+            className={`w-full inline-flex items-center justify-center px-6 py-3.5 rounded-xl text-base ${
+              isSubmittingBooking || isCreatingBooking ? "bg-zinc-700 text-white" : "bg-[#111111] text-white"
+            }`}
+          >
+            {isSubmittingBooking || isCreatingBooking ? (
+              <>
+                <Loader2 size={16} className="animate-spin" />
+                Confirming…
+              </>
+            ) : (
+              "Confirm Booking"
+            )}
+          </ShinyBlackButton>
+        </div>
+      ) : null}
+
       {/* Mobile sticky Book a table CTA (overview) */}
-      {!hideBookingSidebar && activeTab !== "Book a Table" && !isLightboxOpen ? (
-        <div className="md:hidden fixed bottom-0 inset-x-0 z-50 border-t border-slate-200 bg-white px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+      {!hideBookingSidebar &&
+      activeTab !== "Book a Table" &&
+      !isLightboxOpen &&
+      !stickyCtaHidden &&
+      !venueInfoModal ? (
+        <div
+          className="md:hidden fixed inset-x-0 z-40 border-t border-slate-200 bg-white px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+          style={{ bottom: stickyCtaBottom }}
+        >
           <ShinyBookTableCTAButton
             onClick={() => handleQuickBook()}
             className="w-full text-base py-3.5"
@@ -4632,12 +4726,9 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
               type="button"
               className="absolute inset-0 bg-black/45 cursor-pointer"
               aria-label="Close reviews"
-              onClick={() => {
-                setReviewsModalOpen(false);
-                setExpandedReviewId(null);
-              }}
+              onClick={() => setReviewsModalOpen(false)}
             />
-            <div className="relative w-full sm:max-w-lg max-h-[85vh] sm:max-h-[80vh] bg-white rounded-t-2xl sm:rounded-2xl shadow-xl flex flex-col overflow-hidden">
+            <div className="relative flex w-full sm:max-w-lg max-h-[88dvh] flex-col overflow-hidden bg-white rounded-t-2xl sm:rounded-2xl shadow-xl">
               <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-slate-100 shrink-0">
                 <h2
                   id="dining-reviews-modal-title"
@@ -4647,10 +4738,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                 </h2>
                 <button
                   type="button"
-                  onClick={() => {
-                    setReviewsModalOpen(false);
-                    setExpandedReviewId(null);
-                  }}
+                  onClick={() => setReviewsModalOpen(false)}
                   className="w-9 h-9 rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-100 cursor-pointer"
                   aria-label="Close"
                 >
@@ -4659,61 +4747,22 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
               </div>
               <div
                 data-scroll-lock-container
-                className="overflow-y-auto flex-1 px-5 sm:px-6 py-2 pr-6 sm:pr-7 overscroll-contain"
+                className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 space-y-3 pb-[max(1.25rem,env(safe-area-inset-bottom))]"
               >
                 {reviews.map((rev: any) => {
                   const ratingNum = Number(rev.rating) || 0;
                   const name = rev.user_name || "Guest";
-                  const text = (rev.text || "").trim();
-                  const timeLabel = reviewTimeAgo(rev.created_at);
-                  const expanded = expandedReviewId === String(rev.id);
-                  const needsMore = text.length > 180;
                   return (
-                    <article
+                    <CustomerReviewCard
                       key={rev.id}
-                      className="py-4 border-b border-slate-100 last:border-b-0"
-                    >
-                      <div className="flex items-start gap-2.5 pr-1">
-                        <span className="inline-flex size-9 items-center justify-center rounded-full bg-slate-100 text-sm font-bold text-slate-600 shrink-0">
-                          {String(name).slice(0, 1).toUpperCase()}
-                        </span>
-                        <div className="min-w-0 flex-1 flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <p className="text-sm font-semibold text-[#111111] truncate leading-snug">
-                              {name}
-                            </p>
-                            {timeLabel ? (
-                              <p className="mt-0.5 text-xs text-slate-400 leading-snug">
-                                {timeLabel}
-                              </p>
-                            ) : null}
-                          </div>
-                          <span className="shrink-0 inline-flex items-center gap-1 rounded-md bg-[#1B7A3D] px-2.5 py-1 text-xs font-bold text-white leading-none mt-0.5">
-                            <Star size={10} className="fill-white text-white" />
-                            {Math.round(ratingNum)}
-                          </span>
-                        </div>
-                      </div>
-                      {text ? (
-                        <div className="mt-2.5 relative pl-0">
-                          <p
-                            className={`text-sm text-[#111111] leading-relaxed whitespace-pre-wrap ${expanded || !needsMore ? "" : "line-clamp-4"
-                              }`}
-                          >
-                            {text}
-                          </p>
-                          {needsMore && !expanded ? (
-                            <button
-                              type="button"
-                              onClick={() => setExpandedReviewId(String(rev.id))}
-                              className="absolute bottom-0 right-0 pl-8 bg-gradient-to-l from-white via-white to-transparent text-sm font-semibold text-rose-600 cursor-pointer"
-                            >
-                              Read More
-                            </button>
-                          ) : null}
-                        </div>
-                      ) : null}
-                    </article>
+                      name={name}
+                      rating={ratingNum}
+                      text={rev.text}
+                      timeLabel={reviewTimeAgo(rev.created_at)}
+                      bookedOnPlatform={Boolean(rev.booked_on_platform)}
+                      accentColor="#6900AA"
+                      className="rounded-xl p-4 shadow-none"
+                    />
                   );
                 })}
               </div>
@@ -4726,6 +4775,8 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
         open={bookingPolicyOpen}
         focusSection={bookingPolicyFocus}
         onClose={() => setBookingPolicyOpen(false)}
+        termsText={profile.booking_terms}
+        cancellationText={profile.cancellation_policy}
       />
 
       {bookingSuccess && lastBookingId ? (
@@ -4734,6 +4785,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
           module="dining"
           bookingId={lastBookingId}
           nextHref={`/customer/bookings/confirmation?id=${lastBookingId}`}
+          onClose={() => setBookingSuccess(false)}
         />
       ) : null}
 

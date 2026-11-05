@@ -231,7 +231,7 @@ export default function CustomerGiftCardsPage() {
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-6 flex flex-col gap-4 sm:gap-5">
         <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-start justify-between gap-3">
           <div className="flex flex-col gap-1 min-w-0">
-            <h2 className="text-[20px] sm:text-2xl font-bold text-[#1a1040] tracking-tight">
+            <h2 className="hidden lg:block text-[20px] sm:text-2xl font-bold text-[#1a1040] tracking-tight">
               My Gift Cards
             </h2>
             <p className="text-[13px] sm:text-sm text-[#6B7280]">

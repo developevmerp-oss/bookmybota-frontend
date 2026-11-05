@@ -173,9 +173,9 @@ export default function RecommendedMoviesRail() {
       : MOVIES_HOME_HREF;
 
   return (
-    <section className="bg-white py-6 sm:py-8 lg:pb-5">
+    <section className="bg-white pt-3 pb-5 sm:pt-4 sm:pb-6 lg:pt-3 lg:pb-4">
       <div className="bmb-section-container">
-        <div className="flex items-end justify-between gap-3 sm:gap-4 mb-4 sm:mb-5">
+        <div className="flex items-end justify-between gap-3 sm:gap-4 mb-3 sm:mb-4">
           <div className="min-w-0">
             <h2 className="text-xl sm:text-2xl font-bold text-slate-800">
               Must-Watch Movies

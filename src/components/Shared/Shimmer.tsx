@@ -40,8 +40,8 @@ export function EventDetailShimmer() {
 
           <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] 2xl:grid-cols-[minmax(0,1fr)_360px] gap-5 sm:gap-6 lg:gap-8 2xl:gap-10">
             <div className="min-w-0">
-              {/* Hero media — matches EventMediaSlider aspect ratios */}
-              <div className="w-full overflow-hidden rounded-lg sm:rounded-xl aspect-[4/3] sm:aspect-[16/9] lg:aspect-[2/1] 2xl:aspect-[21/9]">
+              {/* Hero media — matches EventMediaSlider 16:9 */}
+              <div className="w-full overflow-hidden rounded-lg sm:rounded-xl aspect-[16/9]">
                 <Skeleton className="!block !h-full !w-full !rounded-lg sm:!rounded-xl" height="100%" />
               </div>
 
@@ -377,7 +377,7 @@ export function EventListShimmer() {
   return (
     <Wrap>
       <div
-        className="grid w-full grid-cols-1 gap-5 md:grid-cols-2 md:gap-4 lg:grid-cols-4 lg:gap-5"
+        className="grid w-full grid-cols-2 gap-4 lg:grid-cols-4 lg:gap-6"
         aria-busy="true"
         aria-label="Loading events"
       >
@@ -925,7 +925,7 @@ export function MovieGridShimmer({ count = 8 }: { count?: number }) {
   return (
     <Wrap>
       <div
-        className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4"
+        className="grid grid-cols-2 gap-x-4 gap-y-5 sm:gap-x-[1.15rem] lg:grid-cols-4 lg:gap-x-6 lg:gap-y-6"
         aria-busy="true"
         aria-label="Loading movies"
       >

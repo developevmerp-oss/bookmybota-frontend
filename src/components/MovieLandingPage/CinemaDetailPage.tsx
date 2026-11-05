@@ -38,6 +38,12 @@ import {
   type PublicRegisteredPartner,
 } from "@/services/api";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
+import { toast } from "sonner";
+import {
+  toggleCinemaFavorite,
+  isCinemaFavorited,
+  readCinemaFavoriteIds,
+} from "@/lib/cinemaWishlist";
 import {
   formatTime12h,
   isMovieShowEnded,
@@ -52,6 +58,7 @@ import {
   normalizeFilterKey,
 } from "@/lib/movieShowtimeFilters";
 import { CustomerFullscreenShimmer, ShowtimeListShimmer } from "@/components/Shared/Shimmer";
+import ShinyBlackButton from "@/components/Shared/ShinyBlackButton";
 
 const PAGE_BG = "#F4F2F8";
 const BRAND = "#6900AA";
@@ -146,12 +153,9 @@ function cinemaFavoriteLegacyKeys(
   apiCinema: PublicRegisteredPartner | undefined,
   routeKey: string
 ): string[] {
-  return [apiCinema?.id, apiCinema?.slug, routeKey].filter(Boolean) as string[];
+  return [apiCinema?.id, apiCinema?.slug, routeKey, apiCinema?.name].filter(Boolean) as string[];
 }
 
-function isCinemaFavorited(list: string[], legacyKeys: string[]): boolean {
-  return legacyKeys.some((k) => list.includes(k));
-}
 
 function mapPartnerAddress(v: PublicRegisteredPartner) {
   const cityPart = [v.city_name, v.city_state].filter(Boolean).join(", ");
@@ -348,7 +352,7 @@ function BmsFilterDropdown({
             ref={menuRef}
             role="listbox"
             aria-multiselectable
-            className="fixed z-[200] max-h-[min(20rem,60vh)] overflow-y-auto rounded-xl border border-[#E8E2F2] bg-white py-1.5 shadow-[0_12px_28px_rgba(0,0,0,0.14)]"
+            className="fixed z-[200] max-h-[min(20rem,60vh)] overflow-y-auto rounded-xl border border-slate-200 bg-white py-1.5 shadow-[0_12px_28px_rgba(0,0,0,0.14)]"
             style={{
               top: menuPos.top,
               left: menuPos.left,
@@ -356,7 +360,7 @@ function BmsFilterDropdown({
             }}
           >
             {options.length === 0 ? (
-              <li className="px-3.5 py-3 text-[12px] text-[#9CA3AF]">{emptyText}</li>
+              <li className="px-3.5 py-3 text-[12px] text-slate-400">{emptyText}</li>
             ) : (
               options.map((opt) => {
                 const checked = values.includes(opt.value);
@@ -375,7 +379,7 @@ function BmsFilterDropdown({
                       className={`w-full px-3.5 py-2.5 flex items-center gap-3 text-left text-[13px] transition-colors ${
                         disabled
                           ? "cursor-not-allowed bg-white"
-                          : "text-[#333333] hover:bg-[#F7E9FF]/70 cursor-pointer"
+                          : "text-slate-800 hover:bg-slate-50 cursor-pointer"
                       }`}
                     >
                       {opt.icon ? (
@@ -386,7 +390,7 @@ function BmsFilterDropdown({
                       <span className="flex-1 min-w-0">
                         <span
                           className={`font-semibold block leading-tight ${
-                            disabled ? "text-[#B8B8B8]" : "text-[#222222]"
+                            disabled ? "text-slate-300" : "text-slate-800"
                           }`}
                         >
                           {opt.label}
@@ -394,7 +398,7 @@ function BmsFilterDropdown({
                         {opt.hint ? (
                           <span
                             className={`block mt-0.5 text-[11px] font-normal leading-tight ${
-                              disabled ? "text-[#D0D0D0]" : "text-[#9CA3AF]"
+                              disabled ? "text-slate-300" : "text-slate-400"
                             }`}
                           >
                             {opt.hint}
@@ -404,10 +408,10 @@ function BmsFilterDropdown({
                       <span
                         className={`h-4 w-4 shrink-0 rounded-[3px] border flex items-center justify-center ${
                           disabled
-                            ? "border-0 bg-[#E0E0E0]"
+                            ? "border-0 bg-slate-200"
                             : checked
-                              ? "border-[#6900AA] bg-[#6900AA] text-white"
-                              : "border-[#9CA3AF] bg-white"
+                              ? "border-slate-900 bg-slate-900 text-white"
+                              : "border-slate-300 bg-white"
                         }`}
                         aria-hidden
                       >
@@ -440,8 +444,8 @@ function BmsFilterDropdown({
         onClick={() => onOpenChange(!open)}
         className={`h-9 sm:h-10 px-2.5 sm:px-3.5 inline-flex items-center gap-1.5 sm:gap-2 rounded-full border text-[12px] sm:text-[13px] font-medium cursor-pointer focus:outline-none transition-colors whitespace-nowrap ${
           active
-            ? "border-[#6900AA] text-[#6900AA] bg-[#F7E9FF]"
-            : "border-[#E8E0F2] text-[#4B5563] bg-white hover:border-[#6900AA]/40"
+            ? "border-slate-400 bg-slate-100 text-slate-900 font-semibold"
+            : "border-slate-200 text-slate-700 bg-white hover:border-slate-300"
         }`}
         aria-haspopup="listbox"
         aria-expanded={open}
@@ -453,7 +457,7 @@ function BmsFilterDropdown({
         <ChevronDown
           size={14}
           className={`shrink-0 transition-transform ${open ? "rotate-180" : ""} ${
-            active ? "text-[#6900AA]" : "text-[#9CA3AF]"
+            active ? "text-slate-900" : "text-slate-400"
           }`}
         />
       </button>
@@ -591,7 +595,7 @@ function MobileBottomSheet({
         onClick={onClose}
       />
       <div
-        className={`absolute inset-x-0 bottom-0 max-h-[88vh] overflow-y-auto rounded-t-2xl bg-white shadow-2xl ${
+        className={`absolute inset-x-0 bottom-0 max-h-[88vh] flex flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl ${
           exiting ? "mobile-filter-sheet-panel-out" : "mobile-filter-sheet-panel"
         }`}
         role="dialog"
@@ -691,30 +695,36 @@ export default function CinemaDetailPage({ cinemaId }: { cinemaId: string }) {
   }, []);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem("movie_cinema_favorites");
-      const list = raw ? (JSON.parse(raw) as string[]) : [];
-      setFavorited(isCinemaFavorited(list, favoriteLegacyKeys));
-    } catch {
-      setFavorited(false);
-    }
+    const update = () => {
+      setFavorited(isCinemaFavorited(favoriteLegacyKeys));
+    };
+    update();
+    window.addEventListener("movie_cinema_favorites_changed", update);
+    window.addEventListener("storage", update);
+    return () => {
+      window.removeEventListener("movie_cinema_favorites_changed", update);
+      window.removeEventListener("storage", update);
+    };
   }, [favoriteLegacyKeys]);
 
   const toggleFavorite = () => {
-    setFavorited((prev) => {
-      const next = !prev;
-      try {
-        const raw = localStorage.getItem("movie_cinema_favorites");
-        const list: string[] = raw ? (JSON.parse(raw) as string[]) : [];
-        const legacy = new Set(favoriteLegacyKeys);
-        let updated = list.filter((id) => !legacy.has(id));
-        if (next) updated = Array.from(new Set([...updated, favoriteStorageId]));
-        localStorage.setItem("movie_cinema_favorites", JSON.stringify(updated));
-      } catch {
-        /* ignore */
-      }
-      return next;
-    });
+    const { wishlisted } = toggleCinemaFavorite(
+      {
+        id: favoriteStorageId,
+        name: cinemaName,
+        address: cinemaAddress,
+        cover_image_url: cinemaImage || undefined,
+        slug: apiCinema?.slug || (cinemaId !== favoriteStorageId ? cinemaId : undefined),
+        href: cinemaHref(apiCinema || { id: cinemaId, slug: cinemaId }),
+      },
+      favoriteLegacyKeys
+    );
+    setFavorited(wishlisted);
+    if (wishlisted) {
+      toast.success(`Added ${cinemaName} to your favorite cinemas`);
+    } else {
+      toast.success(`Removed ${cinemaName} from your favorite cinemas`);
+    }
   };
 
   const [clockTick, setClockTick] = useState(0);
@@ -922,19 +932,19 @@ export default function CinemaDetailPage({ cinemaId }: { cinemaId: string }) {
   };
 
   const filterChipClass = (active: boolean, disabled = false) =>
-    `inline-flex items-center justify-center rounded-full border px-3.5 py-2 text-[12px] font-semibold transition-colors ${
+    `inline-flex items-center justify-center rounded-full border px-4 py-2 text-[13px] font-semibold transition-all select-none ${
       disabled
-        ? "border-[#E8E8E8] text-[#C8C8C8] bg-white cursor-not-allowed"
+        ? "border-slate-200 text-slate-300 bg-slate-50 cursor-not-allowed opacity-60"
         : active
-          ? "border-[#6900AA] bg-[#6900AA] text-white cursor-pointer"
-          : "border-[#6900AA]/55 bg-white text-[#6900AA] cursor-pointer"
+          ? "border-slate-900 bg-slate-900 text-white shadow-sm cursor-pointer"
+          : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50 active:scale-[0.98] cursor-pointer"
     }`;
 
   const mobilePillClass = (active: boolean) =>
-    `shrink-0 h-9 px-3 inline-flex items-center gap-1.5 rounded-full border text-[12px] font-semibold whitespace-nowrap cursor-pointer transition-colors ${
+    `shrink-0 h-9 px-3.5 inline-flex items-center gap-1.5 rounded-full border text-[13px] whitespace-nowrap cursor-pointer transition-colors ${
       active
-        ? "border-[#6900AA] text-[#6900AA] bg-[#F7E9FF]"
-        : "border-[#E5E5E5] text-[#333333] bg-white"
+        ? "border-slate-400 bg-slate-100 text-slate-900 font-semibold"
+        : "border-slate-200 text-slate-700 bg-white hover:border-slate-300 font-medium"
     }`;
 
   const handleShowtimeClick = (id: string) => {
@@ -1534,16 +1544,32 @@ export default function CinemaDetailPage({ cinemaId }: { cinemaId: string }) {
       </div>
 
       <MobileBottomSheet open={mobileFiltersOpen} onClose={() => setMobileFiltersOpen(false)}>
-        <div className="px-4 pt-4 pb-3">
-          <h2 className="text-lg font-extrabold text-[#111111]">Filters</h2>
+        <div className="w-10 h-1 bg-slate-300 rounded-full mx-auto mt-2.5 shrink-0" />
+        <div className="flex items-center justify-between gap-3 px-5 py-3.5 border-b border-slate-200 shrink-0 bg-white">
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-bold text-slate-900 tracking-tight">Filters</h2>
+            {draftLanguageFilters.length + draftTimeFilters.length + draftPriceFilters.length > 0 && (
+              <span className="inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full text-[11px] font-bold bg-slate-900 text-white">
+                {draftLanguageFilters.length + draftTimeFilters.length + draftPriceFilters.length}
+              </span>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => setMobileFiltersOpen(false)}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors cursor-pointer"
+            aria-label="Close"
+          >
+            <X size={18} strokeWidth={2.25} />
+          </button>
         </div>
-        <div className="pb-24">
-          <div className="bg-[#F3F4F6] px-4 py-2 text-[11px] font-bold uppercase tracking-wide text-[#6B7280]">
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain pb-6">
+          <div className="bg-[#F8FAFC] px-5 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-500 border-b border-slate-100">
             Language
           </div>
-          <div className="flex flex-wrap gap-2 px-4 py-3">
+          <div className="flex flex-wrap gap-2.5 px-5 py-3.5">
             {languageOptions.length === 0 ? (
-              <p className="text-[12px] text-[#9CA3AF]">No languages available</p>
+              <p className="text-[12px] text-slate-400">No languages available</p>
             ) : (
               languageOptions.map((opt) => (
                 <button
@@ -1560,10 +1586,10 @@ export default function CinemaDetailPage({ cinemaId }: { cinemaId: string }) {
             )}
           </div>
 
-          <div className="bg-[#F3F4F6] px-4 py-2 text-[11px] font-bold uppercase tracking-wide text-[#6B7280]">
+          <div className="bg-[#F8FAFC] px-5 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-500 border-y border-slate-100">
             Preferred Time
           </div>
-          <div className="flex flex-wrap gap-2 px-4 py-3">
+          <div className="flex flex-wrap gap-2.5 px-5 py-3.5">
             {preferredTimeOptions.map((opt) => {
               const disabled = Boolean(opt.disabled);
               return (
@@ -1584,10 +1610,10 @@ export default function CinemaDetailPage({ cinemaId }: { cinemaId: string }) {
             })}
           </div>
 
-          <div className="bg-[#F3F4F6] px-4 py-2 text-[11px] font-bold uppercase tracking-wide text-[#6B7280]">
+          <div className="bg-[#F8FAFC] px-5 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-500 border-y border-slate-100">
             Price Range
           </div>
-          <div className="flex flex-wrap gap-2 px-4 py-3">
+          <div className="flex flex-wrap gap-2.5 px-5 py-3.5">
             {PRICE_BAND_OPTIONS.map((opt) => (
               <button
                 key={opt.value}
@@ -1602,7 +1628,7 @@ export default function CinemaDetailPage({ cinemaId }: { cinemaId: string }) {
             ))}
           </div>
         </div>
-        <div className="sticky bottom-0 inset-x-0 flex gap-3 border-t border-[#E8E8E8] bg-white px-4 py-3 safe-area-pb">
+        <div className="sticky bottom-0 inset-x-0 flex items-center gap-3 border-t border-slate-200 bg-white px-5 py-3 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-[0_-4px_16px_rgba(0,0,0,0.06)] shrink-0">
           <button
             type="button"
             onClick={() => {
@@ -1610,22 +1636,21 @@ export default function CinemaDetailPage({ cinemaId }: { cinemaId: string }) {
               setDraftTimeFilters([]);
               setDraftPriceFilters([]);
             }}
-            className="flex-1 h-11 rounded-xl border border-[#6900AA] text-[#6900AA] text-sm font-bold cursor-pointer"
+            className="flex-1 h-11 inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-5 text-sm font-bold text-slate-800 hover:bg-slate-50 active:scale-[0.98] transition-all cursor-pointer"
           >
             Reset
           </button>
-          <button
-            type="button"
+          <ShinyBlackButton
             onClick={() => {
               setLanguageFilters(draftLanguageFilters);
               setTimeFilters(draftTimeFilters);
               setPriceFilters(draftPriceFilters);
               setMobileFiltersOpen(false);
             }}
-            className="flex-[1.4] h-11 rounded-xl bg-[#6900AA] text-white text-sm font-bold cursor-pointer"
+            className="flex-[1.4] h-11 !rounded-full bg-[#111111] text-white text-sm font-bold shadow-md shadow-black/20"
           >
             Apply Filters
-          </button>
+          </ShinyBlackButton>
         </div>
       </MobileBottomSheet>
     </div>

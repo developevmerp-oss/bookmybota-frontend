@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, Play, Share2, Star, ThumbsUp } from "lucide-react";
+import { ArrowLeft, ArrowRight, Calendar, Play, Share2, Star, ThumbsUp } from "lucide-react";
 import { toast } from "sonner";
 import MovieTrailerModal from "@/components/MovieLandingPage/MovieTrailerModal";
 import SafeCoverImage, { MovieImageFallback } from "@/components/Shared/SafeCoverImage";
@@ -27,12 +27,14 @@ import MovieLanguageFormatModal, {
   shouldShowLanguageFormatPicker,
 } from "@/components/MovieLandingPage/MovieLanguageFormatModal";
 import { MovieDetailShimmer } from "@/components/Shared/Shimmer";
+import ShinyBlackButton from "@/components/Shared/ShinyBlackButton";
 import { useStickyHeaderOffset } from "@/lib/useStickyHeaderOffset";
+import { useStickyCtaAboveFooter } from "@/lib/useStickyCtaAboveFooter";
 import { formatDateCustomer } from "@/lib/dateFormat";
 
-/** Matches MovieDetailBanner desktop Book Tickets CTA */
+/** Dining-parity black booking CTA (one-time shine via ShinyBlackButton). */
 const HERO_BOOK_BTN_CLASS =
-  "inline-flex items-center justify-center gap-2 rounded-xl bg-[linear-gradient(135deg,#A78BFA_0%,#8B5CF6_38%,#6D28D9_72%,#4C1D95_100%)] px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-[#6D28D9]/30 hover:opacity-90 transition-opacity";
+  "inline-flex items-center justify-center gap-2 rounded-xl bg-[#111111] px-5 py-2.5 text-sm font-bold text-white";
 
 const HERO_FORMAT_BADGE_CLASS =
   "inline-flex items-center rounded-md border border-white/25 bg-white/15 px-2.5 py-1 text-[11px] sm:text-xs font-bold text-white backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]";
@@ -135,7 +137,7 @@ function MovieDetailBanner({
   };
 
   const bookClass =
-    "inline-flex items-center justify-center gap-2 rounded-xl bg-[linear-gradient(135deg,#A78BFA_0%,#8B5CF6_38%,#6D28D9_72%,#4C1D95_100%)] px-5 sm:px-8 py-2.5 sm:py-3 text-sm sm:text-base font-bold text-white shadow-lg shadow-[#6D28D9]/30 hover:opacity-90 transition-opacity";
+    "inline-flex items-center justify-center gap-2 rounded-xl bg-[#111111] px-5 sm:px-8 py-2.5 sm:py-3 text-sm sm:text-base font-bold text-white";
 
   const bookLabel = (
     <>
@@ -173,8 +175,8 @@ function MovieDetailBanner({
         {/* Spacer so hero starts below the fixed header */}
         <div className="h-[3.25rem]" aria-hidden />
 
-        {/* Landscape / poster hero */}
-        <section className="relative w-full h-[min(42vh,360px)] min-h-[240px] overflow-hidden bg-[#111]">
+        {/* Landscape / poster hero — exact 2.5:1 ratio matching banner standard */}
+        <section className="relative w-full aspect-[2.5/1] overflow-hidden bg-[#111]">
           <SafeCoverImage
             src={bg}
             alt={movie.title}
@@ -183,55 +185,53 @@ function MovieDetailBanner({
             fallback={<MovieImageFallback size={64} />}
             loading="eager"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-black/10" />
-
-          {(movie.duration || heroFormats.length > 0 || movie.certification) && (
-            <div className="absolute inset-x-0 bottom-0 z-10 px-4 pb-16 pt-8 bg-gradient-to-t from-black/75 to-transparent">
-              {movie.duration ? (
-                <p className="text-[13px] font-medium text-white/90">{movie.duration} •</p>
-              ) : null}
-              {(heroFormats.length > 0 || movie.certification) && (
-                <div className={`${movie.duration ? "mt-2" : ""} flex flex-wrap items-center gap-2`}>
-                  {heroFormats.map((fmt) => (
-                    <span key={fmt} className={HERO_FORMAT_BADGE_CLASS}>
-                      {fmt}
-                    </span>
-                  ))}
-                  {movie.certification ? (
-                    <span className={HERO_FORMAT_BADGE_CLASS}>{movie.certification}</span>
-                  ) : null}
-                </div>
-              )}
-            </div>
-          )}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-black/10" />
 
           {hasTrailer ? (
-            <div className="absolute inset-x-0 bottom-4 z-10 flex justify-center px-4">
+            <div className="absolute inset-x-0 bottom-3 z-10 flex justify-center px-4 pointer-events-none">
               <button
                 type="button"
                 onClick={handleOpenTrailer}
-                className="inline-flex items-center gap-2 rounded-full bg-black/85 px-5 py-2.5 text-[13px] font-semibold text-white cursor-pointer hover:bg-black"
+                className="pointer-events-auto inline-flex items-center gap-1.5 rounded-full bg-black/85 px-3.5 py-1.5 text-xs font-semibold text-white cursor-pointer hover:bg-black shadow-md"
               >
-                <Play className="size-3.5" fill="currentColor" />
+                <Play className="size-3" fill="currentColor" />
                 Trailer
               </button>
             </div>
           ) : null}
         </section>
 
-        <div className="px-5 sm:px-8 pt-5 pb-2">
-          {mobileMetaLine ? (
-            <p className="text-[14px] sm:text-[15px] text-[#8B95A5] font-medium leading-snug">
-              {mobileMetaLine}
-            </p>
+        <div className="px-4 sm:px-6 pt-3.5 pb-3 border-b border-slate-100/80 space-y-2.5">
+          {mobileMetaLine || heroFormats.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-2 text-xs sm:text-[13px] text-slate-600 font-medium">
+              {movie.certification ? (
+                <span className="inline-flex items-center rounded-md border border-slate-300/80 bg-slate-50 px-1.5 py-0.5 text-[11px] font-bold text-slate-700">
+                  {movie.certification}
+                </span>
+              ) : null}
+              {heroFormats.length > 0 ? (
+                <span className="inline-flex items-center rounded-md border border-slate-300/80 bg-slate-50 px-1.5 py-0.5 text-[11px] font-bold text-slate-700">
+                  {heroFormats.join(", ")}
+                </span>
+              ) : null}
+              {movie.languages.length > 0 ? (
+                <span>{movie.languages.join(", ")}</span>
+              ) : null}
+              {movie.duration ? (
+                <>
+                  <span className="text-slate-300 select-none">•</span>
+                  <span>{movie.duration}</span>
+                </>
+              ) : null}
+            </div>
           ) : null}
 
           {movie.genres.length > 0 ? (
-            <div className={`${mobileMetaLine ? "mt-3.5" : ""} flex flex-wrap gap-2`}>
+            <div className="flex flex-wrap items-center gap-1.5">
               {movie.genres.map((g) => (
                 <span
                   key={g}
-                  className="inline-flex items-center rounded-full bg-[#F1F3F5] px-3.5 py-1.5 text-[13px] font-medium text-[#4B5563]"
+                  className="inline-flex items-center rounded-md bg-slate-100 border border-slate-200/70 px-2.5 py-0.5 text-xs font-semibold text-slate-700"
                 >
                   {g}
                 </span>
@@ -240,13 +240,10 @@ function MovieDetailBanner({
           ) : null}
 
           {releasedLine ? (
-            <p
-              className={`${
-                mobileMetaLine || movie.genres.length > 0 ? "mt-3.5" : ""
-              } text-[14px] sm:text-[15px] text-[#8B95A5] font-normal`}
-            >
-              {releasedLine}
-            </p>
+            <div className="flex items-center gap-1.5 text-xs sm:text-[13px] text-slate-500 font-normal">
+              <Calendar className="size-3.5 text-slate-400 shrink-0" />
+              <span>{releasedLine}</span>
+            </div>
           ) : null}
         </div>
       </div>
@@ -357,13 +354,17 @@ function MovieDetailBanner({
 
               <div className="mt-5 sm:mt-6 flex flex-wrap items-center gap-3">
                 {movie.comingSoon ? (
-                  <span className={bookClass.replace("hover:opacity-90", "opacity-80 cursor-default")}>
+                  <span className={`${bookClass} opacity-80 cursor-default`}>
                     Coming Soon
                   </span>
                 ) : (
-                  <button type="button" onClick={onBookTickets} className={`${bookClass} cursor-pointer`}>
+                  <ShinyBlackButton
+                    type="button"
+                    onClick={onBookTickets}
+                    className={bookClass}
+                  >
                     {bookLabel}
-                  </button>
+                  </ShinyBlackButton>
                 )}
                 <MovieWishlistButton movieId={movie.id} />
               </div>
@@ -404,6 +405,8 @@ export default function MovieDetailPage() {
   const { data: apiMovie, isLoading, isError } = useGetPublicMovieQuery(idOrSlug, {
     skip: !idOrSlug,
   });
+
+  const { stickyCtaBottom, stickyCtaHidden } = useStickyCtaAboveFooter(!isLoading && Boolean(apiMovie));
 
   const { data: cinemaOffers = [] } = useGetPublicCinemaOffersForMovieQuery(idOrSlug, {
     skip: !idOrSlug,
@@ -530,36 +533,41 @@ export default function MovieDetailPage() {
               Coming Soon
             </span>
           ) : (
-            <button
+            <ShinyBlackButton
               type="button"
               onClick={handleBookTickets}
-              className={`${HERO_BOOK_BTN_CLASS} shrink-0 rounded-md text-xs sm:text-sm px-4 sm:px-5 cursor-pointer`}
+              className={`${HERO_BOOK_BTN_CLASS} shrink-0 rounded-md text-xs sm:text-sm px-4 sm:px-5`}
             >
               Book tickets
-            </button>
+            </ShinyBlackButton>
           )}
         </div>
       </div>
 
       <MovieDetailSections movie={movie} idOrSlug={idOrSlug} />
 
-      {/* Sticky Book Tickets — mobile / tablet bottom (hero button color) */}
-      <div className="lg:hidden fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white px-4 py-3 safe-area-pb">
-        {movie.comingSoon ? (
-          <span className="flex w-full items-center justify-center rounded-xl bg-[linear-gradient(135deg,#A78BFA_0%,#8B5CF6_38%,#6D28D9_72%,#4C1D95_100%)] px-5 py-3.5 text-base font-bold text-white opacity-80">
-            Coming Soon
-          </span>
-        ) : (
-          <button
-            type="button"
-            onClick={handleBookTickets}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-[linear-gradient(135deg,#A78BFA_0%,#8B5CF6_38%,#6D28D9_72%,#4C1D95_100%)] px-5 py-3.5 text-base font-bold text-white shadow-lg shadow-[#6D28D9]/30 hover:opacity-90 transition-opacity cursor-pointer"
-          >
-            Book Tickets
-            <ArrowRight className="size-5" strokeWidth={2.25} />
-          </button>
-        )}
-      </div>
+      {/* Sticky Book Tickets — mobile / tablet bottom (dining-parity black + shine with footer avoidance) */}
+      {!stickyCtaHidden ? (
+        <div
+          className="lg:hidden fixed inset-x-0 z-40 border-t border-slate-200 bg-white px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] transition-[bottom] duration-75 ease-out"
+          style={{ bottom: stickyCtaBottom }}
+        >
+          {movie.comingSoon ? (
+            <span className="flex w-full items-center justify-center rounded-xl bg-[#111111] px-5 py-3.5 text-base font-bold text-white opacity-80">
+              Coming Soon
+            </span>
+          ) : (
+            <ShinyBlackButton
+              type="button"
+              onClick={handleBookTickets}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#111111] px-5 py-3.5 text-base font-bold text-white"
+            >
+              Book Tickets
+              <ArrowRight className="size-5" strokeWidth={2.25} />
+            </ShinyBlackButton>
+          )}
+        </div>
+      ) : null}
 
       <MovieLanguageFormatModal
         open={langFormatOpen}

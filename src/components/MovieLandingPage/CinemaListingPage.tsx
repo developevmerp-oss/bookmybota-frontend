@@ -4,6 +4,12 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Heart, Search } from "lucide-react";
+import { toast } from "sonner";
+import {
+  readCinemaFavoriteIds,
+  toggleCinemaFavorite,
+  isCinemaFavorited,
+} from "@/lib/cinemaWishlist";
 import {
   useGetPublicRegisteredCinemasQuery,
   type PublicRegisteredPartner,
@@ -23,6 +29,8 @@ type CinemaCard = {
   name: string;
   address: string;
   href?: string;
+  slug?: string;
+  cover_image_url?: string;
 };
 
 const SHOWCASE_CINEMAS: CinemaCard[] = [
@@ -31,37 +39,43 @@ const SHOWCASE_CINEMAS: CinemaCard[] = [
     name: "PVR: Palladium Mall, Addis Ababa",
     address:
       "4th floor, Palladium Mall, Bole Road, Addis Ababa, Ethiopia",
-    href: cinemaHref({ id: "c1" }),
+    href: cinemaHref({ id: "c1", slug: "pvr-palladium-mall" }),
+    slug: "pvr-palladium-mall",
   },
   {
     id: "c2",
     name: "Cinepolis: City Centre, Addis Ababa",
     address: "City Centre Mall, Mexico Square, Addis Ababa, Ethiopia",
-    href: cinemaHref({ id: "c2" }),
+    href: cinemaHref({ id: "c2", slug: "cinepolis-city-centre" }),
+    slug: "cinepolis-city-centre",
   },
   {
     id: "c3",
     name: "Edna Mall Cinema, Addis Ababa",
     address: "Edna Mall, Bole Medhanialem, Addis Ababa, Ethiopia",
-    href: cinemaHref({ id: "c3" }),
+    href: cinemaHref({ id: "c3", slug: "edna-mall-cinema" }),
+    slug: "edna-mall-cinema",
   },
   {
     id: "c4",
     name: "Alliance Ethio-Française Cinema",
     address: "Wollo Sefer, Near Mexico, Addis Ababa, Ethiopia",
-    href: cinemaHref({ id: "c4" }),
+    href: cinemaHref({ id: "c4", slug: "alliance-ethio-francaise-cinema" }),
+    slug: "alliance-ethio-francaise-cinema",
   },
   {
     id: "c5",
     name: "Century Cinema: Merkato",
     address: "Merkato Complex, Addis Ababa, Ethiopia",
-    href: cinemaHref({ id: "c5" }),
+    href: cinemaHref({ id: "c5", slug: "century-cinema-merkato" }),
+    slug: "century-cinema-merkato",
   },
   {
     id: "c6",
     name: "Gas Cinema: CMC",
     address: "CMC Michael, Addis Ababa, Ethiopia",
-    href: cinemaHref({ id: "c6" }),
+    href: cinemaHref({ id: "c6", slug: "gas-cinema-cmc" }),
+    slug: "gas-cinema-cmc",
   },
 ];
 
@@ -76,6 +90,8 @@ function mapVenue(v: PublicRegisteredPartner): CinemaCard {
     name: v.name,
     address,
     href: cinemaHref(v),
+    slug: v.slug,
+    cover_image_url: v.cover_image_url,
   };
 }
 
@@ -88,8 +104,8 @@ function CinemaCardItem({
   favorited: boolean;
   onToggleFavorite: () => void;
 }) {
-  const body = (
-    <div className="flex items-start gap-3">
+  return (
+    <article className="h-full rounded-lg border border-slate-200 bg-white p-4 sm:p-5 shadow-sm hover:shadow-md transition-shadow flex items-start gap-3">
       <button
         type="button"
         aria-label={favorited ? "Remove from favorites" : "Add to favorites"}
@@ -99,7 +115,7 @@ function CinemaCardItem({
           e.stopPropagation();
           onToggleFavorite();
         }}
-        className="mt-0.5 shrink-0 cursor-pointer relative z-10"
+        className="mt-0.5 shrink-0 cursor-pointer p-1 -m-1 rounded-full hover:bg-slate-100 transition-colors relative z-10"
       >
         <Heart
           size={18}
@@ -110,25 +126,24 @@ function CinemaCardItem({
           }
         />
       </button>
-      <div className="min-w-0">
-        <h3 className="text-sm sm:text-base font-bold text-[#111111] leading-snug group-hover:text-[#6900AA] transition-colors">
-          {cinema.name}
-        </h3>
-        <p className="mt-1.5 text-xs sm:text-sm text-slate-500 leading-relaxed">
-          {cinema.address}
-        </p>
-      </div>
-    </div>
-  );
-
-  return (
-    <article className="h-full rounded-lg border border-slate-200 bg-white p-4 sm:p-5 shadow-sm hover:shadow-md transition-shadow">
       {cinema.href ? (
-        <Link href={cinema.href} className="block group h-full">
-          {body}
+        <Link href={cinema.href} className="min-w-0 flex-1 group block">
+          <h3 className="text-sm sm:text-base font-bold text-[#111111] leading-snug group-hover:text-[#6900AA] transition-colors">
+            {cinema.name}
+          </h3>
+          <p className="mt-1.5 text-xs sm:text-sm text-slate-500 leading-relaxed">
+            {cinema.address}
+          </p>
         </Link>
       ) : (
-        body
+        <div className="min-w-0 flex-1">
+          <h3 className="text-sm sm:text-base font-bold text-[#111111] leading-snug">
+            {cinema.name}
+          </h3>
+          <p className="mt-1.5 text-xs sm:text-sm text-slate-500 leading-relaxed">
+            {cinema.address}
+          </p>
+        </div>
       )}
     </article>
   );
@@ -193,24 +208,38 @@ export default function CinemaListingPage() {
   }, [search, city, pathname, router]);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem("movie_cinema_favorites");
-      setFavorites(raw ? (JSON.parse(raw) as string[]) : []);
-    } catch {
-      setFavorites([]);
-    }
+    const update = () => {
+      setFavorites(readCinemaFavoriteIds());
+    };
+    update();
+    window.addEventListener("movie_cinema_favorites_changed", update);
+    window.addEventListener("storage", update);
+    return () => {
+      window.removeEventListener("movie_cinema_favorites_changed", update);
+      window.removeEventListener("storage", update);
+    };
   }, []);
 
-  const toggleFavorite = (id: string) => {
-    setFavorites((prev) => {
-      const next = prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id];
-      try {
-        localStorage.setItem("movie_cinema_favorites", JSON.stringify(next));
-      } catch {
-        /* ignore */
-      }
-      return next;
-    });
+  const toggleFavorite = (cinema: CinemaCard) => {
+    const slugKey = cinema.slug || cinema.href?.split("/").pop() || "";
+    const legacyKeys = [cinema.id, slugKey, cinema.name].filter(Boolean);
+    const { wishlisted, ids } = toggleCinemaFavorite(
+      {
+        id: cinema.id,
+        name: cinema.name,
+        address: cinema.address,
+        slug: cinema.slug || slugKey,
+        cover_image_url: cinema.cover_image_url,
+        href: cinema.href,
+      },
+      legacyKeys
+    );
+    setFavorites(ids);
+    if (wishlisted) {
+      toast.success(`Added ${cinema.name || "cinema"} to your favorite cinemas`);
+    } else {
+      toast.success(`Removed ${cinema.name || "cinema"} from your favorite cinemas`);
+    }
   };
 
   const apiCinemas = venues.map(mapVenue);
@@ -269,8 +298,8 @@ export default function CinemaListingPage() {
               <CinemaCardItem
                 key={cinema.id}
                 cinema={cinema}
-                favorited={favorites.includes(cinema.id)}
-                onToggleFavorite={() => toggleFavorite(cinema.id)}
+                favorited={isCinemaFavorited([cinema.id, cinema.slug || "", cinema.name, cinema.href?.split("/").pop() || ""], favorites)}
+                onToggleFavorite={() => toggleFavorite(cinema)}
               />
             ))}
           </div>

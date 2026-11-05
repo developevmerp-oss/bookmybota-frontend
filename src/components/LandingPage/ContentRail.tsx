@@ -61,14 +61,14 @@ export default function ContentRail({
     <section
       className={
         dark
-          ? "bg-[#111111] py-6 sm:py-8 lg:pt-0"
+          ? "bg-[#111111] pt-6 sm:pt-7 lg:pt-8"
           : alt
-            ? "bg-[#F7F7F7] py-6 sm:py-8 lg:pt-0"
-            : "bg-white py-6 sm:py-8 lg:py-5"
+            ? "bg-[#F7F7F7] pt-6 sm:pt-7 lg:pt-8"
+            : "bg-white pt-6 sm:pt-7 lg:pt-8"
       }
     >
       <div className="bmb-section-container">
-        <div className="flex items-end justify-between gap-3 sm:gap-4 mb-4 sm:mb-5">
+        <div className="flex items-center justify-between gap-3 sm:gap-4 mb-0.3 sm:mb-0.5">
           <div className="min-w-0">
             {eyebrow ? (
               <p

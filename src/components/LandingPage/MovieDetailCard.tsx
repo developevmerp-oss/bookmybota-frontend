@@ -94,7 +94,7 @@ export function MovieDetailCard({ movie }: { movie: MustWatchMovieCard }) {
         </div>
 
         <div className="flex flex-1 flex-col gap-1 px-3.5 pt-3 pb-3.5 min-w-0">
-          <h3 className="text-base tracking-wide sm:text-lg font-bold text-[#1C1C1C] truncate leading-snug">
+          <h3 className="text-base tracking-wide sm:text-lg font-bold text-[#1C1C1C] break-words leading-snug">
             {movie.title}
           </h3>
 

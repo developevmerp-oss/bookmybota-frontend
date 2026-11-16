@@ -93,11 +93,11 @@ function MovieCard({ movie }: { movie: RailMovieCard }) {
           ) : null}
         </div>
         <div className="px-3 pt-3 pb-3.5 flex flex-col gap-0.5">
-          <h3 className="text-base tracking-wide sm:text-lg font-bold  text-[#1C1C1C] truncate min-w-0 flex-1 leading-snug  transition-colors">
+          <h3 className="text-base tracking-wide sm:text-lg font-bold text-[#1C1C1C] break-words min-w-0 leading-snug transition-colors">
             {movie.title}
           </h3>
           {meta ? (
-            <p className="type-card-body text-sm tracking-wide text-gray-600 truncate leading-snug">{meta}</p>
+            <p className="type-card-body text-sm tracking-wide text-gray-600 break-words leading-snug">{meta}</p>
           ) : null}
         </div>
       </article>

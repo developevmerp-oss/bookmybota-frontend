@@ -226,13 +226,15 @@ export const eventDraftSchema = yup.object({
   promo_plan_id: yup.string().trim().default(''),
   promo_title: yup.string().trim().default(''),
   promo_banner_url: yup.string().trim().default(''),
+  /** Mobile / tablet 2:1 banner for slider plans. */
+  promo_banner_mobile_url: yup.string().trim().default(''),
   promo_slider_accent_text: yup
     .string()
     .trim()
     .max(40, 'Accent text must be at most 40 characters.')
     .default(''),
   promo_start_date: yup.string().trim().default(''),
-  /** Synced from the selected plan: home / category slider placements need a banner. */
+  /** Synced from the selected plan: home / category slider placements need banners. */
   promo_needs_banner: yup.boolean().default(false),
   languages: yup.array().of(yup.string().required()).default([]),
   about_event: yup
@@ -449,6 +451,7 @@ export function defaultEventFormValues(): EventFormValues {
     promo_plan_id: '',
     promo_title: '',
     promo_banner_url: '',
+    promo_banner_mobile_url: '',
     promo_slider_accent_text: '',
     promo_start_date: '',
     promo_needs_banner: false,

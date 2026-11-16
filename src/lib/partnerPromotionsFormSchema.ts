@@ -20,12 +20,13 @@ export const partnerPromotionsFormSchema = yup
       .min(2, "Title must be at least 2 characters.")
       .max(120, "Title must be at most 120 characters."),
     banner_image_url: yup.string().trim().default(""),
+    banner_image_mobile_url: yup.string().trim().default(""),
     slider_accent_text: yup
-    .string()
-    .trim()
-    .max(40, "Accent text must be at most 40 characters.")
-    .default(""),
-  target_type: yup
+      .string()
+      .trim()
+      .max(40, "Accent text must be at most 40 characters.")
+      .default(""),
+    target_type: yup
       .mixed<PartnerPromoTargetType>()
       .oneOf(["BUSINESS", "RESTAURANT", "EVENT", "MOVIE"])
       .required("Target type is required."),
@@ -45,14 +46,26 @@ export const partnerPromotionsFormSchema = yup
     /** Synced from selected plan — drives conditional item-target validation */
     allows_item_target: yup.boolean().default(false),
   })
-  .test("banner-required", "Banner image is required for slider / rail plans", function (values) {
+  .test("banner-required", "Desktop banner is required for slider / rail plans", function (values) {
     if (!values?.landing_slider && !values?.category_rail) return true;
     if (String(values.banner_image_url || "").trim()) return true;
     return this.createError({
       path: "banner_image_url",
-      message: "Banner image is required for this plan.",
+      message: "Desktop 3:1 banner is required for this plan.",
     });
   })
+  .test(
+    "mobile-banner-required",
+    "Mobile / tablet banner is required for slider / rail plans",
+    function (values) {
+      if (!values?.landing_slider && !values?.category_rail) return true;
+      if (String(values.banner_image_mobile_url || "").trim()) return true;
+      return this.createError({
+        path: "banner_image_mobile_url",
+        message: "Mobile / tablet 2:1 banner is required for this plan.",
+      });
+    }
+  )
   .test("target-required", "Select what you want to promote", function (values) {
     if (!values?.allows_item_target) return true;
     const t = values.target_type;
@@ -72,6 +85,7 @@ export const emptyPartnerPromotionsFormValues = (
   plan_id: "",
   title: "",
   banner_image_url: "",
+  banner_image_mobile_url: "",
   slider_accent_text: "",
   target_type: module === "DINING" ? "RESTAURANT" : module === "EVENTS" ? "EVENT" : "MOVIE",
   target_id: "",

@@ -327,10 +327,14 @@ export default function EventFormCustomerPreview({
   const promoBanner = values.promo_banner_url
     ? resolveMediaUrl(values.promo_banner_url)
     : "";
+  const promoBannerMobile = values.promo_banner_mobile_url
+    ? resolveMediaUrl(values.promo_banner_mobile_url)
+    : promoBanner;
   const showLandingSlider = wantPromotion && Boolean(promoPlan?.landing_slider);
   const showCategoryRail = wantPromotion && Boolean(promoPlan?.category_rail);
   const showDetailBanner =
-    wantPromotion && (showCategoryRail || showLandingSlider || Boolean(promoBanner));
+    wantPromotion &&
+    (showCategoryRail || showLandingSlider || Boolean(promoBanner || promoBannerMobile));
 
   const showIso =
     firstShow?.event_date && firstShow?.start_time
@@ -378,7 +382,7 @@ export default function EventFormCustomerPreview({
         ) : null}
       </div>
       <div className="px-3 pt-3 pb-3.5 flex flex-col gap-0.5">
-        <h3 className="font-bold text-[#111827] text-sm sm:text-[0.9375rem] leading-snug line-clamp-2">
+        <h3 className="font-bold text-[#111827] text-sm sm:text-[0.9375rem] leading-snug break-words">
           {values.name?.trim() || "Untitled event"}
         </h3>
         {placeLine ? (
@@ -449,10 +453,17 @@ export default function EventFormCustomerPreview({
   );
 
   const promoBannerCard = (
-    <div className="w-[min(100%,520px)] sm:w-[420px] lg:w-[480px] relative aspect-[3/1] rounded-2xl overflow-hidden bg-[#111] shrink-0 shadow-sm">
-      {promoBanner ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={promoBanner} alt={promoTitle} className="w-full h-full object-cover" />
+    <div className="w-[min(100%,520px)] sm:w-[420px] lg:w-[480px] relative aspect-[2/1] lg:aspect-[3/1] rounded-2xl overflow-hidden bg-[#111] shrink-0 shadow-sm">
+      {promoBanner || promoBannerMobile ? (
+        <picture>
+          {promoBanner ? <source media="(min-width: 1024px)" srcSet={promoBanner} /> : null}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={promoBannerMobile || promoBanner}
+            alt={promoTitle}
+            className="w-full h-full object-cover"
+          />
+        </picture>
       ) : (
         <div className="w-full h-full bg-gradient-to-br from-[#6900AA] to-[#9d00ff] flex items-center justify-center p-4">
           <p className="text-white font-semibold text-center">{promoTitle}</p>
@@ -639,14 +650,19 @@ export default function EventFormCustomerPreview({
                         </p>
                       </div>
                     </div>
-                    <div className="relative rounded-xl overflow-hidden bg-black aspect-[3/1] ring-2 ring-[#6900AA]/25">
-                      {promoBanner ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={promoBanner}
-                          alt={promoTitle}
-                          className="absolute inset-0 w-full h-full object-cover"
-                        />
+                    <div className="relative rounded-xl overflow-hidden bg-black aspect-[2/1] lg:aspect-[3/1] ring-2 ring-[#6900AA]/25">
+                      {promoBanner || promoBannerMobile ? (
+                        <picture>
+                          {promoBanner ? (
+                            <source media="(min-width: 1024px)" srcSet={promoBanner} />
+                          ) : null}
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={promoBannerMobile || promoBanner}
+                            alt={promoTitle}
+                            className="absolute inset-0 w-full h-full object-cover"
+                          />
+                        </picture>
                       ) : posterHorizontal ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img

@@ -133,7 +133,7 @@ function EditorialCardShell({
         </div>
 
         <div className="flex flex-1 flex-col px-3.5 pt-3 pb-3.5 min-w-0">
-          <h3 className="text-base tracking-wide sm:text-[1.05rem] font-bold text-[#1C1C1C] leading-snug line-clamp-2">
+          <h3 className="text-base tracking-wide sm:text-[1.05rem] font-bold text-[#1C1C1C] leading-snug break-words">
             {title}
           </h3>
 

@@ -13,7 +13,6 @@ import {
   Clock,
   Film,
   Globe,
-  Heart,
   Info,
   ListFilter,
   MapPin,
@@ -37,6 +36,7 @@ import {
   type PublicMovieCinemaGroup,
   type PublicMovieShowtimeItem,
 } from "@/services/api";
+import CinemaWishlistButton from "@/components/MovieLandingPage/CinemaWishlistButton";
 import {
   parseCsvParam,
   sameStringList,
@@ -807,13 +807,9 @@ function CinemaAmenityBadges({
 
 function CinemaInfoModal({
   cinema,
-  favorited,
-  onToggleFavorite,
   onClose,
 }: {
   cinema: PublicMovieCinemaGroup;
-  favorited: boolean;
-  onToggleFavorite: () => void;
   onClose: () => void;
 }) {
   const address =
@@ -901,21 +897,17 @@ function CinemaInfoModal({
             </a>
           </div>
 
-          <button
-            type="button"
-            onClick={onToggleFavorite}
-            className="w-full flex items-center gap-2.5 border-b border-[#EFEFEF] py-3.5 text-left cursor-pointer hover:bg-[#FAFAFA] -mx-1 px-1 rounded-lg"
-          >
-            <Heart
-              size={18}
-              className={favorited ? "fill-[#6900AA] text-[#6900AA]" : "text-[#6B7280]"}
-            />
-            <span className="text-[13px] text-[#4B5563]">
-              {favorited
+          <CinemaWishlistButton
+            cinemaId={cinema.id}
+            className="w-full flex items-center gap-2.5 border-b border-[#EFEFEF] py-3.5 text-left cursor-pointer hover:bg-[#FAFAFA] -mx-1 px-1 rounded-lg disabled:opacity-70"
+            savedClassName="fill-[#6900AA] text-[#6900AA]"
+            unsavedClassName="text-[#6B7280]"
+            label={(saved) =>
+              saved
                 ? "Added to your favorite cinemas"
-                : "Tap to add to your favorite cinemas"}
-            </span>
-          </button>
+                : "Tap to add to your favorite cinemas"
+            }
+          />
 
           <div className="pt-4">
             <h3 className="text-[14px] font-bold text-[#333333]">Available Facilities</h3>
@@ -1155,7 +1147,6 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
   const [draftTimeFilters, setDraftTimeFilters] = useState<string[]>([]);
   const [draftFormatFilters, setDraftFormatFilters] = useState<string[]>([]);
   const [draftLanguageFilters, setDraftLanguageFilters] = useState<string[]>([]);
-  const [favoritedIds, setFavoritedIds] = useState<Record<string, boolean>>({});
   const [infoOpenId, setInfoOpenId] = useState<string | null>(null);
   const [showSearch, setShowSearch] = useState(false);
   const [cinemaSearch, setCinemaSearch] = useState(() => searchParams.get("q") || "");
@@ -2052,7 +2043,6 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
 
             <div className="space-y-3">
               {filteredCinemas.map((cinema) => {
-                const favorited = Boolean(favoritedIds[cinema.id]);
                 const logoSrc = resolveMediaUrl(cinema.logo || cinema.image || "");
 
                 return (
@@ -2107,43 +2097,12 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
                           </div>
                         </div>
 
-                        <button
-                          type="button"
-                          aria-label={favorited ? "Remove favorite" : "Favorite cinema"}
-                          aria-pressed={favorited}
-                          onClick={() =>
-                            setFavoritedIds((prev) => ({
-                              ...prev,
-                              [cinema.id]: !prev[cinema.id],
-                            }))
-                          }
-                          className="shrink-0 cursor-pointer p-1"
-                        >
-                          <svg width="0" height="0" aria-hidden className="absolute">
-                            <defs>
-                              <linearGradient
-                                id={`cinema-heart-${cinema.id}`}
-                                x1="0%"
-                                y1="0%"
-                                x2="100%"
-                                y2="100%"
-                              >
-                                <stop offset="0%" stopColor="#F9A8D4" />
-                                <stop offset="45%" stopColor="#EC4899" />
-                                <stop offset="100%" stopColor="#DB2777" />
-                              </linearGradient>
-                            </defs>
-                          </svg>
-                          <Heart
-                            size={18}
-                            strokeWidth={2.1}
-                            className={favorited ? "fill-[#EC4899]" : undefined}
-                            style={{
-                              stroke: `url(#cinema-heart-${cinema.id})`,
-                              color: favorited ? "#EC4899" : undefined,
-                            }}
-                          />
-                        </button>
+                        <CinemaWishlistButton
+                          cinemaId={cinema.id}
+                          className="shrink-0 cursor-pointer p-1 disabled:opacity-70"
+                          savedClassName="fill-[#EC4899] text-[#EC4899]"
+                          unsavedClassName="text-[#EC4899]"
+                        />
                       </div>
 
                       <div className="space-y-4">
@@ -2184,13 +2143,6 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
                   return (
                     <CinemaInfoModal
                       cinema={cinema}
-                      favorited={Boolean(favoritedIds[cinema.id])}
-                      onToggleFavorite={() =>
-                        setFavoritedIds((prev) => ({
-                          ...prev,
-                          [cinema.id]: !prev[cinema.id],
-                        }))
-                      }
                       onClose={() => setInfoOpenId(null)}
                     />
                   );

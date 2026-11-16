@@ -95,7 +95,7 @@ type OverlayBodyProps = {
 function OverlayBody({ name, locationLine, distance, cuisine }: OverlayBodyProps) {
   return (
     <div className="flex flex-col gap-1.5 px-3.5 pt-3 pb-3.5 min-w-0 bg-white">
-      <h3 className="text-base tracking-wide sm:text-lg font-bold text-[#1C1C1C] leading-snug truncate">
+      <h3 className="text-base tracking-wide sm:text-lg font-bold text-[#1C1C1C] leading-snug break-words">
         {name}
       </h3>
 

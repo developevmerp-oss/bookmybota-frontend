@@ -1051,8 +1051,8 @@ export default function PartnerListYourShowLanding({
   const headerContainerClass = pageContainerClassName ?? "bmb-section-container";
   const loginButtonClass =
     headerLoginVariant === "dark"
-      ? "inline-flex h-9 items-center px-5 rounded-md bg-[#111] text-white text-sm font-semibold hover:bg-[#333] transition-colors"
-      : "inline-flex h-9 items-center px-5 rounded-md border border-[#D0D0D0] text-[#333] text-sm font-semibold hover:bg-[#FAFAFA] transition-colors";
+      ? "inline-flex h-8 sm:h-9 items-center px-3.5 sm:px-5 rounded-md bg-[#111] text-white text-xs sm:text-sm font-semibold hover:bg-[#333] transition-colors shrink-0"
+      : "inline-flex h-8 sm:h-9 items-center px-3.5 sm:px-5 rounded-md border border-[#D0D0D0] text-[#333] text-xs sm:text-sm font-semibold hover:bg-[#FAFAFA] transition-colors shrink-0";
 
   const loginControl = onOpenLogin ? (
     <button
@@ -1069,8 +1069,10 @@ export default function PartnerListYourShowLanding({
   );
 
   const headerLoginArea = headerLoginPrompt ? (
-    <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
-      <span className="text-[13px] sm:text-sm text-[#555555]">{headerLoginPrompt}</span>
+    <div className="flex shrink-0 flex-col items-end gap-1 min-[420px]:flex-row min-[420px]:items-center min-[420px]:gap-2 sm:gap-3">
+      <span className="whitespace-nowrap text-[11px] leading-none text-[#555555] sm:text-sm">
+        {headerLoginPrompt}
+      </span>
       {loginControl}
     </div>
   ) : (
@@ -1095,37 +1097,37 @@ export default function PartnerListYourShowLanding({
         <header className="sticky top-0 w-full z-50 bg-white border-b border-[#EBEBEB]">
           <div className={headerContainerClass}>
             {centeredPartnerHeader ? (
-              <div className="flex items-center justify-between h-[72px] gap-3">
-                <div className="flex items-center gap-3 min-w-0">
+              <div className="flex items-center justify-between h-[64px] sm:h-[72px] gap-2 sm:gap-3">
+                <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                   {showBackButton ? (
                     <button
                       type="button"
                       onClick={() => router.back()}
                       aria-label="Go back"
-                      className="shrink-0 h-10 w-10 rounded-full border border-[#E5E5E5] bg-[#F3F3F3] flex items-center justify-center text-[#444] hover:bg-[#EBEBEB] transition-colors cursor-pointer shadow-[0_1px_3px_rgba(0,0,0,0.08)]"
+                      className="shrink-0 h-9 w-9 sm:h-10 sm:w-10 rounded-full border border-[#E5E5E5] bg-[#F3F3F3] flex items-center justify-center text-[#444] hover:bg-[#EBEBEB] transition-colors cursor-pointer shadow-[0_1px_3px_rgba(0,0,0,0.08)]"
                     >
                       <ChevronLeft size={20} strokeWidth={2} />
                     </button>
                   ) : null}
-                  <Link href="/" className="flex items-center shrink-0">
+                  <Link href="/" className="flex items-center min-w-0 shrink">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={logoSrc()}
                       alt="Book My Bota"
-                      className="h-12 sm:h-14 w-auto object-contain object-left"
+                      className="h-9 sm:h-12 md:h-14 w-auto max-w-[140px] sm:max-w-none object-contain object-left"
                     />
                   </Link>
                 </div>
                 {headerLoginArea}
               </div>
             ) : (
-              <div className="flex justify-between items-center h-[72px]">
-                <Link href="/" className="flex items-center">
+              <div className="flex justify-between items-center h-[64px] sm:h-[72px] gap-2 sm:gap-3">
+                <Link href="/" className="flex items-center min-w-0 shrink">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={logoSrc()}
                     alt="Book My Bota"
-                    className="h-12 sm:h-14 w-auto object-contain object-left"
+                    className="h-9 sm:h-12 md:h-14 w-auto max-w-[140px] sm:max-w-none object-contain object-left"
                   />
                 </Link>
                 {headerLoginArea}

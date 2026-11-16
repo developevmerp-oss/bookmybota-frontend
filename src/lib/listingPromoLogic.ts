@@ -26,9 +26,13 @@ export function listingPromoQueryArgs(
   };
 }
 
-/** Landing-style: only campaigns that already have a banner creative. */
+/** Landing-style: campaigns with a desktop and/or mobile banner creative. */
 export function campaignsWithBanner(campaigns: MarketingCampaign[]): MarketingCampaign[] {
-  return campaigns.filter((c) => Boolean(resolveMediaUrl(c.banner_image_url || "")?.trim()));
+  return campaigns.filter(
+    (c) =>
+      Boolean(resolveMediaUrl(c.banner_image_url || "")?.trim()) ||
+      Boolean(resolveMediaUrl(c.banner_image_mobile_url || "")?.trim())
+  );
 }
 
 /**

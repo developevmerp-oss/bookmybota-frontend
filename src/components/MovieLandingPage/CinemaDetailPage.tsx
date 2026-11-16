@@ -13,7 +13,6 @@ import {
   Coins,
   ExternalLink,
   Film,
-  Heart,
   Loader2,
   MapPin,
   Moon,
@@ -38,12 +37,7 @@ import {
   type PublicRegisteredPartner,
 } from "@/services/api";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
-import { toast } from "sonner";
-import {
-  toggleCinemaFavorite,
-  isCinemaFavorited,
-  readCinemaFavoriteIds,
-} from "@/lib/cinemaWishlist";
+import CinemaWishlistButton from "@/components/MovieLandingPage/CinemaWishlistButton";
 import {
   formatTime12h,
   isMovieShowEnded,
@@ -148,14 +142,6 @@ function buildVenueDateOptions(count = 7) {
   }
   return options;
 }
-
-function cinemaFavoriteLegacyKeys(
-  apiCinema: PublicRegisteredPartner | undefined,
-  routeKey: string
-): string[] {
-  return [apiCinema?.id, apiCinema?.slug, routeKey, apiCinema?.name].filter(Boolean) as string[];
-}
-
 
 function mapPartnerAddress(v: PublicRegisteredPartner) {
   const cityPart = [v.city_name, v.city_state].filter(Boolean).join(", ");
@@ -613,7 +599,6 @@ export default function CinemaDetailPage({ cinemaId }: { cinemaId: string }) {
   const dateOptions = useMemo(() => buildVenueDateOptions(7), []);
   const [selectedDate, setSelectedDate] = useState(dateOptions[0]?.dateStr || "");
   const [detailsOpen, setDetailsOpen] = useState(false);
-  const [favorited, setFavorited] = useState(false);
   const [languageFilters, setLanguageFilters] = useState<string[]>([]);
   const [timeFilters, setTimeFilters] = useState<string[]>([]);
   const [priceFilters, setPriceFilters] = useState<string[]>([]);
@@ -645,11 +630,7 @@ export default function CinemaDetailPage({ cinemaId }: { cinemaId: string }) {
     (v) => v.id === cinemaId || (v.slug != null && v.slug === cinemaId)
   );
   const resolvedCinemaId = apiCinema?.id || cinemaId;
-  const favoriteStorageId = apiCinema?.id || cinemaId;
-  const favoriteLegacyKeys = useMemo(
-    () => cinemaFavoriteLegacyKeys(apiCinema, cinemaId),
-    [apiCinema, cinemaId]
-  );
+  const favoriteCinemaId = apiCinema?.id || cinemaId;
   const showcase = SHOWCASE_BY_ID[cinemaId] || SHOWCASE_BY_ID[resolvedCinemaId];
 
   const cinemaName = apiCinema?.name || showcase?.name || "Cinema";
@@ -693,39 +674,6 @@ export default function CinemaDetailPage({ cinemaId }: { cinemaId: string }) {
     window.addEventListener("selected_city_changed", applyCity);
     return () => window.removeEventListener("selected_city_changed", applyCity);
   }, []);
-
-  useEffect(() => {
-    const update = () => {
-      setFavorited(isCinemaFavorited(favoriteLegacyKeys));
-    };
-    update();
-    window.addEventListener("movie_cinema_favorites_changed", update);
-    window.addEventListener("storage", update);
-    return () => {
-      window.removeEventListener("movie_cinema_favorites_changed", update);
-      window.removeEventListener("storage", update);
-    };
-  }, [favoriteLegacyKeys]);
-
-  const toggleFavorite = () => {
-    const { wishlisted } = toggleCinemaFavorite(
-      {
-        id: favoriteStorageId,
-        name: cinemaName,
-        address: cinemaAddress,
-        cover_image_url: cinemaImage || undefined,
-        slug: apiCinema?.slug || (cinemaId !== favoriteStorageId ? cinemaId : undefined),
-        href: cinemaHref(apiCinema || { id: cinemaId, slug: cinemaId }),
-      },
-      favoriteLegacyKeys
-    );
-    setFavorited(wishlisted);
-    if (wishlisted) {
-      toast.success(`Added ${cinemaName} to your favorite cinemas`);
-    } else {
-      toast.success(`Removed ${cinemaName} from your favorite cinemas`);
-    }
-  };
 
   const [clockTick, setClockTick] = useState(0);
   useEffect(() => {
@@ -1135,24 +1083,17 @@ export default function CinemaDetailPage({ cinemaId }: { cinemaId: string }) {
         >
           <div className="cinema-details-expand__inner">
             <div className="cinema-details-expand__content px-3 sm:px-4 pb-3">
-              <button
-                type="button"
-                onClick={toggleFavorite}
-                className="w-full flex items-center gap-2.5 py-3 text-left cursor-pointer border-b border-[#F0F0F0]"
-                tabIndex={detailsOpen ? 0 : -1}
-              >
-                <Heart
-                  size={18}
-                  className={
-                    favorited ? "fill-[#6900AA] text-[#6900AA]" : "text-[#9CA3AF]"
-                  }
-                />
-                <span className="text-[13px] text-[#4B5563]">
-                  {favorited
+              <CinemaWishlistButton
+                cinemaId={favoriteCinemaId}
+                className="w-full flex items-center gap-2.5 py-3 text-left cursor-pointer border-b border-[#F0F0F0] disabled:opacity-70"
+                savedClassName="fill-[#6900AA] text-[#6900AA]"
+                unsavedClassName="text-[#9CA3AF]"
+                label={(saved) =>
+                  saved
                     ? "Added to your favorite cinemas"
-                    : "Tap to add to your favorite cinemas"}
-                </span>
-              </button>
+                    : "Tap to add to your favorite cinemas"
+                }
+              />
               <h2 className="mt-3 text-[12px] font-bold uppercase tracking-wide text-[#6B7280]">
                 Available Facilities
               </h2>
@@ -1228,22 +1169,11 @@ export default function CinemaDetailPage({ cinemaId }: { cinemaId: string }) {
                   <h1 className="text-xl sm:text-2xl font-extrabold text-[#1E1B4B] leading-snug truncate">
                     {cinemaName}
                   </h1>
-                  <button
-                    type="button"
-                    aria-label={favorited ? "Remove from favorites" : "Add to favorites"}
-                    aria-pressed={favorited}
-                    onClick={toggleFavorite}
-                    className="shrink-0 cursor-pointer"
-                  >
-                    <Heart
-                      size={18}
-                      className={
-                        favorited
-                          ? "fill-[#6900AA] text-[#6900AA]"
-                          : "text-slate-300 hover:text-[#6900AA]"
-                      }
-                    />
-                  </button>
+                  <CinemaWishlistButton
+                    cinemaId={favoriteCinemaId}
+                    className="shrink-0 cursor-pointer p-0.5 rounded-full hover:bg-slate-100 disabled:opacity-70"
+                    unsavedClassName="text-slate-300 hover:text-[#6900AA]"
+                  />
                 </div>
                 <p className="mt-1.5 flex items-start gap-1.5 text-sm text-[#6B7280]">
                   <MapPin size={14} className="mt-0.5 shrink-0 text-[#9CA3AF]" />

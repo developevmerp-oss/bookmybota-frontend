@@ -2,12 +2,12 @@
 
 import { Suspense } from "react";
 import { AdminListShimmer } from "@/components/Shared/Shimmer";
-import MoviePartnerBookingsPage from "@/components/MovieAdminPanel/MoviePartnerBookingsPage";
+import MovieBookingsHubPage from "@/components/MovieAdminPanel/MovieBookingsHubPage";
 
 export default function MovieBookingsRoutePage() {
   return (
     <Suspense fallback={<AdminListShimmer />}>
-      <MoviePartnerBookingsPage />
+      <MovieBookingsHubPage />
     </Suspense>
   );
 }

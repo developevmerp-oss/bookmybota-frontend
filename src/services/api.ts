@@ -488,6 +488,7 @@ export interface MovieShowtime {
   screen_capacity?: number;
   layout_template_id?: string | null;
   layout_name?: string | null;
+  seats_sold?: number;
 }
 
 export type ShowSeatState = 'AVAILABLE' | 'BOOKED' | 'HELD' | 'BLOCKED' | 'OUT_OF_ORDER' | 'SCREEN_BLOCKED';
@@ -513,6 +514,7 @@ export interface ShowSeatMap {
   showtime: {
     id: string;
     movie_title: string;
+    movie_poster_url?: string | null;
     screen_name: string;
     screen_type?: string;
     starts_at: string;
@@ -556,6 +558,27 @@ export interface ShowChannelSummaryRow {
   bookings: number;
   seats: number;
   amount: number;
+}
+
+/** One screen's numbers for the Shows & Seats audit: shows created, revenue and blocked seats. */
+export interface CinemaScreenAuditRow {
+  screen_id: string;
+  name: string;
+  shows: { total: number; past: number; current: number; upcoming: number; today: number; disabled: number; cancelled: number };
+  revenue: { total: number; today: number; advance: number; tickets: number };
+  seats: { total: number; blocked: number };
+  /** Sales by platform: ONLINE (website and app), COUNTER (offline, box office), PARTNER */
+  channels: Array<{ channel: string; bookings: number; tickets: number; amount: number }>;
+}
+
+export interface CinemaScreenSeatAuditEntry {
+  id: string;
+  action: "BLOCK" | "UNBLOCK";
+  seat_count: number;
+  seat_labels: string[];
+  note: string | null;
+  user_name: string | null;
+  created_at: string;
 }
 
 export type MovieShowBookingState = "UPCOMING" | "STARTED" | "ENDED";
@@ -7920,12 +7943,13 @@ export const api = createApi({
         bizId: string;
         screenId: string;
         seats: Array<{ seat_key: string; status: 'BLOCKED' | 'AVAILABLE' }>;
+        note?: string;
       }
     >({
-      query: ({ bizId, screenId, seats }) => ({
+      query: ({ bizId, screenId, seats, note }) => ({
         url: `/businesses/${bizId}/cinema-screens/${screenId}/seat-statuses`,
         method: 'PATCH',
-        body: { seats },
+        body: { seats, note },
       }),
       invalidatesTags: (_r, _e, arg) => [
         { type: 'CinemaScreens', id: arg.bizId },
@@ -7965,6 +7989,7 @@ export const api = createApi({
         seat_keys: string[];
         guest_name?: string;
         guest_phone?: string;
+        guest_email?: string;
         payment_method?: 'CASH' | 'CARD' | 'MOBILE_MONEY';
       }
     >({
@@ -7980,6 +8005,21 @@ export const api = createApi({
       ],
     }),
 
+    getCinemaScreenAuditSummary: builder.query<CinemaScreenAuditRow[], string>({
+      query: (bizId) => `/businesses/${bizId}/cinema-screens/audit-summary`,
+      transformResponse: (res: { data: CinemaScreenAuditRow[] }) => res.data,
+      providesTags: ['CinemaScreens', 'MovieShowtimes'],
+    }),
+
+    getCinemaScreenSeatAudit: builder.query<CinemaScreenSeatAuditEntry[], { bizId: string; screenId: string; limit?: number }>({
+      query: ({ bizId, screenId, limit }) => ({
+        url: `/businesses/${bizId}/cinema-screens/${screenId}/seat-audit`,
+        params: limit ? { limit } : undefined,
+      }),
+      transformResponse: (res: { data: CinemaScreenSeatAuditEntry[] }) => res.data,
+      providesTags: ['CinemaScreens'],
+    }),
+
     getShowChannelSummary: builder.query<ShowChannelSummaryRow[], { bizId: string; showtimeId: string }>({
       query: ({ bizId, showtimeId }) => `/businesses/${bizId}/movie-showtimes/${showtimeId}/channels`,
       transformResponse: (res: { data: { channels: ShowChannelSummaryRow[] } }) => res.data.channels,
@@ -7988,7 +8028,20 @@ export const api = createApi({
 
     getPartnerMovieShowtimes: builder.query<
       MovieShowtime[],
-      { bizId: string; date?: string; cinema_screen_id?: string; movie_id?: string }
+      {
+        bizId: string;
+        date?: string;
+        date_from?: string;
+        date_to?: string;
+        cinema_screen_id?: string;
+        movie_id?: string;
+        /** Searches movie, language, format, screen, date and time on the server */
+        q?: string;
+        time_of_day?: 'morning' | 'afternoon' | 'evening' | 'night';
+        language?: string;
+        format?: string;
+        status?: string;
+      }
     >({
       query: ({ bizId, ...params }) => ({
         url: `/businesses/${bizId}/movie-showtimes`,
@@ -9159,6 +9212,8 @@ export const {
   useUpdateShowSeatOverridesMutation,
   useCreateCounterBookingMutation,
   useGetShowChannelSummaryQuery,
+  useGetCinemaScreenAuditSummaryQuery,
+  useGetCinemaScreenSeatAuditQuery,
   useCreatePartnerMovieShowtimeMutation,
   useUpdatePartnerMovieShowtimeMutation,
   useDeletePartnerMovieShowtimeMutation,

@@ -69,8 +69,8 @@ function MovieShell({ children }: { children: React.ReactNode }) {
     label: "Cinema",
     items: [
       { name: "Dashboard", href: "/movie/dashboard", icon: LayoutDashboard },
-      { name: "Contract", href: "/movie/contract", icon: FileSignature },
       { name: "Screens & Layouts", href: "/movie/screens", icon: MonitorPlay },
+      { name: "Contract", href: "/movie/contract", icon: FileSignature },
       ...(hasBeveragesEnabled
         ? [{ name: "Beverages & Snacks", href: "/movie/beverages", icon: UtensilsCrossed }]
         : []),
@@ -105,15 +105,21 @@ function MovieShell({ children }: { children: React.ReactNode }) {
       ],
     },
   ];
-  // Before the contract is signed only Dashboard, Contract and Screens & Layouts are available
-  const sections: NavSection[] = unlocked ? [cinemaSection, ...laterSections] : [cinemaSection];
+  // Before the contract is signed: Dashboard, Screens & Layouts, Contract and Shows & Seats are available.
+  // Shows & Seats opens, but scheduling a show asks for the contract first.
+  const showsOnly: NavSection = {
+    id: "operations",
+    label: "Operations",
+    items: laterSections[0].items.filter((i) => i.href === "/movie/shows"),
+  };
+  const sections: NavSection[] = unlocked ? [cinemaSection, ...laterSections] : [cinemaSection, showsOnly];
 
   const profileLink: NavLink = { name: "Profile", href: "/movie/profile", icon: User };
 
   const allLinks = [cinemaSection, ...laterSections].flatMap((s) => s.items).concat(profileLink);
 
   // Direct URLs to locked pages go back to the dashboard until the contract is signed
-  const lockedAllowed = ["/movie/dashboard", "/movie/contract", "/movie/screens", "/movie/profile", "/movie/change-password"];
+  const lockedAllowed = ["/movie/dashboard", "/movie/screens", "/movie/contract", "/movie/shows", "/movie/profile", "/movie/change-password"];
   const onLockedPage = !lockedAllowed.some((href) => pathname === href || pathname.startsWith(`${href}/`));
   useEffect(() => {
     if (!contractLoading && !unlocked && onLockedPage) router.replace("/movie/dashboard");

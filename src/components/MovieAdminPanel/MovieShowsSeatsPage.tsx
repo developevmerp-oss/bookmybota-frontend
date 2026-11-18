@@ -14,9 +14,11 @@ import {
   Clock,
   Copy,
   Edit2,
+  Eye,
   FileSignature,
   Film,
   Globe,
+  History,
   Info,
   Lock,
   Monitor,
@@ -27,25 +29,24 @@ import {
   Tag,
   Ticket,
   Trash2,
-  Wrench,
   X,
 } from "lucide-react";
 import { useAppSelector } from "@/lib/hooks";
 import {
-  useCreateCounterBookingMutation,
   useDeletePartnerMovieShowtimeMutation,
   useGetCinemaContractQuery,
+  useGetCinemaScreenAuditSummaryQuery,
+  useGetCinemaScreenSeatAuditQuery,
   useGetCinemaScreensQuery,
   useGetPartnerMovieCatalogQuery,
   useGetPartnerMovieShowtimesQuery,
   useGetShowChannelSummaryQuery,
   useGetShowSeatMapQuery,
   useUpdatePartnerMovieShowtimeMutation,
-  useUpdateShowSeatOverridesMutation,
-  type CounterBookingResult,
+  type CinemaScreen,
+  type CinemaScreenAuditRow,
+  type CinemaScreenSeatAuditEntry,
   type MovieShowtime,
-  type ShowSeatMapSeat,
-  type ShowSeatState,
 } from "@/services/api";
 import { extractApiError } from "@/lib/apiErrors";
 import { isVenueWallTimeReached, venueDateStr } from "@/lib/dateFormat";
@@ -53,6 +54,7 @@ import { getApiBaseUrl } from "@/lib/apiBaseUrl";
 import { AdminListShimmer } from "@/components/Shared/Shimmer";
 import ConfirmDialog from "@/components/Shared/ConfirmDialog";
 import LayoutSeatPreview from "@/components/venue/LayoutSeatPreview";
+import ContractRequiredDialog from "./ContractRequiredDialog";
 import ShowtimeFormModal, { type ShowtimeFormRequest } from "./ShowtimeFormModal";
 import {
   conflictingShowtimeIds,
@@ -63,26 +65,6 @@ import {
   sortedTierPricing,
   toYmdLocal,
 } from "./showtimeHelpers";
-
-const STATE_META: Record<ShowSeatState, { label: string; cls: string }> = {
-  AVAILABLE: {
-    label: "Available",
-    cls: "bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100",
-  },
-  BOOKED: { label: "Sold", cls: "bg-slate-300 text-slate-600 border-slate-400" },
-  HELD: { label: "Held by customer", cls: "bg-amber-100 text-amber-800 border-amber-300" },
-  BLOCKED: { label: "Blocked (this show)", cls: "bg-rose-100 text-rose-700 border-rose-300" },
-  OUT_OF_ORDER: { label: "Out of order", cls: "bg-orange-100 text-orange-800 border-orange-300" },
-  SCREEN_BLOCKED: { label: "Blocked on screen layout", cls: "bg-slate-200 text-slate-500 border-slate-300" },
-};
-
-const BUSY_FILL: Partial<Record<ShowSeatState, string>> = {
-  BOOKED: "#94a3b8",
-  HELD: "#f59e0b",
-  BLOCKED: "#fb7185",
-  OUT_OF_ORDER: "#fb923c",
-  SCREEN_BLOCKED: "#475569",
-};
 
 const CHANNEL_LABEL: Record<string, string> = {
   ONLINE: "Website & app",
@@ -102,67 +84,6 @@ function money(n: number) {
   return Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 }
 
-/** The number the customer sees on the seat (A11 -> 11), even when a row repeats 1-10 on both sides of an aisle */
-function seatLabel(s: ShowSeatMapSeat) {
-  const prefix = s.row.toLowerCase();
-  const id = s.identifier.toLowerCase();
-  if (id.startsWith(prefix)) {
-    const rest = id.slice(prefix.length);
-    if (/^\d+$/.test(rest)) return String(Number(rest));
-  }
-  return s.number;
-}
-
-function hasPlacedLayout(seats: ShowSeatMapSeat[]): boolean {
-  if (seats.length < 2) return false;
-  const xs = new Set(seats.map((s) => Math.round(s.x)));
-  const ys = new Set(seats.map((s) => Math.round(s.y)));
-  return xs.size > 1 || ys.size > 1;
-}
-
-interface SeatRow {
-  label: string;
-  seats: Array<ShowSeatMapSeat & { gapBefore: boolean }>;
-}
-interface SeatSection {
-  name: string;
-  rows: SeatRow[];
-}
-
-function buildSections(seats: ShowSeatMapSeat[]): SeatSection[] {
-  const bySection = new Map<string, ShowSeatMapSeat[]>();
-  for (const s of seats) {
-    if (!bySection.has(s.section)) bySection.set(s.section, []);
-    bySection.get(s.section)!.push(s);
-  }
-  return Array.from(bySection.entries())
-    .map(([name, list]) => {
-      const byRow = new Map<string, ShowSeatMapSeat[]>();
-      for (const s of list) {
-        if (!byRow.has(s.row)) byRow.set(s.row, []);
-        byRow.get(s.row)!.push(s);
-      }
-      const rows = Array.from(byRow.entries())
-        .map(([label, rs]) => {
-          rs.sort((a, b) => a.x - b.x);
-          const steps: number[] = [];
-          for (let i = 0; i < rs.length - 1; i++) {
-            const diff = rs[i + 1].x - rs[i].x;
-            if (diff > 5) steps.push(diff);
-          }
-          const normal = steps.length ? Math.min(...steps) : 40;
-          return {
-            label,
-            avgY: rs.reduce((sum, s) => sum + s.y, 0) / (rs.length || 1),
-            seats: rs.map((s, i) => ({ ...s, gapBefore: i > 0 && s.x - rs[i - 1].x > normal * 1.6 })),
-          };
-        })
-        .sort((a, b) => a.avgY - b.avgY);
-      return { name, minY: Math.min(...rows.map((r) => r.avgY)), rows };
-    })
-    .sort((a, b) => a.minY - b.minY);
-}
-
 export default function MovieShowsSeatsPage() {
   const searchParams = useSearchParams();
   const user = useAppSelector((state) => state.auth.user);
@@ -172,10 +93,9 @@ export default function MovieShowsSeatsPage() {
   const [selectedDate, setSelectedDate] = useState<string>(searchParams.get("date") || todayStr);
   const [screenFilter, setScreenFilter] = useState<string>("");
   const [showId, setShowId] = useState<string>(searchParams.get("show") || "");
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [inspectKey, setInspectKey] = useState<string | null>(null);
-  const [counterOpen, setCounterOpen] = useState(false);
-  const [receipt, setReceipt] = useState<CounterBookingResult | null>(null);
+  const [layoutOpen, setLayoutOpen] = useState(false);
+  const [infoOpen, setInfoOpen] = useState(false);
+  const [contractDialogOpen, setContractDialogOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [formRequest, setFormRequest] = useState<ShowtimeFormRequest | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<MovieShowtime | null>(null);
@@ -222,11 +142,6 @@ export default function MovieShowsSeatsPage() {
     if (!sortedShows.some((s) => s.id === showId)) setShowId(sortedShows[0].id);
   }, [sortedShows, showId]);
 
-  useEffect(() => {
-    setSelected(new Set());
-    setInspectKey(null);
-  }, [showId]);
-
   // "Schedule show" links from the Movies page arrive with ?movie_id=
   useEffect(() => {
     const movieId = searchParams.get("movie_id");
@@ -239,92 +154,21 @@ export default function MovieShowsSeatsPage() {
   const {
     data: map,
     isFetching: mapLoading,
-    isError: mapFailed,
-    error: mapError,
     refetch: refetchMap,
   } = useGetShowSeatMapQuery({ bizId, showtimeId: showId }, { skip: mapSkip, pollingInterval: 15000 });
   const { data: channels = [] } = useGetShowChannelSummaryQuery({ bizId, showtimeId: showId }, { skip: mapSkip });
 
-  const [saveOverrides, { isLoading: saving }] = useUpdateShowSeatOverridesMutation();
-  const [counterBook, { isLoading: booking }] = useCreateCounterBookingMutation();
-
-  const sections = useMemo(() => buildSections(map?.seats ?? []), [map?.seats]);
-  const placedLayout = hasPlacedLayout(map?.seats ?? []);
-  const previewSeats = useMemo(
-    () =>
-      (map?.seats ?? []).map((s) => ({
-        key: s.key,
-        coordinate_x: s.x,
-        coordinate_y: s.y,
-        color: s.color,
-        section_name: s.section,
-        status: "AVAILABLE",
-      })),
-    [map?.seats]
+  const { data: auditRows = [] } = useGetCinemaScreenAuditSummaryQuery(bizId, { skip: !bizId, pollingInterval: 30000 });
+  const { data: auditLog = [] } = useGetCinemaScreenSeatAuditQuery(
+    { bizId, screenId: activeScreenId, limit: 30 },
+    { skip: !bizId || !activeScreenId }
   );
-  const seatByKey = useMemo(() => new Map((map?.seats ?? []).map((s) => [s.key, s])), [map?.seats]);
-  const selectedSeats = useMemo(
-    () => Array.from(selected).map((k) => seatByKey.get(k)).filter(Boolean) as ShowSeatMapSeat[],
-    [selected, seatByKey]
+  const auditRow = auditRows.find((r) => r.screen_id === activeScreenId) ?? null;
+  const { data: todayShows = [] } = useGetPartnerMovieShowtimesQuery(
+    { bizId, date: todayStr, ...(activeScreenId ? { cinema_screen_id: activeScreenId } : {}) },
+    { skip: !bizId || !activeScreenId }
   );
-  const showEnded = map?.showtime.status === "COMPLETED";
-
-  // Drop selections that changed state (e.g. sold online while selected)
-  useEffect(() => {
-    setSelected((prev) => {
-      const next = new Set<string>();
-      prev.forEach((k) => {
-        const s = seatByKey.get(k);
-        if (s && s.state !== "BOOKED" && s.state !== "SCREEN_BLOCKED") next.add(k);
-      });
-      return next.size === prev.size ? prev : next;
-    });
-  }, [seatByKey]);
-
-  const selectable = (s: ShowSeatMapSeat) => s.state !== "BOOKED" && s.state !== "SCREEN_BLOCKED";
-
-  const toggleSeat = (s: ShowSeatMapSeat) => {
-    if (s.state === "BOOKED") {
-      setInspectKey(s.key);
-      return;
-    }
-    if (!selectable(s)) return;
-    setInspectKey(null);
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(s.key)) next.delete(s.key);
-      else next.add(s.key);
-      return next;
-    });
-  };
-
-  const selectGroup = (seats: ShowSeatMapSeat[]) => {
-    const keys = seats.filter(selectable).map((s) => s.key);
-    if (keys.length === 0) return;
-    setSelected((prev) => {
-      const next = new Set(prev);
-      const all = keys.every((k) => next.has(k));
-      keys.forEach((k) => (all ? next.delete(k) : next.add(k)));
-      return next;
-    });
-  };
-
-  const applyStatus = async (status: "AVAILABLE" | "BLOCKED" | "OUT_OF_ORDER") => {
-    if (selected.size === 0) return;
-    try {
-      const res = await saveOverrides({
-        bizId,
-        showtimeId: showId,
-        seats: Array.from(selected).map((seat_key) => ({ seat_key, status })),
-      }).unwrap();
-      const { applied, skipped } = res.data;
-      if (applied > 0) toast.success(res.message || "Seats updated");
-      if (skipped.length > 0) toast.error(skipped[0].reason + (skipped.length > 1 ? ` (+${skipped.length - 1} more)` : ""));
-      setSelected(new Set());
-    } catch (err) {
-      toast.error(extractApiError(err, "Failed to update seats"));
-    }
-  };
+  const screenHasLayout = Array.isArray(activeScreen?.layout_seats_json) && (activeScreen?.layout_seats_json?.length ?? 0) > 0;
 
   const feedUrl = showId ? `${getApiBaseUrl()}/movies/showtimes/${showId}/layout` : "";
   const copyFeed = async () => {
@@ -339,7 +183,7 @@ export default function MovieShowsSeatsPage() {
 
   const openCreate = () => {
     if (!isContractActive) {
-      toast.error("Active contract required. Please review and sign your cinema agreement under Contract first.");
+      setContractDialogOpen(true);
       return;
     }
     setFormRequest({ key: ++formRequestSeq.current, showtime: null, screenId: activeScreenId || undefined });
@@ -379,10 +223,6 @@ export default function MovieShowsSeatsPage() {
     }
   };
 
-  const selectedTotal = selectedSeats.reduce((sum, s) => sum + s.price, 0);
-  const hasUnsellable = selectedSeats.some((s) => s.state === "BLOCKED" || s.state === "OUT_OF_ORDER");
-  const hasHeld = selectedSeats.some((s) => s.state === "HELD");
-  const inspected = inspectKey ? seatByKey.get(inspectKey) : null;
   const tiers = sortedTierPricing(selectedShow?.tier_pricing);
 
   if (!bizId) return <AdminListShimmer rows={4} columns={3} />;
@@ -476,8 +316,8 @@ export default function MovieShowsSeatsPage() {
                 type="button"
                 className={btnPrimary}
                 onClick={openCreate}
-                disabled={!isContractActive || screens.length === 0 || catalogMovies.length === 0}
-                title={!isContractActive ? "Sign contract first" : "Schedule a new show"}
+                disabled={screens.length === 0 || catalogMovies.length === 0}
+                title="Schedule a new show"
               >
                 <Plus size={15} /> Schedule show
               </button>
@@ -499,7 +339,7 @@ export default function MovieShowsSeatsPage() {
                   type="button"
                   className={btnPrimary}
                   onClick={openCreate}
-                  disabled={!isContractActive || screens.length === 0 || catalogMovies.length === 0}
+                  disabled={screens.length === 0 || catalogMovies.length === 0}
                 >
                   <Plus size={14} /> Schedule a show
                 </button>
@@ -607,8 +447,8 @@ export default function MovieShowsSeatsPage() {
                   { label: "Available", value: map.counts.available, tone: "text-emerald-600" },
                   { label: "Sold", value: map.counts.booked, tone: "text-slate-900" },
                   { label: "Held", value: map.counts.held, tone: "text-amber-600" },
-                  { label: "Blocked", value: map.counts.blocked + map.counts.screen_blocked, tone: "text-rose-600" },
-                  { label: "Out of order", value: map.counts.out_of_order, tone: "text-orange-600" },
+                  { label: "Damaged", value: map.counts.screen_blocked, tone: "text-orange-600" },
+                  { label: "Blocked (this show)", value: map.counts.blocked, tone: "text-rose-600" },
                   { label: "Revenue", value: money(map.revenue), tone: "text-slate-900" },
                 ].map((c) => (
                   <div key={c.label} className={`${card} px-3 py-2`}>
@@ -616,54 +456,6 @@ export default function MovieShowsSeatsPage() {
                     <div className={`text-lg font-black leading-tight ${c.tone}`}>{c.value}</div>
                   </div>
                 ))}
-              </div>
-
-              <div className={`${card} p-4 space-y-3`}>
-                <div className="font-bold text-slate-900 text-sm">Seat actions</div>
-                {selected.size === 0 ? (
-                  <p className="text-xs text-slate-500">
-                    Pick seats on the layout, or tap a row letter or section name. Then sell, block or mark them out of order.
-                  </p>
-                ) : (
-                  <p className="text-sm text-slate-900">
-                    <b>{selected.size}</b> seat{selected.size === 1 ? "" : "s"} · <b>{money(selectedTotal)} ETB</b>
-                    <span className="block text-xs text-slate-500">
-                      {selectedSeats.slice(0, 8).map((s) => s.identifier).join(", ")}
-                      {selectedSeats.length > 8 ? ` +${selectedSeats.length - 8}` : ""}
-                    </span>
-                  </p>
-                )}
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    className={`${btnPrimary} col-span-2`}
-                    disabled={selected.size === 0 || hasUnsellable || showEnded}
-                    onClick={() => setCounterOpen(true)}
-                    title={hasUnsellable ? "Unblock the blocked seats first" : "Sell the selected seats at the counter"}
-                  >
-                    <Store size={14} /> Sell at counter
-                  </button>
-                  <button type="button" className={btnSecondary} disabled={selected.size === 0 || saving || showEnded} onClick={() => applyStatus("BLOCKED")}>
-                    <Ban size={14} /> Block
-                  </button>
-                  <button type="button" className={btnSecondary} disabled={selected.size === 0 || saving || showEnded} onClick={() => applyStatus("OUT_OF_ORDER")}>
-                    <Wrench size={14} /> Out of order
-                  </button>
-                  <button type="button" className={btnSecondary} disabled={selected.size === 0 || saving || showEnded} onClick={() => applyStatus("AVAILABLE")}>
-                    Make available
-                  </button>
-                  <button type="button" className={btnSecondary} disabled={selected.size === 0} onClick={() => setSelected(new Set())}>
-                    Clear
-                  </button>
-                </div>
-                {hasHeld && selected.size > 0 && (
-                  <p className="text-[11px] text-amber-600">
-                    Some selected seats are held by an online customer right now.
-                  </p>
-                )}
-                <p className="text-[11px] text-slate-500">
-                  Changes apply to this show only and reach the website, app and partner apps straight away.
-                </p>
               </div>
 
               <div className={`${card} p-4`}>
@@ -715,222 +507,18 @@ export default function MovieShowsSeatsPage() {
           )}
         </div>
 
-        {/* ───────── Right: layout ───────── */}
-        <div className={`${card} p-4 sm:p-5 min-w-0 flex flex-col lg:overflow-hidden`}>
-          {!selectedShow ? (
-            activeScreen ? (
-              <>
-                <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-                  <div className="min-w-0">
-                    <div className="font-bold text-slate-900 truncate">{displayScreenName(activeScreen.name)} layout</div>
-                    <div className="text-xs text-slate-500">
-                      {activeScreen.layout_name ? `${activeScreen.layout_name} · ` : ""}
-                      {activeScreen.layout_seat_count || activeScreen.capacity || 0} seats · Schedule or pick a show on the left to manage its seats
-                    </div>
-                  </div>
-                </div>
-                {Array.isArray(activeScreen.layout_seats_json) && activeScreen.layout_seats_json.length > 0 ? (
-                  <div className="min-h-0 flex-1">
-                    <LayoutSeatPreview
-                      seats={activeScreen.layout_seats_json}
-                      config={activeScreen.layout_seating_config}
-                      heightClass="h-[min(70vh,600px)]"
-                      className="bg-white"
-                    />
-                  </div>
-                ) : (
-                  <div className="flex flex-1 flex-col items-center justify-center text-center py-16 text-slate-500">
-                    <Monitor size={40} className="text-slate-300 mb-3" />
-                    <p className="font-semibold text-slate-700">No live layout for this screen yet</p>
-                    <p className="text-sm mt-1 max-w-xs">
-                      Approve a layout under <b>Screens &amp; Layouts</b> to see it here.
-                    </p>
-                  </div>
-                )}
-              </>
-            ) : (
-              <div className="flex flex-1 flex-col items-center justify-center text-center py-16 text-slate-500">
-                <Monitor size={40} className="text-slate-300 mb-3" />
-                <p className="font-semibold text-slate-700">No screen yet</p>
-                <p className="text-sm mt-1 max-w-xs">Add a screen under Screens &amp; Layouts first.</p>
-              </div>
-            )
-          ) : !showLive ? (
-            <div className="flex flex-1 flex-col items-center justify-center text-center py-16 text-slate-500">
-              <Lock size={32} className="text-slate-300 mb-3" />
-              <p className="font-semibold text-slate-700">Layout hidden for this show</p>
-              <p className="text-sm mt-1 max-w-xs">Enable the show to manage its seats.</p>
-            </div>
-          ) : !map && mapFailed ? (
-            <p className="text-sm text-rose-600 py-10 text-center">
-              {extractApiError(mapError, "The seat layout could not be loaded. Refresh and try again.")}
-            </p>
-          ) : !map ? (
-            <p className="text-sm text-slate-500 py-10 text-center">Loading the seat layout…</p>
-          ) : (
-            <>
-              <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-                <div className="min-w-0">
-                  <div className="font-bold text-slate-900 truncate">{map.showtime.movie_title}</div>
-                  <div className="text-xs text-slate-500">
-                    {displayScreenName(map.showtime.screen_name)} · {map.showtime.format} · {map.showtime.language} · {formatTime(map.showtime.starts_at)}
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <button type="button" className={btnSecondary} onClick={() => selectGroup(map.seats)}>
-                    Select all free
-                  </button>
-                  <button type="button" className={btnSecondary} disabled={selected.size === 0} onClick={() => setSelected(new Set())}>
-                    Clear
-                  </button>
-                </div>
-              </div>
-
-              {inspected && inspected.booking && (
-                <div className="mb-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <div className="font-bold text-slate-900">Seat {inspected.identifier} · sold</div>
-                    <button type="button" onClick={() => setInspectKey(null)} aria-label="Close" className="text-slate-500 hover:text-slate-900">
-                      <X size={14} />
-                    </button>
-                  </div>
-                  <dl className="grid grid-cols-2 gap-x-6 gap-y-1 text-slate-600 text-xs">
-                    <div className="flex justify-between"><dt>Booking</dt><dd className="font-mono">{inspected.booking.booking_code}</dd></div>
-                    <div className="flex justify-between"><dt>Guest</dt><dd>{inspected.booking.guest_name || "—"}</dd></div>
-                    <div className="flex justify-between"><dt>Sold via</dt><dd>{CHANNEL_LABEL[inspected.booking.channel] || inspected.booking.channel}</dd></div>
-                    <div className="flex justify-between"><dt>Paid</dt><dd>{money(inspected.booking.paid)} ETB</dd></div>
-                  </dl>
-                  <p className="text-[11px] text-slate-500 mt-2 flex gap-1">
-                    <Lock size={11} className="mt-0.5 shrink-0" /> Sold seats are locked. Cancel the booking from Bookings to free the seat.
-                  </p>
-                </div>
-              )}
-
-              <div className="min-h-0 flex-1 lg:overflow-y-auto">
-                {!placedLayout && (
-                  <div className="mb-5">
-                    <div className="mx-auto h-2 w-3/5 rounded-b-full bg-gradient-to-b from-slate-400 to-slate-200" />
-                    <div className="text-center text-[11px] tracking-[0.3em] text-slate-400 mt-1">SCREEN THIS WAY</div>
-                  </div>
-                )}
-
-                {map.seats.length === 0 ? (
-                  <p className="text-sm text-slate-500 py-10 text-center">
-                    This screen has no approved seat layout yet. Open <b>Screens &amp; Layouts</b> to submit and approve one.
-                  </p>
-                ) : placedLayout ? (
-                  <div>
-                    <div className="mb-3 flex flex-wrap gap-2">
-                      {sections.map((sec) => {
-                        const secSeats = sec.rows.flatMap((r) => r.seats);
-                        const price = secSeats[0]?.base_price ?? 0;
-                        return (
-                          <button
-                            key={sec.name}
-                            type="button"
-                            onClick={() => selectGroup(secSeats)}
-                            className="rounded-full border border-slate-200 px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-slate-600 hover:border-rose-400 hover:text-rose-600 cursor-pointer"
-                            title="Select / unselect this section"
-                          >
-                            {sec.name} · {money(price)} ETB
-                          </button>
-                        );
-                      })}
-                    </div>
-                    <LayoutSeatPreview
-                      seats={previewSeats}
-                      config={map.layout?.seating_config}
-                      heightClass="h-[min(62vh,540px)]"
-                      className="bg-white"
-                      seatMarker={(raw) => {
-                        const key = String((raw as { key?: string }).key || "");
-                        const live = seatByKey.get(key);
-                        if (!live) return null;
-                        const isSel = selected.has(live.key);
-                        const busy = BUSY_FILL[live.state];
-                        return {
-                          fill: isSel ? "#e11d48" : busy || "",
-                          stroke: isSel ? "#9f1239" : "#ffffff",
-                          strokeWidth: isSel ? 3 : undefined,
-                          cursor: live.state === "SCREEN_BLOCKED" ? "not-allowed" : "pointer",
-                          title: `${live.row}${live.number || ""} · ${STATE_META[live.state].label} · ${money(live.price)} ETB`,
-                          onClick: live.state === "SCREEN_BLOCKED" ? undefined : () => toggleSeat(live),
-                        };
-                      }}
-                    />
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <div className="min-w-max mx-auto space-y-6">
-                      {sections.map((sec) => {
-                        const secSeats = sec.rows.flatMap((r) => r.seats);
-                        const price = secSeats[0]?.base_price ?? 0;
-                        return (
-                          <div key={sec.name}>
-                            <button
-                              type="button"
-                              onClick={() => selectGroup(secSeats)}
-                              className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500 hover:text-rose-600 cursor-pointer"
-                              title="Select / unselect the whole section"
-                            >
-                              {sec.name} · {money(price)} ETB
-                            </button>
-                            <div className="space-y-1.5">
-                              {sec.rows.map((row) => (
-                                <div key={row.label} className="flex items-center gap-1.5">
-                                  <button
-                                    type="button"
-                                    onClick={() => selectGroup(row.seats)}
-                                    className="w-6 text-xs font-bold text-slate-500 hover:text-rose-600 text-center cursor-pointer"
-                                    title={`Select row ${row.label}`}
-                                  >
-                                    {row.label}
-                                  </button>
-                                  {row.seats.map((s) => {
-                                    const isSel = selected.has(s.key);
-                                    const meta = STATE_META[s.state];
-                                    return (
-                                      <span key={s.key} className={`flex ${s.gapBefore ? "ml-5" : ""}`}>
-                                        <button
-                                          type="button"
-                                          onClick={() => toggleSeat(s)}
-                                          disabled={s.state === "SCREEN_BLOCKED"}
-                                          title={`${s.identifier} · ${meta.label} · ${money(s.price)} ETB${s.note ? ` · ${s.note}` : ""}`}
-                                          className={`relative h-8 min-w-[2rem] px-1 rounded-md border text-[11px] font-semibold transition-all cursor-pointer ${meta.cls} ${
-                                            isSel ? "ring-2 ring-rose-500 ring-offset-1 scale-105 !bg-rose-500 !text-white !border-rose-600" : ""
-                                          } ${s.state === "SCREEN_BLOCKED" ? "!cursor-not-allowed" : ""}`}
-                                        >
-                                          {seatLabel(s)}
-                                          {s.state === "OUT_OF_ORDER" && <Wrench size={9} className="absolute -top-1 -right-1" />}
-                                        </button>
-                                      </span>
-                                    );
-                                  })}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="mt-4 pt-3 border-t border-slate-100 flex flex-wrap gap-x-4 gap-y-2 text-[11px] text-slate-600">
-                {(Object.keys(STATE_META) as ShowSeatState[]).map((k) => (
-                  <span key={k} className="inline-flex items-center gap-1.5">
-                    <span className={`inline-block h-3.5 w-3.5 rounded border ${STATE_META[k].cls.split(" hover:")[0]}`} />
-                    {STATE_META[k].label}
-                  </span>
-                ))}
-                <span className="inline-flex items-center gap-1.5">
-                  <span className="inline-block h-3.5 w-3.5 rounded border bg-rose-500 border-rose-600" /> Selected
-                </span>
-              </div>
-            </>
-          )}
-        </div>
+        {/* ───────── Right: screen audit ───────── */}
+        <ScreenAuditPanel
+          screen={activeScreen}
+          row={auditRow}
+          rows={auditRows}
+          log={auditLog}
+          todayShows={todayShows}
+          hasLayout={screenHasLayout}
+          onSelectScreen={(id) => setScreenFilter(id)}
+          onOpenLayout={() => setLayoutOpen(true)}
+          onOpenInfo={() => setInfoOpen(true)}
+        />
       </div>
 
       <ShowtimeFormModal
@@ -946,55 +534,11 @@ export default function MovieShowsSeatsPage() {
         }}
       />
 
-      {counterOpen && (
-        <CounterModal
-          seats={selectedSeats}
-          total={selectedTotal}
-          saving={booking}
-          onClose={() => setCounterOpen(false)}
-          onConfirm={async (form) => {
-            try {
-              const res = await counterBook({
-                bizId,
-                showtimeId: showId,
-                seat_keys: selectedSeats.map((s) => s.key),
-                ...form,
-              }).unwrap();
-              setCounterOpen(false);
-              setSelected(new Set());
-              setReceipt(res.data);
-              toast.success(res.message || "Tickets booked");
-            } catch (err) {
-              toast.error(extractApiError(err, "Counter booking failed"));
-              refetchMap();
-            }
-          }}
-        />
+      {layoutOpen && activeScreen && (
+        <ScreenLayoutModal screen={activeScreen} onClose={() => setLayoutOpen(false)} />
       )}
-
-      {receipt && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
-          <div className="w-full max-w-sm rounded-2xl bg-white border border-slate-200 p-6 text-center">
-            <div className="mx-auto mb-3 h-12 w-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center">
-              <Check size={24} />
-            </div>
-            <h3 className="text-lg font-black text-slate-900">Tickets booked</h3>
-            <p className="text-sm text-slate-600 mt-1">
-              {receipt.seats.map((s) => s.identifier).join(", ")} · <b>{money(receipt.total)} ETB</b>
-            </p>
-            <p className="mt-3 font-mono text-sm text-slate-900">{receipt.booking_code}</p>
-            <p className="text-xs text-slate-500 mt-1">Guest can show this code at the gate. Find it under Bookings.</p>
-            <div className="mt-5 flex gap-2 justify-center">
-              <Link href="/movie/bookings" className={btnSecondary}>
-                View bookings
-              </Link>
-              <button type="button" className={btnPrimary} onClick={() => setReceipt(null)}>
-                Done
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {infoOpen && activeScreen && <ScreenInfoModal screen={activeScreen} row={auditRow} onClose={() => setInfoOpen(false)} />}
+      <ContractRequiredDialog open={contractDialogOpen} onClose={() => setContractDialogOpen(false)} />
 
       <ConfirmDialog
         open={Boolean(statusConfirm)}
@@ -1082,84 +626,350 @@ function PriceEditor({
   );
 }
 
-function CounterModal({
-  seats,
-  total,
-  saving,
-  onClose,
-  onConfirm,
-}: {
-  seats: ShowSeatMapSeat[];
-  total: number;
-  saving: boolean;
-  onClose: () => void;
-  onConfirm: (form: { guest_name?: string; guest_phone?: string; payment_method: "CASH" | "CARD" | "MOBILE_MONEY" }) => Promise<void>;
-}) {
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [method, setMethod] = useState<"CASH" | "CARD" | "MOBILE_MONEY">("CASH");
+const when = (iso: string) => {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime())
+    ? iso
+    : d.toLocaleString(undefined, { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+};
+
+function Stat({ label, value, tone = "text-slate-900", hint }: { label: string; value: string | number; tone?: string; hint?: string }) {
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="w-full max-w-md rounded-2xl bg-white border border-slate-200 p-5" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-bold text-slate-900">Sell at counter</h3>
-          <button type="button" onClick={onClose} aria-label="Close" className="text-slate-500 hover:text-slate-900">
+    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5">
+      <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">{label}</div>
+      <div className={`text-xl font-black leading-tight ${tone}`}>{value}</div>
+      {hint ? <div className="text-[10px] text-slate-400 mt-0.5">{hint}</div> : null}
+    </div>
+  );
+}
+
+/** Per-screen numbers: shows created (past, running, upcoming), revenue, blocked seats, and who blocked which seats. */
+function ScreenAuditPanel({
+  screen,
+  row,
+  rows,
+  log,
+  todayShows,
+  hasLayout,
+  onSelectScreen,
+  onOpenLayout,
+  onOpenInfo,
+}: {
+  screen: CinemaScreen | null;
+  row: CinemaScreenAuditRow | null;
+  rows: CinemaScreenAuditRow[];
+  log: CinemaScreenSeatAuditEntry[];
+  todayShows: MovieShowtime[];
+  hasLayout: boolean;
+  onSelectScreen: (id: string) => void;
+  onOpenLayout: () => void;
+  onOpenInfo: () => void;
+}) {
+  if (!screen) {
+    return (
+      <div className={`${card} p-5 flex flex-col items-center justify-center text-center text-slate-500 min-h-[18rem]`}>
+        <Monitor size={40} className="text-slate-300 mb-3" />
+        <p className="font-semibold text-slate-700">No screen yet</p>
+        <p className="text-sm mt-1 max-w-xs">Add a screen under Screens &amp; Layouts first.</p>
+      </div>
+    );
+  }
+  const totals = rows.reduce(
+    (acc, r) => ({
+      revenue: acc.revenue + r.revenue.total,
+      shows: acc.shows + r.shows.total,
+      tickets: acc.tickets + r.revenue.tickets,
+    }),
+    { revenue: 0, shows: 0, tickets: 0 }
+  );
+  return (
+    <div className={`${card} p-4 sm:p-5 min-w-0 lg:overflow-y-auto space-y-5`}>
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="text-lg font-extrabold text-slate-900 truncate">{displayScreenName(screen.name)} · audit</div>
+          <div className="text-xs text-slate-500">
+            {(screen.screen_type || "standard").toUpperCase()} · {screen.layout_name ? `${screen.layout_name} · ` : ""}
+            {screen.layout_seat_count || screen.capacity || 0} seats
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <button type="button" className={`${btnSecondary} !px-2.5`} onClick={onOpenInfo} title="About this screen" aria-label="About this screen">
+            <Info size={15} />
+          </button>
+          <button type="button" className={btnSecondary} onClick={onOpenLayout} disabled={!hasLayout} title={hasLayout ? "View the live layout" : "No live layout yet"}>
+            <Eye size={14} /> View layout
+          </button>
+        </div>
+      </div>
+
+      {!row ? (
+        <p className="text-sm text-slate-500">Loading numbers for this screen…</p>
+      ) : (
+        <>
+          <div>
+            <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500 mb-2">Shows on this screen</div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <Stat label="Created" value={row.shows.total} />
+              <Stat label="Running now" value={row.shows.current} tone="text-emerald-600" />
+              <Stat label="Upcoming" value={row.shows.upcoming} tone="text-sky-600" />
+              <Stat label="Completed" value={row.shows.past} tone="text-slate-600" />
+            </div>
+            <p className="text-[11px] text-slate-500 mt-2">
+              {row.shows.today} today
+              {row.shows.disabled > 0 ? ` · ${row.shows.disabled} disabled` : ""}
+              {row.shows.cancelled > 0 ? ` · ${row.shows.cancelled} cancelled` : ""}
+            </p>
+          </div>
+
+          <div>
+            <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500 mb-2">Today on this screen</div>
+            {todayShows.length === 0 ? (
+              <p className="text-xs text-slate-500">No shows scheduled for today.</p>
+            ) : (
+              <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200">
+                {[...todayShows]
+                  .sort((a, b) => String(a.starts_at).localeCompare(String(b.starts_at)))
+                  .map((st) => {
+                    const ended = !!st.ends_at && isVenueWallTimeReached(st.ends_at);
+                    const started = isVenueWallTimeReached(st.starts_at);
+                    const state = st.status === "CANCELLED" ? "Cancelled" : !st.is_active ? "Disabled" : ended ? "Completed" : started ? "Running now" : "Upcoming";
+                    const tone =
+                      state === "Running now" ? "bg-emerald-50 text-emerald-700 border-emerald-200" : state === "Upcoming" ? "bg-sky-50 text-sky-700 border-sky-200" : "bg-slate-100 text-slate-600 border-slate-200";
+                    return (
+                      <li key={st.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-xs">
+                        <span className="min-w-0">
+                          <span className="font-bold text-slate-900">{formatTime(st.starts_at)}</span>{" "}
+                          <span className="text-slate-700">{st.movie_title}</span>
+                          <span className="text-slate-400"> · {st.format || "2D"} · {st.language || "—"}</span>
+                        </span>
+                        <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${tone}`}>{state}</span>
+                      </li>
+                    );
+                  })}
+              </ul>
+            )}
+          </div>
+
+          <div>
+            <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500 mb-2">Revenue from this screen</div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <Stat label="Total" value={`${money(row.revenue.total)}`} hint="ETB, tickets" />
+              <Stat label="Today's shows" value={`${money(row.revenue.today)}`} hint="ETB" />
+              <Stat label="Advance sales" value={`${money(row.revenue.advance)}`} hint="ETB, shows still to come" />
+              <Stat label="Tickets sold" value={row.revenue.tickets} />
+            </div>
+          </div>
+
+          <div>
+            <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500 mb-2">Sold by platform</div>
+            {row.channels.length === 0 ? (
+              <p className="text-xs text-slate-500">No tickets sold on this screen yet.</p>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                {row.channels.map((c) => (
+                  <div key={c.channel} className="rounded-xl border border-slate-200 bg-white px-3 py-2.5">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
+                      {c.channel === "COUNTER" ? <Store size={13} className="text-[#e11d48]" /> : <Globe size={13} className="text-sky-500" />}
+                      {CHANNEL_LABEL[c.channel] || c.channel}
+                    </div>
+                    <div className="text-lg font-black text-slate-900 leading-tight mt-1">{money(c.amount)} <span className="text-[10px] font-semibold text-slate-500">ETB</span></div>
+                    <div className="text-[11px] text-slate-500">
+                      {c.tickets} ticket{c.tickets === 1 ? "" : "s"} · {c.bookings} booking{c.bookings === 1 ? "" : "s"}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <p className="text-[11px] text-slate-400 mt-1.5">Box office is offline sales taken by your staff. Website &amp; app are online sales.</p>
+          </div>
+
+          <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+            <div>
+              <div className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                <Ban size={14} className="text-orange-500" /> Damaged seats on this screen
+              </div>
+              <div className="text-xs text-slate-500">
+                Hidden from every show and from customers. Mark or repair them under{" "}
+                <Link href="/movie/screens" className="font-semibold text-[#e11d48] hover:underline">
+                  Screens &amp; Layouts
+                </Link>
+                .
+              </div>
+            </div>
+            <div className="text-2xl font-black text-orange-600">{row.seats.blocked}</div>
+          </div>
+        </>
+      )}
+
+      <div>
+        <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500 mb-2">All screens</div>
+        <div className="overflow-x-auto rounded-xl border border-slate-200">
+          <table className="w-full min-w-[34rem] text-left text-xs">
+            <thead className="bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500">
+              <tr>
+                <th className="px-3 py-2">Screen</th>
+                <th className="px-2 py-2 text-right">Shows</th>
+                <th className="px-2 py-2 text-right">Now</th>
+                <th className="px-2 py-2 text-right">Upcoming</th>
+                <th className="px-2 py-2 text-right">Damaged</th>
+                <th className="px-3 py-2 text-right">Revenue (ETB)</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {rows.map((r) => (
+                <tr
+                  key={r.screen_id}
+                  onClick={() => onSelectScreen(r.screen_id)}
+                  className={`cursor-pointer hover:bg-rose-50/50 ${r.screen_id === screen.id ? "bg-rose-50" : ""}`}
+                >
+                  <td className="px-3 py-2 font-semibold text-slate-800">{displayScreenName(r.name)}</td>
+                  <td className="px-2 py-2 text-right">{r.shows.total}</td>
+                  <td className="px-2 py-2 text-right text-emerald-600">{r.shows.current}</td>
+                  <td className="px-2 py-2 text-right text-sky-600">{r.shows.upcoming}</td>
+                  <td className="px-2 py-2 text-right text-orange-600">{r.seats.blocked}</td>
+                  <td className="px-3 py-2 text-right font-bold">{money(r.revenue.total)}</td>
+                </tr>
+              ))}
+              {rows.length > 1 && (
+                <tr className="bg-slate-50 font-bold">
+                  <td className="px-3 py-2">All screens</td>
+                  <td className="px-2 py-2 text-right">{totals.shows}</td>
+                  <td colSpan={2} />
+                  <td className="px-2 py-2 text-right text-slate-500">{totals.tickets} tickets</td>
+                  <td className="px-3 py-2 text-right">{money(totals.revenue)}</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div>
+        <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500 mb-2 flex items-center gap-1.5">
+          <History size={12} /> Damaged seat history
+        </div>
+        {log.length === 0 ? (
+          <p className="text-xs text-slate-500">No seats have been marked damaged or repaired on this screen yet.</p>
+        ) : (
+          <ul className="space-y-2">
+            {log.map((e) => (
+              <li key={e.id} className="rounded-xl border border-slate-200 px-3 py-2 text-xs">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className={`font-bold ${e.action === "BLOCK" ? "text-orange-600" : "text-emerald-600"}`}>
+                    {e.action === "BLOCK" ? "Marked damaged" : "Repaired"} · {e.seat_count} seat{e.seat_count === 1 ? "" : "s"}
+                  </span>
+                  <span className="text-slate-500">
+                    {when(e.created_at)}
+                    {e.user_name ? ` · ${e.user_name}` : ""}
+                  </span>
+                </div>
+                <div className="mt-0.5 text-slate-700 break-words">
+                  {e.seat_labels.slice(0, 24).join(", ")}
+                  {e.seat_labels.length > 24 ? ` +${e.seat_labels.length - 24} more` : ""}
+                </div>
+                {e.note ? <div className="mt-0.5 text-slate-500 italic">“{e.note}”</div> : null}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ScreenInfoModal({ screen, row, onClose }: { screen: CinemaScreen; row: CinemaScreenAuditRow | null; onClose: () => void }) {
+  const types = (screen.seat_types_json || {}) as Record<string, unknown>;
+  const lines: Array<[string, string]> = [
+    ["Screen", displayScreenName(screen.name)],
+    ["Type", (screen.screen_type || "standard").toUpperCase()],
+    ["Capacity", String(screen.capacity ?? "—")],
+    ["Live layout", screen.layout_name || "None yet"],
+    ["Seats on the layout", String(screen.layout_seat_count || 0)],
+    ["Regular / Recliner / Couple", `${Number(types.regular) || 0} / ${Number(types.recliner) || 0} / ${Number(types.couple) || 0}`],
+    ["Blocked seats", String(row?.seats.blocked ?? 0)],
+    ["Status", screen.is_active ? "Active" : "Disabled"],
+  ];
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
+      <div role="dialog" aria-modal="true" className="w-full max-w-sm rounded-2xl bg-white border border-slate-200 shadow-2xl p-5" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between gap-3 mb-3">
+          <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+            <Info size={16} className="text-[#e11d48]" /> About this screen
+          </h3>
+          <button type="button" onClick={onClose} aria-label="Close" className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer">
             <X size={18} />
           </button>
         </div>
-        <ul className="max-h-40 overflow-auto rounded-lg border border-slate-200 divide-y divide-slate-100 mb-3">
-          {seats.map((s) => (
-            <li key={s.key} className="flex justify-between px-3 py-1.5 text-sm text-slate-700">
-              <span>
-                {s.identifier} <span className="text-xs text-slate-500">· {s.section}</span>
-              </span>
-              <span>{money(s.price)} ETB</span>
-            </li>
+        <dl className="divide-y divide-slate-100 text-sm">
+          {lines.map(([k, v]) => (
+            <div key={k} className="flex justify-between gap-4 py-2">
+              <dt className="text-slate-500">{k}</dt>
+              <dd className="font-semibold text-slate-900 text-right">{v}</dd>
+            </div>
           ))}
-        </ul>
-        <div className="flex justify-between text-base font-black text-slate-900 mb-4">
-          <span>Total to collect</span>
-          <span>{money(total)} ETB</span>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="text-xs font-semibold text-slate-600">Guest name (optional)</label>
-            <input value={name} onChange={(e) => setName(e.target.value)} className={`${inputCls} mt-1`} placeholder="Walk-in" />
+        </dl>
+      </div>
+    </div>
+  );
+}
+
+type LayoutSeatRecord = Record<string, unknown>;
+
+const seatNameOf = (seat: LayoutSeatRecord) => `${String(seat.row_label || seat.row || "")}${String(seat.seat_label || seat.label || "")}`;
+const seatStatusOf = (seat: LayoutSeatRecord) => String(seat.status || "AVAILABLE").toUpperCase();
+
+/** The eye button: the screen's live layout, read only. Damaged seats show in orange. */
+function ScreenLayoutModal({ screen, onClose }: { screen: CinemaScreen; onClose: () => void }) {
+  const seats = useMemo(
+    () => (Array.isArray(screen.layout_seats_json) ? (screen.layout_seats_json as LayoutSeatRecord[]) : []),
+    [screen.layout_seats_json]
+  );
+  const damaged = seats.filter((seat) => seatStatusOf(seat) === "BLOCKED").length;
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5" onClick={onClose}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        className="w-full max-w-5xl max-h-[94vh] overflow-y-auto rounded-2xl bg-white border border-slate-200 shadow-2xl p-4 sm:p-5 space-y-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h3 className="text-base font-extrabold text-slate-900 truncate">{displayScreenName(screen.name)} layout</h3>
+            <p className="text-xs text-slate-500">
+              {screen.layout_name ? `${screen.layout_name} · ` : ""}
+              {seats.length} seats · {damaged} damaged
+            </p>
           </div>
-          <div>
-            <label className="text-xs font-semibold text-slate-600">Phone (optional)</label>
-            <input value={phone} onChange={(e) => setPhone(e.target.value)} className={`${inputCls} mt-1`} inputMode="tel" />
+          <button type="button" onClick={onClose} aria-label="Close" className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer">
+            <X size={18} />
+          </button>
+        </div>
+        <LayoutSeatPreview
+          seats={seats as never}
+          config={screen.layout_seating_config}
+          heightClass="h-[min(60vh,520px)]"
+          className="bg-white"
+          seatMarker={(raw) => {
+            const seat = raw as unknown as LayoutSeatRecord;
+            const status = seatStatusOf(seat);
+            return {
+              fill: status === "BLOCKED" ? "#f97316" : status === "BOOKED" || status === "RESERVED" ? "#94a3b8" : "",
+              stroke: status === "BLOCKED" ? "#c2410c" : "#ffffff",
+              strokeWidth: status === "BLOCKED" ? 2 : undefined,
+              cursor: "default",
+              title: `${seatNameOf(seat)} · ${status === "BLOCKED" ? "Damaged" : "Available"}`,
+            };
+          }}
+        />
+        <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-600">
+          <div className="flex gap-x-4">
+            <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-blue-500" /> Available</span>
+            <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-orange-500" /> Damaged</span>
           </div>
-        </div>
-        <div className="mt-3 flex gap-2">
-          {(["CASH", "CARD", "MOBILE_MONEY"] as const).map((m) => (
-            <button
-              key={m}
-              type="button"
-              onClick={() => setMethod(m)}
-              className={`flex-1 rounded-lg border px-2 py-1.5 text-xs font-semibold cursor-pointer ${
-                method === m ? "border-rose-500 bg-rose-50 text-rose-700" : "border-slate-300 text-slate-600"
-              }`}
-            >
-              {m === "MOBILE_MONEY" ? "Mobile money" : m === "CASH" ? "Cash" : "Card"}
-            </button>
-          ))}
-        </div>
-        <p className="text-[11px] text-slate-500 mt-3">
-          Counter sales are collected by your cinema, so no platform commission or convenience fee is charged and nothing is added to settlements.
-        </p>
-        <div className="mt-5 flex justify-end gap-2">
-          <button type="button" className={btnSecondary} onClick={onClose} disabled={saving}>
-            Cancel
-          </button>
-          <button
-            type="button"
-            className={btnPrimary}
-            disabled={saving}
-            onClick={() => onConfirm({ guest_name: name.trim() || undefined, guest_phone: phone.trim() || undefined, payment_method: method })}
-          >
-            {saving ? "Booking…" : `Confirm · ${money(total)} ETB`}
-          </button>
+          <Link href="/movie/screens" className="font-semibold text-[#e11d48] hover:underline">
+            Mark or repair damaged seats in Screens &amp; Layouts
+          </Link>
         </div>
       </div>
     </div>

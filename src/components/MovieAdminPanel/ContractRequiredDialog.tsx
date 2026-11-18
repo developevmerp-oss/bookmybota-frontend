@@ -8,7 +8,7 @@ interface ContractRequiredDialogProps {
   onClose: () => void;
 }
 
-/** Shown when a cinema tries to act on screens or layouts before signing its contract. */
+/** Shown when a cinema tries to schedule a show before signing its contract. */
 export default function ContractRequiredDialog({ open, onClose }: ContractRequiredDialogProps) {
   if (!open) return null;
   return (
@@ -38,7 +38,7 @@ export default function ContractRequiredDialog({ open, onClose }: ContractRequir
           Create your contract first
         </h2>
         <p className="text-sm text-slate-600 leading-relaxed">
-          You need to sign your cinema contract before you can approve or reject layouts or manage your screens.
+          You need to sign your cinema contract before you can schedule shows.
         </p>
         <Link
           href="/movie/contract"

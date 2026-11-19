@@ -50,8 +50,8 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  // Next 16 defaults to Turbopack; empty block silences the webpack/turbopack mismatch
-  // when tooling inspects this file without the --webpack flag.
+  // Prefer Turbopack in `npm run dev` (lower RAM than webpack on 8–16GB laptops).
+  // Keep empty turbopack block so Next does not warn when configs are inspected.
   turbopack: {},
   experimental: {
     optimizePackageImports: [
@@ -73,8 +73,7 @@ const nextConfig: NextConfig = {
       },
     ];
   },
-  // OneDrive / cloud-synced Desktop folders can touch file mtimes and trigger
-  // endless Fast Refresh ("Compiling…" loops). Applied when running `next dev --webpack`.
+  // Fallback for `npm run dev:webpack` only — dampens watch thrash on slow / synced disks.
   webpack: (config, { dev }) => {
     if (dev) {
       config.watchOptions = {
@@ -87,7 +86,8 @@ const nextConfig: NextConfig = {
           "**/coverage/**",
           "**/backend/dist/**",
         ],
-        aggregateTimeout: 800,
+        aggregateTimeout: 1000,
+        poll: false,
       };
     }
     return config;

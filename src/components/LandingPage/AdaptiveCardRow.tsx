@@ -39,9 +39,10 @@ type AdaptiveCardRowProps = {
 };
 
 /**
- * Landing-page card row (responsive peek):
- * - Phone: 1 full card + ~20% of the next.
- * - Tablet: 2 full cards + ~20% of the next.
+ * Landing-page card row (responsive peek, District-style):
+ * - Phone: 2 full + ~25% peek; dining 1 full + ~50% peek.
+ * - Small tablet: 2.5 peek; dining 1 + ~75% peek.
+ * - Tablet: 3 full + ~25% peek; dining 2 full + ~25% peek.
  * - Desktop: minVisible cards in view (default 5).
  * - Fewer items keep the same card width (empty space on the right).
  */

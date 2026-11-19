@@ -1,7 +1,7 @@
 .adaptive-card-row {
-  /* Phone: 1 full card + ~20% of the next */
+  /* Phone: 2 full cards + ~25% of the next */
   --adaptive-gap: 0.75rem;
-  --adaptive-visible: 1.2;
+  --adaptive-visible: 2.25;
   --adaptive-count: 1;
   display: flex;
   width: 100%;
@@ -25,30 +25,49 @@
   display: none;
 }
 
-/* Dining / events / sports / movies — same peek cadence */
-.adaptive-card-row--dining,
+/* Movies / events / sports — 2 + 25% peek on phone */
 .adaptive-card-row--four {
-  --adaptive-visible: 1.2;
+  --adaptive-visible: 2.25;
   --adaptive-gap: 0.75rem;
   padding-left: 0;
   padding-right: 0;
 }
 
-/* Tablet: 2 full + ~20% peek */
+/* Popular Dining / Raise a Glass: 1 full + ~50% of the next */
+.adaptive-card-row--dining {
+  --adaptive-visible: 1.5;
+  --adaptive-gap: 0.75rem;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+/* Small tablet / large phone landscape */
 @media (min-width: 640px) {
   .adaptive-card-row,
-  .adaptive-card-row--dining,
   .adaptive-card-row--four {
-    --adaptive-visible: 2.2;
+    --adaptive-visible: 2.5;
+    --adaptive-gap: 1rem;
+  }
+
+  /* Dining: 1 full + ~75% peek — still roomy before iPad width */
+  .adaptive-card-row--dining {
+    --adaptive-visible: 1.75;
     --adaptive-gap: 1rem;
   }
 }
 
+/* Tablet (iPad portrait → short of desktop) */
 @media (min-width: 768px) and (max-width: 1023px) {
+  /* Poster rails: 3 full + ~25% peek */
   .adaptive-card-row,
-  .adaptive-card-row--dining,
   .adaptive-card-row--four {
-    --adaptive-visible: 2.2;
+    --adaptive-visible: 3.25;
+    --adaptive-gap: 1.15rem;
+  }
+
+  /* Dining / bars: 2 full + ~25% peek */
+  .adaptive-card-row--dining {
+    --adaptive-visible: 2.25;
     --adaptive-gap: 1.15rem;
   }
 }
@@ -66,8 +85,8 @@
   }
 
   .adaptive-card-row--four {
-    --adaptive-visible: var(--adaptive-min-visible, 4);
-    --adaptive-gap: 1.5rem;
+    --adaptive-visible: var(--adaptive-min-visible, 5);
+    --adaptive-gap: 1.25rem;
   }
 }
 

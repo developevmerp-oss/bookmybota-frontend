@@ -175,15 +175,35 @@ export default function VenueLayoutViewer({
       {};
 
     if (Array.isArray(rawSeats) && rawSeats.length > 0) {
-      setSeats(
-        rawSeats.map((s: any) => ({
-          ...s,
-          id: s.id || s.internalId || `${s.row_label || ""}${s.seat_label || ""}`,
-          coordinate_x: Number(s.coordinate_x),
-          coordinate_y: Number(s.coordinate_y),
-          is_bestseller: Boolean(s.is_bestseller ?? s.isBestseller ?? s.bestseller),
-        }))
-      );
+      const mapped = rawSeats.map((s: any) => ({
+        ...s,
+        id: s.id || s.internalId || `${s.row_label || ""}${s.seat_label || ""}`,
+        coordinate_x: Number(s.coordinate_x),
+        coordinate_y: Number(s.coordinate_y),
+        is_bestseller: Boolean(s.is_bestseller ?? s.isBestseller ?? s.bestseller),
+      }));
+      // Prefer booked/held when collapsing duplicate physical seats
+      const rank = (status: unknown) => {
+        const st = String(status || "").toUpperCase();
+        if (st === "BOOKED" || st === "SOLD") return 3;
+        if (st === "HELD" || st === "LOCKED" || st === "RESERVED") return 2;
+        if (st === "AVAILABLE") return 1;
+        return 0;
+      };
+      const byPhysical = new Map<string, (typeof mapped)[number]>();
+      for (const seat of mapped) {
+        const key = [
+          String(seat.section_name || "").trim().toUpperCase(),
+          String(seat.row_label || "").trim().toUpperCase(),
+          String(seat.seat_label || "").trim().toUpperCase(),
+        ].join("|");
+        const physical = key === "||" ? String(seat.id) : key;
+        const prev = byPhysical.get(physical);
+        if (!prev || rank(seat.status) > rank(prev.status)) {
+          byPhysical.set(physical, seat);
+        }
+      }
+      setSeats(Array.from(byPhysical.values()));
     }
     if (rawConfig?.labels && Array.isArray(rawConfig.labels)) {
       setLabels(rawConfig.labels);
@@ -195,7 +215,13 @@ export default function VenueLayoutViewer({
 
   useEffect(() => {
     if (initialSelectedSeats) {
-      const incomingIds = initialSelectedSeats.map((s: any) => s.id || s.seat_identifier || s.internalId);
+      const incomingIds = Array.from(
+        new Set(
+          initialSelectedSeats
+            .map((s: any) => String(s.id || s.seat_identifier || s.internalId || ""))
+            .filter(Boolean)
+        )
+      );
       setSelectedSeatIds(incomingIds);
     }
   }, [initialSelectedSeats]);

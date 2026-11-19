@@ -2427,7 +2427,7 @@ export default function Home() {
             {/* ========== END UI OPTION ONE ========== */}
 
             {/* ========== UI OPTION TWO ========== */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5 lg:gap-5 w-full">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-5 lg:gap-5 w-full">
               {displayRestaurants.map((restaurant) => (
                 <DiningRestaurantCardOption2
                   key={`opt2-${restaurant.id}`}

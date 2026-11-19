@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, type MouseEvent } from "react";
-import { Heart, Loader2 } from "lucide-react";
+import { Bookmark, Heart, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   useGetDiningWishlistIdsQuery,
@@ -20,6 +20,8 @@ import {
 type Appearance = "default" | "glass";
 /** Icon colors — independent of button chrome (`appearance` / `className`). */
 type Tone = "default" | "neutral" | "onDark";
+/** Listing cards use bookmark (District-style); detail/media keep heart. */
+type IconVariant = "heart" | "bookmark";
 
 type Props = {
   businessId: string;
@@ -33,6 +35,7 @@ type Props = {
    * - `onDark` — white outline on dark overlays; rose fill when saved
    */
   tone?: Tone;
+  icon?: IconVariant;
 };
 
 /** Avoid every card on a grid firing guest→account sync at once */
@@ -74,6 +77,7 @@ export default function DiningWishlistButton({
   className,
   appearance = "default",
   tone = "default",
+  icon = "heart",
 }: Props) {
   const dispatch = useAppDispatch();
   const authUser = useAppSelector((s) => s.auth.user);
@@ -159,11 +163,12 @@ export default function DiningWishlistButton({
       ? "absolute top-3 right-3 z-[2] w-9 h-9 rounded-full bg-white/35 backdrop-blur-md border border-white/50 shadow-sm flex items-center justify-center hover:bg-white/50 transition-colors cursor-pointer disabled:opacity-70"
       : "absolute top-3 right-3 z-[2] w-9 h-9 rounded-full bg-white shadow-md flex items-center justify-center hover:bg-slate-50 transition-colors cursor-pointer disabled:opacity-70";
 
-  const { heart: heartClass, loader: loaderClass } = resolveIconClasses(
+  const { heart: iconClass, loader: loaderClass } = resolveIconClasses(
     appearance,
     tone,
     saved
   );
+  const Icon = icon === "bookmark" ? Bookmark : Heart;
 
   return (
     <>
@@ -178,7 +183,7 @@ export default function DiningWishlistButton({
         {toggling ? (
           <Loader2 size={16} className={loaderClass} />
         ) : (
-          <Heart size={18} className={heartClass} strokeWidth={2.25} />
+          <Icon size={18} className={iconClass} strokeWidth={2.25} />
         )}
       </button>
 

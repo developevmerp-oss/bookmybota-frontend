@@ -80,9 +80,12 @@ const QUICK_LINKS = [
   { label: "Gift Cards", href: "/gift-cards" },
 ] as const;
 
-export default function Footer() {
+export default function Footer({ className = "" }: { className?: string }) {
   return (
-    <footer id="contact" className="bg-[#0B0B0B] text-white">
+    <footer
+      id="contact"
+      className={["bg-[#0B0B0B] text-white", className].filter(Boolean).join(" ")}
+    >
       {/* Partner CTA */}
       <div className="border-b border-white/10 bg-[#141414]">
         <div className={`${CONTAINER} py-7 sm:py-8`}>

@@ -145,7 +145,7 @@ function OfferCard({ offer }: { offer: DisplayOffer }) {
           )}
           {offer.badge.label}
         </p>
-        <div>
+        <div className="offer-card__body">
           <p className="offer-card__discount">{offer.discountMain}</p>
           {offer.discountMax ? (
             <p className="offer-card__discount-max">{offer.discountMax}</p>
@@ -160,7 +160,7 @@ function OfferCard({ offer }: { offer: DisplayOffer }) {
         </div>
         <p className="offer-card__min">
           <Calendar size={13} strokeWidth={2} />
-          {offer.minBooking}
+          <span>{offer.minBooking}</span>
         </p>
       </div>
 
@@ -175,7 +175,12 @@ function OfferCard({ offer }: { offer: DisplayOffer }) {
           {revealed ? offer.code : "••••••••"}
         </button>
         <button type="button" className="offer-card__copy-btn" onClick={copyCode}>
-          {copied ? "COPIED!" : revealed ? "COPY CODE" : "REVEAL CODE"}
+          <span className="offer-card__copy-btn-full">
+            {copied ? "COPIED!" : revealed ? "COPY CODE" : "REVEAL CODE"}
+          </span>
+          <span className="offer-card__copy-btn-short">
+            {copied ? "COPIED" : revealed ? "COPY" : "REVEAL"}
+          </span>
         </button>
         <p className="offer-card__valid">{offer.validTill}</p>
       </div>

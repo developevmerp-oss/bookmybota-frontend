@@ -365,6 +365,17 @@ export default function PublicEventDetailPage({
       };
     });
   }, [event?.artists]);
+  // Guests and chief guests are people the organizer added to this event, so they are listed apart from artists
+  const isGuestEntry = (a: StaticArtist) => /^guest$/i.test(String(a.role || "").trim()) || /chief\s*guest/i.test(String(a.role || ""));
+  const artistGroups = useMemo(
+    () =>
+      [
+        { title: "Artists", list: displayArtists.filter((a) => !isGuestEntry(a)) },
+        { title: "Chief Guests", list: displayArtists.filter((a) => /chief\s*guest/i.test(String(a.role || ""))) },
+        { title: "Guests", list: displayArtists.filter((a) => /^guest$/i.test(String(a.role || "").trim())) },
+      ].filter((g) => g.list.length > 0),
+    [displayArtists]
+  );
   const minPrice = ticketTypes.length
     ? Math.min(...ticketTypes.map((t) => Number(t.price) || 0))
     : null;
@@ -908,13 +919,13 @@ export default function PublicEventDetailPage({
               </section>
             )}
 
-            {displayArtists.length > 0 && (
-            <section className="mt-6 sm:mt-8 lg:mt-9">
+            {artistGroups.map((group) => (
+            <section key={group.title} className="mt-6 sm:mt-8 lg:mt-9">
               <h2 className="text-[1.25rem] sm:text-[1.375rem] lg:text-[1.4rem] font-semibold text-[#1A1A1A] mb-2.5 sm:mb-2">
-                Artists
+                {group.title}
               </h2>
               <div className="flex gap-3 sm:gap-4 lg:gap-5 overflow-x-auto pb-1 -mx-5 px-5 sm:mx-0 sm:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                {displayArtists.map((artist, i) => (
+                {group.list.map((artist, i) => (
                   <button
                     key={`${artist.name}-${i}`}
                     type="button"
@@ -953,7 +964,7 @@ export default function PublicEventDetailPage({
                 ))}
               </div>
             </section>
-          )}
+            ))}
 
           {offers.length > 0 && (
               <section className="mt-6 sm:mt-8 lg:mt-9">
@@ -1259,7 +1270,8 @@ export default function PublicEventDetailPage({
         showtimes={showtimes}
       />
 
-      <Footer />
+      {/* Desktop only — mobile detail pages omit the site footer */}
+      <Footer className="hidden md:block" />
     </div>
   );
 }

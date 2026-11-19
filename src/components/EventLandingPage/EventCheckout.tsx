@@ -64,6 +64,11 @@ import { isGiftCardSpendable } from "@/lib/giftCardOwnership";
 import { resolveHoldExpiresAt } from "@/lib/holdCountdown";
 import { pickContiguousBlock } from "@/lib/bmsSeatAutoSelect";
 import {
+  dedupeSeatsByPhysicalKey,
+  isSameSeat,
+  seatPhysicalKeyFromAny,
+} from "@/lib/seatIdentity";
+import {
   emptyEventCheckoutContactValues,
   emptyEventCheckoutDeliveryValues,
   eventCheckoutContactSchema,
@@ -1280,9 +1285,12 @@ export default function EventCheckout({
     };
     type GridBand = { avgY: number; sections: GridSection[] };
 
-    const rawSeats = Array.isArray(activeLayoutData?.data?.seats)
+    const rawSeatsIn = Array.isArray(activeLayoutData?.data?.seats)
       ? activeLayoutData.data.seats
       : [];
+    // Collapse duplicate physical seats (same section/row/number, different UUIDs)
+    // which otherwise inflate qty and show labels like "I9 · I9".
+    const rawSeats = dedupeSeatsByPhysicalKey(rawSeatsIn);
     const config =
       activeLayoutData?.data?.seating_config ||
       activeLayoutData?.seating_config ||
@@ -1540,9 +1548,34 @@ export default function EventCheckout({
     if (seat.isBooked || !desiredSeatQty) return;
 
     // Tap a selected seat → deselect only that seat (adjust like BMS)
-    const exists = selectedSeats.some((s) => String(s.id) === seat.id);
+    const exists = selectedSeats.some((s) =>
+      isSameSeat(
+        String(s.id),
+        seat.id,
+        s.row_label || s.row,
+        seat.row,
+        s.seat_label || s.number,
+        seat.number,
+        s.section_name || s.sectionName,
+        seat.sectionName
+      )
+    );
     if (exists) {
-      applySelectedSeats(selectedSeats.filter((s) => String(s.id) !== seat.id));
+      applySelectedSeats(
+        selectedSeats.filter(
+          (s) =>
+            !isSameSeat(
+              String(s.id),
+              seat.id,
+              s.row_label || s.row,
+              seat.row,
+              s.seat_label || s.number,
+              seat.number,
+              s.section_name || s.sectionName,
+              seat.sectionName
+            )
+        )
+      );
       return;
     }
 
@@ -1563,8 +1596,12 @@ export default function EventCheckout({
         toast.message("Please select seats from the same ticket type / block.");
         return;
       }
-      const existingIds = new Set(selectedSeats.map((s) => String(s.id)));
-      const toAdd = autoBlock.filter((s) => !existingIds.has(String(s.id)));
+      const existingKeys = new Set(
+        selectedSeats.map((s) => seatPhysicalKeyFromAny(s) || String(s.id))
+      );
+      const toAdd = autoBlock.filter(
+        (s) => !existingKeys.has(seatPhysicalKeyFromAny(s) || String(s.id))
+      );
       if (!toAdd.length) return;
       const merged = [...selectedSeats, ...toAdd].slice(0, desiredSeatQty);
       applySelectedSeats(merged);
@@ -1590,12 +1627,14 @@ export default function EventCheckout({
       return;
     }
 
+    const seatKey = (s: any) => seatPhysicalKeyFromAny(s) || String(s.id);
     const prevIds = new Set(selectedSeats.map((s) => String(s.id)));
+    const prevKeys = new Set(selectedSeats.map(seatKey));
     const nextIds = new Set(seats.map((s) => String(s.id)));
 
     // Deselect path from map viewer — or BMS "start fresh" when qty was full
     if (seats.length < selectedSeats.length) {
-      if (seats.length === 1 && !prevIds.has(String(seats[0].id))) {
+      if (seats.length === 1 && !prevKeys.has(seatKey(seats[0])) && !prevIds.has(String(seats[0].id))) {
         const autoBlock = autoSelectNeighborSeats(String(seats[0].id), desiredSeatQty);
         if (autoBlock && autoBlock.length > 0) {
           applySelectedSeats(autoBlock);
@@ -1611,7 +1650,9 @@ export default function EventCheckout({
       return;
     }
 
-    const newlyAdded = seats.filter((s) => !prevIds.has(String(s.id)));
+    const newlyAdded = seats.filter(
+      (s) => !prevKeys.has(seatKey(s)) && !prevIds.has(String(s.id))
+    );
     if (newlyAdded.length === 1 && seats.length === selectedSeats.length + 1) {
       const startFresh = selectedSeats.length === 0 || selectedSeats.length >= desiredSeatQty;
       const need = startFresh ? desiredSeatQty : desiredSeatQty - selectedSeats.length;
@@ -1619,9 +1660,14 @@ export default function EventCheckout({
       if (autoBlock && autoBlock.length > 0) {
         if (startFresh) {
           applySelectedSeats(autoBlock);
+          if (autoBlock.length < desiredSeatQty) {
+            toast.message(
+              `${autoBlock.length}/${desiredSeatQty} selected — tap another row for the rest.`
+            );
+          }
         } else {
-          const existing = new Set(selectedSeats.map((s) => String(s.id)));
-          const toAdd = autoBlock.filter((s) => !existing.has(String(s.id)));
+          const existing = new Set(selectedSeats.map(seatKey));
+          const toAdd = autoBlock.filter((s) => !existing.has(seatKey(s)));
           applySelectedSeats([...selectedSeats, ...toAdd].slice(0, desiredSeatQty));
         }
         return;
@@ -1941,20 +1987,24 @@ export default function EventCheckout({
       return;
     }
 
-    const normalized = seats.map((s) => {
-      const resolved = resolveSeatTicket({
-        ...s,
-        section_name: s.section_name || s.sectionName,
-      });
-      return {
-        ...s,
-        id: String(s.id),
-        ticket_type_id: String(resolved?.id || s.ticket_type_id || ""),
-        section_name: s.section_name || s.sectionName || resolved?.ticket_type || "",
-        price: Number(resolved?.price) || Number(s.price) || Number(s.unit_price) || 0,
-        unit_price: Number(resolved?.price) || Number(s.unit_price) || Number(s.price) || 0,
-      };
-    });
+    const normalized = dedupeSeatsByPhysicalKey(
+      seats.map((s) => {
+        const resolved = resolveSeatTicket({
+          ...s,
+          section_name: s.section_name || s.sectionName,
+        });
+        return {
+          ...s,
+          id: String(s.id),
+          ticket_type_id: String(resolved?.id || s.ticket_type_id || ""),
+          section_name: s.section_name || s.sectionName || resolved?.ticket_type || "",
+          row_label: s.row_label || s.row || "",
+          seat_label: s.seat_label || s.number || "",
+          price: Number(resolved?.price) || Number(s.price) || Number(s.unit_price) || 0,
+          unit_price: Number(resolved?.price) || Number(s.unit_price) || Number(s.price) || 0,
+        };
+      })
+    );
 
     const typeIds = [
       ...new Set(normalized.map((s) => String(s.ticket_type_id || "")).filter(Boolean)),
@@ -3535,7 +3585,11 @@ export default function EventCheckout({
                 {selectedSeats.length > 0 && (
                   <p className="text-[11px] md:max-lg:text-[13px] lg:text-[11px] text-slate-400 truncate mt-0.5 hidden sm:block">
                     {selectedSeats
-                      .map((s: any) => `${s.row_label || s.row || ""}${s.seat_label || s.number || ""}`)
+                      .map((s: any) => {
+                        const row = String(s.row_label || s.row || "").trim();
+                        const num = String(s.seat_label || s.number || "").trim();
+                        return row && num ? `${row} ${num}` : `${row}${num}`;
+                      })
                       .filter(Boolean)
                       .join(" · ")}
                   </p>

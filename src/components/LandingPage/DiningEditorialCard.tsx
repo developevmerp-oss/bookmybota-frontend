@@ -27,6 +27,7 @@ export function DiningEditorialCard({
       place={place}
       showPromoted={false}
       showOffer={false}
+      railCompact
       className={`${widthClass} ${className}`}
     />
   );
@@ -61,6 +62,7 @@ export function ShowcaseDiningEditorialCard({
       locality={locality}
       cuisine={cuisine}
       href={href}
+      railCompact
       className={`${widthClass} ${className}`}
     />
   );

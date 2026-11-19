@@ -181,17 +181,21 @@ export default function CustomerReviewCard({
             <p className="text-[0.9375rem] font-semibold text-[#111111] truncate leading-tight">
               {displayName}
             </p>
-            <p className="mt-0.5 flex items-center gap-1 text-xs text-gray-600 leading-none">
+            <div className="mt-1 inline-flex items-center gap-1.5 text-xs text-gray-600 leading-none">
               <span className="shrink-0">
                 {bookedOnPlatform ? "Booked on" : "Customer on"}
               </span>
+              {/*
+                Logo asset has ~25% vertical padding; 1.33em makes the visible
+                wordmark height match this text-xs (1em) line.
+              */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={logoSrc()}
                 alt="Book My Bota"
-                className="h-3.5 w-auto max-w-[5.5rem] object-contain object-left"
+                className="block h-[1.33em] w-auto object-contain object-left"
               />
-            </p>
+            </div>
           </div>
 
           <span className="inline-flex shrink-0 items-center gap-1 text-sm font-bold text-[#111111] pt-0.5">

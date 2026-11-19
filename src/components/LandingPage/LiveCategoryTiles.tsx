@@ -52,13 +52,13 @@ export default function LiveCategoryTiles({ city }: { city: string }) {
     <section className="relative z-10 bg-white pt-6 sm:pt-7 lg:pt-8">
       <div className="bmb-section-container">
         <h2 className="text-xl sm:text-2xl font-bold text-slate-800 mb-2 sm:mb-3">
-          The Best of Live Events
+          Something for Every Mood
         </h2>
 
         {isLoadingFilters ? (
           <CategoryTilesShimmer count={6} />
         ) : cards.length === 0 ? (
-          <p className="type-body text-[#6B6B6B] py-6">No event categories yet.</p>
+          <p className="type-body text-[#6B6B6B] py-6">No categories yet.</p>
         ) : (
           <div className="flex flex-wrap gap-2.5 sm:gap-3 md:gap-4 items-start">
             {cards.map((card) => (

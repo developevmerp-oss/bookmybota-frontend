@@ -53,6 +53,7 @@ import { loadFromStorage, setCredentials } from '@/features/auth/authSlice';
 import { readSessionForRole } from '@/lib/authStorage';
 import CustomerAuthModal from '@/components/Shared/CustomerAuthModal';
 import CustomerReviewCard from '@/components/Shared/CustomerReviewCard';
+import ShareSheet from '@/components/Shared/ShareSheet';
 import { lockBodyScroll } from '@/lib/lockBodyScroll';
 import { useSelectedCity } from '@/lib/useSelectedCity';
 import PaymentSuccessView from '@/components/Shared/PaymentSuccessView';
@@ -683,6 +684,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
   const dispatch = useAppDispatch();
   const authUser = useAppSelector((state) => state.auth.user);
   const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [reviewsModalOpen, setReviewsModalOpen] = useState(false);
   useEffect(() => {
     if (!reviewsModalOpen) return;
@@ -718,9 +720,11 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
   const [siteHeaderHeight, setSiteHeaderHeight] = useState(0);
   const [sidebarStickyTop, setSidebarStickyTop] = useState(140);
   const [titlePast, setTitlePast] = useState(false);
+  const [galleryPast, setGalleryPast] = useState(false);
   const [heroPast, setHeroPast] = useState(false);
   const [restaurantStickyHeight, setRestaurantStickyHeight] = useState(0);
   const titleSentinelRef = useRef<HTMLDivElement>(null);
+  const galleryEndSentinelRef = useRef<HTMLDivElement>(null);
   const heroEndSentinelRef = useRef<HTMLDivElement>(null);
   const restaurantStickyRef = useRef<HTMLDivElement>(null);
   const scrollSpyPausedRef = useRef(false);
@@ -737,7 +741,14 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
   );
   const [mobileTabsHeight, setMobileTabsHeight] = useState(0);
   const mobileTabsRef = useRef<HTMLDivElement>(null);
-  const showMobileSectionTabs = isMobileViewport && heroPast && !isBookTableFlow;
+  /** Compact sticky: back + name + share after hero image scrolls away. */
+  const showMobileCompactHeader =
+    isMobileViewport && galleryPast && !isBookTableFlow;
+  /** Section tabs stick once meta / actions scroll past (District scrolled state). */
+  const showMobileSectionTabs =
+    isMobileViewport && heroPast && !isBookTableFlow;
+  const showMobileStickyChrome =
+    showMobileCompactHeader || showMobileSectionTabs;
   /** Desktop book: restaurant sticky carries Overview… + Book a Table (selected). */
   const showSectionTabs =
     (isBookTableFlow && isLgViewport) ||
@@ -793,7 +804,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
 
   useEffect(() => {
     const el = mobileTabsRef.current;
-    if (!el || !showMobileSectionTabs) {
+    if (!el || !showMobileStickyChrome) {
       setMobileTabsHeight(0);
       return;
     }
@@ -803,7 +814,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
     const ro = new ResizeObserver(update);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [showMobileSectionTabs, activeTab]);
+  }, [showMobileStickyChrome, showMobileSectionTabs, activeTab]);
 
   useEffect(() => {
     if (typeof IntersectionObserver === "undefined") return;
@@ -825,6 +836,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
     };
 
     watch(titleSentinelRef.current, setTitlePast, "-1px 0px 0px 0px");
+    watch(galleryEndSentinelRef.current, setGalleryPast, "-1px 0px 0px 0px");
     watch(heroEndSentinelRef.current, setHeroPast, "-1px 0px 0px 0px");
 
     return () => observers.forEach((o) => o.disconnect());
@@ -846,8 +858,8 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
   const getDetailStickyOffset = useCallback(() => {
     if (typeof window === "undefined") return 140;
     if (isMobileViewport) {
-      if (showMobileSectionTabs) {
-        return (mobileTabsHeight || 48) + 8;
+      if (showMobileStickyChrome) {
+        return (mobileTabsHeight || (showMobileSectionTabs ? 96 : 52)) + 8;
       }
       return 8;
     }
@@ -866,6 +878,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
     restaurantStickyVisible,
     restaurantStickyHeight,
     isMobileViewport,
+    showMobileStickyChrome,
     showMobileSectionTabs,
     mobileTabsHeight,
   ]);
@@ -1324,8 +1337,9 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
   const [currentPhotoIdx, setCurrentPhotoIdx] = useState(0);
   const [lightboxItems, setLightboxItems] = useState<string[]>([]);
   const [heroPhotoIdx, setHeroPhotoIdx] = useState(0);
-  const heroSwipeRef = useRef<{ x: number; y: number } | null>(null);
+  const heroScrollRef = useRef<HTMLDivElement | null>(null);
   const heroSuppressClickRef = useRef(false);
+  const heroDragRef = useRef<{ x: number; y: number; scrolling: boolean } | null>(null);
   const lightboxSwipeRef = useRef<{ x: number; y: number } | null>(null);
   const lightboxSuppressClickRef = useRef(false);
 
@@ -1344,6 +1358,8 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
 
   useEffect(() => {
     setHeroPhotoIdx(0);
+    const el = heroScrollRef.current;
+    if (el) el.scrollLeft = 0;
   }, [profile?.id]);
 
   useEffect(() => {
@@ -1373,34 +1389,32 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
     setCurrentPhotoIdx((prev) => (prev - 1 + (lightboxItems.length || 1)) % (lightboxItems.length || 1));
   }, [lightboxItems.length]);
 
-  const nextHeroPhoto = useCallback(() => {
-    if (photos.length < 2) return;
-    setHeroPhotoIdx((prev) => (prev + 1) % photos.length);
+  const syncHeroPhotoFromScroll = useCallback(() => {
+    const el = heroScrollRef.current;
+    if (!el || photos.length < 1) return;
+    const width = el.clientWidth || 1;
+    const idx = Math.round(el.scrollLeft / width);
+    const next = Math.max(0, Math.min(idx, photos.length - 1));
+    setHeroPhotoIdx((prev) => (prev === next ? prev : next));
   }, [photos.length]);
 
-  const prevHeroPhoto = useCallback(() => {
-    if (photos.length < 2) return;
-    setHeroPhotoIdx((prev) => (prev - 1 + photos.length) % photos.length);
-  }, [photos.length]);
-
-  const onHeroTouchStart = (e: React.TouchEvent) => {
-    const t = e.touches[0];
-    if (!t) return;
-    heroSwipeRef.current = { x: t.clientX, y: t.clientY };
+  const onHeroPointerDown = (e: React.PointerEvent) => {
+    heroDragRef.current = { x: e.clientX, y: e.clientY, scrolling: false };
   };
 
-  const onHeroTouchEnd = (e: React.TouchEvent) => {
-    const start = heroSwipeRef.current;
-    heroSwipeRef.current = null;
-    if (!start || photos.length < 2) return;
-    const t = e.changedTouches[0];
-    if (!t) return;
-    const dx = t.clientX - start.x;
-    const dy = t.clientY - start.y;
-    if (Math.abs(dx) < 48 || Math.abs(dx) < Math.abs(dy) * 1.15) return;
-    heroSuppressClickRef.current = true;
-    if (dx < 0) nextHeroPhoto();
-    else prevHeroPhoto();
+  const onHeroPointerMove = (e: React.PointerEvent) => {
+    const start = heroDragRef.current;
+    if (!start || start.scrolling) return;
+    const dx = Math.abs(e.clientX - start.x);
+    const dy = Math.abs(e.clientY - start.y);
+    if (dx > 10 || dy > 10) {
+      start.scrolling = true;
+      heroSuppressClickRef.current = true;
+    }
+  };
+
+  const onHeroPointerUp = () => {
+    heroDragRef.current = null;
   };
 
   const onLightboxTouchStart = (e: React.TouchEvent) => {
@@ -1936,6 +1950,35 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
     .filter(Boolean)
     .join(" | ");
 
+  /** Mobile/sticky back — router.back() often no-ops on cold open; fall back to /dining */
+  const handleDiningBack = () => {
+    if (typeof window === "undefined") {
+      router.push("/dining");
+      return;
+    }
+    const startedPath = window.location.pathname;
+    let navigated = false;
+    try {
+      const ref = document.referrer;
+      const sameOrigin = Boolean(ref) && new URL(ref).origin === window.location.origin;
+      if (sameOrigin && window.history.length > 1) {
+        router.back();
+        navigated = true;
+      }
+    } catch {
+      /* ignore referrer parse errors */
+    }
+    if (!navigated) {
+      router.push("/dining");
+      return;
+    }
+    window.setTimeout(() => {
+      if (window.location.pathname === startedPath) {
+        router.push("/dining");
+      }
+    }, 200);
+  };
+
   return (
     <div className={`${isBookTableFlow ? "" : "min-h-screen"} bg-white text-slate-700`}>
 
@@ -2009,14 +2052,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  if (navigator.share) {
-                    navigator.share({ title: profile.name, url: window.location.href });
-                  } else {
-                    navigator.clipboard.writeText(window.location.href);
-                    toast.success("Link copied to clipboard!");
-                  }
-                }}
+                onClick={() => setShareOpen(true)}
                 className="w-9 h-9 rounded-full bg-transparent flex items-center justify-center hover:bg-slate-100 transition-colors cursor-pointer"
                 aria-label="Share"
                 title="Share"
@@ -2058,42 +2094,54 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
               }`}
           >
             <div ref={titleSentinelRef} className="h-px w-full" aria-hidden />
-            {/* Mobile full-bleed hero — swipe to change photos */}
-            <div
-              className="md:hidden relative w-full h-[62vw] min-h-[280px] max-h-[440px] overflow-hidden bg-[#F3F4F6] touch-pan-y"
-              onTouchStart={onHeroTouchStart}
-              onTouchEnd={onHeroTouchEnd}
-            >
+            {/* Mobile full-bleed hero — horizontal scroll changes photos */}
+            <div className="md:hidden relative w-full h-[62vw] min-h-[280px] max-h-[440px] overflow-hidden bg-[#F3F4F6]">
               {photos.length > 0 ? (
-                <button
-                  type="button"
-                  className="absolute inset-0 w-full h-full cursor-pointer"
-                  onClick={() => {
-                    if (heroSuppressClickRef.current) {
-                      heroSuppressClickRef.current = false;
-                      return;
-                    }
-                    openLightbox(heroPhotoIdx);
-                  }}
-                  aria-label="View gallery"
+                <div
+                  ref={heroScrollRef}
+                  className="flex h-full w-full overflow-x-auto overflow-y-hidden snap-x snap-mandatory scrollbar-hide [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden overscroll-x-contain"
+                  onScroll={syncHeroPhotoFromScroll}  
+                  onPointerDown={onHeroPointerDown}
+                  onPointerMove={onHeroPointerMove}
+                  onPointerUp={onHeroPointerUp}
+                  onPointerCancel={onHeroPointerUp}
+                  role="region"
+                  aria-roledescription="carousel"
+                  aria-label={`${profile.name} photos`}
                 >
-                  <SafeCoverImage
-                    key={photos[heroPhotoIdx] || heroPhotoIdx}
-                    src={photos[heroPhotoIdx] || photos[0]}
-                    alt={`${profile.name} photo ${heroPhotoIdx + 1}`}
-                    className="w-full h-full object-cover"
-                    fallbackClassName="flex h-full w-full items-center justify-center bg-[#F3F4F6] text-slate-300"
-                    fallback={<DiningImageFallback size={36} />}
-                  />
-                </button>
+                  {photos.map((photoUrl, idx) => (
+                    <button
+                      key={`${photoUrl}-${idx}`}
+                      type="button"
+                      className="relative h-full w-full min-w-full shrink-0 snap-center snap-always cursor-pointer border-0 p-0"
+                      onClick={() => {
+                        if (heroSuppressClickRef.current) {
+                          heroSuppressClickRef.current = false;
+                          return;
+                        }
+                        openLightbox(idx);
+                      }}
+                      aria-label={`View gallery, photo ${idx + 1} of ${photos.length}`}
+                    >
+                      <SafeCoverImage
+                        src={photoUrl}
+                        alt={`${profile.name} photo ${idx + 1}`}
+                        className="w-full h-full object-cover pointer-events-none"
+                        fallbackClassName="flex h-full w-full items-center justify-center bg-[#F3F4F6] text-slate-300"
+                        fallback={<DiningImageFallback size={36} />}
+                      />
+                    </button>
+                  ))}
+                </div>
               ) : (
                 <div className="flex h-full w-full items-center justify-center text-slate-300">
                   <Utensils size={40} strokeWidth={1.5} />
                 </div>
               )}
+
               <button
                 type="button"
-                onClick={() => router.back()}
+                onClick={handleDiningBack}
                 className="absolute top-3 left-3 z-20 w-9 h-9 rounded-full bg-white shadow-md flex items-center justify-center cursor-pointer"
                 aria-label="Go back"
               >
@@ -2101,14 +2149,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  if (navigator.share) {
-                    navigator.share({ title: profile.name, url: window.location.href });
-                  } else {
-                    navigator.clipboard.writeText(window.location.href);
-                    toast.success("Link copied to clipboard!");
-                  }
-                }}
+                onClick={() => setShareOpen(true)}
                 className="absolute top-3 right-3 z-20 w-9 h-9 rounded-full bg-white shadow-md flex items-center justify-center cursor-pointer"
                 aria-label="Share"
               >
@@ -2125,7 +2166,6 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                 </button>
               ) : null}
             </div>
-
             {/* Tablet/desktop mosaic gallery */}
             <div className="hidden md:grid grid-cols-4 grid-rows-2 gap-2 h-[260px] md:h-[380px] rounded-2xl overflow-hidden shadow-sm border border-slate-100 mb-0 bg-[#F3F4F6]">
               {photos.length === 0 ? (
@@ -2272,7 +2312,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
 
             {/* Mobile District-style meta under gallery */}
             <div className="md:hidden mt-4 space-y-3 px-5">
-              <div className="flex items-start justify-between gap-3">
+              <div className="relative flex items-start justify-between gap-3">
                 <h1 className="text-[1.65rem] font-semibold text-slate-900 tracking-tight leading-tight min-w-0">
                   {profile.name}
                 </h1>
@@ -2285,6 +2325,12 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                     New
                   </div>
                 )}
+                {/* Sticky trigger after title — absolute so it does not add space-y gap */}
+                <div
+                  ref={galleryEndSentinelRef}
+                  className="pointer-events-none absolute inset-x-0 bottom-0 h-px w-full"
+                  aria-hidden
+                />
               </div>
 
               {profile.address?.trim() ? (
@@ -2341,14 +2387,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                 ) : null}
                 <button
                   type="button"
-                  onClick={() => {
-                    if (navigator.share) {
-                      navigator.share({ title: profile.name, url: window.location.href });
-                    } else {
-                      navigator.clipboard.writeText(window.location.href);
-                      toast.success("Link copied to clipboard!");
-                    }
-                  }}
+                  onClick={() => setShareOpen(true)}
                   className="inline-flex items-center gap-1.5 rounded-full border border-slate-300 px-3.5 py-2 text-sm font-semibold text-slate-800 cursor-pointer hover:bg-slate-50"
                 >
                   <Upload size={15} strokeWidth={2.25} />
@@ -2645,15 +2684,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                         ) : null}
                       </div>
 
-                      {aboutCostDisplay ? (
-                        <div className="mt-5">
-                          <h4 className="text-base sm:text-lg lg:text-base font-bold text-zinc-800">Cost</h4>
-                          <p className="mt-1 inline-flex items-center gap-1 text-base sm:text-lg lg:text-sm text-slate-500">
-                            <EqualApproximately size={15} strokeWidth={2} className="shrink-0 text-slate-500" aria-hidden />
-                            <span>{aboutCostDisplay}</span>
-                          </p>
-                        </div>
-                      ) : null}
+                      {/* Cost lives in the header meta only — avoid repeating ≈ X for two here */}
 
                       {cuisineDisplay ? (
                         <div className="mt-5">
@@ -3010,53 +3041,51 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
             <X size={22} className="text-white" strokeWidth={2.25} />
           </button>
 
-          {/* Image stage — swipe on mobile/touch */}
+          {/* Image stage — full-width on mobile; arrows overlay the photo */}
           <div
-            className="flex-1 flex flex-col items-center justify-center min-h-0 px-0 sm:px-5 md:px-6 relative touch-pan-y"
+            className="flex-1 flex flex-col min-h-0 relative touch-pan-y"
             onTouchStart={onLightboxTouchStart}
             onTouchEnd={onLightboxTouchEnd}
           >
-            {lightboxItems.length > 1 ? (
-              <button
-                type="button"
-                onClick={prevPhoto}
-                className="hidden sm:flex absolute left-4 z-10 p-2.5 bg-white/10 hover:bg-white/20 text-white rounded-full cursor-pointer"
-                aria-label="Previous image"
-              >
-                <ChevronLeft size={22} />
-              </button>
-            ) : null}
-
-            <div className="w-full flex-1 flex items-center justify-center overflow-hidden">
+            <div className="relative flex-1 w-full min-h-0 flex items-center justify-center overflow-hidden">
               <img
                 key={lightboxItems[currentPhotoIdx] + "-" + currentPhotoIdx}
                 src={lightboxItems[currentPhotoIdx]}
                 alt={`Gallery image ${currentPhotoIdx + 1}`}
                 draggable={false}
-                className="max-h-[78vh] w-full sm:w-auto sm:max-w-[min(920px,90vw)] object-contain select-none animate-diningLightboxSlideUp"
+                className="w-full h-full max-h-[calc(100dvh-5.5rem)] md:max-h-[78vh] md:w-auto md:max-w-[min(920px,92vw)] object-contain select-none animate-diningLightboxSlideUp"
                 onClick={(e) => {
                   e.stopPropagation();
                   if (lightboxSuppressClickRef.current) {
                     lightboxSuppressClickRef.current = false;
                     return;
                   }
-                  if (lightboxItems.length > 1) nextPhoto();
                 }}
               />
+
+              {lightboxItems.length > 1 ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={prevPhoto}
+                    className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 z-10 w-10 h-10 sm:w-11 sm:h-11 inline-flex items-center justify-center rounded-full bg-black/45 hover:bg-black/60 active:bg-black/70 border border-white/30 text-white cursor-pointer shadow-lg backdrop-blur-[2px]"
+                    aria-label="Previous image"
+                  >
+                    <ChevronLeft size={22} strokeWidth={2.25} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={nextPhoto}
+                    className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 z-10 w-10 h-10 sm:w-11 sm:h-11 inline-flex items-center justify-center rounded-full bg-black/45 hover:bg-black/60 active:bg-black/70 border border-white/30 text-white cursor-pointer shadow-lg backdrop-blur-[2px]"
+                    aria-label="Next image"
+                  >
+                    <ChevronRight size={22} strokeWidth={2.25} />
+                  </button>
+                </>
+              ) : null}
             </div>
 
-            {lightboxItems.length > 1 ? (
-              <button
-                type="button"
-                onClick={nextPhoto}
-                className="hidden sm:flex absolute right-4 z-10 p-2.5 bg-white/10 hover:bg-white/20 text-white rounded-full cursor-pointer"
-                aria-label="Next image"
-              >
-                <ChevronRight size={22} />
-              </button>
-            ) : null}
-
-            <p className="shrink-0 text-white text-sm font-semibold tracking-wide py-4">
+            <p className="shrink-0 text-center text-white text-sm font-semibold tracking-wide py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
               {currentPhotoIdx + 1} / {lightboxItems.length}
             </p>
           </div>
@@ -4682,32 +4711,64 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
           document.body
         )}
 
-      {/* Mobile section tab bar (District-style; replaces restaurant sticky on mobile) */}
+      {/* Mobile sticky chrome: back + name + share, then section tabs (District-style) */}
       {typeof document !== "undefined" &&
         createPortal(
           <div
             ref={mobileTabsRef}
             id="dining-mobile-section-tabs"
-            className={`md:hidden fixed top-0 left-0 right-0 z-[60] bg-white border-b border-slate-200 transition-all duration-300 ease-out ${showMobileSectionTabs && !isLightboxOpen
+            className={`md:hidden fixed top-0 left-0 right-0 z-[60] bg-white border-b border-slate-200 transition-all duration-300 ease-out ${
+              showMobileStickyChrome && !isLightboxOpen
                 ? "translate-y-0 opacity-100"
                 : "-translate-y-full opacity-0 pointer-events-none"
-              }`}
-            aria-hidden={!showMobileSectionTabs || isLightboxOpen}
+            }`}
+            aria-hidden={!showMobileStickyChrome || isLightboxOpen}
           >
-            <div className="px-5 flex gap-5 overflow-x-auto scrollbar-hide">
-              {DETAIL_SECTION_TABS.map((tab) => (
-                <button
-                  key={`mobile-tab-${tab.id}`}
-                  type="button"
-                  onClick={() => scrollToDetailSection(tab.sectionId, tab.id)}
-                  className={`py-3 text-sm font-semibold tracking-wide border-b-2 transition-all whitespace-nowrap cursor-pointer ${activeTab === tab.id
-                      ? "border-slate-900 text-slate-900 font-bold"
-                      : "border-transparent text-slate-400"
+            <div className="flex items-center gap-2 px-2.5 sm:px-3 h-12">
+              <button
+                type="button"
+                onClick={handleDiningBack}
+                className="shrink-0 w-9 h-9 inline-flex items-center justify-center rounded-full text-slate-900 hover:bg-slate-100 cursor-pointer"
+                aria-label="Go back"
+              >
+                <ChevronLeft size={22} strokeWidth={2.25} />
+              </button>
+              <p className="min-w-0 flex-1 text-[0.9375rem] font-bold text-slate-900 truncate text-center leading-tight">
+                {profile.name}
+              </p>
+              <button
+                type="button"
+                onClick={() => setShareOpen(true)}
+                className="shrink-0 w-9 h-9 inline-flex items-center justify-center rounded-full text-slate-900 hover:bg-slate-100 cursor-pointer"
+                aria-label="Share"
+              >
+                <Upload size={16} strokeWidth={2.25} />
+              </button>
+            </div>
+
+            <div
+              className={`overflow-hidden transition-[max-height,opacity] duration-300 ease-out ${
+                showMobileSectionTabs
+                  ? "max-h-14 opacity-100"
+                  : "max-h-0 opacity-0 pointer-events-none"
+              }`}
+            >
+              <div className="px-5 flex gap-5 overflow-x-auto scrollbar-hide border-t border-slate-100">
+                {DETAIL_SECTION_TABS.map((tab) => (
+                  <button
+                    key={`mobile-tab-${tab.id}`}
+                    type="button"
+                    onClick={() => scrollToDetailSection(tab.sectionId, tab.id)}
+                    className={`py-2.5 text-sm font-semibold tracking-wide border-b-2 transition-all whitespace-nowrap cursor-pointer ${
+                      activeTab === tab.id
+                        ? "border-slate-900 text-slate-900 font-bold"
+                        : "border-transparent text-slate-400"
                     }`}
-                >
-                  {tab.id}
-                </button>
-              ))}
+                  >
+                    {tab.id}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>,
           document.body
@@ -4799,6 +4860,13 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
         address={profile.address}
         phone={profile.phone}
         openingHours={openingHourRows}
+      />
+
+      <ShareSheet
+        open={shareOpen}
+        onClose={() => setShareOpen(false)}
+        title={profile.name}
+        text={`Check out ${profile.name} on Book My Bota`}
       />
     </div>
   );

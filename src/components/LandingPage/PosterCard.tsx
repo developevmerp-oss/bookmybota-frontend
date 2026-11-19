@@ -180,18 +180,18 @@ export function EventPosterCard({
           </span>
         ) : null}
       </div>
-      <div className="space-y-1 px-3.5 py-3 sm:px-4 sm:py-3.5">
+      <div className="space-y-0.5 sm:space-y-1 px-2.5 py-2.5 sm:px-4 sm:py-3.5">
         {dateLine ? (
-          <p className="text-sm tracking-wide  truncate leading-snug font-semibold text-[#B59B2A]">{dateLine}</p>
+          <p className="text-xs sm:text-sm tracking-wide truncate leading-snug font-semibold text-[#B59B2A]">{dateLine}</p>
         ) : null}
-        <h3 className="text-base tracking-wide sm:text-lg font-bold text-[#1C1C1C] break-words min-w-0 leading-snug">
+        <h3 className="text-[0.875rem] sm:text-base md:text-lg tracking-wide font-bold text-[#1C1C1C] break-words min-w-0 leading-snug line-clamp-2">
           {event.name}
         </h3>
         {placeLine ? (
-          <p className="text-sm tracking-wide text-gray-600 truncate leading-snug">{placeLine}</p>
+          <p className="text-xs sm:text-sm tracking-wide text-gray-600 truncate leading-snug">{placeLine}</p>
         ) : null}
         {eventType ? (
-          <p className="text-sm tracking-wide text-gray-600 truncate leading-snug">{eventType}</p>
+          <p className="hidden sm:block text-sm tracking-wide text-gray-600 truncate leading-snug">{eventType}</p>
         ) : null}
       </div>
     </Link>
@@ -239,18 +239,18 @@ export function ShowcaseEventPosterCard({
           hoverScaleClass="group-hover:scale-[1.04]"
         />
       </div>
-      <div className="space-y-1 px-3.5 py-3 sm:px-4 sm:py-3.5">
+      <div className="space-y-0.5 sm:space-y-1 px-2.5 py-2.5 sm:px-4 sm:py-3.5">
         {dateLine ? (
-          <p className="text-sm tracking-wide  truncate leading-snug font-semibold text-[#B59B2A]">{dateLine}</p>
+          <p className="text-xs sm:text-sm tracking-wide truncate leading-snug font-semibold text-[#B59B2A]">{dateLine}</p>
         ) : null}
-        <h3 className="text-base tracking-wide sm:text-lg font-bold text-[#1C1C1C] break-words min-w-0 leading-snug">
+        <h3 className="text-[0.875rem] sm:text-base md:text-lg tracking-wide font-bold text-[#1C1C1C] break-words min-w-0 leading-snug line-clamp-2">
           {title}
         </h3>
         {place ? (
-          <p className="text-sm tracking-wide text-gray-600 truncate leading-snug">{place}</p>
+          <p className="text-xs sm:text-sm tracking-wide text-gray-600 truncate leading-snug">{place}</p>
         ) : null}
         {eventType ? (
-          <p className="text-sm tracking-wide text-gray-600 truncate leading-snug">{eventType}</p>
+          <p className="hidden sm:block text-sm tracking-wide text-gray-600 truncate leading-snug">{eventType}</p>
         ) : null}
       </div>
     </Link>

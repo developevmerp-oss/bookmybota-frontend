@@ -67,10 +67,10 @@ import "./MovieLandingPage.css";
 import "@/components/DinningLandingPage/DiningHomePage.css";
 import "@/components/DinningLandingPage/DiningSearchPopup.css";
 
-/** See All / expanded grid — 1-up mobile, 2-up tablet, 4-up desktop. */
+/** See All / expanded grid — 1-up mobile, 2-up tablet, 5-up desktop. */
 const MOVIE_GRID_COLS =
-  "grid-cols-1 gap-y-5 sm:grid-cols-2 sm:gap-x-[1.15rem] sm:gap-y-5 lg:grid-cols-4 lg:gap-x-6 lg:gap-y-6";
-const DISPLAY_ONE_ROW_COUNT = 4;
+  "grid-cols-1 gap-y-5 sm:grid-cols-2 sm:gap-x-[1.15rem] sm:gap-y-5 lg:grid-cols-5 lg:gap-x-5 lg:gap-y-6";
+const DISPLAY_ONE_ROW_COUNT = 5;
 
 const FORMATS = ["2D", "3D", "4DX", "IMAX 2D"] as const;
 const CONTAINER = "bmb-section-container";
@@ -455,9 +455,9 @@ function toLandingMovieCard(movie: MovieCardData): MustWatchMovieCard {
   };
 }
 
-/** Same card UI as home landing Notify Movies section. */
+/** Same card UI as home landing Notify Movies section (5-up dense type). */
 function MovieCard({ movie }: { movie: MovieCardData }) {
-  return <MovieNotifyCard movie={toLandingMovieCard(movie)} />;
+  return <MovieNotifyCard movie={toLandingMovieCard(movie)} dense />;
 }
 
 /** Same See All / Show Less expand pattern as EventsListPage (rail → grid). */
@@ -502,7 +502,7 @@ function MovieRail({
       {!expanded ? (
         <>
           <AdaptiveCardRow
-            minVisible={4}
+            minVisible={5}
             scrollerRef={scrollerRef}
             className="adaptive-card-row--four"
           >
@@ -549,7 +549,7 @@ function MovieRail({
   );
 }
 
-/** Catalog grid: 1-up mobile, 2-up tablet, 4-up desktop. */
+/** Catalog grid: 1-up mobile, 2-up tablet, 5-up desktop. */
 function MovieCardsGrid({ movies }: { movies: MovieCardData[] }) {
   return (
     <div className={`grid ${MOVIE_GRID_COLS}`}>
@@ -606,7 +606,7 @@ function MovieReleasesGrid({
         {!expanded ? (
           <>
             <AdaptiveCardRow
-              minVisible={4}
+              minVisible={5}
               scrollerRef={scrollerRef}
               className="adaptive-card-row--four"
             >
@@ -1906,7 +1906,7 @@ export default function MovieLandingPage() {
             ) : !isMoviesExpanded ? (
               <div className={isFetching ? "opacity-70 transition-opacity" : ""}>
                 <AdaptiveCardRow
-                  minVisible={4}
+                  minVisible={5}
                   scrollerRef={moviesRailRef}
                   className="adaptive-card-row--four"
                 >

@@ -65,8 +65,8 @@ function mapVenue(v: PublicRegisteredPartner): CinemaCard {
     name: v.name,
     address,
     href: cinemaHref(v),
-    slug: v.slug,
-    cover_image_url: v.cover_image_url,
+    slug: v.slug ?? undefined,
+    cover_image_url: v.cover_image_url ?? undefined,
   };
 }
 

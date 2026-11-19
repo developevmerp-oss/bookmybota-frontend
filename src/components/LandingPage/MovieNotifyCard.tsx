@@ -6,6 +6,7 @@ import { Clapperboard, Star } from "lucide-react";
 // import { ArrowRight } from "lucide-react"; // used by commented Book Now / View Details CTA
 import MovieWishlistButton from "@/components/MovieLandingPage/MovieWishlistButton";
 import { formatMovieCardMeta } from "@/lib/movieDisplay";
+import { useAdaptiveCard } from "@/components/LandingPage/AdaptiveCardRow";
 import {
   // formatMovieReleaseLabel, // used by commented release date row
   movieDetailMeta,
@@ -29,9 +30,19 @@ function formatReviewsCount(count: number) {
 /**
  * Must-Watch movie card — status on poster; rating on title row (right);
  * genre meta, release date, CTA below.
+ * Typography densifies inside 5-up AdaptiveCardRow slots.
  */
-export function MovieNotifyCard({ movie }: { movie: MustWatchMovieCard }) {
+export function MovieNotifyCard({
+  movie,
+  dense: denseProp,
+}: {
+  movie: MustWatchMovieCard;
+  /** Force compact type for 5-up grids outside AdaptiveCardRow. */
+  dense?: boolean;
+}) {
   const [imgFailed, setImgFailed] = useState(false);
+  const adaptive = useAdaptiveCard();
+  const dense = denseProp ?? (adaptive?.minVisible ?? 0) >= 5;
   const showPoster = Boolean(movie.poster) && !imgFailed;
   const meta = movieDetailMeta(movie);
   // const releaseLabel = formatMovieReleaseLabel(movie.releaseDate);
@@ -61,48 +72,88 @@ export function MovieNotifyCard({ movie }: { movie: MustWatchMovieCard }) {
             />
           ) : (
             <div className="absolute inset-0 flex items-center justify-center text-slate-300">
-              <Clapperboard size={32} strokeWidth={1.4} />
+              <Clapperboard size={dense ? 28 : 32} strokeWidth={1.4} />
             </div>
           )}
 
           {/* Status — top left on poster (Coming Soon wins over Promoted); badge UI matches dining */}
           {comingSoon ? (
-            <span className="absolute top-3 left-3 z-[2] pointer-events-none inline-flex max-w-[65%] items-center rounded-full bg-black/70 px-2.5 py-1 text-[11px] font-semibold tracking-wide text-white backdrop-blur-[2px] shadow-sm">
+            <span
+              className={`absolute z-[2] pointer-events-none inline-flex max-w-[70%] items-center rounded-full bg-black/70 font-semibold tracking-wide text-white backdrop-blur-[2px] shadow-sm ${
+                dense
+                  ? "top-2 left-2 px-2 py-0.5 text-[10px]"
+                  : "top-3 left-3 px-2.5 py-1 text-[11px]"
+              }`}
+            >
               Coming Soon
             </span>
           ) : promoted ? (
-            <span className="absolute top-3 left-3 z-[2] pointer-events-none inline-flex max-w-[65%] items-center rounded-full bg-white/80 backdrop-blur-[2px] px-2.5 py-1 text-[11px] font-semibold text-slate-900 shadow-sm border border-white/60">
+            <span
+              className={`absolute z-[2] pointer-events-none inline-flex max-w-[70%] items-center rounded-full bg-white/80 backdrop-blur-[2px] font-semibold text-slate-900 shadow-sm border border-white/60 ${
+                dense
+                  ? "top-2 left-2 px-2 py-0.5 text-[10px]"
+                  : "top-3 left-3 px-2.5 py-1 text-[11px]"
+              }`}
+            >
               Promoted
             </span>
           ) : null}
 
-          <MovieWishlistButton movieId={String(movie.id)} appearance="glass" />
+          <MovieWishlistButton
+            movieId={String(movie.id)}
+            appearance="glass"
+            className={
+              dense
+                ? "absolute top-2 right-2 z-[2] w-8 h-8 rounded-full bg-white/35 backdrop-blur-md border border-white/50 shadow-sm flex items-center justify-center hover:bg-white/50 transition-colors cursor-pointer disabled:opacity-70"
+                : undefined
+            }
+          />
         </div>
 
-        <div className="flex flex-col gap-1 px-3.5 pt-3 pb-3.5 min-w-0">
-          <div className="flex items-start justify-between gap-2 min-w-0">
-            <h3 className="min-w-0 flex-1 text-base tracking-wide sm:text-lg font-bold text-[#1C1C1C] break-words leading-snug">
+        <div
+          className={`flex flex-col min-w-0 ${
+            dense
+              ? "gap-0.5 px-2.5 pt-2 pb-2.5"
+              : "gap-0.5 sm:gap-1 px-2.5 sm:px-3.5 pt-2.5 sm:pt-3 pb-3 sm:pb-3.5"
+          }`}
+        >
+          <div className={`flex items-start justify-between min-w-0 ${dense ? "gap-1" : "gap-1.5 sm:gap-2"}`}>
+            <h3
+              className={`min-w-0 flex-1 font-bold text-[#1C1C1C] break-words leading-snug line-clamp-2 tracking-wide ${
+                dense
+                  ? "text-[0.8125rem] sm:text-[0.875rem] lg:text-[0.9375rem]"
+                  : "text-[0.875rem] sm:text-base md:text-lg"
+              }`}
+            >
               {movie.title}
             </h3>
             {showRating ? (
               <span
-                className="shrink-0 inline-flex items-center gap-1 pt-0.5"
+                className={`shrink-0 inline-flex items-center pt-0.5 ${dense ? "gap-0.5" : "gap-1"}`}
                 aria-label={`Rated ${rating.toFixed(1)}${reviewsCount > 0 ? ` from ${reviewsCount} reviews` : ""}`}
               >
                 <Star
-                  size={13}
+                  size={dense ? 11 : 13}
                   className="fill-[#F5C518] text-[#F5C518]"
                   strokeWidth={0}
                 />
-                <span className="text-sm font-bold tabular-nums text-[#1C1C1C] leading-none">
+                <span
+                  className={`font-bold tabular-nums text-[#1C1C1C] leading-none ${
+                    dense ? "text-[11px] sm:text-xs" : "text-xs sm:text-sm"
+                  }`}
+                >
                   {rating.toFixed(1)}
                 </span>
                 {reviewsCount > 0 ? (
                   <>
-                    <span className="text-gray-300 leading-none" aria-hidden>
+                    <span className="hidden sm:inline text-gray-300 leading-none" aria-hidden>
                       |
                     </span>
-                    <span className="text-sm font-medium tabular-nums text-gray-500 leading-none">
+                    <span
+                      className={`hidden sm:inline font-medium tabular-nums text-gray-500 leading-none ${
+                        dense ? "text-[11px]" : "text-sm"
+                      }`}
+                    >
                       {formatReviewsCount(reviewsCount)}
                     </span>
                   </>
@@ -112,7 +163,11 @@ export function MovieNotifyCard({ movie }: { movie: MustWatchMovieCard }) {
           </div>
 
           {metaLine ? (
-            <p className="min-w-0 text-sm tracking-wide text-gray-600 break-words leading-snug">
+            <p
+              className={`min-w-0 tracking-wide text-gray-600 truncate leading-snug ${
+                dense ? "text-[11px] sm:text-xs" : "text-xs sm:text-sm"
+              }`}
+            >
               {metaLine}
             </p>
           ) : null}

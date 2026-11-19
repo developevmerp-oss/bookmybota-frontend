@@ -115,6 +115,10 @@ export interface Business {
   approved_at?: string | null;
   grace_time_minutes?: number;
   slot_interval_minutes?: number;
+  /** Today's calendar row from business_operating_dates (Addis date). */
+  today_is_open?: boolean | null;
+  today_open_time?: string | null;
+  today_close_time?: string | null;
   booking_terms?: string | null;
   cancellation_policy?: string | null;
   latitude?: number | string | null;

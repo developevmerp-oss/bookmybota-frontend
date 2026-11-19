@@ -478,6 +478,29 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
     ? showtimeDateKey(layoutData.showtime.starts_at)
     : "";
 
+  /** Seat-page back → this movie's showtimes with matching date / language / format. */
+  const showtimesBackHref = useMemo(() => {
+    const movieKey = layoutData?.movie?.slug || layoutData?.movie?.id;
+    if (!movieKey) return "/movies";
+    const params = new URLSearchParams();
+    const dateKey = layoutData?.showtime?.starts_at
+      ? showtimeDateKey(layoutData.showtime.starts_at)
+      : "";
+    const language = String(layoutData?.showtime?.language || "").trim();
+    const format = String(layoutData?.showtime?.format || "").trim();
+    if (dateKey) params.set("date", dateKey);
+    if (language) params.set("language", language);
+    if (format) params.set("format", format);
+    const qs = params.toString();
+    return qs ? `/movies/${movieKey}/showtimes?${qs}` : `/movies/${movieKey}/showtimes`;
+  }, [
+    layoutData?.movie?.slug,
+    layoutData?.movie?.id,
+    layoutData?.showtime?.starts_at,
+    layoutData?.showtime?.language,
+    layoutData?.showtime?.format,
+  ]);
+
   const { data: publicShowtimesData } = useGetPublicMovieShowtimesQuery(
     {
       idOrSlug: movieKeyForShowtimes,
@@ -1511,8 +1534,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
       const msg = extractApiError(err, "Could not hold seats. Please try again.");
       toast.error(msg);
       if (/show has ended/i.test(msg)) {
-        const movieKey = movie?.slug || movie?.id;
-        router.push(movieKey ? `/movies/${movieKey}/showtimes` : "/movies");
+        router.push(showtimesBackHref);
         return;
       }
       refetch();
@@ -1527,8 +1549,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
     showtimeId,
     refetch,
     showtimeBeverages.length,
-    movie?.slug,
-    movie?.id,
+    showtimesBackHref,
     router,
   ]);
 
@@ -1655,8 +1676,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
       const msg = extractApiError(err, "Failed to confirm booking. Please try again.");
       toast.error(msg);
       if (/show has ended/i.test(msg)) {
-        const movieKey = movie?.slug || movie?.id;
-        router.push(movieKey ? `/movies/${movieKey}/showtimes` : "/movies");
+        router.push(showtimesBackHref);
         return;
       }
       refetch();
@@ -1788,21 +1808,28 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
     [findGridSeatContext, qty]
   );
 
-  const classicMaxSeatSlots = useMemo(() => {
-    let max = 1;
+  /**
+   * Pixel footprint must match classic seat buttons (sm:size-10 + sm:gap-3 + aisle sm:w-8)
+   * so every cinema layout gets the same default fit framing.
+   */
+  const CLASSIC_SEAT_PX = 40;
+  const CLASSIC_GAP_PX = 12;
+  const CLASSIC_AISLE_PX = 32;
+
+  const classicSeatTrackPx = useMemo(() => {
+    let max = CLASSIC_SEAT_PX;
     for (const row of gridRows) {
-      let slots = 0;
+      let width = 0;
       row.seats.forEach((seat, i) => {
-        slots += 1;
-        if (seat.isAisleGap ?? (i === 3 || i === 9)) slots += 0.85;
+        width += CLASSIC_SEAT_PX;
+        if (i < row.seats.length - 1) width += CLASSIC_GAP_PX;
+        if (seat.isAisleGap ?? (i === 3 || i === 9)) width += CLASSIC_AISLE_PX;
       });
-      max = Math.max(max, slots);
+      max = Math.max(max, width);
     }
-    return max;
+    return Math.ceil(max);
   }, [gridRows]);
 
-  /** Wider layout: larger seat + gap footprint (~40px seat + ~10px gap). */
-  const classicSeatTrackPx = Math.ceil(classicMaxSeatSlots * 50);
   /** Fixed left alphabet column + gap before seat track (labels from admin row_label). */
   const classicRowLabelColPx = 30;
   const classicRowLabelGapPx = 36;
@@ -1820,39 +1847,54 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
     }, 1600);
   }, []);
 
-  /** Full-hall fit (width + height) — used as zoom-out floor. */
+  /** Tightest zoom-out allowed (width + height) — floor for the − control only. */
   const getClassicFitZoom = useCallback(() => {
     const viewport = classicViewportRef.current;
     const content = classicContentRef.current;
     if (!viewport || !content) return 1;
+    const vw = viewport.clientWidth;
+    const vh = viewport.clientHeight;
+    if (vw < 40 || vh < 40) return 1;
     const pad = 8;
-    const baseW = Math.max(content.offsetWidth, classicContentSize.w, 1);
-    const baseH = Math.max(content.offsetHeight, classicContentSize.h, 1);
-    const zw = (viewport.clientWidth - pad * 2) / baseW;
-    const zh = (viewport.clientHeight - pad * 2) / baseH;
-    return Math.min(1, Math.max(0.4, Math.min(zw, zh)));
+    const baseW = Math.max(content.scrollWidth || content.offsetWidth, classicContentSize.w, 1);
+    const baseH = Math.max(content.scrollHeight || content.offsetHeight, classicContentSize.h, 1);
+    const zw = (vw - pad * 2) / baseW;
+    const zh = (vh - pad * 2) / baseH;
+    return Math.min(1, Math.max(0.35, Math.min(zw, zh)));
   }, [classicContentSize.h, classicContentSize.w]);
 
   /**
-   * Preferred open zoom: default fitted view (as in reference image 1),
-   * fitting both width and height comfortably so all rows from screen down to Row H are visible at once.
+   * Default open zoom — match the reference framing (~20% side margin each side,
+   * readable seat size). Width-based only: do NOT shrink to fit full hall height
+   * (that caused the tiny centered map). Tall layouts scroll vertically.
    */
   const getClassicPreferredZoom = useCallback(() => {
     const viewport = classicViewportRef.current;
     const content = classicContentRef.current;
-    if (!viewport || !content) return 1.0;
-    const padX = 24;
-    const padY = 28;
-    const baseW = Math.max(content.offsetWidth, classicContentSize.w, 1);
-    const baseH = Math.max(content.offsetHeight, classicContentSize.h, 1);
-    const zw = (viewport.clientWidth - padX * 2) / baseW;
-    const zh = (viewport.clientHeight - padY * 2) / baseH;
-    // Fit both width and height so all rows and screen are fully visible without vertical clipping
-    const fit = Math.min(zw, zh);
-    return Math.min(1.0, Math.max(0.35, Math.round(fit * 100) / 100));
-  }, [classicContentSize.w, classicContentSize.h]);
+    if (!viewport || !content) return null;
+    const vw = viewport.clientWidth;
+    if (vw < 40 || viewport.clientHeight < 40) return null;
 
-  /** Desktop & mobile: allow full-hall fit as zoom-out floor. */
+    // Reference screenshot: ~20% white space on each side of the seat grid
+    const padX = Math.max(72, Math.round(vw * 0.2));
+    const baseW = Math.max(
+      classicSeatTrackPx + classicRowLabelColPx + classicRowLabelGapPx,
+      content.scrollWidth || content.offsetWidth,
+      classicContentSize.w,
+      1
+    );
+    const widthZoom = (vw - padX * 2) / baseW;
+
+    // Keep seats near reference density (not postage-stamp, not edge-to-edge)
+    return Math.min(1.0, Math.max(0.6, Math.round(widthZoom * 100) / 100));
+  }, [
+    classicContentSize.w,
+    classicSeatTrackPx,
+    classicRowLabelColPx,
+    classicRowLabelGapPx,
+  ]);
+
+  /** Zoom-out floor for the − button (can go smaller than default open zoom). */
   const getClassicMinZoom = useCallback(() => {
     const fit = getClassicFitZoom();
     return Math.min(fit, 0.35);
@@ -1963,22 +2005,48 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
     }
     if (!classicContentSize.w || !classicContentSize.h) return;
 
-    // Fit once per showtime & layout change (after content is measured)
+    // Fit once per showtime & layout change — only commit after viewport is ready
+    // so we never lock zoom=1 before the seat map has real dimensions.
     const fitKey = `${showtimeId}:${gridRows.length}:${classicSeatTrackPx}:${classicContentSize.w}x${classicContentSize.h}`;
     if (lastClassicFitKeyRef.current === fitKey) return;
-    lastClassicFitKeyRef.current = fitKey;
 
-    if (!isTouchClassicRef.current) {
+    let attempts = 0;
+    let raf = 0;
+    let cancelled = false;
+
+    const tryFit = () => {
+      if (cancelled) return;
+      attempts += 1;
+      if (isTouchClassicRef.current) {
+        lastClassicFitKeyRef.current = fitKey;
+        centerClassicScroll();
+        updateClassicViewport();
+        syncStickyRowLabels();
+        return;
+      }
       const initialZoom = getClassicPreferredZoom();
+      if (initialZoom == null) {
+        if (attempts < 24) {
+          raf = requestAnimationFrame(tryFit);
+        }
+        return;
+      }
+      lastClassicFitKeyRef.current = fitKey;
       classicZoomRef.current = initialZoom;
       setClassicZoom(initialZoom);
-    }
-    const id = requestAnimationFrame(() => {
-      centerClassicScroll();
-      updateClassicViewport();
-      syncStickyRowLabels();
-    });
-    return () => cancelAnimationFrame(id);
+      requestAnimationFrame(() => {
+        if (cancelled) return;
+        centerClassicScroll();
+        updateClassicViewport();
+        syncStickyRowLabels();
+      });
+    };
+
+    raf = requestAnimationFrame(tryFit);
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(raf);
+    };
   }, [
     viewMode,
     showtimeId,
@@ -1997,6 +2065,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
     const handleResize = () => {
       if (!isTouchClassicRef.current) {
         const nextZoom = getClassicPreferredZoom();
+        if (nextZoom == null) return;
         classicZoomRef.current = nextZoom;
         setClassicZoom(nextZoom);
         requestAnimationFrame(() => {
@@ -2873,7 +2942,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
     <div className={`h-[100dvh] min-h-screen text-slate-900 flex flex-col overflow-hidden ${step === "seats" ? "bg-white" : "bg-[#F5F5F7]"}`}>
       <header className="shrink-0 z-30 border-b border-slate-200 bg-white">
         <div className="bmb-section-container relative flex items-center justify-between gap-2 sm:gap-3 min-h-[3.25rem] lg:min-h-[3.75rem] py-2.5">
-          {/* Left — back (mobile/tablet only) + logo (desktop only, like main navbar) */}
+          {/* Left — back (all breakpoints) + logo (desktop) */}
           <div className="relative z-10 flex shrink-0 items-center gap-1 sm:gap-1.5">
             <button
               type="button"
@@ -2886,14 +2955,9 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                   setStep("seats");
                   return;
                 }
-                const movieKey = movie?.slug || movie?.id;
-                if (movieKey) {
-                  router.push(`/movies/${movieKey}/showtimes`);
-                  return;
-                }
-                router.push("/movies");
+                router.push(showtimesBackHref);
               }}
-              className="lg:hidden shrink-0 flex size-9 items-center justify-center rounded-lg text-slate-700 hover:bg-slate-100 cursor-pointer -ml-1"
+              className="shrink-0 flex size-9 items-center justify-center rounded-lg text-slate-700 hover:bg-slate-100 cursor-pointer -ml-1"
               title={
                 step === "review"
                   ? "Back to snacks"

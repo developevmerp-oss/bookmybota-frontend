@@ -108,6 +108,20 @@ export default function RootLayoutClient({
   const isListYourShowLanding = pathname === "/list-your-show";
   const isListYourShowSubpage = Boolean(pathname?.startsWith("/list-your-show/"));
   const isListYourShowPage = isListYourShowLanding || isListYourShowSubpage;
+  /** Public entity detail pages — hide site footer on mobile only; keep on md+. */
+  const isMovieEntityDetail = Boolean(
+    pathname?.match(/^\/movies\/[^/]+(\/showtimes)?\/?$/) &&
+      !pathname?.match(/^\/movies\/(cinemas|book|booking-confirmation)(\/|$)/)
+  );
+  const isPublicDetailPage = Boolean(
+    pathname?.match(/^\/restaurant\/[^/]+\/?$/) ||
+      isMovieEntityDetail ||
+      pathname?.match(/^\/movies\/cinemas\/[^/]+\/?$/) ||
+      pathname?.match(/^\/events\/[^/]+(\/gallery)?\/?$/) ||
+      pathname?.match(/^\/artists\/[^/]+\/?$/) ||
+      pathname?.match(/^\/venues\/[^/]+\/?$/) ||
+      pathname?.match(/^\/gift-cards\/buy\/[^/]+\/?$/)
+  );
   const showPublicHeader =
     !isAdminOrBusiness &&
     !isImmersiveBookingFlow &&
@@ -159,7 +173,9 @@ export default function RootLayoutClient({
       ) : null}
       <main className={isImmersiveBookingFlow ? "h-[100dvh] max-h-[100dvh] overflow-hidden" : undefined}>
         {children}
-        {showLayoutFooter && <Footer />}
+        {showLayoutFooter ? (
+          <Footer className={isPublicDetailPage ? "hidden md:block" : undefined} />
+        ) : null}
       </main>
       <Toaster position="top-center" richColors />
       <NetworkStatusOverlay />

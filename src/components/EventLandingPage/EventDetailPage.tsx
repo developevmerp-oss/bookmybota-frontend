@@ -1270,7 +1270,8 @@ export default function PublicEventDetailPage({
         showtimes={showtimes}
       />
 
-      <Footer />
+      {/* Desktop only — mobile detail pages omit the site footer */}
+      <Footer className="hidden md:block" />
     </div>
   );
 }

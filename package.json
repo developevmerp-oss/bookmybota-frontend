@@ -3,10 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --webpack",
+    "dev": "NODE_OPTIONS='--max-old-space-size=1536' next dev --turbopack",
+    "dev:webpack": "NODE_OPTIONS='--max-old-space-size=2048' next dev --webpack",
     "clean": "node -e \"try { require('fs').rmSync('.next', { recursive: true, force: true }); console.log('.next cache cleared.'); } catch(e) { console.error(e); }\"",
-    "dev:clean": "npm run clean && next dev --webpack",
-    "build": "next build",
+    "dev:clean": "npm run clean && npm run dev",
+    "dev:clean:webpack": "npm run clean && npm run dev:webpack",
+    "build": "NODE_OPTIONS='--max-old-space-size=2048' next build",
     "start": "next start",
     "lint": "eslint"
   },

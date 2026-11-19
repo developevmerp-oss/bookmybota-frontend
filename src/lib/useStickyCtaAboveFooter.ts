@@ -7,9 +7,21 @@ import { useEffect, useState } from "react";
  * site footer as it enters. They only hide once the footer has scrolled far up
  * the screen (dining Book a table parity).
  *
+ * Detail pages hide the footer on mobile (`hidden md:block`) — a display:none
+ * footer must be ignored, otherwise getBoundingClientRect() is 0 and the CTA
+ * is pushed off-screen with bottom ≈ 100vh.
+ *
  * `enabled` should flip true after page content (and its `<footer>`) has mounted —
  * event pages render Footer inside the page after loading, not in the root layout.
  */
+function isFooterVisuallyPresent(el: Element): boolean {
+  if (!(el instanceof HTMLElement)) return false;
+  const style = getComputedStyle(el);
+  if (style.display === "none" || style.visibility === "hidden") return false;
+  const rect = el.getBoundingClientRect();
+  return rect.height > 0 || rect.width > 0;
+}
+
 export function useStickyCtaAboveFooter(enabled = true): {
   stickyCtaBottom: number;
   stickyCtaHidden: boolean;
@@ -29,8 +41,18 @@ export function useStickyCtaAboveFooter(enabled = true): {
     let pollId = 0;
     let cancelled = false;
 
+    const clearCtaOffset = () => {
+      setStickyCtaBottom((prev) => (prev === 0 ? prev : 0));
+      setStickyCtaHidden((prev) => (prev === false ? prev : false));
+    };
+
     const update = () => {
       if (!footer) return;
+      // Mobile-hidden footer (detail pages) — keep CTA pinned to viewport bottom
+      if (!isFooterVisuallyPresent(footer)) {
+        clearCtaOffset();
+        return;
+      }
       const rect = footer.getBoundingClientRect();
       const vh = window.innerHeight;
       const overlap = Math.max(0, Math.ceil(vh - rect.top));
@@ -65,6 +87,8 @@ export function useStickyCtaAboveFooter(enabled = true): {
         attach(el);
         return;
       }
+      // No footer in DOM — CTA stays at bottom
+      clearCtaOffset();
       pollId = window.setTimeout(tryFind, 80);
     };
 

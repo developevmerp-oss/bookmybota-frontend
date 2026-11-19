@@ -424,7 +424,7 @@ export default function ConfirmationPageUI1({
       if (prev) prev.qty += 1;
       else grouped.set(key, { label, qty: 1, unit });
     }
-    const rows =
+    const rows: { label: string; labelDetail?: string; value: string }[] =
       grouped.size > 0
         ? [...grouped.values()].map((g) => ({
             label: `${g.label} × ${g.qty}`,

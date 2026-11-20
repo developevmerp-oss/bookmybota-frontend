@@ -23,6 +23,27 @@ const HIDE_SCROLLBAR =
 
 const logoSrc = typeof images.logo === "string" ? images.logo : images.logo.src;
 
+/** Stand / screen name: scale down for long labels so the ticket stays balanced. */
+function primaryLabelClassName(label: string, layout: "center" | "compact"): string {
+  const len = String(label || "").trim().length;
+  if (layout === "compact") {
+    if (len > 28) {
+      return "mt-1 text-[0.875rem] sm:text-[0.9375rem] font-bold text-[#111] uppercase leading-snug tracking-wide break-words";
+    }
+    if (len > 16) {
+      return "mt-1 text-[1rem] sm:text-[1.125rem] font-bold text-[#111] uppercase leading-snug tracking-wide break-words";
+    }
+    return "mt-1 text-[1.125rem] sm:text-[1.25rem] font-bold text-[#111] uppercase leading-tight tracking-wide break-words";
+  }
+  if (len > 28) {
+    return "mt-1.5 text-[0.9375rem] sm:text-[1rem] md:text-[1.0625rem] font-bold text-[#111] uppercase leading-snug tracking-wide break-words px-1";
+  }
+  if (len > 16) {
+    return "mt-1.5 text-[1.05rem] sm:text-[1.125rem] md:text-[1.2rem] font-bold text-[#111] uppercase leading-snug tracking-wide break-words px-1";
+  }
+  return "mt-1.5 text-[1.15rem] sm:text-[1.25rem] md:text-[1.35rem] font-bold text-[#111] uppercase leading-snug tracking-wide break-words px-1";
+}
+
 function BrandLogo() {
   return (
     <div className="mt-6 flex justify-center">
@@ -56,6 +77,8 @@ export type ConfirmationPageUI1ShellProps = {
   ticketCountLabel: string;
   primaryLabel: string;
   secondaryLabel?: string;
+  /** Optional third line under seats / secondary (e.g. guest name on event tickets). */
+  tertiaryLabel?: string;
   bookingCode: string;
   qrValue: string;
   totalFormatted?: string;
@@ -253,6 +276,7 @@ export default function ConfirmationPageUI1Shell(props: ConfirmationPageUI1Shell
     ticketCountLabel,
     primaryLabel,
     secondaryLabel,
+    tertiaryLabel,
     bookingCode,
     qrValue,
     totalFormatted,
@@ -387,12 +411,15 @@ export default function ConfirmationPageUI1Shell(props: ConfirmationPageUI1Shell
 
       <div className="px-5 sm:px-6 pt-6 pb-0 text-center">
         <p className="text-[0.75rem] md:text-[0.8125rem] text-[#888] font-medium">{ticketCountLabel}</p>
-        <p className="mt-1.5 text-[1.4rem] font-bold text-[#111] uppercase tracking-wide">
-          {primaryLabel}
-        </p>
+        <p className={primaryLabelClassName(primaryLabel, "center")}>{primaryLabel}</p>
         {secondaryLabel ? (
           <p className="mt-1.5 text-[0.8125rem] md:text-[0.875rem] text-[#555] break-words leading-snug">
             {secondaryLabel}
+          </p>
+        ) : null}
+        {tertiaryLabel ? (
+          <p className="mt-1 text-[0.8125rem] md:text-[0.875rem] text-[#666] break-words leading-snug">
+            {tertiaryLabel}
           </p>
         ) : null}
 
@@ -580,12 +607,15 @@ export default function ConfirmationPageUI1Shell(props: ConfirmationPageUI1Shell
           ) : null}
           <div className="min-w-0 flex-1 pt-0.5">
             <p className="text-[0.75rem] md:text-[0.8125rem] text-[#888]">{ticketCountLabel}</p>
-            <p className="mt-1 text-[1.2rem] sm:text-[1.35rem] font-bold text-[#111] uppercase leading-tight">
-              {primaryLabel}
-            </p>
+            <p className={primaryLabelClassName(primaryLabel, "compact")}>{primaryLabel}</p>
             {secondaryLabel ? (
               <p className="mt-1.5 text-[0.8125rem] md:text-[0.875rem] text-[#555] break-words leading-snug">
                 {secondaryLabel}
+              </p>
+            ) : null}
+            {tertiaryLabel ? (
+              <p className="mt-1 text-[0.8125rem] md:text-[0.875rem] text-[#666] break-words leading-snug">
+                {tertiaryLabel}
               </p>
             ) : null}
             <p className="mt-3 text-[0.8125rem] md:text-[0.875rem] font-bold text-[#111] tracking-wide">
@@ -732,12 +762,15 @@ export default function ConfirmationPageUI1Shell(props: ConfirmationPageUI1Shell
           >
             <div className="px-6 sm:px-7 pt-7 pb-0 text-center">
               <p className="text-[0.75rem] md:text-[0.8125rem] text-[#888]">{ticketCountLabel}</p>
-              <p className="mt-1.5 text-[1.4rem] font-bold text-[#111] uppercase tracking-wide">
-                {primaryLabel}
-              </p>
+              <p className={primaryLabelClassName(primaryLabel, "center")}>{primaryLabel}</p>
               {secondaryLabel ? (
                 <p className="mt-1.5 text-[0.8125rem] md:text-[0.875rem] text-[#555] break-words leading-snug">
                   {secondaryLabel}
+                </p>
+              ) : null}
+              {tertiaryLabel ? (
+                <p className="mt-1 text-[0.8125rem] md:text-[0.875rem] text-[#666] break-words leading-snug">
+                  {tertiaryLabel}
                 </p>
               ) : null}
               {/* eslint-disable-next-line @next/next/no-img-element */}

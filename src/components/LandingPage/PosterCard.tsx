@@ -8,12 +8,12 @@ import { useGetPublicEventQuery } from "@/services/api";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { restaurantHref, venueHref } from "@/lib/businessPublicPath";
 import { formatMoney } from "@/lib/currencyFormat";
-import { formatDateCustomer, formatTime12h } from "@/lib/dateFormat";
 import { listingOfferBannerLabel } from "@/lib/diningOffers";
 import DiningWishlistButton from "@/components/DinningLandingPage/DiningWishlistButton";
 import {
   eventPortrait,
   eventPlaceLine,
+  formatEventDateLine,
   localityFromAddress,
   venueFromEventDetail,
 } from "./homeUtils";
@@ -73,17 +73,6 @@ function OfferPercentSeal({ className = "" }: { className?: string }) {
 /** Purple → transparent fishtail ribbon (ref lavender offer gradient). */
 const LISTING_OFFER_RIBBON_BG =
   "linear-gradient(90deg, #7B5DFA 0%, rgba(123,93,250,0.96) 36%, rgba(162,139,250,0.75) 66%, rgba(196,181,253,0.16) 100%)";
-
-function listingDateLine(iso?: string) {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  const weekday = d.toLocaleString("en-GB", { weekday: "short" });
-  const dateLabel = formatDateCustomer(iso);
-  const time = formatTime12h(iso);
-  if (!dateLabel || dateLabel === "—") return "";
-  return `${weekday}, ${dateLabel}, ${time}`;
-}
 
 function MediaFallback({ icon }: { icon: ReactNode }) {
   return (
@@ -160,7 +149,7 @@ export function EventPosterCard({
     city
   );
 
-  const dateLine = listingDateLine(event.next_showtime);
+  const dateLine = formatEventDateLine(event.next_showtime);
 
   return (
     <Link
@@ -182,16 +171,22 @@ export function EventPosterCard({
       </div>
       <div className="space-y-0.5 sm:space-y-1 px-2.5 py-2.5 sm:px-4 sm:py-3.5">
         {dateLine ? (
-          <p className="text-xs sm:text-sm tracking-wide truncate leading-snug font-semibold text-[#B59B2A]">{dateLine}</p>
+          <p className="text-xs sm:text-sm tracking-wide leading-snug font-semibold text-[#B59B2A] break-words">
+            {dateLine}
+          </p>
         ) : null}
         <h3 className="text-[0.875rem] sm:text-base md:text-lg tracking-wide font-bold text-[#1C1C1C] break-words min-w-0 leading-snug line-clamp-2">
           {event.name}
         </h3>
         {placeLine ? (
-          <p className="text-xs sm:text-sm tracking-wide text-gray-600 truncate leading-snug">{placeLine}</p>
+          <p className="text-xs sm:text-sm tracking-wide text-gray-600 leading-snug break-words [overflow-wrap:anywhere] line-clamp-2">
+            {placeLine}
+          </p>
         ) : null}
         {eventType ? (
-          <p className="hidden sm:block text-sm tracking-wide text-gray-600 truncate leading-snug">{eventType}</p>
+          <p className="hidden sm:block text-sm tracking-wide text-gray-600 leading-snug break-words line-clamp-1">
+            {eventType}
+          </p>
         ) : null}
       </div>
     </Link>
@@ -224,7 +219,7 @@ export function ShowcaseEventPosterCard({
     ? "w-full"
     : "snap-start shrink-0 w-[180px] sm:w-[200px] md:w-[210px]";
 
-  const dateLine = listingDateLine(showDate);
+  const dateLine = formatEventDateLine(showDate);
 
   return (
     <Link
@@ -241,16 +236,22 @@ export function ShowcaseEventPosterCard({
       </div>
       <div className="space-y-0.5 sm:space-y-1 px-2.5 py-2.5 sm:px-4 sm:py-3.5">
         {dateLine ? (
-          <p className="text-xs sm:text-sm tracking-wide truncate leading-snug font-semibold text-[#B59B2A]">{dateLine}</p>
+          <p className="text-xs sm:text-sm tracking-wide leading-snug font-semibold text-[#B59B2A] break-words">
+            {dateLine}
+          </p>
         ) : null}
         <h3 className="text-[0.875rem] sm:text-base md:text-lg tracking-wide font-bold text-[#1C1C1C] break-words min-w-0 leading-snug line-clamp-2">
           {title}
         </h3>
         {place ? (
-          <p className="text-xs sm:text-sm tracking-wide text-gray-600 truncate leading-snug">{place}</p>
+          <p className="text-xs sm:text-sm tracking-wide text-gray-600 leading-snug break-words [overflow-wrap:anywhere] line-clamp-2">
+            {place}
+          </p>
         ) : null}
         {eventType ? (
-          <p className="hidden sm:block text-sm tracking-wide text-gray-600 truncate leading-snug">{eventType}</p>
+          <p className="hidden sm:block text-sm tracking-wide text-gray-600 leading-snug break-words line-clamp-1">
+            {eventType}
+          </p>
         ) : null}
       </div>
     </Link>

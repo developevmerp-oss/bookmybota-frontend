@@ -35,7 +35,6 @@ import {
 } from "@/services/api";
 import { useAppDispatch } from "@/lib/hooks";
 import { formatMoney } from "@/lib/currencyFormat";
-import { formatDateCustomer, formatTime12h } from "@/lib/dateFormat";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { artistHref } from "@/lib/businessPublicPath";
 import { ShowcaseEventPosterCard } from "@/components/LandingPage/PosterCard";
@@ -252,15 +251,9 @@ function sameStringList(a: string[], b: string[]) {
   return true;
 }
 
+/** Same date line as landing Popular Events cards (no year / time). */
 function formatPromoDateTime(iso?: string) {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  const weekday = d.toLocaleString("en-GB", { weekday: "short" });
-  const dateLabel = formatDateCustomer(iso);
-  const time = formatTime12h(iso);
-  if (!dateLabel || dateLabel === "—") return "";
-  return `${weekday}, ${dateLabel}, ${time}`;
+  return formatEventDateLine(iso);
 }
 
 function priceOnwards(event: PublicEvent) {
@@ -558,18 +551,24 @@ function DistrictEventCard({
         />
         {promoted ? <PromotedBadge /> : null}
       </div>
-      <div className="flex-1 space-y-1 px-3.5 py-3 sm:px-4 sm:py-3.5">
+      <div className="flex-1 space-y-0.5 sm:space-y-1 px-2.5 py-2.5 sm:px-4 sm:py-3.5">
         {dateLine ? (
-          <p className="text-sm font-semibold text-[#B59B2A] line-clamp-1">{dateLine}</p>
+          <p className="text-xs sm:text-sm font-semibold leading-snug tracking-wide text-[#B59B2A] break-words">
+            {dateLine}
+          </p>
         ) : null}
-        <h3 className="text-base font-semibold leading-snug text-black break-words sm:text-xl">
+        <h3 className="text-[0.875rem] sm:text-base md:text-lg font-bold leading-snug tracking-wide text-[#1C1C1C] break-words line-clamp-2">
           {event.name}
         </h3>
         {place ? (
-          <p className="text-sm font-medium text-[#6B6B6B] line-clamp-1">{place}</p>
+          <p className="text-xs sm:text-sm font-medium leading-snug tracking-wide text-gray-600 break-words [overflow-wrap:anywhere]">
+            {place}
+          </p>
         ) : null}
         {price ? (
-          <p className="text-sm font-medium text-[#6B6B6B] line-clamp-1">{price}</p>
+          <p className="text-xs sm:text-sm font-medium leading-snug tracking-wide text-gray-600 break-words">
+            {price}
+          </p>
         ) : null}
       </div>
     </Link>
@@ -606,13 +605,15 @@ function RecommendCard({
       </div>
       <div className="mt-2 space-y-0.5">
         {place ? (
-          <p className="flex items-center gap-1 text-sm font-semibold text-slate-600 line-clamp-1">
-            <MapPin className="shrink-0 text-[#6900AA]" size={13} strokeWidth={2} />
-            <span className="truncate">{place}</span>
+          <p className="flex items-start gap-1 text-xs sm:text-sm font-semibold text-slate-600">
+            <MapPin className="mt-0.5 shrink-0 text-[#6900AA]" size={13} strokeWidth={2} />
+            <span className="min-w-0 break-words [overflow-wrap:anywhere]">{place}</span>
           </p>
         ) : null}
-        <h3 className="text-sm sm:text-lg font-bold text-slate-900 break-words">{event.name}</h3>
-        {dateLine ? <p className="text-sm font-semibold text-slate-500 line-clamp-1">{dateLine}</p> : null}
+        <h3 className="text-sm sm:text-lg font-bold text-slate-900 break-words line-clamp-2">{event.name}</h3>
+        {dateLine ? (
+          <p className="text-xs sm:text-sm font-semibold text-slate-500 break-words">{dateLine}</p>
+        ) : null}
       </div>
     </Link>
   );
@@ -650,13 +651,15 @@ function RecommendShowcaseCard({
       </div>
       <div className="mt-2 space-y-0.5">
         {place ? (
-          <p className="flex items-center gap-1 text-sm font-semibold text-slate-600 line-clamp-1">
-            <MapPin className="shrink-0 text-[#6900AA]" size={13} strokeWidth={2} />
-            <span className="truncate">{place}</span>
+          <p className="flex items-start gap-1 text-xs sm:text-sm font-semibold text-slate-600">
+            <MapPin className="mt-0.5 shrink-0 text-[#6900AA]" size={13} strokeWidth={2} />
+            <span className="min-w-0 break-words [overflow-wrap:anywhere]">{place}</span>
           </p>
         ) : null}
-        <h3 className="text-sm sm:text-lg font-bold text-slate-900 break-words">{title}</h3>
-        {dateLine ? <p className="text-sm font-semibold text-slate-500 line-clamp-1">{dateLine}</p> : null}
+        <h3 className="text-sm sm:text-lg font-bold text-slate-900 break-words line-clamp-2">{title}</h3>
+        {dateLine ? (
+          <p className="text-xs sm:text-sm font-semibold text-slate-500 break-words">{dateLine}</p>
+        ) : null}
       </div>
     </Link>
   );

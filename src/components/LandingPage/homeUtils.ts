@@ -61,14 +61,25 @@ export function formatShowDateBar(iso?: string) {
   return formatEventDateLine(iso);
 }
 
-/** Reference card date: "Sat, 10 October 2026 onwards" */
+/**
+ * Landing / system-wide event poster card date.
+ * Example: "Wed, 31 March" — no year, no time.
+ */
 export function formatEventDateLine(iso?: string) {
   if (!iso) return "";
   const parts = getVenueDateTimeParts(iso);
-  if (!parts) return "";
-  const dateLabel = formatDateCustomer(iso);
-  if (!dateLabel || dateLabel === "—") return "";
-  return `${parts.weekdayLong.slice(0, 3)}, ${dateLabel} onwards`;
+  if (parts) {
+    const month = new Date(Date.UTC(parts.y, parts.m - 1, parts.d, 12)).toLocaleString("en-GB", {
+      month: "long",
+      timeZone: "UTC",
+    });
+    return `${parts.weekdayLong.slice(0, 3)}, ${parts.d} ${month}`;
+  }
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const weekday = d.toLocaleString("en-GB", { weekday: "short" });
+  const dayMonth = d.toLocaleString("en-GB", { day: "numeric", month: "long" });
+  return dayMonth ? `${weekday}, ${dayMonth}` : "";
 }
 
 /** Parts for the small date badge on poster images. */
@@ -94,7 +105,13 @@ export function eventPlaceLine(event: PublicEvent, fallbackCity?: string) {
     (fallbackCity && fallbackCity !== "All Cities" && fallbackCity !== "Ethiopia"
       ? fallbackCity.trim()
       : "");
-  if (venue && city && venue.toLowerCase() !== city.toLowerCase()) {
+  if (venue && city) {
+    const venueLower = venue.toLowerCase();
+    const cityLower = city.toLowerCase();
+    // Avoid "Theatre in Addis Ababa: Addis Ababa" when venue already names the city.
+    if (venueLower === cityLower || venueLower.includes(cityLower)) {
+      return venue;
+    }
     return `${venue}: ${city}`;
   }
   if (venue) return venue;

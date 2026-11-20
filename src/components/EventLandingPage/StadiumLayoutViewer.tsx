@@ -1097,55 +1097,87 @@ export default function StadiumLayoutViewer({
     setStagePos(newPos);
   }, []);
 
-  // Handle manual zoom buttons — works for block/tier when selected
-  const handleZoomChange = (delta: number) => {
-    const current = zoomScale ?? baseScale;
-    const newScale = selectedBlockId
-      ? Math.max(1.8, Math.min(16, current + delta))
-      : Math.max(0.3, Math.min(8, current + delta));
-    setZoomScale(newScale);
-    if (stageRef.current) {
-      stageRef.current.to({
-        scaleX: newScale,
-        scaleY: newScale,
-        duration: 0.22,
-      });
-    }
-  };
+  /** Photo-style two-finger pinch on the stadium map (no +/- controller). */
+  const stadiumPinchRef = useRef<{
+    startDist: number;
+    startScale: number;
+    lastMidX: number;
+    lastMidY: number;
+  } | null>(null);
 
-  const handleResetZoom = () => {
-    if (selectedBlock) {
-      handleBlockClick(selectedBlock, activeTierId || undefined);
-    } else {
-      setZoomScale(baseScale);
-      setStagePos(fitStagePos);
-      if (stageRef.current) {
-        stageRef.current.to({
-          x: fitStagePos.x,
-          y: fitStagePos.y,
-          scaleX: baseScale,
-          scaleY: baseScale,
-          duration: 0.35,
-          easing: Konva.Easings.EaseInOut,
-        });
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const touchDist = (a: Touch, b: Touch) =>
+      Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY);
+
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length !== 2) return;
+      const stage = stageRef.current;
+      if (!stage) return;
+      stage.draggable(false);
+      stadiumPinchRef.current = {
+        startDist: Math.max(1, touchDist(e.touches[0], e.touches[1])),
+        startScale: stage.scaleX(),
+        lastMidX: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+        lastMidY: (e.touches[0].clientY + e.touches[1].clientY) / 2,
+      };
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches.length !== 2 || !stadiumPinchRef.current) return;
+      e.preventDefault();
+      const stage = stageRef.current;
+      if (!stage) return;
+
+      const pinch = stadiumPinchRef.current;
+      const dist = Math.max(1, touchDist(e.touches[0], e.touches[1]));
+      const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+      const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+      const rect = el.getBoundingClientRect();
+      const pointer = { x: midX - rect.left, y: midY - rect.top };
+      const oldScale = stage.scaleX();
+      const newScale = Math.max(
+        0.2,
+        Math.min(16, pinch.startScale * (dist / pinch.startDist))
+      );
+      if (Math.abs(newScale - oldScale) < 0.0005) return;
+
+      const mousePointTo = {
+        x: (pointer.x - stage.x()) / oldScale,
+        y: (pointer.y - stage.y()) / oldScale,
+      };
+      const newPos = {
+        x: pointer.x - mousePointTo.x * newScale,
+        y: pointer.y - mousePointTo.y * newScale,
+      };
+      stage.scale({ x: newScale, y: newScale });
+      stage.position(newPos);
+      setZoomScale(newScale);
+      setStagePos(newPos);
+      pinch.lastMidX = midX;
+      pinch.lastMidY = midY;
+    };
+
+    const onTouchEnd = (e: TouchEvent) => {
+      if (e.touches.length < 2) {
+        stadiumPinchRef.current = null;
+        stageRef.current?.draggable(true);
       }
-    }
-  };
+    };
 
-  const handleFitStadium = useCallback(() => {
-    setZoomScale(baseScale);
-    setStagePos(fitStagePos);
-    if (stageRef.current) {
-      stageRef.current.to({
-        x: fitStagePos.x,
-        y: fitStagePos.y,
-        scaleX: baseScale,
-        scaleY: baseScale,
-        duration: 0.35,
-        easing: Konva.Easings.EaseInOut,
-      });
-    }
-  }, [baseScale, fitStagePos]);
+    el.addEventListener("touchstart", onTouchStart, { passive: true });
+    el.addEventListener("touchmove", onTouchMove, { passive: false });
+    el.addEventListener("touchend", onTouchEnd);
+    el.addEventListener("touchcancel", onTouchEnd);
+    return () => {
+      el.removeEventListener("touchstart", onTouchStart);
+      el.removeEventListener("touchmove", onTouchMove);
+      el.removeEventListener("touchend", onTouchEnd);
+      el.removeEventListener("touchcancel", onTouchEnd);
+    };
+  }, []);
 
   // Seat toggle selection
   const handleSeatClick = useCallback(
@@ -2084,7 +2116,8 @@ export default function StadiumLayoutViewer({
         {/* ── Interactive Konva Canvas (Zoomable Pitch + Stands + Seats) ── */}
         <div
           ref={containerRef}
-          className="flex-1 min-h-0 h-full w-full min-w-0 bg-white relative overflow-hidden flex items-center justify-center cursor-grab active:cursor-grabbing touch-pan-y"
+          className="flex-1 min-h-0 h-full w-full min-w-0 bg-white relative overflow-hidden flex items-center justify-center cursor-grab active:cursor-grabbing"
+          style={{ touchAction: "none" }}
         >
         <Stage
           ref={stageRef}

@@ -1071,6 +1071,8 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
   const bookingFiltersRef = useRef<HTMLDivElement>(null);
   const [reserveWidgetDropdown, setReserveWidgetDropdown] = useState<"date" | "guests" | null>(null);
   const reserveWidgetRef = useRef<HTMLDivElement>(null);
+  /** Mobile book-flow guests dropdown (sidebar reserveWidgetRef is unmounted in that flow). */
+  const mobileGuestsDropdownRef = useRef<HTMLDivElement>(null);
 
   const [loginStep, setLoginStep] = useState(1); // 1: phone, 2: OTP, 3: register profile
   const [loginPhone, setLoginPhone] = useState('');
@@ -1230,17 +1232,21 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
   useEffect(() => {
     if (!reserveWidgetDropdown) return;
     const handleClickOutside = (e: MouseEvent) => {
-      if (reserveWidgetRef.current && !reserveWidgetRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      const inSidebar = reserveWidgetRef.current?.contains(target);
+      const inMobileGuests = mobileGuestsDropdownRef.current?.contains(target);
+      if (!inSidebar && !inMobileGuests) {
         setReserveWidgetDropdown(null);
       }
     };
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") setReserveWidgetDropdown(null);
     };
-    document.addEventListener("mousedown", handleClickOutside);
+    // capture so we still close even if an inner layer stops bubbling
+    document.addEventListener("pointerdown", handleClickOutside, true);
     document.addEventListener("keydown", handleKeyDown);
     return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("pointerdown", handleClickOutside, true);
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, [reserveWidgetDropdown]);
@@ -3367,7 +3373,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                         <p className="md:hidden text-sm text-slate-500 mb-2">Select number of guests</p>
                         <p className="hidden md:block text-sm font-semibold text-slate-800 mb-3">Number of guest(s)</p>
 
-                        <div className="md:hidden relative">
+                        <div ref={mobileGuestsDropdownRef} className="md:hidden relative">
                           <button
                             type="button"
                             onClick={() =>

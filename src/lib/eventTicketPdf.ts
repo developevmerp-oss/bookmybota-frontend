@@ -10,6 +10,7 @@ import {
 } from "@/lib/eventTicketMode";
 import { eventBookingQrValue } from "@/lib/eventScanToken";
 import { buildTicketCardPdf, type TicketCardPdfAmountRow } from "./confirmationTicketPdf";
+import { eventBookingSeatsLabel } from "./eventSeatLabel";
 
 const BRAND: [number, number, number] = [105, 0, 170];
 const BRAND_DARK: [number, number, number] = [87, 0, 142];
@@ -57,6 +58,10 @@ export type EventTicketPdfBooking = {
     ticket_type?: string;
     qty?: number;
     unit_price?: number | string;
+    event_seat_id?: string | null;
+    section_name?: string | null;
+    row_label?: string | null;
+    seat_label?: string | null;
   }>;
 };
 
@@ -681,9 +686,11 @@ export async function buildEventTicketPdf(
     .filter(Boolean)
     .join(", ");
 
-  const ticketTypes = Array.from(map.values())
-    .map((item) => `${item.ticket_type}${item.qty > 1 ? ` (${item.qty})` : ""}`)
-    .join(", ");
+  const ticketTypes = Array.from(
+    new Set(Array.from(map.values()).map((item) => item.ticket_type))
+  ).join(", ");
+
+  const seatsLabel = eventBookingSeatsLabel(booking.items);
 
   return buildTicketCardPdf({
     filenameTitle: "Event",
@@ -694,7 +701,7 @@ export async function buildEventTicketPdf(
     venueLine: venueLine || undefined,
     ticketCountLabel: `${totalTickets} Ticket${totalTickets === 1 ? "" : "(s)"}`,
     primaryLabel: ticketTypes || "EVENT PASS",
-    secondaryLabel: booking.guest_name?.trim() || undefined,
+    secondaryLabel: seatsLabel || undefined,
     bookingCode: displayCode,
     qrValue: qrRaw,
     showQr: true,

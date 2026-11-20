@@ -1262,12 +1262,55 @@ export function CustomerAccountShellShimmer({
   );
 }
 
+/** Card rows only — used while switching All / Dining / Events / Movies tabs. */
+export function CustomerOrdersCardsShimmer({ rows = 4 }: { rows?: number }) {
+  return (
+    <Wrap>
+      <div
+        className="flex flex-col gap-3 sm:gap-0 sm:divide-y sm:divide-slate-100"
+        aria-busy="true"
+        aria-label="Loading bookings"
+      >
+        {Array.from({ length: rows }).map((_, i) => (
+          <div
+            key={i}
+            className="rounded-2xl border border-slate-200 bg-white p-2.5 sm:rounded-xl sm:border-0 sm:bg-transparent sm:p-0 sm:py-5"
+          >
+            <div className="flex flex-row items-stretch gap-3 sm:gap-4 sm:items-start">
+              <div className="shrink-0 w-[88px] sm:w-[115px] lg:w-[130px] min-h-[7.25rem] sm:min-h-0 sm:aspect-[3/4] overflow-hidden rounded-xl">
+                <Skeleton className="!block !h-full !w-full !rounded-xl" height="100%" />
+              </div>
+              <div className="flex-1 min-w-0 space-y-2 py-0.5">
+                <Skeleton width={56} height={16} borderRadius={6} />
+                <Skeleton width="70%" height={18} />
+                <Skeleton width="90%" height={12} />
+                <Skeleton width="55%" height={12} />
+                <div className="hidden sm:flex items-center gap-2 pt-2">
+                  <Skeleton width={88} height={22} borderRadius={999} />
+                  <Skeleton width={72} height={14} />
+                </div>
+              </div>
+            </div>
+            <div className="sm:hidden mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Skeleton width={88} height={22} borderRadius={999} />
+                <Skeleton width={64} height={12} />
+              </div>
+              <Skeleton width={72} height={32} borderRadius={8} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </Wrap>
+  );
+}
+
 /** My Orders / Reservations list — matches dashboard booking rows */
 export function CustomerOrdersListShimmer({ rows = 4 }: { rows?: number }) {
   return (
     <Wrap>
       <div
-        className="bg-white rounded-2xl border border-slate-100 shadow-[0_8px_30px_rgba(15,23,42,0.04)] p-5 sm:p-6 lg:p-8"
+        className="bg-white rounded-2xl border border-slate-100 shadow-[0_8px_30px_rgba(15,23,42,0.04)] px-3 py-4 sm:p-6 lg:p-8"
         aria-busy="true"
         aria-label="Loading orders"
       >
@@ -1285,29 +1328,7 @@ export function CustomerOrdersListShimmer({ rows = 4 }: { rows?: number }) {
             <Skeleton key={i} width={88} height={32} borderRadius={999} />
           ))}
         </div>
-        <div className="divide-y divide-slate-100">
-          {Array.from({ length: rows }).map((_, i) => (
-            <div
-              key={i}
-              className="flex flex-col sm:flex-row sm:items-start gap-4 py-5 first:pt-2"
-            >
-              <div className="w-full sm:w-[168px] lg:w-[188px] aspect-[16/10] sm:aspect-auto sm:h-[108px] lg:h-[118px] shrink-0 overflow-hidden rounded-xl">
-                <Skeleton className="!block !h-full !w-full !rounded-xl" height="100%" />
-              </div>
-              <div className="flex-1 min-w-0 space-y-2">
-                <Skeleton width={56} height={18} borderRadius={6} />
-                <Skeleton width="55%" height={18} />
-                <Skeleton width="80%" height={12} />
-                <Skeleton width="45%" height={12} />
-                <Skeleton width="30%" height={12} />
-              </div>
-              <div className="shrink-0 flex sm:flex-col items-end gap-3">
-                <Skeleton width={88} height={24} borderRadius={999} />
-                <Skeleton width={72} height={14} />
-              </div>
-            </div>
-          ))}
-        </div>
+        <CustomerOrdersCardsShimmer rows={rows} />
       </div>
     </Wrap>
   );

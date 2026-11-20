@@ -21,6 +21,8 @@ export type TicketCardPdfOptions = {
   ticketCountLabel: string;
   primaryLabel: string;
   secondaryLabel?: string;
+  /** Optional third line (e.g. guest name when seats are shown). */
+  tertiaryLabel?: string;
   bookingCode: string;
   qrValue?: string | null;
   showQr?: boolean;
@@ -150,8 +152,21 @@ export async function buildTicketCardPdf(options: TicketCardPdfOptions): Promise
 
   const topH = pad + posterH + pad;
 
-  let middleH = 6.5 + 5.5 + 4.5; // ticketCountLabel + primaryLabel + secondaryLabel
-  if (options.showQr && qrDataUrl) middleH += 38;
+  const primaryText = String(options.primaryLabel || "RESERVATION").trim() || "RESERVATION";
+  const primaryLen = primaryText.length;
+  const primaryFontSize = primaryLen > 28 ? 10 : primaryLen > 16 ? 11.5 : 13.5;
+  const primaryMaxW = cardW - pad * 2;
+  const primaryCharsPerLine = Math.max(12, Math.floor(primaryMaxW / (primaryFontSize * 0.42)));
+  const primaryLines = Math.max(1, Math.ceil(primaryLen / primaryCharsPerLine));
+  const primaryLineStep = primaryFontSize * 0.38 + 0.8;
+  // Balanced: count → stand → seats with even gaps (not cramped, not sparse)
+  const primaryBlockH = 5 + (primaryLines - 1) * primaryLineStep;
+
+  let middleH = 6 + primaryBlockH; // after cut + ticketCount + primary
+  if (options.secondaryLabel) middleH += 4.2 + 3.2; // gap to seats + seat line
+  if (options.tertiaryLabel) middleH += 3.8;
+  if (options.showQr && qrDataUrl) middleH += 5 + 32 + 2; // gap + QR + pad
+  else middleH += 2;
   middleH += 4.5 + 4.5; // booking ID + spacing
   if (options.cancellationNote) middleH += 7 + 4.5; // banner + spacing
   middleH += 4.5 + 3.8 + 5; // contact support rows
@@ -263,38 +278,50 @@ export async function buildTicketCardPdf(options: TicketCardPdfOptions): Promise
   doc.setLineDashPattern([], 0);
 
   // ── Section 2: Middle Details (Exact Image 2 Layout) ───────────────────────
-  curY += 6.5;
+  curY += 6;
 
-  // Guest / Ticket count
+  // Ticket count
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7.5);
   doc.setTextColor(136, 136, 136);
   doc.text(options.ticketCountLabel || "1 Ticket", centerX, curY, { align: "center" });
 
-  // Primary Label (RESERVATION / Screen Name)
-  curY += 5.5;
+  // Primary label (stand / screen) — scale & wrap for long names
+  curY += 5;
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(13.5);
+  doc.setFontSize(primaryFontSize);
   doc.setTextColor(17, 17, 17);
-  doc.text(options.primaryLabel || "RESERVATION", centerX, curY, { align: "center" });
+  const primaryWrapped = doc.splitTextToSize(primaryText.toUpperCase(), primaryMaxW);
+  doc.text(primaryWrapped, centerX, curY, { align: "center", lineHeightFactor: 1.15 });
+  if (primaryWrapped.length > 1) {
+    curY += (primaryWrapped.length - 1) * primaryLineStep;
+  }
 
-  // Secondary Label (Guest Name / Seats)
+  // Seats — even gap under stand (not cramped)
   if (options.secondaryLabel) {
-    curY += 4.5;
+    curY += 4.2;
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8.5);
     doc.setTextColor(68, 68, 68);
     doc.text(options.secondaryLabel, centerX, curY, { align: "center" });
   }
 
+  if (options.tertiaryLabel) {
+    curY += 3.8;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(85, 85, 85);
+    doc.text(options.tertiaryLabel, centerX, curY, { align: "center" });
+  }
+
   // QR Code (For Movies & Events, omitted for Dining)
   if (options.showQr && qrDataUrl) {
-    curY += 3.5;
+    curY += 5;
     const qrSize = 32;
     doc.addImage(qrDataUrl, "PNG", centerX - qrSize / 2, curY, qrSize, qrSize);
     curY += qrSize + 2;
   } else {
-    curY += 1.5;
+    curY += 2;
   }
 
   // BOOKING ID

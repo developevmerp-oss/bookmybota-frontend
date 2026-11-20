@@ -77,7 +77,7 @@ export default function CustomerAccountLayout({
 
   return (
     <div className="bg-[#f4f5f7] pt-2 pb-4 sm:pt-3 sm:pb-6 lg:pt-4 lg:pb-8">
-      <div className="max-w-[1440px] mx-auto px-3 sm:px-6 lg:px-8">
+      <div className="max-w-[1440px] mx-auto px-2 sm:px-6 lg:px-8">
         <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 items-start">
           <aside
             className={`w-full lg:w-[260px] shrink-0 lg:sticky lg:top-20 lg:self-start ${

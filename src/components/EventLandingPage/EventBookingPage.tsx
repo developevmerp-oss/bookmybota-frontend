@@ -33,16 +33,17 @@ export default function EventBookingPage({
     return Number.isFinite(n) && n >= 1 && n <= 4 ? n : undefined;
   }, [stepParam]);
 
-  const { data: event, isLoading, isError } = useGetPublicEventQuery(id);
+  const { data: event, isLoading, isFetching, isError } = useGetPublicEventQuery(id);
 
-  const canBook = useMemo(() => {
+  // Allow checkout when types exist even if sold out (post-booking inventory hit 0).
+  const canOpenCheckout = useMemo(() => {
     if (!event) return false;
     const showtimes = event.showtimes || [];
     const tickets = event.ticket_types || [];
-    return showtimes.length > 0 && tickets.some((t) => (Number(t.available_count) || 0) > 0);
+    return showtimes.length > 0 && tickets.length > 0;
   }, [event]);
 
-  if (isLoading) {
+  if (isLoading || (isFetching && !event)) {
     return <EventBookingShimmer />;
   }
 
@@ -57,7 +58,7 @@ export default function EventBookingPage({
     );
   }
 
-  if (!canBook) {
+  if (!canOpenCheckout) {
     return (
       <div className="text-center py-20 px-4">
         <p className="text-slate-600 mb-4 text-[1rem]">Booking is not available for this event.</p>

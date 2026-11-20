@@ -34,6 +34,7 @@ import { CONFIRMATION_UI_VERSION } from "@/components/Shared/Confirmation/confir
 import { formatDateCustomer, formatTime12h, getVenueDateTimeParts } from "@/lib/dateFormat";
 import { formatMoney } from "@/lib/currencyFormat";
 import { eventBookingQrValue } from "@/lib/eventScanToken";
+import { eventBookingSeatsLabel } from "@/lib/eventSeatLabel";
 
 const CONFIRM_PAGE_MAX = "mx-auto w-full max-w-[64rem] px-4 md:px-5 lg:px-10 xl:px-12";
 
@@ -268,6 +269,7 @@ function ConfirmationContent() {
     : booking.ticket_qty
       ? `${booking.ticket_qty} ticket${booking.ticket_qty === 1 ? "" : "s"}`
       : "Ticket";
+  const seatsLabel = eventBookingSeatsLabel(booking.items);
 
   const feeTotal = Number(booking.convenience_fee_total) || 0;
   const discountTotal = Number(booking.discount_amount) || 0;
@@ -312,7 +314,7 @@ function ConfirmationContent() {
         venueLine={venue || undefined}
         ticketCountLabel={`${booking.ticket_qty ?? booking.items?.reduce((a, i) => a + Number(i.qty || 0), 0) ?? 0} Ticket(s)`}
         primaryLabel={ticketTypeDisplay}
-        secondaryLabel={booking.guest_name?.trim() || undefined}
+        secondaryLabel={seatsLabel || undefined}
         bookingCode={displayCode}
         qrValue={eventBookingQrValue(booking)}
         totalFormatted={formatMoney(booking.grand_total)}

@@ -26,7 +26,7 @@ import ConfirmDialog from "@/components/Shared/ConfirmDialog";
 import { formatMoney } from "@/lib/currencyFormat";
 import { buildEventTicketPdf, downloadPdfBlob, shortBookingCode } from "@/lib/eventTicketPdf";
 import { EventTicketCard } from "@/components/EventBooking/EventTicketCard";
-import { EventConfirmationShimmer } from "@/components/Shared/Shimmer";
+import { CustomerBookingDetailShimmer } from "@/components/Shared/Shimmer";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { formatDateCustomer } from "@/lib/dateFormat";
 import { eventBookingSeatsLabel } from "@/lib/eventSeatLabel";
@@ -129,7 +129,7 @@ export default function EventBookingDetailPage({
   };
 
   if (!user || isLoading) {
-    return <EventConfirmationShimmer />;
+    return <CustomerBookingDetailShimmer />;
   }
 
   if (error || !booking) {

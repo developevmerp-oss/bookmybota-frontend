@@ -844,7 +844,7 @@ export default function PublicEventDetailPage({
               <h2 className="text-[1.25rem] sm:text-[1.375rem] lg:text-[1.4rem] font-semibold text-[#1A1A1A] mb-2.5 sm:mb-2">
                 {group.title}
               </h2>
-              <div className="flex gap-3 sm:gap-4 lg:gap-5 overflow-x-auto pb-1 -mx-5 px-5 sm:mx-0 sm:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <div className="flex gap-3 sm:gap-4 lg:gap-5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 {group.list.map((artist, i) => (
                   <button
                     key={`${artist.name}-${i}`}
@@ -934,12 +934,12 @@ export default function PublicEventDetailPage({
                 <p className="text-[0.9375rem] sm:text-[1rem] text-[#6B6B6B] mt-1 mb-3.5 sm:mb-4">
                   Events around you, book now.
                 </p>
-                <div className="relative min-w-0 overflow-visible">
-                  {/* 3 full cards + ~half of the 4th (peek), matching landing rail behavior */}
+                <div className="relative min-w-0">
+                  {/* Keep inside section gutters so the first card lines up with the title */}
                   <AdaptiveCardRow
                     minVisible={3.5}
                     scrollerRef={relatedRef}
-                    className="!mt-0 !mb-0 !pt-0 !pb-1 -mx-5 px-5 sm:mx-0 sm:px-0"
+                    className="!mt-0 !mb-0 !pt-0 !pb-1"
                   >
                     {related.map((e) => (
                       <EventPosterCard key={e.id} event={e} fullWidth />
@@ -954,7 +954,7 @@ export default function PublicEventDetailPage({
                           const el = relatedRef.current;
                           if (el) scrollRailBy(el, -1);
                         }}
-                        className="absolute left-1 sm:left-0 top-[36%] -translate-y-1/2 z-20 flex size-9 rounded-full bg-[#3A3A3A] text-white items-center justify-center cursor-pointer shadow-md"
+                        className="absolute left-0 top-[36%] -translate-y-1/2 z-20 flex size-9 rounded-full bg-[#3A3A3A] text-white items-center justify-center cursor-pointer shadow-md"
                       >
                         <ChevronLeft size={16} />
                       </button>
@@ -965,7 +965,7 @@ export default function PublicEventDetailPage({
                           const el = relatedRef.current;
                           if (el) scrollRailBy(el, 1);
                         }}
-                        className="absolute right-1 sm:right-0 top-[36%] -translate-y-1/2 z-20 flex size-9 rounded-full bg-[#3A3A3A] text-white items-center justify-center cursor-pointer shadow-md"
+                        className="absolute right-0 top-[36%] -translate-y-1/2 z-20 flex size-9 rounded-full bg-[#3A3A3A] text-white items-center justify-center cursor-pointer shadow-md"
                       >
                         <ChevronRight size={16} />
                       </button>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, CalendarDays, ChevronLeft, ChevronRight, MapPin } from "lucide-react";
 import { Swiper, SwiperSlide } from "swiper/react";
@@ -27,10 +27,11 @@ import {
 import { PromoBannerShimmer } from "@/components/Shared/Shimmer";
 import { promoBannerDotIndex, promoBannerMode, preparePromoLoopSlides } from "./promoBannerLoop";
 import {
-  promoNormalizeWrap,
+  promoScheduleNormalize,
   promoSlideNext,
   promoSlidePrev,
   promoSlideToDot,
+  usePromoSwipeNav,
   usePromoWrapAutoplay,
 } from "./promoBannerNav";
 import "./PromoBannerCarousel.css";
@@ -508,6 +509,7 @@ export default function ListingPromoSlider({
 
   const prevRef = useRef<HTMLButtonElement>(null);
   const nextRef = useRef<HTMLButtonElement>(null);
+  const frameRef = useRef<HTMLDivElement>(null);
   const swiperRef = useRef<SwiperType | null>(null);
   const [activeDot, setActiveDot] = useState(0);
 
@@ -521,6 +523,19 @@ export default function ListingPromoSlider({
     multi && !isLoading,
     originalCount,
     useWrapTrack
+  );
+  const onSwipeStart = useCallback(() => pauseAutoplay(), [pauseAutoplay]);
+  const onSwipeEnd = useCallback(() => {
+    window.setTimeout(() => resumeAutoplay(), 800);
+  }, [resumeAutoplay]);
+  usePromoSwipeNav(
+    frameRef,
+    swiperRef,
+    multi && !isLoading,
+    originalCount,
+    useWrapTrack,
+    onSwipeStart,
+    onSwipeEnd
   );
 
   if (isLoading) {
@@ -537,7 +552,8 @@ export default function ListingPromoSlider({
         } ${className}`}
     >
       <div
-        className={`relative w-full promo-banner-frame ${multi ? "" : "promo-banner-single-wrap"}`}
+        ref={frameRef}
+        className={`relative w-full promo-banner-frame ${multi ? "touch-pan-y" : "promo-banner-single-wrap"}`}
         onMouseEnter={pauseAutoplay}
         onMouseLeave={resumeAutoplay}
       >
@@ -550,7 +566,8 @@ export default function ListingPromoSlider({
           centeredSlides={multi}
           centeredSlidesBounds={edgeBounds}
           grabCursor={multi}
-          allowTouchMove={multi}
+          allowTouchMove={false}
+          simulateTouch={false}
           slidesPerView={multi ? "auto" : 1}
           spaceBetween={multi ? 8 : 0}
           watchSlidesProgress={multi}
@@ -577,7 +594,7 @@ export default function ListingPromoSlider({
             setActiveDot(promoBannerDotIndex(swiper.activeIndex, originalCount));
           }}
           onSlideChangeTransitionEnd={(swiper) => {
-            if (useWrapTrack) promoNormalizeWrap(swiper, originalCount);
+            if (useWrapTrack) promoScheduleNormalize(swiper, originalCount);
           }}
         >
           {renderSlides.map((slide) => (
@@ -586,6 +603,8 @@ export default function ListingPromoSlider({
                 href={slide.href}
                 aria-label={`${slide.title}${slide.year ? ` ${slide.year}` : ""}`}
                 className="promo-banner-card group relative flex h-full w-full overflow-hidden rounded-2xl sm:rounded-3xl outline-none focus-visible:ring-2 focus-visible:ring-[#6900AA] focus-visible:ring-offset-2"
+                draggable={false}
+                onDragStart={(e) => e.preventDefault()}
               >
                 {/* Same as Dining listing: banner creative only (no title/CTA overlay). */}
                 <SlideCard slide={slide} plainImage />

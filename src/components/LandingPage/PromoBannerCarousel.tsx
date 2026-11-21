@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Swiper, SwiperSlide } from "swiper/react";
@@ -26,10 +26,11 @@ import {
 import { PromoBannerShimmer } from "@/components/Shared/Shimmer";
 import { promoBannerDotIndex, promoBannerMode, preparePromoLoopSlides } from "./promoBannerLoop";
 import {
-  promoNormalizeWrap,
+  promoScheduleNormalize,
   promoSlideNext,
   promoSlidePrev,
   promoSlideToDot,
+  usePromoSwipeNav,
   usePromoWrapAutoplay,
 } from "./promoBannerNav";
 import "./PromoBannerCarousel.css";
@@ -361,6 +362,7 @@ export default function PromoBannerCarousel({ city }: PromoBannerCarouselProps) 
     });
   const prevRef = useRef<HTMLButtonElement>(null);
   const nextRef = useRef<HTMLButtonElement>(null);
+  const frameRef = useRef<HTMLDivElement>(null);
   const swiperRef = useRef<SwiperType | null>(null);
   const [activeDot, setActiveDot] = useState(0);
 
@@ -426,6 +428,19 @@ export default function PromoBannerCarousel({ city }: PromoBannerCarouselProps) 
     originalCount,
     useWrapTrack
   );
+  const onSwipeStart = useCallback(() => pauseAutoplay(), [pauseAutoplay]);
+  const onSwipeEnd = useCallback(() => {
+    window.setTimeout(() => resumeAutoplay(), 800);
+  }, [resumeAutoplay]);
+  usePromoSwipeNav(
+    frameRef,
+    swiperRef,
+    multi && !loading,
+    originalCount,
+    useWrapTrack,
+    onSwipeStart,
+    onSwipeEnd
+  );
 
   if (loading) {
     return <PromoBannerShimmer />;
@@ -442,7 +457,8 @@ export default function PromoBannerCarousel({ city }: PromoBannerCarouselProps) 
       }`}
     >
       <div
-        className={`relative w-full promo-banner-frame ${multi ? "" : "promo-banner-single-wrap"}`}
+        ref={frameRef}
+        className={`relative w-full promo-banner-frame ${multi ? "touch-pan-y" : "promo-banner-single-wrap"}`}
         onMouseEnter={pauseAutoplay}
         onMouseLeave={resumeAutoplay}
       >
@@ -455,7 +471,9 @@ export default function PromoBannerCarousel({ city }: PromoBannerCarouselProps) 
           centeredSlides={multi}
           centeredSlidesBounds={edgeBounds}
           grabCursor={multi}
-          allowTouchMove={multi}
+          // Swipes are handled by usePromoSwipeNav → same infinite next/prev as arrows.
+          allowTouchMove={false}
+          simulateTouch={false}
           slidesPerView={multi ? "auto" : 1}
           spaceBetween={multi ? 8 : 0}
           watchSlidesProgress={multi}
@@ -482,7 +500,7 @@ export default function PromoBannerCarousel({ city }: PromoBannerCarouselProps) 
             setActiveDot(promoBannerDotIndex(swiper.activeIndex, originalCount));
           }}
           onSlideChangeTransitionEnd={(swiper) => {
-            if (useWrapTrack) promoNormalizeWrap(swiper, originalCount);
+            if (useWrapTrack) promoScheduleNormalize(swiper, originalCount);
           }}
         >
           {renderSlides.map((slide) => (
@@ -491,6 +509,8 @@ export default function PromoBannerCarousel({ city }: PromoBannerCarouselProps) 
                 href={slide.href}
                 aria-label={`${slide.title}${slide.year ? ` ${slide.year}` : ""}`}
                 className="promo-banner-card group relative block h-full w-full overflow-hidden rounded-xl sm:rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-[#6900AA] focus-visible:ring-offset-2"
+                draggable={false}
+                onDragStart={(e) => e.preventDefault()}
               >
                 <SlideCard slide={slide} />
               </Link>

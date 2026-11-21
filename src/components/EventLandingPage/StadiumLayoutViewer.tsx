@@ -1179,7 +1179,7 @@ export default function StadiumLayoutViewer({
     };
   }, []);
 
-  // Seat toggle selection
+  // Seat toggle selection — same BMS / movie logic as VenueLayoutViewer
   const handleSeatClick = useCallback(
     (seat: TierSeat) => {
       if (seat.status !== "AVAILABLE") {
@@ -1191,12 +1191,16 @@ export default function StadiumLayoutViewer({
       let next: TierSeat[];
 
       if (isAlreadySelected) {
+        // Tap selected seat → deselect only that seat
         next = selectedSeats.filter((s) => s.id !== seat.id);
+      } else if (
+        maxSelectable < Number.MAX_SAFE_INTEGER &&
+        selectedSeats.length >= maxSelectable
+      ) {
+        // Qty already filled → start a fresh pick from the tapped seat
+        // (EventCheckout expands contiguous neighbors via onSeatsSelected).
+        next = [seat];
       } else {
-        if (selectedSeats.length >= maxSelectable) {
-          toast.warning(`You can select a maximum of ${maxSelectable} seat${maxSelectable === 1 ? "" : "s"}.`);
-          return;
-        }
         next = [...selectedSeats, seat];
       }
 

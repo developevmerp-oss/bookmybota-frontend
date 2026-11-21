@@ -32,9 +32,9 @@ import { useStickyHeaderOffset } from "@/lib/useStickyHeaderOffset";
 import { useStickyCtaAboveFooter } from "@/lib/useStickyCtaAboveFooter";
 import { formatDateCustomer } from "@/lib/dateFormat";
 
-/** Dining-parity black booking CTA (one-time shine via ShinyBlackButton). */
+/** Solid black booking CTA (one-time shine via ShinyBlackButton). */
 const HERO_BOOK_BTN_CLASS =
-  "inline-flex items-center justify-center gap-2 rounded-xl bg-[#111111] px-5 py-2.5 text-sm font-bold text-white";
+  "inline-flex items-center justify-center gap-2 rounded-xl !bg-[#111111] hover:!bg-black px-5 py-2.5 text-sm font-bold !text-white shadow-[0_4px_14px_rgba(0,0,0,0.28)]";
 
 const HERO_FORMAT_BADGE_CLASS =
   "inline-flex items-center rounded-md border border-white/25 bg-white/15 px-2.5 py-1 text-[11px] sm:text-xs font-bold text-white backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]";
@@ -136,8 +136,9 @@ function MovieDetailBanner({
     }
   };
 
+  /** Desktop hero only — SubNav MOVIE purple gradient; sticky/mobile stay black */
   const bookClass =
-    "inline-flex items-center justify-center gap-2 rounded-xl bg-[#111111] px-5 sm:px-8 py-2.5 sm:py-3 text-sm sm:text-base font-bold text-white";
+    "inline-flex items-center justify-center gap-2 rounded-xl !bg-gradient-to-r !from-[#A78BFA] !to-[#6D28D9] hover:brightness-110 px-5 sm:px-8 py-2.5 sm:py-3 text-sm sm:text-base font-bold !text-white shadow-[0_8px_24px_rgba(109,40,217,0.4)] ring-1 ring-white/20";
 
   const bookLabel = (
     <>
@@ -412,10 +413,12 @@ export default function MovieDetailPage() {
     skip: !idOrSlug,
   });
 
-  const { data: showtimesData } = useGetPublicMovieShowtimesQuery(
-    { idOrSlug },
-    { skip: !idOrSlug }
-  );
+  const {
+    data: showtimesData,
+    isLoading: showtimesLoading,
+    isSuccess: showtimesSuccess,
+    isError: showtimesError,
+  } = useGetPublicMovieShowtimesQuery({ idOrSlug }, { skip: !idOrSlug });
 
   const movie = useMemo<MovieDetailData | null>(() => {
     if (!apiMovie) return null;
@@ -435,19 +438,24 @@ export default function MovieDetailPage() {
     );
   }, [apiMovie, cinemaOffers]);
 
+  /** True after first showtimes response (or error) — avoid catalog “multi format” false positives. */
+  const showtimesReady = showtimesSuccess || showtimesError || (!showtimesLoading && showtimesData !== undefined);
+
   const langFormatGroups = useMemo(() => {
     if (!movie) return [];
     return buildLanguageFormatGroups(
       groupsFromShowtimes(showtimesData?.cinemas),
       movie.languages,
-      movie.formats || []
+      movie.formats || [],
+      { showtimesReady }
     );
-  }, [movie, showtimesData?.cinemas]);
+  }, [movie, showtimesData?.cinemas, showtimesReady]);
 
-  const formatBadges = useMemo(
-    () => allFormatsFromGroups(langFormatGroups),
-    [langFormatGroups]
-  );
+  const formatBadges = useMemo(() => {
+    const fromGroups = allFormatsFromGroups(langFormatGroups);
+    if (fromGroups.length > 0) return fromGroups;
+    return (movie?.formats || []).map((f) => f.trim()).filter(Boolean);
+  }, [langFormatGroups, movie?.formats]);
 
   const needsLangFormatPicker = shouldShowLanguageFormatPicker(langFormatGroups);
 
@@ -488,11 +496,16 @@ export default function MovieDetailPage() {
   const bookHref = movie.bookHref || `/movies/${movie.slug || movie.id}/showtimes`;
 
   const handleBookTickets = () => {
+    // Wait for showtimes so we only open the picker for real multi options
+    if (!showtimesReady && !showtimesError) {
+      router.push(bookHref);
+      return;
+    }
+    // Multiple languages / formats → BMS picker; otherwise go straight to showtimes
     if (needsLangFormatPicker) {
       setLangFormatOpen(true);
       return;
     }
-    // Single option — go straight to showtimes (pre-filter when we know language/format)
     const only = langFormatGroups[0];
     if (only?.language && only.language !== "All" && only.formats.length === 1) {
       const params = new URLSearchParams();
@@ -546,21 +559,21 @@ export default function MovieDetailPage() {
 
       <MovieDetailSections movie={movie} idOrSlug={idOrSlug} />
 
-      {/* Sticky Book Tickets — mobile / tablet bottom (dining-parity black + shine with footer avoidance) */}
+      {/* Sticky Book Tickets — mobile / tablet only: solid black (unchanged) */}
       {!stickyCtaHidden ? (
         <div
           className="lg:hidden fixed inset-x-0 z-40 border-t border-slate-200 bg-white px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] transition-[bottom] duration-75 ease-out"
           style={{ bottom: stickyCtaBottom }}
         >
           {movie.comingSoon ? (
-            <span className="flex w-full items-center justify-center rounded-xl bg-[#111111] px-5 py-3.5 text-base font-bold text-white opacity-80">
+            <span className="flex w-full items-center justify-center rounded-xl !bg-[#111111] px-5 py-3.5 text-base font-bold text-white opacity-80">
               Coming Soon
             </span>
           ) : (
             <ShinyBlackButton
               type="button"
               onClick={handleBookTickets}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#111111] px-5 py-3.5 text-base font-bold text-white"
+              className="flex w-full items-center justify-center gap-2 rounded-xl !bg-[#111111] hover:!bg-black px-5 py-3.5 text-base font-bold !text-white shadow-[0_4px_14px_rgba(0,0,0,0.28)]"
             >
               Book Tickets
               <ArrowRight className="size-5" strokeWidth={2.25} />
@@ -569,13 +582,15 @@ export default function MovieDetailPage() {
         </div>
       ) : null}
 
-      <MovieLanguageFormatModal
-        open={langFormatOpen}
-        onClose={() => setLangFormatOpen(false)}
-        movieTitle={movie.title}
-        showtimesPath={bookHref}
-        groups={langFormatGroups}
-      />
+      {needsLangFormatPicker ? (
+        <MovieLanguageFormatModal
+          open={langFormatOpen}
+          onClose={() => setLangFormatOpen(false)}
+          movieTitle={movie.title}
+          showtimesPath={bookHref}
+          groups={langFormatGroups}
+        />
+      ) : null}
     </div>
   );
 }

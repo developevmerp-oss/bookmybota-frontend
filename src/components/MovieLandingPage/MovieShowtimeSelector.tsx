@@ -269,16 +269,18 @@ function tooltipTiers(st: PublicMovieShowtimeItem): MovieShowtimeTierAvailabilit
   return [];
 }
 
+/** BMS-style tooltip labels (uppercase status under each tier). */
 function tierStatusLabel(status: string): string {
-  if (status === "FILLING_FAST") return "Filling Fast";
-  if (status === "SOLD_OUT") return "Sold Out";
-  return "Available";
+  if (status === "FILLING_FAST") return "FILLING FAST";
+  if (status === "SOLD_OUT") return "SOLD OUT";
+  return "AVAILABLE";
 }
 
+/** BMS-style tooltip colors: green / yellow / muted grey (not red). */
 function tierStatusClass(status: string): string {
-  if (status === "FILLING_FAST") return "text-[#EA580C]";
-  if (status === "SOLD_OUT") return "text-[#DC2626]";
-  return "text-[#16A34A]";
+  if (status === "FILLING_FAST") return "text-[#EAB308]";
+  if (status === "SOLD_OUT") return "text-[#B0B0B0]";
+  return "text-[#4CAD4C]";
 }
 
 function priceInBands(price: number, bands: string[]) {
@@ -733,12 +735,21 @@ function buildShowtimesTitle(
 const DISABLED_MUTED = "#C8C8C8";
 const DISABLED_MUTED_SOFT = "#D4D4D4";
 
-/** Chip border + left accent — matches fill status */
+/** Visible grey pill outline — status color lives in under-label / tooltip / legend */
+const CHIP_BORDER = "#BDBDBD";
+
 const STATUS_BORDER: Record<ChipFillStatus, string> = {
-  available: "#22C55E",
-  filling: "#EAB308",
-  soldout: "#DC2626",
-  started: "#F97316",
+  available: CHIP_BORDER,
+  filling: CHIP_BORDER,
+  soldout: CHIP_BORDER,
+  started: CHIP_BORDER,
+};
+
+const STATUS_SUBTEXT: Record<ChipFillStatus, string> = {
+  available: "#4CAD4C",
+  filling: "#CA8A04",
+  soldout: "#B0B0B0",
+  started: "#F97122",
 };
 
 function cinemaMapsQuery(cinema: PublicMovieCinemaGroup) {
@@ -999,13 +1010,30 @@ function ShowtimeChip({
   })();
 
   const showLateNightMoon = grouped && isLateNight;
+  /** Format under the pill (District) — skip plain 2D when already in a lang/format group heading */
+  const underLabel = (() => {
+    if (started) return { text: "STARTED", color: STATUS_SUBTEXT.started };
+    if (soldOut) return { text: "SOLD OUT", color: STATUS_SUBTEXT.soldout };
+    if (!grouped && formatLabel) {
+      return { text: formatLabel.toUpperCase(), color: "#9CA3AF" };
+    }
+    if (grouped && formatLabel && !/^2d$/i.test(formatLabel)) {
+      return { text: formatLabel.toUpperCase(), color: "#9CA3AF" };
+    }
+    if (!grouped && metaLine) {
+      return { text: metaLine, color: "#9CA3AF" };
+    }
+    if (minPrice !== null && !grouped) {
+      return { text: `ETB ${minPrice}`, color: "#6B7280" };
+    }
+    return null;
+  })();
 
   return (
-    <span className="group/chip relative inline-block overflow-visible pt-2.5 pr-2.5">
-      {/* Hover tooltip — neutral grey border (do not inherit chip status filter) */}
+    <span className="group/chip relative inline-flex flex-col items-center overflow-visible pt-2.5 pr-2">
       {tiers.length > 0 ? (
         <div
-          className="pointer-events-none absolute bottom-[calc(100%+10px)] left-1/2 z-40 hidden w-max max-w-[min(92vw,36rem)] -translate-x-1/2 rounded-lg border border-[#E5E7EB] bg-white px-3 py-2.5 shadow-[0_8px_24px_rgba(15,23,42,0.12)] group-hover/chip:block"
+          className="pointer-events-none absolute bottom-[calc(100%+8px)] left-1/2 z-40 hidden w-max max-w-[min(92vw,36rem)] -translate-x-1/2 rounded-lg border border-[#E5E7EB] bg-white px-3 py-2.5 shadow-[0_8px_24px_rgba(15,23,42,0.12)] group-hover/chip:block"
           role="tooltip"
         >
           <div className="flex flex-wrap items-start justify-center gap-x-4 gap-y-2">
@@ -1017,11 +1045,11 @@ function ShowtimeChip({
                 <div className="text-[12px] font-bold text-[#111827] tabular-nums">
                   {tier.price > 0 ? `ETB ${tier.price}` : "—"}
                 </div>
-                <div className="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#374151] leading-tight line-clamp-2">
+                <div className="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#6B7280] leading-tight line-clamp-2">
                   {tier.tier_name}
                 </div>
                 <div
-                  className={`mt-0.5 text-[10px] font-semibold ${tierStatusClass(tier.status)}`}
+                  className={`mt-0.5 text-[10px] font-bold uppercase tracking-wide ${tierStatusClass(tier.status)}`}
                 >
                   {tierStatusLabel(tier.status)}
                 </div>
@@ -1035,8 +1063,8 @@ function ShowtimeChip({
         </div>
       ) : null}
 
-      {/* Rectangular chip + left accent bar (status color); moon on late-night */}
-      <span className="relative inline-block overflow-visible">
+      {/* District pill — full colored outline (status), time inside, label under */}
+      <span className="relative inline-flex flex-col items-center">
         {showLateNightMoon ? (
           <span
             className="pointer-events-none absolute top-0 right-0 z-20 flex size-[16px] -translate-y-1/2 translate-x-1/2 items-center justify-center rounded-full bg-[#5A5A5A] text-white shadow-[0_1px_2px_rgba(0,0,0,0.25)]"
@@ -1049,6 +1077,7 @@ function ShowtimeChip({
 
         <button
           type="button"
+          data-status={status}
           onClick={onClick}
           disabled={soldOut}
           aria-label={`${formatTime(st.starts_at)}${
@@ -1062,46 +1091,28 @@ function ShowtimeChip({
                   ? "Sold out"
                   : "Started"
           }`}
-          className={`relative min-w-[104px] sm:min-w-[112px] overflow-hidden border bg-white pl-4 pr-3.5 py-2 text-center ${
+          className={`bmb-showtime-chip inline-flex h-9 sm:h-10 min-w-[5.75rem] sm:min-w-[6.25rem] items-center justify-center rounded-full border-[1.5px] border-solid bg-white px-3.5 sm:px-4 text-center transition-colors ${
             soldOut
-              ? "cursor-not-allowed opacity-70"
-              : "cursor-pointer hover:bg-[#FAFAFA]"
+              ? "cursor-not-allowed opacity-60"
+              : "cursor-pointer hover:bg-[#FAFFFA] active:scale-[0.98]"
           }`}
-          style={{ borderColor }}
+          style={{ border: `1.5px solid ${borderColor}`, boxShadow: "none" }}
         >
-          <span
-            className="pointer-events-none absolute inset-y-0 left-0 w-[4px]"
-            style={{ backgroundColor: borderColor }}
-            aria-hidden
-          />
-          <span className="block text-[13px] font-bold tabular-nums text-[#374151]">
+          <span className="text-[13px] sm:text-[14px] font-bold leading-none tabular-nums tracking-tight text-[#1A1A1A]">
             {formatTime(st.starts_at)}
           </span>
-          {started ? (
-            <span className="mt-0.5 block text-[10px] font-semibold uppercase tracking-wide text-[#EA580C]">
-              Started
-            </span>
-          ) : soldOut ? (
-            <span className="mt-0.5 block text-[10px] font-semibold uppercase tracking-wide text-[#DC2626]">
-              Sold Out
-            </span>
-          ) : null}
-          {grouped && formatLabel && !/^2d$/i.test(formatLabel) ? (
-            <span className="mt-0.5 block text-[10px] font-medium uppercase tracking-wide text-[#9CA3AF]">
-              {formatLabel}
-            </span>
-          ) : null}
-          {metaLine ? (
-            <span className="mt-0.5 block text-[10px] font-medium uppercase tracking-wide text-[#9CA3AF]">
-              {metaLine}
-            </span>
-          ) : null}
-          {minPrice !== null && !grouped ? (
-            <span className="mt-0.5 block text-[10px] font-medium text-[#6B7280]">
-              ETB {minPrice}
-            </span>
-          ) : null}
         </button>
+
+        {underLabel ? (
+          <span
+            className="mt-1 max-w-[6.5rem] truncate text-center text-[10px] font-semibold uppercase tracking-wide leading-none"
+            style={{ color: underLabel.color }}
+          >
+            {underLabel.text}
+          </span>
+        ) : (
+          <span className="mt-1 block h-[10px]" aria-hidden />
+        )}
       </span>
     </span>
   );
@@ -1960,21 +1971,21 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
               </button>
             ) : null}
           </div>
-          <div className="inline-flex flex-wrap items-center gap-4 text-[11px] font-semibold tracking-wide text-[#6B7280]">
-            <span className="inline-flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-[#22C55E]" />
+          <div className="inline-flex flex-wrap items-center gap-4 text-[11px] font-semibold tracking-wide">
+            <span className="inline-flex items-center gap-1.5 text-[#111111]">
+              <span className="h-2 w-2 rounded-full bg-[#4CAD4C]" />
               AVAILABLE
             </span>
-            <span className="inline-flex items-center gap-1.5">
+            <span className="inline-flex items-center gap-1.5 text-[#EAB308]">
               <span className="h-2 w-2 rounded-full bg-[#EAB308]" />
-              FAST FILLING
+              FILLING FAST
             </span>
-            <span className="inline-flex items-center gap-1.5">
+            <span className="inline-flex items-center gap-1.5 text-[#B0B0B0]">
               <span className="h-2 w-2 rounded-full bg-[#DC2626]" />
               SOLD OUT
             </span>
-            <span className="inline-flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-[#F97316]" />
+            <span className="inline-flex items-center gap-1.5 text-[#F97122]">
+              <span className="h-2 w-2 rounded-full bg-[#F97122]" />
               STARTED
             </span>
           </div>
@@ -2114,10 +2125,10 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
                                 aria-hidden
                               />
                             ) : null}
-                            <p className="mb-2.5 text-[11px] sm:text-xs font-bold uppercase tracking-wide text-[#6B7280]">
+                            <p className="mb-2 text-[11px] sm:text-xs font-semibold uppercase tracking-[0.08em] text-[#6B7280]">
                               {group.label}
                             </p>
-                            <div className="flex flex-wrap items-start gap-2.5 overflow-visible pt-0.5">
+                            <div className="flex flex-wrap items-stretch gap-2 sm:gap-2.5 overflow-visible pt-0.5">
                               {group.showtimes.map((st) => (
                                 <ShowtimeChip
                                   key={st.id}

@@ -799,6 +799,18 @@
     pointer-events: none;
     animation: bmbRipple 0.65s cubic-bezier(0, 0, 0.2, 1) forwards;
   }
+
+}
+
+/*
+ * Movie showtime pills — light grey outline (status shown via under-label +
+ * hover tooltip / legend, not colored borders).
+ */
+button.bmb-showtime-chip {
+  border-width: 1.5px !important;
+  border-style: solid !important;
+  border-color: #bdbdbd !important;
+  background-clip: padding-box;
 }
 
 /* ─── Admin & Business Portal overrides for white/light theme ─── */

@@ -23,7 +23,7 @@ import { useHomeCatalog } from "./useHomeCatalog";
 import { lockBodyScroll } from "@/lib/lockBodyScroll";
 import { artistHref, restaurantHref, venueHref } from "@/lib/businessPublicPath";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
-import { CustomerPageShimmer } from "@/components/Shared/Shimmer";
+import { SearchResultsListShimmer } from "@/components/Shared/Shimmer";
 import "@/components/DinningLandingPage/DiningSearchPopup.css";
 
 type SearchOverlayProps = {
@@ -396,7 +396,7 @@ export default function SearchOverlay({ open, city, onClose }: SearchOverlayProp
             <p className="text-[15px] sm:text-base font-bold text-[#111111] mb-3">{listTitle}</p>
             {isLoadingEvents && query.trim() ? (
               <div className="py-2">
-                <CustomerPageShimmer rows={2} />
+                <SearchResultsListShimmer rows={5} />
               </div>
             ) : list.length === 0 ? (
               <p className="py-3 text-sm text-slate-400">

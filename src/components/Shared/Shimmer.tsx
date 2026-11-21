@@ -4,6 +4,10 @@ import type { ReactNode } from "react";
 import Skeleton, { SkeletonTheme } from "react-loading-skeleton";
 import "react-loading-skeleton/dist/skeleton.css";
 import { CONFIRMATION_UI_VERSION } from "@/components/Shared/Confirmation/confirmationUiVersion";
+import "@/components/LandingPage/PromoBannerCarousel.css";
+import "@/components/LandingPage/AdaptiveCardRow.css";
+import "@/components/LandingPage/SpecialOffersRail.css";
+import "@/components/DinningLandingPage/DiningCollectionsOption2.css";
 
 const theme = {
   baseColor: "#E8E4EE",
@@ -96,21 +100,11 @@ export function EventDetailShimmer() {
                 </div>
               </div>
 
-              {/* You May Also Like */}
-              <div className="mt-6 sm:mt-8 lg:mt-9">
+              {/* You May Also Like — AdaptiveCardRow 3.5 peek + EventPosterCard 3/4 */}
+              <div className="mt-6 sm:mt-8 lg:mt-9 min-w-0">
                 <Skeleton width={180} height={26} className="mb-1" />
                 <Skeleton width={200} height={14} className="mb-3" />
-                <div className="flex gap-3 sm:gap-4 overflow-hidden">
-                  {[0, 1, 2, 3, 4].map((i) => (
-                    <div key={i} className="w-[148px] sm:w-[176px] lg:w-[196px] shrink-0">
-                      <div className="h-[208px] sm:h-[248px] lg:h-[264px] rounded-xl overflow-hidden">
-                        <Skeleton className="!block !h-full !w-full !rounded-xl" height="100%" />
-                      </div>
-                      <Skeleton width="90%" height={16} className="mt-2" />
-                      <Skeleton width="55%" height={12} className="mt-1" />
-                    </div>
-                  ))}
-                </div>
+                <CustomerRailShimmer count={5} variant="poster" minVisible={3.5} />
               </div>
             </div>
 
@@ -382,13 +376,17 @@ export function EventListShimmer() {
         aria-label="Loading events"
       >
         {Array.from({ length: 8 }).map((_, i) => (
-          <div key={i} className="min-w-0">
-            <div className="aspect-[2/3] w-full overflow-hidden rounded-2xl">
-              <Skeleton className="!block !h-full !w-full !rounded-2xl" height="100%" />
+          <div
+            key={i}
+            className="min-w-0 overflow-hidden rounded-2xl border border-[#E5E5E5] bg-white shadow-[0_1px_3px_rgba(17,17,17,0.06)]"
+          >
+            <div className="aspect-[3/4] w-full overflow-hidden bg-slate-100">
+              <Skeleton className="!block !h-full !w-full !rounded-none" height="100%" />
             </div>
-            <div className="mt-2.5 space-y-2">
-              <Skeleton width="85%" height={16} />
+            <div className="space-y-1.5 px-2.5 py-2.5 sm:px-4 sm:py-3.5">
               <Skeleton width="55%" height={12} />
+              <Skeleton width="90%" height={16} />
+              <Skeleton width="70%" height={12} />
             </div>
           </div>
         ))}
@@ -397,18 +395,30 @@ export function EventListShimmer() {
   );
 }
 
-/** Explore Events pastel category tiles (events home) */
+/** Explore Events — horizontal pastel pills (ExploreEventOption2) */
 export function EventExploreShimmer({ count = 6 }: { count?: number }) {
   return (
     <Wrap>
       <div
-        className="flex gap-4 sm:gap-5 overflow-hidden px-1 pt-5 pb-8"
+        className="flex gap-3 sm:gap-4 overflow-hidden px-1 pt-2 pb-4"
         aria-busy="true"
         aria-label="Loading categories"
       >
         {Array.from({ length: count }).map((_, i) => (
-          <div key={i} className="h-[188px] w-[148px] sm:h-[180px] sm:w-[140px] shrink-0 overflow-hidden rounded-[22px]">
-            <Skeleton className="!block !h-full !w-full !rounded-[22px]" height="100%" />
+          <div
+            key={i}
+            className="flex shrink-0 items-center gap-3 sm:gap-3.5 rounded-[1.25rem] sm:rounded-[1.5rem] border border-black/[0.04] bg-[#F7F3FB] px-3.5 py-3 sm:px-4 sm:py-3.5 w-[min(78vw,15.5rem)] sm:w-[15.5rem] md:w-[16.25rem] lg:w-[17rem] min-h-[5.5rem] sm:min-h-[6rem]"
+          >
+            <Skeleton
+              width={60}
+              height={60}
+              borderRadius={14}
+              className="shrink-0 sm:!w-[72px] sm:!h-[72px]"
+            />
+            <div className="min-w-0 flex-1 space-y-2">
+              <Skeleton width="75%" height={16} />
+              <Skeleton width="55%" height={12} />
+            </div>
           </div>
         ))}
       </div>
@@ -485,13 +495,12 @@ export function EventReviewsShimmer() {
   );
 }
 
-/** Dining home restaurant listing cards — matches DiningPosterCard listing layout */
-/** Matches DiningRestaurantCardOption2 listing card layout. */
+/** Matches DiningRestaurantCardOption2: mobile horizontal row, md+ vertical 5/4 card. */
 export function DiningHomeRestaurantShimmer({ count = 6 }: { count?: number }) {
   return (
     <Wrap>
       <div
-        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5 lg:gap-5 w-full"
+        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-5 lg:gap-5 w-full"
         aria-busy="true"
         aria-label="Loading restaurants"
       >
@@ -500,23 +509,38 @@ export function DiningHomeRestaurantShimmer({ count = 6 }: { count?: number }) {
             key={i}
             className="flex w-full flex-col overflow-hidden rounded-2xl border border-[#E8E8E8] bg-white shadow-[0_2px_10px_rgba(17,17,17,0.06)]"
           >
-            <div className="relative aspect-[5/4] w-full overflow-hidden bg-[#F3F4F6]">
-              <Skeleton className="!absolute !inset-0 !block !h-full !w-full !rounded-none" height="100%" />
+            {/* Mobile — District horizontal card */}
+            <div className="md:hidden flex gap-3 p-3">
+              <div className="relative h-[7.25rem] w-[7.25rem] shrink-0 overflow-hidden rounded-xl bg-[#F3F4F6]">
+                <Skeleton className="!absolute !inset-0 !block !h-full !w-full !rounded-xl" height="100%" />
+              </div>
+              <div className="min-w-0 flex-1 flex flex-col gap-1.5 pt-0.5">
+                <Skeleton width="85%" height={16} />
+                <Skeleton width="70%" height={12} />
+                <Skeleton width="60%" height={12} />
+                <Skeleton width="45%" height={12} />
+              </div>
             </div>
-            <div className="flex flex-col gap-2 px-4 pt-3 pb-3.5 min-w-0">
-              <div className="flex items-center justify-between gap-2 min-w-0">
-                <Skeleton width="68%" height={20} />
-                <Skeleton width={40} height={18} borderRadius={4} />
+            {/* Tablet/desktop — vertical listing card */}
+            <div className="hidden md:flex md:flex-col">
+              <div className="relative aspect-[5/4] w-full overflow-hidden bg-[#F3F4F6]">
+                <Skeleton className="!absolute !inset-0 !block !h-full !w-full !rounded-none" height="100%" />
               </div>
-              <div className="flex items-center justify-between gap-2 min-w-0">
-                <Skeleton width="58%" height={14} />
-                <Skeleton width={48} height={14} />
-              </div>
-              <div className="flex items-center justify-between gap-2 min-w-0">
-                <Skeleton width="42%" height={14} />
-                <div className="relative flex h-10 w-[3.25rem] items-center">
-                  <Skeleton circle width={36} height={36} className="!absolute left-0" />
-                  <Skeleton circle width={36} height={36} className="!absolute left-3.5" />
+              <div className="flex flex-col gap-2 px-4 pt-3 pb-3.5 min-w-0">
+                <div className="flex items-center justify-between gap-2 min-w-0">
+                  <Skeleton width="68%" height={20} />
+                  <Skeleton width={40} height={18} borderRadius={4} />
+                </div>
+                <div className="flex items-center justify-between gap-2 min-w-0">
+                  <Skeleton width="58%" height={14} />
+                  <Skeleton width={48} height={14} />
+                </div>
+                <div className="flex items-center justify-between gap-2 min-w-0">
+                  <Skeleton width="42%" height={14} />
+                  <div className="relative flex h-10 w-[3.25rem] items-center">
+                    <Skeleton circle width={36} height={36} className="!absolute left-0" />
+                    <Skeleton circle width={36} height={36} className="!absolute left-3.5" />
+                  </div>
                 </div>
               </div>
             </div>
@@ -653,33 +677,47 @@ export function AdminListShimmer({
 
 /* ─── Customer-facing shimmers ───────────────────────────────────────────── */
 
-/** Horizontal poster / dining card rail used by ContentRail and custom rails */
+const posterCardShell =
+  "overflow-hidden rounded-2xl border border-[#E5E5E5] bg-white shadow-[0_1px_3px_rgba(17,17,17,0.06)]";
+
+/** Horizontal poster / dining card rail — matches AdaptiveCardRow + EventPosterCard */
 export function CustomerRailShimmer({
   count = 4,
   variant = "poster",
   className = "",
+  minVisible = 5,
 }: {
   count?: number;
   variant?: "poster" | "dining" | "movie";
   className?: string;
+  /** Desktop AdaptiveCardRow minVisible (default 5; dining rails often 4). */
+  minVisible?: number;
 }) {
-  const aspect =
-    variant === "dining" ? "aspect-[5/4]" : variant === "movie" ? "aspect-[3/4]" : "aspect-[2/3]";
+  const isDining = variant === "dining";
+  const aspect = isDining ? "aspect-[5/4]" : "aspect-[3/4]";
+  const rowClass = isDining
+    ? "adaptive-card-row adaptive-card-row--dining"
+    : "adaptive-card-row adaptive-card-row--four";
+
   return (
     <Wrap>
       <div
-        className={`flex gap-3 sm:gap-4 overflow-hidden ${className}`}
+        className={`${rowClass} overflow-hidden ${className}`}
+        style={{ ["--adaptive-min-visible" as string]: String(minVisible) }}
         aria-busy="true"
         aria-label="Loading"
       >
         {Array.from({ length: count }).map((_, i) => (
-          <div key={i} className="min-w-0 flex-1 basis-0">
-            <div className={`${aspect} w-full overflow-hidden rounded-xl`}>
-              <Skeleton className="!block !h-full !w-full !rounded-xl" height="100%" />
-            </div>
-            <div className="mt-2.5 space-y-2">
-              <Skeleton width="85%" height={16} />
-              <Skeleton width="55%" height={12} />
+          <div key={i} className="adaptive-card-slot">
+            <div className={`h-full w-full ${posterCardShell}`}>
+              <div className={`${aspect} w-full overflow-hidden bg-slate-100`}>
+                <Skeleton className="!block !h-full !w-full !rounded-none" height="100%" />
+              </div>
+              <div className="space-y-1.5 px-2.5 py-2.5 sm:px-4 sm:py-3.5">
+                {!isDining ? <Skeleton width="55%" height={12} /> : null}
+                <Skeleton width="85%" height={16} />
+                <Skeleton width="65%" height={12} />
+              </div>
             </div>
           </div>
         ))}
@@ -688,15 +726,24 @@ export function CustomerRailShimmer({
   );
 }
 
-/** Circular artist avatars rail */
+/** Top artists — square circular avatars in adaptive slots */
 export function ArtistRailShimmer({ count = 6 }: { count?: number }) {
   return (
     <Wrap>
-      <div className="flex gap-4 sm:gap-6 overflow-hidden" aria-busy="true" aria-label="Loading artists">
+      <div
+        className="adaptive-card-row adaptive-card-row--four overflow-hidden"
+        style={{ ["--adaptive-min-visible" as string]: "6" }}
+        aria-busy="true"
+        aria-label="Loading artists"
+      >
         {Array.from({ length: count }).map((_, i) => (
-          <div key={i} className="flex flex-col items-center gap-2 shrink-0">
-            <Skeleton circle width={120} height={120} className="sm:!w-[190px] sm:!h-[190px]" />
-            <Skeleton width={72} height={12} />
+          <div key={i} className="adaptive-card-slot">
+            <div className="flex w-full flex-col items-center gap-2">
+              <div className="aspect-square w-full max-w-[190px] overflow-hidden rounded-full">
+                <Skeleton circle className="!block !h-full !w-full" height="100%" />
+              </div>
+              <Skeleton width="70%" height={12} />
+            </div>
           </div>
         ))}
       </div>
@@ -726,20 +773,25 @@ export function CategoryTilesShimmer({ count = 6 }: { count?: number }) {
   );
 }
 
-/** Special offers horizontal cards */
+/** Special offers — matches offers-rail peek + ticket-style offer-card */
 export function OffersRailShimmer({ count = 4 }: { count?: number }) {
   return (
     <Wrap>
-      <div className="flex gap-3 sm:gap-4 overflow-hidden" aria-busy="true" aria-label="Loading offers">
+      <div className="offers-rail overflow-hidden" aria-busy="true" aria-label="Loading offers">
         {Array.from({ length: count }).map((_, i) => (
-          <div
-            key={i}
-            className="w-[min(85vw,20rem)] sm:w-[22rem] shrink-0 rounded-2xl border border-slate-100 bg-white p-4 space-y-3"
-          >
-            <Skeleton height={120} borderRadius={12} />
-            <Skeleton width="70%" height={18} />
-            <Skeleton width="90%" height={14} />
-            <Skeleton width={100} height={32} borderRadius={999} />
+          <div key={i} className="offers-rail-slot">
+            <div className="offer-card flex min-h-[168px] overflow-hidden rounded-2xl border border-slate-100 bg-white">
+              <div className="flex min-w-0 flex-[1.35] flex-col justify-center gap-2 p-4 sm:p-5">
+                <Skeleton width={56} height={20} borderRadius={999} />
+                <Skeleton width="70%" height={28} />
+                <Skeleton width="90%" height={14} />
+                <Skeleton width="55%" height={12} />
+              </div>
+              <div className="flex w-[38%] shrink-0 flex-col items-center justify-center gap-2 border-l border-dashed border-slate-200 bg-[#F7F3FB] p-3">
+                <Skeleton width="70%" height={14} />
+                <Skeleton width={88} height={32} borderRadius={999} />
+              </div>
+            </div>
           </div>
         ))}
       </div>
@@ -747,17 +799,49 @@ export function OffersRailShimmer({ count = 4 }: { count?: number }) {
   );
 }
 
-/** Top promo / listing banner */
+/** Top promo / listing banner — same CSS vars as PromoBannerCarousel (2:1 / 3:1 peek) */
 export function PromoBannerShimmer() {
   return (
     <Wrap>
-      <div className="w-full bg-white pt-2 sm:pt-2.5 lg:pt-3 pb-5 sm:pb-6 lg:pb-7" aria-busy="true" aria-label="Loading promotions">
-        <div className="relative flex w-full justify-center h-[250px] sm:h-[300px] md:h-[340px] lg:h-[380px] xl:h-[400px] 2xl:h-[440px]">
-          <div className="h-full w-[min(92%,calc(250px*3))] sm:w-[min(90%,calc(300px*3))] md:w-[min(90%,calc(340px*3))] lg:w-[min(90%,calc(380px*3))] xl:w-[min(88%,calc(400px*3))] 2xl:w-[min(86%,calc(440px*3))] overflow-hidden rounded-xl sm:rounded-2xl bg-[#111]">
-            <Skeleton className="!block !h-full !w-full !rounded-xl sm:!rounded-2xl" height="100%" />
+      <section
+        className="promo-banner-swiper is-multi w-full bg-white pt-2 sm:pt-2.5 lg:pt-3 pb-0"
+        aria-busy="true"
+        aria-label="Loading promotions"
+      >
+        <div className="relative w-full promo-banner-frame">
+          <div className="flex h-full w-full items-stretch justify-center gap-2 sm:gap-2.5 md:gap-3 overflow-hidden">
+            <div
+              className="hidden sm:block shrink-0 overflow-hidden rounded-xl sm:rounded-2xl bg-[#111] opacity-50"
+              style={{ width: "var(--promo-slide-w)", height: "var(--promo-h)" }}
+              aria-hidden
+            >
+              <Skeleton className="!block !h-full !w-full !rounded-xl sm:!rounded-2xl" height="100%" />
+            </div>
+            <div
+              className="shrink-0 overflow-hidden rounded-xl sm:rounded-2xl bg-[#111]"
+              style={{ width: "var(--promo-slide-w)", height: "var(--promo-h)" }}
+            >
+              <Skeleton className="!block !h-full !w-full !rounded-xl sm:!rounded-2xl" height="100%" />
+            </div>
+            <div
+              className="hidden sm:block shrink-0 overflow-hidden rounded-xl sm:rounded-2xl bg-[#111] opacity-50"
+              style={{ width: "var(--promo-slide-w)", height: "var(--promo-h)" }}
+              aria-hidden
+            >
+              <Skeleton className="!block !h-full !w-full !rounded-xl sm:!rounded-2xl" height="100%" />
+            </div>
+          </div>
+          <div className="promo-banner-dots pointer-events-none" aria-hidden>
+            {[0, 1, 2].map((i) => (
+              <span
+                key={i}
+                className={`promo-banner-dot ${i === 0 ? "is-active" : ""}`}
+                style={{ display: "inline-block" }}
+              />
+            ))}
           </div>
         </div>
-      </div>
+      </section>
     </Wrap>
   );
 }
@@ -890,27 +974,58 @@ export function RestaurantDetailShimmer() {
   );
 }
 
-/** Movie detail page */
+/** Movie detail — mobile 2.5:1 hero + chips; desktop banner with left poster */
 export function MovieDetailShimmer() {
   return (
     <Wrap>
       <div className="min-h-screen bg-white" aria-busy="true" aria-label="Loading movie">
-        <div className="w-full aspect-[2.4/1] min-h-[220px] overflow-hidden">
-          <Skeleton className="!block !h-full !w-full !rounded-none" height="100%" />
+        {/* Mobile */}
+        <div className="lg:hidden">
+          <div className="h-[3.25rem] flex items-center gap-3 px-4 border-b border-slate-100">
+            <Skeleton circle width={36} height={36} />
+            <Skeleton width="45%" height={16} />
+            <Skeleton circle width={36} height={36} className="ml-auto" />
+          </div>
+          <div className="relative w-full aspect-[2.5/1] overflow-hidden bg-[#111]">
+            <Skeleton className="!absolute !inset-0 !block !h-full !w-full !rounded-none" height="100%" />
+          </div>
+          <div className="px-4 sm:px-6 pt-3.5 pb-3 border-b border-slate-100/80 space-y-2.5">
+            <div className="flex flex-wrap gap-2">
+              <Skeleton width={44} height={22} borderRadius={6} />
+              <Skeleton width={72} height={22} borderRadius={6} />
+              <Skeleton width={88} height={14} />
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              <Skeleton width={64} height={22} borderRadius={6} />
+              <Skeleton width={56} height={22} borderRadius={6} />
+              <Skeleton width={72} height={22} borderRadius={6} />
+            </div>
+            <Skeleton width="40%" height={14} />
+          </div>
         </div>
-        <div className="bmb-section-container py-6 space-y-5">
-          <div className="flex gap-4 sm:gap-6">
-            <Skeleton width={140} height={210} borderRadius={12} className="shrink-0 sm:!w-[180px] sm:!h-[270px]" />
-            <div className="flex-1 space-y-3 pt-1">
-              <Skeleton width="60%" height={28} />
-              <Skeleton width="40%" height={16} />
-              <Skeleton width="80%" height={14} />
-              <div className="flex gap-2 pt-2">
-                <Skeleton width={120} height={40} borderRadius={8} />
-                <Skeleton width={40} height={40} borderRadius={8} />
+
+        {/* Desktop hero */}
+        <section className="relative hidden w-full overflow-hidden lg:block h-[460px] xl:h-[480px] bg-[#111]">
+          <Skeleton className="!absolute !inset-0 !block !h-full !w-full !rounded-none" height="100%" />
+          <div className="relative bmb-section-container flex h-full items-center py-8">
+            <div className="grid w-full grid-cols-[200px_1fr] gap-6 lg:gap-12 xl:gap-16 items-center">
+              <div className="aspect-[2/3] max-w-[200px] h-[340px] overflow-hidden rounded-2xl">
+                <Skeleton className="!block !h-full !w-full !rounded-2xl" height="100%" />
+              </div>
+              <div className="space-y-3 min-w-0">
+                <Skeleton width="55%" height={36} />
+                <Skeleton width="40%" height={16} />
+                <Skeleton width="70%" height={14} />
+                <div className="flex gap-2 pt-2">
+                  <Skeleton width={140} height={44} borderRadius={999} />
+                  <Skeleton width={44} height={44} borderRadius={999} />
+                </div>
               </div>
             </div>
           </div>
+        </section>
+
+        <div className="bmb-section-container py-6 space-y-5">
           <Skeleton width={160} height={22} />
           <Skeleton count={3} />
           <CustomerRailShimmer count={5} variant="movie" />
@@ -920,22 +1035,27 @@ export function MovieDetailShimmer() {
   );
 }
 
-/** Movies / cinemas listing grids */
-export function MovieGridShimmer({ count = 8 }: { count?: number }) {
+/** Movies listing grid — matches MOVIE_GRID_COLS (lg: 5 cols, 3/4 posters) */
+export function MovieGridShimmer({ count = 10 }: { count?: number }) {
   return (
     <Wrap>
       <div
-        className="grid grid-cols-1 gap-y-5 sm:grid-cols-2 sm:gap-x-[1.15rem] sm:gap-y-5 lg:grid-cols-4 lg:gap-x-6 lg:gap-y-6"
+        className="grid grid-cols-1 gap-y-5 sm:grid-cols-2 sm:gap-x-[1.15rem] sm:gap-y-5 lg:grid-cols-5 lg:gap-x-5 lg:gap-y-6"
         aria-busy="true"
         aria-label="Loading movies"
       >
         {Array.from({ length: count }).map((_, i) => (
-          <div key={i} className="min-w-0">
-            <div className="aspect-[2/3] overflow-hidden rounded-xl">
-              <Skeleton className="!block !h-full !w-full !rounded-xl" height="100%" />
+          <div
+            key={i}
+            className={`min-w-0 ${posterCardShell}`}
+          >
+            <div className="aspect-[3/4] overflow-hidden bg-slate-100">
+              <Skeleton className="!block !h-full !w-full !rounded-none" height="100%" />
             </div>
-            <Skeleton width="85%" height={14} className="mt-2" />
-            <Skeleton width="55%" height={12} className="mt-1" />
+            <div className="space-y-1.5 px-2.5 py-2.5 sm:px-3 sm:py-3">
+              <Skeleton width="85%" height={14} />
+              <Skeleton width="55%" height={12} />
+            </div>
           </div>
         ))}
       </div>
@@ -966,18 +1086,37 @@ export function CinemaListShimmer({ count = 6 }: { count?: number }) {
   );
 }
 
-/** Collections grid */
-export function CollectionsShimmer({ count = 6 }: { count?: number }) {
+/** What's your mood rail — same peek as DiningCollectionsOption2 (2.25 / 3.25 / 4) */
+export function DiningMoodRailShimmer({ count = 6 }: { count?: number }) {
+  return (
+    <Wrap>
+      <div className="mt-3 sm:mt-4" aria-busy="true" aria-label="Loading mood collections">
+        <div className="dining-mood-rail overflow-hidden">
+          {Array.from({ length: count }).map((_, i) => (
+            <div key={i} className="dining-mood-slot">
+              <div className="dining-mood-card pointer-events-none">
+                <Skeleton className="!absolute !inset-0 !block !h-full !w-full !rounded-[inherit]" height="100%" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </Wrap>
+  );
+}
+
+/** Collections / mood cards grid — 3/4 like dining mood rail */
+export function CollectionsShimmer({ count = 8 }: { count?: number }) {
   return (
     <Wrap>
       <div
-        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5"
+        className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-5"
         aria-busy="true"
         aria-label="Loading collections"
       >
         {Array.from({ length: count }).map((_, i) => (
           <div key={i} className="overflow-hidden rounded-2xl">
-            <div className="aspect-[16/10]">
+            <div className="aspect-[3/4]">
               <Skeleton className="!block !h-full !w-full !rounded-2xl" height="100%" />
             </div>
           </div>
@@ -1031,22 +1170,48 @@ export function DiningSearchShimmer({ count = 6 }: { count?: number }) {
   );
 }
 
-/** Generic customer account / wishlist / offers content */
+/** Generic customer account / wishlist content — poster-style cards */
 export function CustomerPageShimmer({ rows = 4 }: { rows?: number }) {
   return (
     <Wrap>
       <div className="space-y-4" aria-busy="true" aria-label="Loading">
         <Skeleton width={200} height={28} />
         <Skeleton width={160} height={14} />
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 pt-2">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 pt-2">
           {Array.from({ length: rows }).map((_, i) => (
-            <div key={i} className="rounded-2xl border border-slate-100 bg-white p-3 space-y-3">
-              <Skeleton height={140} borderRadius={12} />
-              <Skeleton width="70%" height={16} />
-              <Skeleton width="50%" height={12} />
+            <div key={i} className={posterCardShell}>
+              <div className="aspect-[3/4] overflow-hidden bg-slate-100">
+                <Skeleton className="!block !h-full !w-full !rounded-none" height="100%" />
+              </div>
+              <div className="space-y-1.5 px-2.5 py-2.5">
+                <Skeleton width="70%" height={14} />
+                <Skeleton width="50%" height={12} />
+              </div>
             </div>
           ))}
         </div>
+      </div>
+    </Wrap>
+  );
+}
+
+/** Search overlay / results — list rows with thumbs */
+export function SearchResultsListShimmer({ rows = 6 }: { rows?: number }) {
+  return (
+    <Wrap>
+      <div className="space-y-3" aria-busy="true" aria-label="Loading search results">
+        {Array.from({ length: rows }).map((_, i) => (
+          <div key={i} className="flex items-center gap-3 rounded-xl px-1 py-2">
+            <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-slate-100 sm:h-16 sm:w-16">
+              <Skeleton className="!block !h-full !w-full !rounded-xl" height="100%" />
+            </div>
+            <div className="min-w-0 flex-1 space-y-1.5">
+              <Skeleton width="55%" height={16} />
+              <Skeleton width="40%" height={12} />
+            </div>
+            <Skeleton width={56} height={12} className="shrink-0" />
+          </div>
+        ))}
       </div>
     </Wrap>
   );
@@ -1435,22 +1600,37 @@ export function CustomerBookingDetailShimmer() {
   );
 }
 
-/** My Gift Cards wallet list — `embedded` skips outer chrome when page already has it */
+/** My Gift Cards wallet / public browse — `embedded` skips outer chrome when page already has it */
 export function CustomerGiftCardsShimmer({
   embedded = false,
+  variant = "wallet",
 }: {
   embedded?: boolean;
+  /** `browse` = public gift-cards grid (up to 4 cols); `wallet` = my cards */
+  variant?: "wallet" | "browse";
 }) {
+  const gridClass =
+    variant === "browse"
+      ? "grid grid-cols-1 min-[480px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5"
+      : "grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4";
+  const tileCount = variant === "browse" ? 8 : 6;
+
   const grid = (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-      {[0, 1, 2, 3].map((i) => (
+    <div className={gridClass}>
+      {Array.from({ length: tileCount }).map((_, i) => (
         <div
           key={i}
-          className="rounded-2xl border border-slate-100 p-4 space-y-3"
+          className="overflow-hidden rounded-2xl border border-slate-100 bg-white"
         >
-          <Skeleton height={120} borderRadius={12} />
-          <Skeleton width="55%" height={16} />
-          <Skeleton width="40%" height={12} />
+          <div className="aspect-[16/10] w-full overflow-hidden bg-slate-100">
+            <Skeleton className="!block !h-full !w-full !rounded-none" height="100%" />
+          </div>
+          {variant === "wallet" ? (
+            <div className="space-y-2 border-t border-slate-100 px-3 py-3">
+              <Skeleton width="55%" height={16} />
+              <Skeleton width="40%" height={12} />
+            </div>
+          ) : null}
         </div>
       ))}
     </div>
@@ -1496,7 +1676,13 @@ export function CustomerGiftCardDetailShimmer({
   const body = (
     <>
       {!embedded && <Skeleton width="7rem" height={16} />}
-      <Skeleton height={160} borderRadius={16} />
+      <div className="aspect-[16/9] w-full overflow-hidden rounded-2xl bg-slate-100">
+        <Skeleton className="!block !h-full !w-full !rounded-2xl" height="100%" />
+      </div>
+      <div className="rounded-xl border border-slate-100 px-4 py-3 space-y-2">
+        <Skeleton width="35%" height={12} />
+        <Skeleton width="50%" height={22} />
+      </div>
       <div className="grid grid-cols-2 gap-3">
         {[0, 1, 2, 3].map((i) => (
           <Skeleton key={i} height={56} borderRadius={12} />

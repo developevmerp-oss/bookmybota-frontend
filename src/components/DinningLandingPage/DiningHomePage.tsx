@@ -17,7 +17,7 @@ import {
 import Link from "next/link";
 import type { IconType } from "react-icons";
 import { DiningPosterCard, ShowcaseDiningPosterCard } from "@/components/LandingPage/PosterCard";
-import { DiningHomeRestaurantShimmer } from "@/components/Shared/Shimmer";
+import { DiningHomeRestaurantShimmer, DiningMoodRailShimmer } from "@/components/Shared/Shimmer";
 import { SHOWCASE_BAR_CARDS, SHOWCASE_DINING_CARDS, type ShowcaseDiningCard } from "@/data/showcaseDiningCards";
 import { hasCityFilter, preferCityOrAll, shouldShowShowcaseCards } from "@/components/LandingPage/homeUtils";
 import CitySectionEmptyNotice from "@/components/LandingPage/CitySectionEmptyNotice";
@@ -1292,7 +1292,12 @@ export default function Home() {
         .map((b) => diningToListingSlide(b, activeCity || "")),
     [promoCityBusinesses, activeCity]
   );
-  const { data: collections = EMPTY_COLLECTIONS } = useGetCollectionsQuery();
+  const {
+    data: collections = EMPTY_COLLECTIONS,
+    isLoading: collectionsLoading,
+    isFetching: collectionsFetching,
+  } = useGetCollectionsQuery();
+  const collectionsPending = collectionsLoading || (collectionsFetching && collections.length === 0);
   // const { data: moods = [] } = useGetMoodsQuery();
   const { data: cuisineMasters = [] } = useGetDiningCuisinesQuery();
 
@@ -2121,6 +2126,69 @@ export default function Home() {
         </div>
       </section>
 
+      {/* What's your mood — collections, directly under Explore Dining */}
+      {collectionsPending || collections.length > 0 ? (
+        <section className="w-full bg-white">
+          <div className="bmb-section-container pt-6 sm:pt-7 lg:pt-8 pb-2 sm:pb-3">
+            <div className="lg:hidden">
+              <div className="flex items-center justify-between gap-2">
+                <h2 className="text-lg sm:text-xl md:text-2xl font-semibold text-slate-900 shrink-0 tracking-tight">
+                  What&apos;s your mood
+                </h2>
+                {!collectionsPending ? (
+                  <Link
+                    href={
+                      locationCity
+                        ? `/collections?city=${encodeURIComponent(locationCity)}`
+                        : "/collections"
+                    }
+                    className="flex items-center gap-0.5 text-sm font-semibold text-[#6900AA] hover:text-[#57008E] transition-colors cursor-pointer shrink-0 whitespace-nowrap"
+                  >
+                    All collections <ChevronRight size={16} />
+                  </Link>
+                ) : (
+                  <span className="shrink-0">
+                    <span className="inline-block h-4 w-24 rounded bg-[#E8E4EE]/80" aria-hidden />
+                  </span>
+                )}
+              </div>
+              <p className="text-sm text-slate-500 mt-0.5">
+                Explore curated lists of top restaurants, cafes and bars
+              </p>
+            </div>
+
+            <div className="hidden lg:flex items-center justify-between mb-1">
+              <div>
+                <h2 className="text-lg sm:text-xl md:text-2xl font-semibold text-slate-900 tracking-tight">
+                  What&apos;s your mood
+                </h2>
+                <p className="text-sm text-slate-500 mt-0.5">
+                  Explore curated lists of top restaurants, cafes and bars
+                </p>
+              </div>
+              {!collectionsPending ? (
+                <Link
+                  href={
+                    locationCity
+                      ? `/collections?city=${encodeURIComponent(locationCity)}`
+                      : "/collections"
+                  }
+                  className="flex items-center gap-1 text-sm font-semibold text-[#6900AA] hover:text-[#57008E] transition-colors cursor-pointer"
+                >
+                  All collections <ChevronRight size={16} />
+                </Link>
+              ) : null}
+            </div>
+
+            {collectionsPending ? (
+              <DiningMoodRailShimmer count={6} />
+            ) : (
+              <DiningCollectionsOption2 collections={collections} city={activeCity} />
+            )}
+          </div>
+        </section>
+      ) : null}
+
       {/* Explore Cuisines — only after Restaurant is selected in Explore Dining */}
       {exploreCardId === "restaurant" && cuisineCards.length > 0 && (
         <div className="w-full bg-white border-b border-slate-100">
@@ -2444,43 +2512,6 @@ export default function Home() {
             </>
           )}
         </section>
-
-          {showHomeExtras && (
-            <section className="w-full pt-6 sm:pt-7 lg:pt-8 pb-6 sm:pb-7 lg:pb-8">
-              {/* Collections — after restaurant listings */}
-              <div className="lg:hidden">
-                <div className="flex items-center justify-between gap-2">
-                  <h2 className="text-lg sm:text-xl md:text-2xl font-semibold text-slate-900 shrink-0 tracking-tight">Collections</h2>
-                  <Link
-                    href={locationCity ? `/collections?city=${encodeURIComponent(locationCity)}` : "/collections"}
-                    className="flex items-center gap-0.5 text-sm font-semibold text-[#6900AA] hover:text-[#57008E] transition-colors cursor-pointer shrink-0 whitespace-nowrap"
-                  >
-                    All collections <ChevronRight size={16} />
-                  </Link>
-                </div>
-                <p className="text-sm text-slate-500 mt-0.5">
-                  Explore curated lists of top restaurants, cafes and bars
-                </p>
-              </div>
-
-              <div className="hidden lg:flex items-center justify-between mb-2">
-                <div>
-                  <h2 className="text-lg sm:text-xl md:text-2xl font-semibold text-slate-900 tracking-tight">Collections</h2>
-                  <p className="text-sm text-slate-500 mt-0.5">
-                    Explore curated lists of top restaurants, cafes and bars
-                  </p>
-                </div>
-                <Link
-                  href={locationCity ? `/collections?city=${encodeURIComponent(locationCity)}` : "/collections"}
-                  className="flex items-center gap-1 text-sm font-semibold text-[#6900AA] hover:text-[#57008E] transition-colors cursor-pointer"
-                >
-                  All collections <ChevronRight size={16} />
-                </Link>
-              </div>
-
-              <DiningCollectionsOption2 collections={collections} city={activeCity} />
-            </section>
-          )}
 
         </div>
       </div>

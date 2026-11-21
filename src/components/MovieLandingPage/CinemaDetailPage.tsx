@@ -452,10 +452,13 @@ function BmsFilterDropdown({
   );
 }
 
+/** Visible grey pill outline — matches showtime selector chips */
+const CHIP_BORDER = "#BDBDBD";
+
 const STATUS_BORDER: Record<"available" | "filling" | "almost", string> = {
-  available: "#22C55E",
-  filling: "#EAB308",
-  almost: "#EF4444",
+  available: CHIP_BORDER,
+  filling: CHIP_BORDER,
+  almost: CHIP_BORDER,
 };
 
 function TicketShowtimeButton({
@@ -470,53 +473,49 @@ function TicketShowtimeButton({
   const price = showtimePrice(st);
   const status = fillStatus(st.starts_at);
   const screenLabel = st.screen_type || st.format || "";
-  const accent = STATUS_BORDER[status];
+  const border = STATUS_BORDER[status];
+  const under =
+    price != null
+      ? `ETB ${price}`
+      : screenLabel
+        ? String(screenLabel).toUpperCase()
+        : "";
 
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`relative min-w-[104px] overflow-hidden border rounded-sm pl-3.5 pr-3.5 py-2 text-center cursor-pointer transition-colors ${
-        selected ? "" : "bg-white hover:bg-[#FAFAFA]"
-      }`}
-      style={
-        selected
-          ? { borderColor: accent, backgroundColor: accent }
-          : { borderColor: accent, backgroundColor: "#FFFFFF" }
-      }
-    >
-      {!selected ? (
-        <span
-          className="pointer-events-none absolute inset-y-0 left-0 w-[4px]"
-          style={{ backgroundColor: accent }}
-          aria-hidden
-        />
-      ) : null}
-      <span
-        className={`block text-[13px] font-bold tabular-nums ${
-          selected ? "text-white" : "text-[#374151]"
+    <span className="inline-flex flex-col items-center">
+      <button
+        type="button"
+        onClick={onClick}
+        data-status={status}
+        className={`bmb-showtime-chip inline-flex h-9 sm:h-10 min-w-[5.75rem] sm:min-w-[6.25rem] items-center justify-center rounded-full border border-solid px-3.5 sm:px-4 text-center cursor-pointer transition-colors active:scale-[0.98] ${
+          selected ? "" : "bg-white hover:bg-[#FAFAFA]"
         }`}
+        style={
+          selected
+            ? { border: `1.5px solid #111111`, backgroundColor: "#111111" }
+            : { border: `1.5px solid ${border}`, backgroundColor: "#FFFFFF" }
+        }
       >
-        {formatTime(st.starts_at)}
-      </span>
-      {price != null ? (
         <span
-          className={`mt-0.5 block text-[10px] font-semibold ${
-            selected ? "text-white/90" : "text-[#6B7280]"
+          className={`text-[13px] sm:text-[14px] font-bold leading-none tabular-nums tracking-tight ${
+            selected ? "text-white" : "text-[#1A1A1A]"
           }`}
         >
-          ETB {price}
+          {formatTime(st.starts_at)}
         </span>
-      ) : screenLabel ? (
+      </button>
+      {under ? (
         <span
-          className={`mt-0.5 block text-[10px] font-medium uppercase tracking-wide ${
-            selected ? "text-white/90" : "text-[#9CA3AF]"
+          className={`mt-1 max-w-[6.5rem] truncate text-center text-[10px] font-semibold uppercase tracking-wide leading-none ${
+            selected ? "text-[#6B7280]" : "text-[#9CA3AF]"
           }`}
         >
-          {screenLabel}
+          {under}
         </span>
-      ) : null}
-    </button>
+      ) : (
+        <span className="mt-1 block h-[10px]" aria-hidden />
+      )}
+    </span>
   );
 }
 
@@ -1307,7 +1306,7 @@ export default function CinemaDetailPage({ cinemaId }: { cinemaId: string }) {
           <div className="mt-3 pt-3 border-t border-[#EEEAF4] flex flex-wrap items-center justify-between gap-2 text-xs text-[#6B7280]">
             <div className="inline-flex flex-wrap items-center gap-4">
               <span className="inline-flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-[#22C55E]" />
+                <span className="h-2 w-2 rounded-full bg-[#4CAD4C]" />
                 Available
               </span>
               <span className="inline-flex items-center gap-1.5">

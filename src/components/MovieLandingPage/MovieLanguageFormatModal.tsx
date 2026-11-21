@@ -72,13 +72,20 @@ export function groupsFromShowtimes(
   return groups;
 }
 
-/** Prefer showtime-derived groups; fall back to catalog language/format lists. */
+/**
+ * Prefer showtime-derived groups (real bookable combos).
+ * Catalog fallback only when showtimes are ready and empty — never invent
+ * every language × every format while showtimes are still loading (that made
+ * the picker appear “all the time”).
+ */
 export function buildLanguageFormatGroups(
   showtimeGroups: LanguageFormatGroup[],
   languages: string[],
-  formats: string[]
+  formats: string[],
+  opts?: { showtimesReady?: boolean }
 ): LanguageFormatGroup[] {
   if (showtimeGroups.length > 0) return showtimeGroups;
+  if (opts?.showtimesReady === false) return [];
   return groupsFromMovieLists(languages, formats);
 }
 
@@ -111,9 +118,11 @@ export function groupsFromMovieLists(
   }));
 }
 
-/** True when the BMS picker should appear before showtimes. */
+/** True when Book Tickets should open the picker (2+ languages or 2+ formats). */
 export function shouldShowLanguageFormatPicker(groups: LanguageFormatGroup[]): boolean {
-  if (groups.length === 0) return false;
+  if (!groups.length) return false;
+  const pairCount = groups.reduce((n, g) => n + (g.formats?.length || 0), 0);
+  if (pairCount <= 1) return false;
   if (groups.length > 1) return true;
   return (groups[0]?.formats.length ?? 0) > 1;
 }

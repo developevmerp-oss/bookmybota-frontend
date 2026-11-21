@@ -47,27 +47,26 @@ export default function ShinyBlackButton({
       aria-busy={ariaBusy}
       onMouseDown={handlePointerDown}
       onClick={onClick}
-      className={`bmb-shiny-btn group relative overflow-hidden rounded-xl font-bold transition-all duration-200 select-none ${
+      className={`bmb-shiny-btn group relative isolate overflow-hidden rounded-xl font-bold transition-all duration-200 select-none ${
         disabled
           ? "cursor-not-allowed opacity-60"
-          : "active:scale-[0.98] active:brightness-90 hover:bg-black hover:shadow-lg hover:shadow-black/25 cursor-pointer"
+          : "active:scale-[0.98] active:brightness-95 hover:brightness-110 hover:shadow-lg hover:shadow-black/30 cursor-pointer"
       } ${className}`}
     >
+      {/* Keep fill opaque so shine never washes the black on light backgrounds */}
+      <span
+        className="pointer-events-none absolute inset-0 -z-[1] bg-[inherit] rounded-[inherit]"
+        aria-hidden="true"
+      />
       {!disabled && (
         <span
-          className="pointer-events-none absolute inset-0 -translate-x-full animate-bmb-shine bg-gradient-to-r from-transparent via-white/35 to-transparent skew-x-[-20deg]"
+          className="pointer-events-none absolute inset-0 -translate-x-full animate-bmb-shine bg-gradient-to-r from-transparent via-white/20 to-transparent skew-x-[-20deg]"
           aria-hidden="true"
         />
       )}
       {!disabled && (
         <span
-          className="pointer-events-none absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/25 to-transparent"
-          aria-hidden="true"
-        />
-      )}
-      {!disabled && (
-        <span
-          className="pointer-events-none absolute inset-0 bg-white/0 group-hover:bg-white/[0.06] transition-colors duration-200"
+          className="pointer-events-none absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/20 to-transparent"
           aria-hidden="true"
         />
       )}

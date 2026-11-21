@@ -26,9 +26,11 @@ import ConfirmDialog from "@/components/Shared/ConfirmDialog";
 import { formatMoney } from "@/lib/currencyFormat";
 import { buildEventTicketPdf, downloadPdfBlob, shortBookingCode } from "@/lib/eventTicketPdf";
 import { EventTicketCard } from "@/components/EventBooking/EventTicketCard";
-import { EventConfirmationShimmer } from "@/components/Shared/Shimmer";
+import { CustomerBookingDetailShimmer } from "@/components/Shared/Shimmer";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { formatDateCustomer } from "@/lib/dateFormat";
+import { eventBookingSeatsLabel } from "@/lib/eventSeatLabel";
+// seats line uses movie-style "Type • seats" via eventBookingSeatsLabel
 
 function formatDateLine(iso?: string) {
   if (!iso) return "";
@@ -90,6 +92,7 @@ export default function EventBookingDetailPage({
   const venue = [booking?.venue_name, booking?.venue_address].filter(Boolean).join(", ");
   const ticketTypeLabel = booking?.items?.[0]?.ticket_type || "Ticket";
   const ticketCount = booking?.ticket_qty || 0;
+  const seatsLabel = eventBookingSeatsLabel(booking?.items);
 
   const handleCancel = () => {
     if (!booking) return;
@@ -126,7 +129,7 @@ export default function EventBookingDetailPage({
   };
 
   if (!user || isLoading) {
-    return <EventConfirmationShimmer />;
+    return <CustomerBookingDetailShimmer />;
   }
 
   if (error || !booking) {
@@ -273,7 +276,9 @@ export default function EventBookingDetailPage({
             <div>
               <Ticket size={16} className="text-[#6900AA] mb-1" />
               <p className="text-sm font-bold text-slate-900">{ticketCount} Tickets</p>
-              <p className="text-xs text-slate-400">{ticketTypeLabel}</p>
+              <p className="text-xs text-slate-400">
+                {seatsLabel ? `${ticketTypeLabel} · ${seatsLabel}` : ticketTypeLabel}
+              </p>
             </div>
           </div>
         </div>
@@ -340,14 +345,18 @@ export default function EventBookingDetailPage({
       </div>
       <ConfirmDialog
         open={confirmOpen}
+        theme="light"
         title="Cancel ticket booking?"
         body="Cancel this ticket booking? Seats will be released."
         confirmLabel="Cancel booking"
+        cancelLabel="Keep booking"
         danger
         busy={confirmBusy || isCancelling}
-        onCancel={() => !confirmBusy && setConfirmOpen(false)}
+        onCancel={() => {
+          if (!confirmBusy && !isCancelling) setConfirmOpen(false);
+        }}
         onConfirm={async () => {
-          if (!booking) return;
+          if (!booking || confirmBusy || isCancelling) return;
           setConfirmBusy(true);
           try {
             await cancelBooking({

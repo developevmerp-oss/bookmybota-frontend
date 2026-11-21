@@ -1,7 +1,5 @@
 "use client";
 
-import { duplicateSlidesForPeek } from "@/lib/listingPromoLogic";
-
 /** Dot index from active index (unique banners only). */
 export function promoBannerDotIndex(index: number, originalCount: number): number {
   if (originalCount <= 0) return 0;
@@ -52,8 +50,12 @@ export function preparePromoLoopSlides<T extends { id: string }>(
     };
   }
 
-  const minNeeded = originalCount * PROMO_COPIES;
-  const renderSlides = duplicateSlidesForPeek(slides, minNeeded);
+  const renderSlides: T[] = [];
+  for (let copy = 0; copy < PROMO_COPIES; copy++) {
+    for (const s of slides) {
+      renderSlides.push(copy === 0 ? s : { ...s, id: `${s.id}__c${copy}` });
+    }
+  }
 
   return {
     renderSlides,

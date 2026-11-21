@@ -429,6 +429,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
   const classicMinimapDragRef = useRef(false);
   const classicZoomRef = useRef(1.0);
   const isTouchClassicRef = useRef(false);
+  const classicPinchRef = useRef<{ startDist: number; startScale: number } | null>(null);
   const lastClassicFitKeyRef = useRef("");
 
   useEffect(() => {
@@ -2114,7 +2115,6 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
       const target = e.target as HTMLElement | null;
       if (target?.closest("[data-classic-seat]")) return;
       if (target?.closest("[data-classic-minimap]")) return;
-      if (target?.closest("[data-classic-zoom]")) return;
       if (target?.closest("button, a, input, textarea, select, label")) return;
       const el = classicViewportRef.current;
       if (!el) return;
@@ -2264,19 +2264,59 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
     if (viewMode !== "classic") return;
     const el = classicViewportRef.current;
     if (!el) return;
+
     const onWheel = (e: WheelEvent) => {
       if (e.ctrlKey || e.metaKey) {
         e.preventDefault();
+        isTouchClassicRef.current = true;
         const step = Math.min(0.35, Math.max(0.08, Math.abs(e.deltaY) * 0.0015));
         const next = classicZoomRef.current + (e.deltaY < 0 ? step : -step);
         setClassicZoomLevel(next, { clientX: e.clientX, clientY: e.clientY });
         return;
       }
-      // Normal wheel / trackpad scroll → show top-right layout navigator (like mobile)
       revealClassicMinimap();
     };
+
+    const touchDist = (a: Touch, b: Touch) =>
+      Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY);
+
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 2) {
+        classicPinchRef.current = {
+          startDist: Math.max(1, touchDist(e.touches[0], e.touches[1])),
+          startScale: classicZoomRef.current,
+        };
+      }
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches.length !== 2 || !classicPinchRef.current) return;
+      e.preventDefault();
+      isTouchClassicRef.current = true;
+      const dist = Math.max(1, touchDist(e.touches[0], e.touches[1]));
+      const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+      const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+      const next =
+        classicPinchRef.current.startScale * (dist / classicPinchRef.current.startDist);
+      setClassicZoomLevel(next, { clientX: midX, clientY: midY });
+    };
+
+    const onTouchEnd = (e: TouchEvent) => {
+      if (e.touches.length < 2) classicPinchRef.current = null;
+    };
+
     el.addEventListener("wheel", onWheel, { passive: false });
-    return () => el.removeEventListener("wheel", onWheel);
+    el.addEventListener("touchstart", onTouchStart, { passive: true });
+    el.addEventListener("touchmove", onTouchMove, { passive: false });
+    el.addEventListener("touchend", onTouchEnd);
+    el.addEventListener("touchcancel", onTouchEnd);
+    return () => {
+      el.removeEventListener("wheel", onWheel);
+      el.removeEventListener("touchstart", onTouchStart);
+      el.removeEventListener("touchmove", onTouchMove);
+      el.removeEventListener("touchend", onTouchEnd);
+      el.removeEventListener("touchcancel", onTouchEnd);
+    };
   }, [viewMode, setClassicZoomLevel, revealClassicMinimap]);
 
   const seatMapSection = (
@@ -2738,36 +2778,6 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
               </div>
             </div>
 
-            <div
-              data-classic-zoom
-              className="absolute bottom-3 right-3 z-30 flex flex-col gap-1.5"
-            >
-              <button
-                type="button"
-                onClick={() => {
-                  isTouchClassicRef.current = true;
-                  setClassicZoomLevel(classicZoom + 0.2);
-                }}
-                disabled={classicZoom >= 2.4}
-                className="size-9 sm:size-8 rounded-full bg-white/95 border border-slate-200 shadow-md text-slate-600 hover:bg-white disabled:opacity-40 cursor-pointer flex items-center justify-center"
-                title="Zoom in"
-              >
-                <Plus className="size-3.5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  isTouchClassicRef.current = true;
-                  setClassicZoomLevel(classicZoom - 0.2);
-                }}
-                disabled={classicZoom <= getClassicMinZoom() + 0.01}
-                className="size-9 sm:size-8 rounded-full bg-white/95 border border-slate-200 shadow-md text-slate-600 hover:bg-white disabled:opacity-40 cursor-pointer flex items-center justify-center"
-                title="Zoom out"
-              >
-                <Minus className="size-3.5" />
-              </button>
-            </div>
-
             {/* Legend hides when Proceed bar is visible (seat selected) */}
             {selectedSeats.length === 0 ? (
               <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-5 lg:gap-7 border-t border-slate-100 bg-white py-1 px-3 sm:py-1.5 lg:py-2.5 lg:px-4 text-[11px] lg:text-xs text-slate-800 shrink-0">
@@ -2989,7 +2999,9 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
               className="shrink-0 flex size-9 items-center justify-center rounded-lg text-slate-700 hover:bg-slate-100 cursor-pointer -ml-1"
               title={
                 step === "review"
-                  ? "Back to snacks"
+                  ? showtimeBeverages.length > 0
+                    ? "Back to snacks"
+                    : "Back to seats"
                   : step === "beverages"
                     ? "Back to seats"
                     : "Back to showtimes"
@@ -3010,29 +3022,6 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                 className="h-12 lg:h-14 w-auto object-contain"
               />
             </Link>
-            {step !== "seats" && (
-              <button
-                type="button"
-                onClick={() => {
-                  if (step === "review") {
-                    setStep(showtimeBeverages.length > 0 ? "beverages" : "seats");
-                  } else {
-                    setStep("seats");
-                  }
-                }}
-                className="hidden lg:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-100 cursor-pointer transition-colors ml-2"
-                title={
-                  step === "review" && showtimeBeverages.length > 0
-                    ? "Back to snacks"
-                    : "Back to seats"
-                }
-              >
-                <ChevronLeft className="size-4" />
-                {step === "review" && showtimeBeverages.length > 0
-                  ? "Back to snacks"
-                  : "Back to seats"}
-              </button>
-            )}
           </div>
 
           {/* Desktop center — movie title + theater / date / time / screen */}

@@ -1097,57 +1097,174 @@ export default function StadiumLayoutViewer({
     setStagePos(newPos);
   }, []);
 
-  // Handle manual zoom buttons — works for block/tier when selected
-  const handleZoomChange = (delta: number) => {
-    const current = zoomScale ?? baseScale;
-    const newScale = selectedBlockId
-      ? Math.max(1.8, Math.min(16, current + delta))
-      : Math.max(0.3, Math.min(8, current + delta));
-    setZoomScale(newScale);
-    if (stageRef.current) {
-      stageRef.current.to({
-        scaleX: newScale,
-        scaleY: newScale,
-        duration: 0.22,
-      });
-    }
-  };
+  /**
+   * Two-finger pinch zoom (photo-style).
+   * Must use Pointer Events + capture — Konva consumes raw TouchEvents on the canvas,
+   * so the previous touchstart/touchmove listeners never saw a stable 2-finger gesture on mobile.
+   */
+  const stadiumPinchRef = useRef<{
+    startDist: number;
+    startScale: number;
+  } | null>(null);
+  const pinchPointersRef = useRef<Map<number, { x: number; y: number }>>(new Map());
 
-  const handleResetZoom = () => {
-    if (selectedBlock) {
-      handleBlockClick(selectedBlock, activeTierId || undefined);
-    } else {
-      setZoomScale(baseScale);
-      setStagePos(fitStagePos);
-      if (stageRef.current) {
-        stageRef.current.to({
-          x: fitStagePos.x,
-          y: fitStagePos.y,
-          scaleX: baseScale,
-          scaleY: baseScale,
-          duration: 0.35,
-          easing: Konva.Easings.EaseInOut,
-        });
+  useEffect(() => {
+    let cancelled = false;
+    let detach: (() => void) | undefined;
+
+    const bind = () => {
+      if (cancelled) return;
+      const el = containerRef.current;
+      if (!el) {
+        requestAnimationFrame(bind);
+        return;
       }
-    }
-  };
 
-  const handleFitStadium = useCallback(() => {
-    setZoomScale(baseScale);
-    setStagePos(fitStagePos);
-    if (stageRef.current) {
-      stageRef.current.to({
-        x: fitStagePos.x,
-        y: fitStagePos.y,
-        scaleX: baseScale,
-        scaleY: baseScale,
-        duration: 0.35,
-        easing: Konva.Easings.EaseInOut,
-      });
-    }
-  }, [baseScale, fitStagePos]);
+      const pointerDist = (
+        a: { x: number; y: number },
+        b: { x: number; y: number }
+      ) => Math.hypot(b.x - a.x, b.y - a.y);
 
-  // Seat toggle selection
+      const capturePointer = (pointerId: number) => {
+        try {
+          el.setPointerCapture?.(pointerId);
+        } catch {
+          /* ignore */
+        }
+      };
+
+      const beginPinch = () => {
+        const pts = [...pinchPointersRef.current.values()];
+        if (pts.length < 2) return;
+        const stage = stageRef.current;
+        if (!stage) return;
+        try {
+          stage.stopDrag();
+        } catch {
+          /* ignore */
+        }
+        stage.draggable(false);
+        stadiumPinchRef.current = {
+          startDist: Math.max(1, pointerDist(pts[0], pts[1])),
+          startScale: stage.scaleX() || 1,
+        };
+      };
+
+      const applyPinch = () => {
+        const pinch = stadiumPinchRef.current;
+        const stage = stageRef.current;
+        const pts = [...pinchPointersRef.current.values()];
+        if (!pinch || !stage || pts.length < 2) return;
+
+        const dist = Math.max(1, pointerDist(pts[0], pts[1]));
+        const midX = (pts[0].x + pts[1].x) / 2;
+        const midY = (pts[0].y + pts[1].y) / 2;
+        const rect = el.getBoundingClientRect();
+        const pointer = { x: midX - rect.left, y: midY - rect.top };
+        const oldScale = stage.scaleX() || 1;
+        const newScale = Math.max(
+          0.2,
+          Math.min(16, pinch.startScale * (dist / pinch.startDist))
+        );
+
+        const mousePointTo = {
+          x: (pointer.x - stage.x()) / oldScale,
+          y: (pointer.y - stage.y()) / oldScale,
+        };
+        const newPos = {
+          x: pointer.x - mousePointTo.x * newScale,
+          y: pointer.y - mousePointTo.y * newScale,
+        };
+        stage.scale({ x: newScale, y: newScale });
+        stage.position(newPos);
+        stage.batchDraw();
+        setZoomScale(newScale);
+        setStagePos(newPos);
+      };
+
+      const endPinchIfNeeded = () => {
+        if (pinchPointersRef.current.size < 2) {
+          stadiumPinchRef.current = null;
+          stageRef.current?.draggable(true);
+        }
+      };
+
+      const onPointerDown = (e: PointerEvent) => {
+        pinchPointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (pinchPointersRef.current.size >= 2) {
+          for (const id of pinchPointersRef.current.keys()) capturePointer(id);
+          beginPinch();
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      };
+
+      const onPointerMove = (e: PointerEvent) => {
+        if (!pinchPointersRef.current.has(e.pointerId) && pinchPointersRef.current.size === 0) {
+          return;
+        }
+        if (pinchPointersRef.current.has(e.pointerId) || pinchPointersRef.current.size > 0) {
+          pinchPointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        }
+        if (pinchPointersRef.current.size >= 2) {
+          e.preventDefault();
+          e.stopPropagation();
+          if (!stadiumPinchRef.current) beginPinch();
+          applyPinch();
+        }
+      };
+
+      const onPointerUp = (e: PointerEvent) => {
+        pinchPointersRef.current.delete(e.pointerId);
+        try {
+          if (el.hasPointerCapture?.(e.pointerId)) {
+            el.releasePointerCapture?.(e.pointerId);
+          }
+        } catch {
+          /* ignore */
+        }
+        endPinchIfNeeded();
+      };
+
+      const onDocPointerMove = (e: PointerEvent) => {
+        if (!pinchPointersRef.current.has(e.pointerId) && pinchPointersRef.current.size === 0) {
+          return;
+        }
+        onPointerMove(e);
+      };
+      const onDocPointerUp = (e: PointerEvent) => onPointerUp(e);
+
+      el.addEventListener("pointerdown", onPointerDown, { capture: true });
+      el.addEventListener("pointermove", onPointerMove, { capture: true });
+      el.addEventListener("pointerup", onPointerUp, { capture: true });
+      el.addEventListener("pointercancel", onPointerUp, { capture: true });
+      document.addEventListener("pointermove", onDocPointerMove, { capture: true });
+      document.addEventListener("pointerup", onDocPointerUp, { capture: true });
+      document.addEventListener("pointercancel", onDocPointerUp, { capture: true });
+
+      detach = () => {
+        el.removeEventListener("pointerdown", onPointerDown, true);
+        el.removeEventListener("pointermove", onPointerMove, true);
+        el.removeEventListener("pointerup", onPointerUp, true);
+        el.removeEventListener("pointercancel", onPointerUp, true);
+        document.removeEventListener("pointermove", onDocPointerMove, true);
+        document.removeEventListener("pointerup", onDocPointerUp, true);
+        document.removeEventListener("pointercancel", onDocPointerUp, true);
+        pinchPointersRef.current.clear();
+        stadiumPinchRef.current = null;
+        stageRef.current?.draggable(true);
+      };
+    };
+
+    const raf = requestAnimationFrame(bind);
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(raf);
+      detach?.();
+    };
+  }, []);
+
+  // Seat toggle selection — same BMS / movie logic as VenueLayoutViewer
   const handleSeatClick = useCallback(
     (seat: TierSeat) => {
       if (seat.status !== "AVAILABLE") {
@@ -1159,12 +1276,16 @@ export default function StadiumLayoutViewer({
       let next: TierSeat[];
 
       if (isAlreadySelected) {
+        // Tap selected seat → deselect only that seat
         next = selectedSeats.filter((s) => s.id !== seat.id);
+      } else if (
+        maxSelectable < Number.MAX_SAFE_INTEGER &&
+        selectedSeats.length >= maxSelectable
+      ) {
+        // Qty already filled → start a fresh pick from the tapped seat
+        // (EventCheckout expands contiguous neighbors via onSeatsSelected).
+        next = [seat];
       } else {
-        if (selectedSeats.length >= maxSelectable) {
-          toast.warning(`You can select a maximum of ${maxSelectable} seat${maxSelectable === 1 ? "" : "s"}.`);
-          return;
-        }
         next = [...selectedSeats, seat];
       }
 
@@ -2084,7 +2205,8 @@ export default function StadiumLayoutViewer({
         {/* ── Interactive Konva Canvas (Zoomable Pitch + Stands + Seats) ── */}
         <div
           ref={containerRef}
-          className="flex-1 min-h-0 h-full w-full min-w-0 bg-white relative overflow-hidden flex items-center justify-center cursor-grab active:cursor-grabbing touch-pan-y"
+          className="flex-1 min-h-0 h-full w-full min-w-0 bg-white relative overflow-hidden flex items-center justify-center cursor-grab active:cursor-grabbing select-none"
+          style={{ touchAction: "none", WebkitUserSelect: "none" }}
         >
         <Stage
           ref={stageRef}
@@ -2097,6 +2219,8 @@ export default function StadiumLayoutViewer({
           draggable
           onWheel={handleWheel}
           onDragEnd={(e) => {
+            // Ignore drag commits that finish during / right after a pinch
+            if (stadiumPinchRef.current || pinchPointersRef.current.size >= 2) return;
             setStagePos({ x: e.target.x(), y: e.target.y() });
           }}
         >
@@ -4214,7 +4338,7 @@ export default function StadiumLayoutViewer({
         {!selectedBlockId && (
           <div className="absolute bottom-16 lg:bottom-3 left-1/2 -translate-x-1/2 z-10 max-w-[min(90%,20rem)] lg:max-w-[min(92%,28rem)] bg-white text-slate-700 px-3 py-1.5 lg:px-3.5 lg:py-2 rounded-full border border-slate-200 shadow-lg text-[10px] sm:text-[11px] md:max-lg:text-[13px] lg:text-xs font-medium flex items-center gap-2 pointer-events-none">
             <Info className="w-3.5 h-3.5 text-[#6900AA] shrink-0" />
-            <span>Tap a stand on the map to pick seats</span>
+            <span>Pinch to zoom · Tap a stand to pick seats</span>
           </div>
         )}
 

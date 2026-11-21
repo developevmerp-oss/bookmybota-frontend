@@ -87,7 +87,8 @@ import {
 import dynamic from "next/dynamic";
 import CustomerAuthModal from "@/components/Shared/CustomerAuthModal";
 const fieldErrorClass = "mt-1.5 text-[0.8125rem] font-medium text-rose-500";
-const reqStar = <span className="text-rose-500">*</span>;
+/** Required-field marker — placed after the label (e.g. "Your name *"). */
+const reqStar = <span className="ml-0.5 text-rose-500" aria-hidden>*</span>;
 const HOLD_SESSION_KEY = "bmb_event_hold_session";
 
 function formatHoldCountdown(totalSeconds: number): string {
@@ -767,7 +768,8 @@ export default function EventCheckout({
     setDesiredSeatQty(null);
     setSeatCountPick(null);
     setSeatQtyModalOpen(false);
-    setIsMapFullscreen(restoredStep === 2);
+    // Never force map on seed — open only after layout confirms real seats
+    setIsMapFullscreen(false);
     autoOpenedMapRef.current = false;
     const seededContact =
       !isOrganizer && authUser?.role === "customer"
@@ -1237,20 +1239,32 @@ export default function EventCheckout({
     return Math.min(10, cap);
   }, [hasReservedSeats, isStadiumLayout, ticketTypes, activeLayoutData]);
 
-  // Auto-open map with "How many seats?" popup when in step 2 with seating layout
+  // Auto-open map only when seats/stadium map actually exist (not just layout_mode flags).
+  // Events without a real map should stay on the ticket-type list.
   useEffect(() => {
     if (!open) {
       autoOpenedMapRef.current = false;
       return;
     }
-    if (step === 2 && (hasReservedSeats || showtimeHasSeatingLayout) && !autoOpenedMapRef.current) {
+    if (isLayoutLoading) return;
+    if (step === 2 && hasReservedSeats && !autoOpenedMapRef.current) {
       autoOpenedMapRef.current = true;
       setIsMapFullscreen(true);
       setDesiredSeatQty((curr) => curr || 2);
       setSeatCountPick((curr) => curr || 2);
       setSeatQtyModalOpen(true);
     }
-  }, [open, step, hasReservedSeats, showtimeHasSeatingLayout]);
+  }, [open, step, hasReservedSeats, isLayoutLoading]);
+
+  // Close blank map if fullscreen opened before layout loaded and there are no seats
+  useEffect(() => {
+    if (!isMapFullscreen) return;
+    if (isLayoutLoading) return;
+    if (hasReservedSeats) return;
+    setIsMapFullscreen(false);
+    setSeatQtyModalOpen(false);
+    autoOpenedMapRef.current = true;
+  }, [isMapFullscreen, isLayoutLoading, hasReservedSeats]);
 
   // Keep desired qty in sync when seats exist but qty was never persisted
   // (avoids "2/2 selected" UI while Continue still thinks qty is missing).
@@ -1499,7 +1513,7 @@ export default function EventCheckout({
     step === 1
       ? "Choose a city and venue for your event."
       : step === 2
-        ? hasReservedSeats || showtimeHasSeatingLayout
+        ? hasReservedSeats
           ? "Choose how many seats, then pick them on the map or grid."
           : "You can add tickets based on availability."
         : step === 3
@@ -1825,8 +1839,11 @@ export default function EventCheckout({
   const navigateToStep = (targetStep: number) => {
     if (!canNavigateToStep(targetStep)) return;
     if (targetStep !== 2) setIsMapFullscreen(false);
-    if (targetStep === 2 && (hasReservedSeats || showtimeHasSeatingLayout)) {
+    // Only enter map fullscreen when a real seat/stadium map is available
+    if (targetStep === 2 && hasReservedSeats) {
       setIsMapFullscreen(true);
+    } else if (targetStep === 2) {
+      setIsMapFullscreen(false);
     }
     if (targetStep === 4) {
       void proceedToReview();
@@ -2293,19 +2310,9 @@ export default function EventCheckout({
                                       }
                                       selectShowtime(s);
                                       setStep(2);
-                                      if (
-                                        (s as any).layout_mode === "standard" ||
-                                        (s as any).layout_mode === "custom" ||
-                                        Boolean((s as any).venue_layout_template_id) ||
-                                        showtimeHasSeatingLayout
-                                      ) {
-                                        setIsMapFullscreen(true);
-                                        setDesiredSeatQty((curr) => curr || 2);
-                                        setSeatCountPick((curr) => curr || 2);
-                                        setSeatQtyModalOpen(true);
-                                      } else {
-                                        setIsMapFullscreen(false);
-                                      }
+                                      // Map opens only after layout confirms seats (see hasReservedSeats effect)
+                                      setIsMapFullscreen(false);
+                                      autoOpenedMapRef.current = false;
                                     }}
                                     className="w-full text-left px-3.5 py-3 cursor-pointer"
                                   >
@@ -2646,7 +2653,7 @@ export default function EventCheckout({
                 <p className="text-[0.9375rem] font-bold text-slate-900">Delivery address</p>
                 <div>
                   <label className="block text-[0.875rem] font-semibold text-slate-800 mb-1">
-                    {reqStar} Street / house / area
+                    Street / house / area{reqStar}
                   </label>
                   <input
                     {...registerDelivery("delivery_address_line")}
@@ -2659,7 +2666,7 @@ export default function EventCheckout({
                 </div>
                 <div>
                   <label className="block text-[0.875rem] font-semibold text-slate-800 mb-1">
-                    {reqStar} City
+                    City{reqStar}
                   </label>
                   <input
                     {...registerDelivery("delivery_city")}
@@ -3763,7 +3770,7 @@ export default function EventCheckout({
             <form onSubmit={saveContactDetails} className="px-5 py-5 space-y-5" noValidate>
               <div>
                 <label className="block text-[1rem] font-bold text-slate-900 mb-1.5">
-                  {reqStar} Your name
+                  Your name{reqStar}
                 </label>
                 <input
                   {...registerContactModal("name")}
@@ -3777,7 +3784,7 @@ export default function EventCheckout({
 
               <div>
                 <label className="block text-[1rem] font-bold text-slate-900 mb-1.5">
-                  {reqStar} Your email
+                  Your email{reqStar}
                 </label>
                 <input
                   type="email"
@@ -3795,7 +3802,7 @@ export default function EventCheckout({
 
               <div>
                 <label className="block text-[1rem] font-bold text-slate-900 mb-1.5">
-                  {reqStar} Mobile Number
+                  Mobile Number{reqStar}
                 </label>
                 <div className="flex items-center gap-2 rounded-[0.375rem] border border-slate-300 px-3 bg-white focus-within:border-[#6900AA] focus-within:ring-1 focus-within:ring-[#6900AA]/30">
                   <span className="inline-flex items-center gap-1 text-[1rem] font-semibold text-slate-700 shrink-0">
@@ -3827,16 +3834,6 @@ export default function EventCheckout({
                   This number will only be used for sending ticket(s)
                 </p>
               </div>
-
-              <button
-                type="button"
-                onClick={() =>
-                  toast.message("Tickets are non-transferable and subject to event terms.")
-                }
-                className="text-[1rem] font-semibold text-[#6900AA] hover:underline cursor-pointer"
-              >
-                *Terms &amp; Conditions
-              </button>
 
               <ShinyBlackButton
                 type="submit"

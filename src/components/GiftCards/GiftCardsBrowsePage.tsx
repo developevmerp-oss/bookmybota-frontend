@@ -70,7 +70,7 @@ export default function GiftCardsBrowsePage() {
         </div>
 
         {isLoading ? (
-          <CustomerGiftCardsShimmer embedded />
+          <CustomerGiftCardsShimmer embedded variant="browse" />
         ) : isError ? (
           <p className="text-center text-rose-600 py-16">Could not load designs. Try again later.</p>
         ) : designs.length === 0 ? (

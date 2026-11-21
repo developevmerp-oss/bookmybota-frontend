@@ -70,7 +70,8 @@ export default function CustomerHelpPage() {
   }, [user, router]);
 
   const customerId = user?.customer_id ?? "";
-  const { data: bookings = [] } = useGetCustomerBookingsQuery(customerId, { skip: !customerId });
+  const { data: bookingsPage } = useGetCustomerBookingsQuery(customerId, { skip: !customerId });
+  const bookings = bookingsPage?.items ?? [];
 
   const foundBookings = useMemo(() => {
     const q = findQuery.trim().toLowerCase();

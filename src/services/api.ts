@@ -1705,6 +1705,10 @@ export interface EventBookingItem {
   ticket_type?: string;
   qty: number;
   unit_price: number | string;
+  event_seat_id?: string | null;
+  section_name?: string | null;
+  row_label?: string | null;
+  seat_label?: string | null;
 }
 
 export interface EventBooking {
@@ -3932,10 +3936,31 @@ export const api = createApi({
       providesTags: (_result, _error, arg) => [{ type: 'Bookings', id: bizIdOf(arg) }],
     }),
 
-    getCustomerBookings: builder.query<Booking[], string>({
-      query: (customerId) => `/bookings/customer/${customerId}`,
-      transformResponse: (res: { data: Booking[] }) => res.data || [],
-      providesTags: (_result, _error, customerId) => [{ type: 'Bookings', id: customerId }],
+    getCustomerBookings: builder.query<
+      PaginatedList<Booking> & {
+        counts?: { all: number; upcoming: number; past: number; cancelled: number };
+      },
+      string | { customerId: string; page?: number; limit?: number; status?: string }
+    >({
+      query: (arg) => {
+        const customerId = typeof arg === 'string' ? arg : arg.customerId;
+        const params =
+          typeof arg === 'string'
+            ? {}
+            : { page: arg.page, limit: arg.limit, status: arg.status };
+        return `/bookings/customer/${customerId}${toListQuery(params)}`;
+      },
+      transformResponse: (res: {
+        data?: Booking[];
+        meta?: PaginationMeta;
+        counts?: { all: number; upcoming: number; past: number; cancelled: number };
+      }) => ({
+        ...unwrapPaginated(res),
+        counts: res.counts,
+      }),
+      providesTags: (_result, _error, arg) => [
+        { type: 'Bookings', id: typeof arg === 'string' ? arg : arg.customerId },
+      ],
     }),
 
     checkAvailability: builder.query<
@@ -4056,6 +4081,7 @@ export const api = createApi({
       query: ({ id }) => ({
         url: `/bookings/${id}/cancel`,
         method: 'PUT',
+        body: {},
       }),
       invalidatesTags: ['Bookings'],
     }),
@@ -7231,10 +7257,31 @@ export const api = createApi({
       invalidatesTags: ['EventBookings', 'PublicEvents', 'OrganizerTicketStats', 'OrganizerBookings', 'OrganizerEvents', 'MyGiftCards'],
     }),
 
-    getCustomerEventBookings: builder.query<EventBooking[], string>({
-      query: (customerId) => `/events/bookings/customer/${customerId}`,
-      transformResponse: (res: { data: EventBooking[] }) => res.data || [],
-      providesTags: (_result, _error, customerId) => [{ type: 'EventBookings', id: customerId }],
+    getCustomerEventBookings: builder.query<
+      PaginatedList<EventBooking> & {
+        counts?: { all: number; upcoming: number; past: number; cancelled: number };
+      },
+      string | { customerId: string; page?: number; limit?: number; status?: string }
+    >({
+      query: (arg) => {
+        const customerId = typeof arg === 'string' ? arg : arg.customerId;
+        const params =
+          typeof arg === 'string'
+            ? {}
+            : { page: arg.page, limit: arg.limit, status: arg.status };
+        return `/events/bookings/customer/${customerId}${toListQuery(params)}`;
+      },
+      transformResponse: (res: {
+        data?: EventBooking[];
+        meta?: PaginationMeta;
+        counts?: { all: number; upcoming: number; past: number; cancelled: number };
+      }) => ({
+        ...unwrapPaginated(res),
+        counts: res.counts,
+      }),
+      providesTags: (_result, _error, arg) => [
+        { type: 'EventBookings', id: typeof arg === 'string' ? arg : arg.customerId },
+      ],
     }),
 
     getEventBookingById: builder.query<EventBooking, string>({
@@ -8556,11 +8603,25 @@ export const api = createApi({
     }),
 
     getCustomerMovieBookings: builder.query<
-      MovieBookingDetail[],
-      void
+      PaginatedList<MovieBookingDetail> & {
+        counts?: { all: number; upcoming: number; past: number; cancelled: number };
+      },
+      void | { page?: number; limit?: number; status?: string }
     >({
-      query: () => '/movies/customer/bookings',
-      transformResponse: (res: { data: MovieBookingDetail[] }) => res.data ?? [],
+      query: (arg) =>
+        `/movies/customer/bookings${toListQuery({
+          page: arg && typeof arg === 'object' ? arg.page : undefined,
+          limit: arg && typeof arg === 'object' ? arg.limit : undefined,
+          status: arg && typeof arg === 'object' ? arg.status : undefined,
+        })}`,
+      transformResponse: (res: {
+        data?: MovieBookingDetail[];
+        meta?: PaginationMeta;
+        counts?: { all: number; upcoming: number; past: number; cancelled: number };
+      }) => ({
+        ...unwrapPaginated(res),
+        counts: res.counts,
+      }),
     }),
 
     // ── Admin City Masters ────────────────────────────────────────────────────

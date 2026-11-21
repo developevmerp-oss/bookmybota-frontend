@@ -89,7 +89,24 @@ export default function VenueLayoutViewer({
   const canvasWrapperRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(0.4);
   const scaleRef = useRef(scale);
+  const userZoomedRef = useRef(false);
   const pendingScrollRef = useRef<{ scrollLeft: number; scrollTop: number } | null>(null);
+  const pinchRef = useRef<{
+    startDist: number;
+    startScale: number;
+  } | null>(null);
+  const panRef = useRef<{
+    active: boolean;
+    moved: boolean;
+    startX: number;
+    startY: number;
+    originLeft: number;
+    originTop: number;
+    pointerId: number;
+  } | null>(null);
+  /** Active pointers for multi-touch pinch (Konva eats raw touch on canvas). */
+  const pointersRef = useRef<Map<number, { x: number; y: number }>>(new Map());
+  const mapReady = seats.length > 0;
 
   const config =
     layoutData?.data?.seating_config ||
@@ -115,52 +132,209 @@ export default function VenueLayoutViewer({
     }
   }, [scale]);
 
-  useEffect(() => {
+  /** Zoom toward a screen point (photo-style) and keep that point under the finger/cursor. */
+  const zoomToPoint = (nextScale: number, clientX: number, clientY: number) => {
     const container = containerRef.current;
-    if (!container) return;
+    const stageEl = canvasWrapperRef.current;
+    if (!container || !stageEl) return;
 
-    const handleWheel = (e: WheelEvent) => {
-      e.preventDefault();
-      const stageEl = canvasWrapperRef.current;
-      if (!stageEl) return;
+    const currentScale = scaleRef.current;
+    const newScale = Math.min(Math.max(Number(nextScale.toFixed(3)), 0.15), 3.0);
+    if (Math.abs(newScale - currentScale) < 0.001) return;
 
-      const currentScale = scaleRef.current;
-      const containerRect = container.getBoundingClientRect();
-      const stageRect = stageEl.getBoundingClientRect();
+    const cRect = container.getBoundingClientRect();
+    const sRect = stageEl.getBoundingClientRect();
+    const fx = clientX - cRect.left;
+    const fy = clientY - cRect.top;
+    const contentX = (clientX - sRect.left) / currentScale;
+    const contentY = (clientY - sRect.top) / currentScale;
+    const stageOriginX = container.scrollLeft + (sRect.left - cRect.left);
+    const stageOriginY = container.scrollTop + (sRect.top - cRect.top);
 
-      const mouseViewportX = e.clientX - containerRect.left;
-      const mouseViewportY = e.clientY - containerRect.top;
+    pendingScrollRef.current = {
+      scrollLeft: stageOriginX + contentX * newScale - fx,
+      scrollTop: stageOriginY + contentY * newScale - fy,
+    };
+    userZoomedRef.current = true;
+    scaleRef.current = newScale;
+    setScale(newScale);
+  };
 
-      const mouseOnStageX = e.clientX - stageRect.left;
-      const mouseOnStageY = e.clientY - stageRect.top;
+  // Attach AFTER the map DOM exists. Early `seats.length === 0 → return null` meant
+  // the old mount-only effect never bound listeners, so pinch/pan never worked.
+  useEffect(() => {
+    if (!mapReady) return;
 
-      const contentX = mouseOnStageX / currentScale;
-      const contentY = mouseOnStageY / currentScale;
+    let cancelled = false;
+    let detach: (() => void) | undefined;
 
-      const factor = e.deltaY < 0 ? 1.15 : (1 / 1.15);
-      const newScale = Math.min(Math.max(Number((currentScale * factor).toFixed(3)), 0.15), 3.0);
+    const bind = () => {
+      if (cancelled) return;
+      const container = containerRef.current;
+      if (!container) {
+        requestAnimationFrame(bind);
+        return;
+      }
 
-      if (Math.abs(newScale - currentScale) < 0.001) return;
+      const pointerDist = (
+        a: { x: number; y: number },
+        b: { x: number; y: number }
+      ) => Math.hypot(b.x - a.x, b.y - a.y);
 
-      const newMouseOnStageX = contentX * newScale;
-      const newMouseOnStageY = contentY * newScale;
-
-      const targetScrollLeft = stageEl.offsetLeft + newMouseOnStageX - mouseViewportX;
-      const targetScrollTop = stageEl.offsetTop + newMouseOnStageY - mouseViewportY;
-
-      pendingScrollRef.current = {
-        scrollLeft: targetScrollLeft,
-        scrollTop: targetScrollTop,
+      const beginPinchFromPointers = () => {
+        const pts = [...pointersRef.current.values()];
+        if (pts.length < 2) return;
+        panRef.current = null;
+        pinchRef.current = {
+          startDist: Math.max(1, pointerDist(pts[0], pts[1])),
+          startScale: scaleRef.current,
+        };
       };
 
-      setScale(newScale);
+      const applyPinchFromPointers = () => {
+        const pinch = pinchRef.current;
+        const pts = [...pointersRef.current.values()];
+        if (!pinch || pts.length < 2) return;
+        const dist = Math.max(1, pointerDist(pts[0], pts[1]));
+        const midX = (pts[0].x + pts[1].x) / 2;
+        const midY = (pts[0].y + pts[1].y) / 2;
+        zoomToPoint(pinch.startScale * (dist / pinch.startDist), midX, midY);
+      };
+
+      const handleWheel = (e: WheelEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const factor = e.deltaY < 0 ? 1.12 : 1 / 1.12;
+        zoomToPoint(scaleRef.current * factor, e.clientX, e.clientY);
+      };
+
+      const capturePointer = (pointerId: number) => {
+        try {
+          container.setPointerCapture?.(pointerId);
+        } catch {
+          /* ignore */
+        }
+      };
+
+      // Pointer-based pinch — works on Konva canvas (Konva uses Pointer Events)
+      const onPointerDown = (e: PointerEvent) => {
+        pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+        if (pointersRef.current.size >= 2) {
+          // Capture both fingers so pinch isn't lost to Konva / browser
+          for (const id of pointersRef.current.keys()) capturePointer(id);
+          beginPinchFromPointers();
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
+
+        if (e.pointerType === "touch" || e.button === 0) {
+          panRef.current = {
+            active: true,
+            moved: false,
+            startX: e.clientX,
+            startY: e.clientY,
+            originLeft: container.scrollLeft,
+            originTop: container.scrollTop,
+            pointerId: e.pointerId,
+          };
+        }
+      };
+
+      const onPointerMove = (e: PointerEvent) => {
+        if (!pointersRef.current.has(e.pointerId) && pointersRef.current.size === 0) {
+          return;
+        }
+        if (pointersRef.current.has(e.pointerId) || pointersRef.current.size > 0) {
+          pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        }
+
+        if (pointersRef.current.size >= 2) {
+          e.preventDefault();
+          e.stopPropagation();
+          if (!pinchRef.current) beginPinchFromPointers();
+          applyPinchFromPointers();
+          return;
+        }
+
+        const pan = panRef.current;
+        if (!pan?.active || pan.pointerId !== e.pointerId) return;
+        const dx = e.clientX - pan.startX;
+        const dy = e.clientY - pan.startY;
+        if (!pan.moved) {
+          if (Math.hypot(dx, dy) < 8) return;
+          pan.moved = true;
+          capturePointer(e.pointerId);
+          container.style.cursor = "grabbing";
+        }
+        e.preventDefault();
+        container.scrollLeft = pan.originLeft - dx;
+        container.scrollTop = pan.originTop - dy;
+      };
+
+      const onPointerUp = (e: PointerEvent) => {
+        pointersRef.current.delete(e.pointerId);
+        try {
+          if (container.hasPointerCapture?.(e.pointerId)) {
+            container.releasePointerCapture?.(e.pointerId);
+          }
+        } catch {
+          /* ignore */
+        }
+
+        if (pointersRef.current.size < 2) {
+          pinchRef.current = null;
+        }
+        if (pointersRef.current.size === 0) {
+          container.style.cursor = "";
+          panRef.current = null;
+        } else if (panRef.current?.pointerId === e.pointerId) {
+          panRef.current = null;
+        }
+      };
+
+      // Also listen on document during gestures so we don't lose the 2nd finger
+      // when Konva / browser retargets events.
+      const onDocPointerMove = (e: PointerEvent) => {
+        if (!pointersRef.current.has(e.pointerId) && pointersRef.current.size === 0) {
+          return;
+        }
+        onPointerMove(e);
+      };
+      const onDocPointerUp = (e: PointerEvent) => onPointerUp(e);
+
+      container.addEventListener("wheel", handleWheel, { passive: false });
+      container.addEventListener("pointerdown", onPointerDown, { capture: true });
+      container.addEventListener("pointermove", onPointerMove, { capture: true });
+      container.addEventListener("pointerup", onPointerUp, { capture: true });
+      container.addEventListener("pointercancel", onPointerUp, { capture: true });
+      document.addEventListener("pointermove", onDocPointerMove, { capture: true });
+      document.addEventListener("pointerup", onDocPointerUp, { capture: true });
+      document.addEventListener("pointercancel", onDocPointerUp, { capture: true });
+
+      detach = () => {
+        container.removeEventListener("wheel", handleWheel);
+        container.removeEventListener("pointerdown", onPointerDown, true);
+        container.removeEventListener("pointermove", onPointerMove, true);
+        container.removeEventListener("pointerup", onPointerUp, true);
+        container.removeEventListener("pointercancel", onPointerUp, true);
+        document.removeEventListener("pointermove", onDocPointerMove, true);
+        document.removeEventListener("pointerup", onDocPointerUp, true);
+        document.removeEventListener("pointercancel", onDocPointerUp, true);
+        pointersRef.current.clear();
+        pinchRef.current = null;
+        panRef.current = null;
+      };
     };
 
-    container.addEventListener("wheel", handleWheel, { passive: false });
+    const raf = requestAnimationFrame(bind);
     return () => {
-      container.removeEventListener("wheel", handleWheel);
+      cancelled = true;
+      cancelAnimationFrame(raf);
+      detach?.();
     };
-  }, []);
+  }, [mapReady]);
 
   useEffect(() => {
     const rawSeats =
@@ -227,30 +401,63 @@ export default function VenueLayoutViewer({
   }, [initialSelectedSeats]);
 
   const boundingBox = useMemo(() => {
+    // Seat circles are r=12; include them so edge seats aren't clipped when fitting.
+    const SEAT_R = 14;
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
     for (const s of seats) {
-      if (s.coordinate_x < minX) minX = s.coordinate_x;
-      if (s.coordinate_x > maxX) maxX = s.coordinate_x;
-      if (s.coordinate_y < minY) minY = s.coordinate_y;
-      if (s.coordinate_y > maxY) maxY = s.coordinate_y;
+      if (s.coordinate_x - SEAT_R < minX) minX = s.coordinate_x - SEAT_R;
+      if (s.coordinate_x + SEAT_R > maxX) maxX = s.coordinate_x + SEAT_R;
+      if (s.coordinate_y - SEAT_R < minY) minY = s.coordinate_y - SEAT_R;
+      if (s.coordinate_y + SEAT_R > maxY) maxY = s.coordinate_y + SEAT_R;
     }
     for (const sh of shapes) {
-      if (sh.x < minX) minX = sh.x;
-      if (sh.x + sh.width > maxX) maxX = sh.x + sh.width;
-      if (sh.y < minY) minY = sh.y;
-      if (sh.y + sh.height > maxY) maxY = sh.y + sh.height;
+      const rot = ((Number(sh.rotation) || 0) * Math.PI) / 180;
+      const cx = sh.x + sh.width / 2;
+      const cy = sh.y + sh.height / 2;
+      const cos = Math.cos(rot);
+      const sin = Math.sin(rot);
+      for (const [lx, ly] of [
+        [-sh.width / 2, -sh.height / 2],
+        [sh.width / 2, -sh.height / 2],
+        [sh.width / 2, sh.height / 2],
+        [-sh.width / 2, sh.height / 2],
+      ] as const) {
+        const px = cx + lx * cos - ly * sin;
+        const py = cy + lx * sin + ly * cos;
+        if (px < minX) minX = px;
+        if (px > maxX) maxX = px;
+        if (py < minY) minY = py;
+        if (py > maxY) maxY = py;
+      }
     }
     for (const lb of labels) {
-      if (lb.x < minX) minX = lb.x;
-      if (lb.x > maxX) maxX = lb.x;
-      if (lb.y < minY) minY = lb.y;
-      if (lb.y > maxY) maxY = lb.y;
+      const font = Number(lb.fontSize) || 16;
+      const lines = String(lb.text || "").split("\n");
+      const textW = Math.max(1, ...lines.map((l) => l.length)) * font * 0.62;
+      const textH = Math.max(1, lines.length) * font * 1.2;
+      const rot = ((Number(lb.rotation) || 0) * Math.PI) / 180;
+      const cos = Math.cos(rot);
+      const sin = Math.sin(rot);
+      // Labels are drawn from (x,y) as top-left of first line
+      for (const [lx, ly] of [
+        [0, 0],
+        [textW, 0],
+        [textW, textH],
+        [0, textH],
+      ] as const) {
+        const px = lb.x + lx * cos - ly * sin;
+        const py = lb.y + lx * sin + ly * cos;
+        if (px < minX) minX = px;
+        if (px > maxX) maxX = px;
+        if (py < minY) minY = py;
+        if (py > maxY) maxY = py;
+      }
     }
     if (!isFinite(minX) || !isFinite(maxX) || maxX <= minX) {
       return { minX: 0, maxX: canvasWidth, minY: 0, maxY: canvasHeight, contentW: canvasWidth, contentH: canvasHeight };
     }
-    const padX = 60;
-    const padY = 60;
+    const padX = 80;
+    const padY = 80;
     return {
       minX: minX - padX,
       minY: minY - padY,
@@ -261,27 +468,92 @@ export default function VenueLayoutViewer({
     };
   }, [seats, shapes, labels, canvasWidth, canvasHeight]);
 
-  useEffect(() => {
-    const updateScale = () => {
-      if (containerRef.current) {
-        const { clientWidth, clientHeight } = containerRef.current;
-        if (!clientWidth || !clientHeight) return;
+  /**
+   * Fit the entire venue (seats + stage + labels) inside the map pane.
+   * Leaves comfortable margin so edge seats aren't clipped by header/footer chrome.
+   */
+  const getPreferredScale = () => {
+    const el = containerRef.current;
+    if (!el) return null;
+    const vw = el.clientWidth;
+    const vh = el.clientHeight;
+    if (vw < 40 || vh < 40) return null;
 
-        const scaleX = (clientWidth - 48) / boundingBox.contentW;
-        const scaleY = (clientHeight - 48) / boundingBox.contentH;
-        const fitScale = Math.min(scaleX, scaleY, 1.2);
-        const resolvedScale = Math.max(0.25, Math.min(fitScale, 1.0));
-        setScale(resolvedScale);
+    // Inner wrapper uses p-3 / sm:p-5 — subtract so fit doesn't overflow into scroll clip.
+    const innerPad = vw >= 640 ? 20 : 12;
+    const availW = Math.max(40, vw - innerPad * 2);
+    const availH = Math.max(40, vh - innerPad * 2);
+
+    const contentW = Math.max(boundingBox.contentW, 1);
+    const contentH = Math.max(boundingBox.contentH, 1);
+    // ~10% breathing room (matches the “full layout visible” framing)
+    const marginX = Math.max(20, Math.round(availW * 0.1));
+    const marginY = Math.max(20, Math.round(availH * 0.1));
+    const widthScale = (availW - marginX * 2) / contentW;
+    const heightScale = (availH - marginY * 2) / contentH;
+    const preferred = Math.min(widthScale, heightScale);
+    return Math.round(Math.min(Math.max(preferred, 0.05), 3) * 1000) / 1000;
+  };
+
+  const centerMapScroll = () => {
+    const el = containerRef.current;
+    if (!el) return;
+    el.scrollLeft = Math.max(0, (el.scrollWidth - el.clientWidth) / 2);
+    el.scrollTop = Math.max(0, (el.scrollHeight - el.clientHeight) / 2);
+  };
+
+  const applyFitScale = () => {
+    if (userZoomedRef.current) return false;
+    const preferred = getPreferredScale();
+    if (preferred == null) return false;
+    if (Math.abs(preferred - scaleRef.current) > 0.001) {
+      scaleRef.current = preferred;
+      setScale(preferred);
+    }
+    requestAnimationFrame(centerMapScroll);
+    return true;
+  };
+
+  // Re-fit whenever seats/bounds change or the map pane resizes (footer/header settle).
+  useEffect(() => {
+    userZoomedRef.current = false;
+    let attempts = 0;
+    let raf = 0;
+    let cancelled = false;
+
+    const tryFit = () => {
+      if (cancelled) return;
+      attempts += 1;
+      if (!applyFitScale()) {
+        if (attempts < 36) raf = requestAnimationFrame(tryFit);
       }
     };
-    
-    updateScale();
-    window.addEventListener("resize", updateScale);
-    return () => window.removeEventListener("resize", updateScale);
-  }, [boundingBox]);
+
+    raf = requestAnimationFrame(tryFit);
+
+    const el = containerRef.current;
+    let ro: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== "undefined" && el) {
+      ro = new ResizeObserver(() => {
+        if (cancelled) return;
+        applyFitScale();
+      });
+      ro.observe(el);
+    }
+
+    const onResize = () => applyFitScale();
+    window.addEventListener("resize", onResize);
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(raf);
+      ro?.disconnect();
+      window.removeEventListener("resize", onResize);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fit when layout bounds change
+  }, [boundingBox.contentW, boundingBox.contentH, mapReady]);
 
   const handleSeatClick = (seat: Seat) => {
-    if (seat.status !== "AVAILABLE") return;
+    if (String(seat.status || "").toUpperCase() !== "AVAILABLE") return;
 
     const isSelected = selectedSeatIds.includes(seat.id);
     let newSelection: string[] = [];
@@ -330,10 +602,15 @@ export default function VenueLayoutViewer({
   };
 
   const handleToggleZoomOnSection = (seat: Seat) => {
-    if (scale > 0.65) {
-      setScale(0.4);
+    userZoomedRef.current = true;
+    const fitScale = getPreferredScale() ?? 0.4;
+    if (scale > fitScale * 1.15) {
+      scaleRef.current = fitScale;
+      setScale(fitScale);
+      requestAnimationFrame(centerMapScroll);
     } else {
-      const targetScale = 0.95;
+      const targetScale = Math.min(1.2, Math.max(fitScale * 2, 0.95));
+      scaleRef.current = targetScale;
       setScale(targetScale);
       const sectionSeats = seats.filter(s => (s.section_name === seat.section_name && s.section_name) || s.id === seat.id);
       const avgX = sectionSeats.length ? sectionSeats.reduce((acc, s) => acc + s.coordinate_x, 0) / sectionSeats.length : seat.coordinate_x;
@@ -355,10 +632,15 @@ export default function VenueLayoutViewer({
   };
 
   const handleToggleZoomOnShape = (shape: Shape) => {
-    if (scale > 0.65) {
-      setScale(0.4);
+    userZoomedRef.current = true;
+    const fitScale = getPreferredScale() ?? 0.4;
+    if (scale > fitScale * 1.15) {
+      scaleRef.current = fitScale;
+      setScale(fitScale);
+      requestAnimationFrame(centerMapScroll);
     } else {
-      const targetScale = 0.95;
+      const targetScale = Math.min(1.2, Math.max(fitScale * 2, 0.95));
+      scaleRef.current = targetScale;
       setScale(targetScale);
       const centerX = shape.x + shape.width / 2;
       const centerY = shape.y + shape.height / 2;
@@ -405,58 +687,47 @@ export default function VenueLayoutViewer({
     ? "flex flex-col md:flex-row h-full w-full bg-white text-slate-900 rounded-2xl overflow-hidden shadow-sm border border-slate-200"
     : "flex flex-col md:flex-row h-full w-full bg-slate-900 text-white rounded-2xl overflow-hidden shadow-2xl border border-slate-800";
   const canvasClass = hideSidePanel
-    ? "flex-1 min-h-0 overflow-auto p-3 sm:p-5 cursor-grab flex justify-center items-center relative bg-[#EEF2F7]"
+    ? "flex-1 min-h-0 overflow-auto relative bg-[#EEF2F7] cursor-grab active:cursor-grabbing select-none [-webkit-overflow-scrolling:touch]"
     : cinemaMode
-    ? "flex-1 overflow-auto p-4 cursor-grab flex justify-center items-center relative bg-[#F5F5F7]"
-    : "flex-1 overflow-auto p-4 cursor-grab flex justify-center items-center relative bg-slate-950";
-  const zoomBarClass = cinemaMode
-    ? "absolute top-4 right-4 z-10 flex items-center gap-2 bg-white/95 backdrop-blur-md border border-slate-200 rounded-xl p-1.5 shadow-md"
-    : "absolute top-4 right-4 z-10 flex items-center gap-2 bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-xl p-1.5 shadow-lg";
-  const zoomBtnClass = cinemaMode
-    ? "w-8 h-8 flex items-center justify-center hover:bg-slate-100 rounded-lg text-slate-700 font-bold transition-colors"
-    : "w-8 h-8 flex items-center justify-center hover:bg-slate-800 rounded-lg text-slate-200 font-bold transition-colors";
-  const zoomLabelClass = cinemaMode
-    ? "text-xs font-mono text-slate-600 px-1"
-    : "text-xs font-mono text-slate-300 px-1";
+    ? "flex-1 min-h-0 overflow-auto relative bg-[#F5F5F7] cursor-grab active:cursor-grabbing select-none [-webkit-overflow-scrolling:touch]"
+    : "flex-1 min-h-0 overflow-auto relative bg-slate-950 cursor-grab active:cursor-grabbing select-none [-webkit-overflow-scrolling:touch]";
   const sidePanelClass = cinemaMode
     ? "w-full md:w-80 bg-white border-t md:border-t-0 md:border-l border-slate-200 p-5 flex flex-col justify-between shrink-0"
     : "w-full md:w-80 bg-slate-900 border-t md:border-t-0 md:border-l border-slate-800 p-5 flex flex-col justify-between shrink-0";
 
+  const mapW = boundingBox.contentW * scale;
+  const mapH = boundingBox.contentH * scale;
+
   return (
     <div className={shellClass}>
-      {/* Canvas Area */}
-      <div 
+      {/* Scroll shell: movie-style — no flex-center (that blocks left/right pan) */}
+      <div
         ref={containerRef}
         className={canvasClass}
+        style={{ touchAction: "none" }}
       >
-        {/* Zoom Controls Overlay */}
-        <div className={zoomBarClass}>
-          <button 
-            onClick={() => setScale(s => Math.max(0.15, s - 0.05))} 
-            className={zoomBtnClass}
+        <div className="min-h-full min-w-full w-max flex items-center justify-center p-3 sm:p-5">
+          <div
+            ref={canvasWrapperRef}
+            style={{ width: Math.max(mapW, 1), height: Math.max(mapH, 1) }}
+            className="relative shrink-0"
           >
-            -
-          </button>
-          <span className={zoomLabelClass}>{Math.round(scale * 100)}%</span>
-          <button 
-            onClick={() => setScale(s => Math.min(1.5, s + 0.05))} 
-            className={zoomBtnClass}
-          >
-            +
-          </button>
-        </div>
-
-        <div 
-          ref={canvasWrapperRef}
-          style={{ width: boundingBox.contentW * scale, height: boundingBox.contentH * scale }} 
-          className="relative origin-top-left inline-block"
-        >
-          <Stage 
-            width={boundingBox.contentW * scale} 
-            height={boundingBox.contentH * scale} 
+          <Stage
+            width={mapW}
+            height={mapH}
             onDblClick={(e) => {
               if (e.target === e.target.getStage()) {
-                setScale(s => s > 0.65 ? 0.4 : 0.95);
+                userZoomedRef.current = true;
+                const fitScale = getPreferredScale() ?? 0.4;
+                setScale((s) => {
+                  const next =
+                    s > fitScale * 1.15
+                      ? fitScale
+                      : Math.min(1.2, Math.max(fitScale * 2, 0.95));
+                  scaleRef.current = next;
+                  return next;
+                });
+                requestAnimationFrame(centerMapScroll);
               }
             }}
           >
@@ -623,7 +894,8 @@ export default function VenueLayoutViewer({
               {/* Seats */}
               {seats.map((seat, sIdx) => {
                 const isSelected = selectedSeatIds.includes(seat.id);
-                const isAvailable = seat.status === "AVAILABLE";
+                const isAvailable =
+                  String(seat.status || "").toUpperCase() === "AVAILABLE";
                 const categoryColor = getSeatColorBySection(seat.section_name);
                 
                 let fill = cinemaMode ? "#ffffff" : "#334155"; // Unavailable / booked
@@ -720,6 +992,7 @@ export default function VenueLayoutViewer({
               ))}
             </Layer>
           </Stage>
+          </div>
         </div>
       </div>
 
@@ -761,13 +1034,13 @@ export default function VenueLayoutViewer({
 
                 <div className="pt-3 space-y-1.5 text-[11px] text-slate-500">
                   <p className="flex items-center gap-1.5">
-                    <span className="text-[#F84464] font-bold">•</span> Double-click any section to zoom in
+                    <span className="text-[#F84464] font-bold">•</span> Pinch or scroll to zoom (like a photo)
                   </p>
                   <p className="flex items-center gap-1.5">
-                    <span className="text-[#F84464] font-bold">•</span> Use +/- buttons or wheel to zoom
+                    <span className="text-[#F84464] font-bold">•</span> Double-tap a section to zoom in
                   </p>
                   <p className="flex items-center gap-1.5">
-                    <span className="text-[#F84464] font-bold">•</span> Drag canvas to pan across screen
+                    <span className="text-[#F84464] font-bold">•</span> Drag to pan across the map
                   </p>
                 </div>
               </div>
@@ -834,7 +1107,11 @@ export default function VenueLayoutViewer({
             <div className="border-t border-slate-200 pt-4 mt-4 flex flex-wrap gap-3 text-xs text-slate-500">
               <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-white border border-[#22C55E]" /> Available</div>
               <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-[#E5E7EB]" /> Sold</div>
-              {seats.some((s) => s.is_bestseller && s.status === "AVAILABLE") ? (
+              {seats.some(
+                (s) =>
+                  s.is_bestseller &&
+                  String(s.status || "").toUpperCase() === "AVAILABLE"
+              ) ? (
                 <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-white border border-[#EAB308]" /> Bestseller</div>
               ) : null}
               <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-[linear-gradient(135deg,#A78BFA_0%,#8B5CF6_38%,#6D28D9_72%,#4C1D95_100%)]" /> Selected</div>

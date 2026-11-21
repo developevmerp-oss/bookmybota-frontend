@@ -26,6 +26,7 @@ import {
 } from "@/lib/eventTicketMode";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import BookingTicketPerforation from "@/components/Shared/BookingTicketPerforation";
+import { eventBookingSeatsLabel } from "@/lib/eventSeatLabel";
 
 export type EventTicketCardBooking = {
   id: string;
@@ -51,6 +52,10 @@ export type EventTicketCardBooking = {
     ticket_type?: string;
     qty?: number;
     unit_price?: number | string;
+    event_seat_id?: string | null;
+    section_name?: string | null;
+    row_label?: string | null;
+    seat_label?: string | null;
   }>;
 };
 
@@ -191,6 +196,7 @@ function EventTicketCardConfirmation({
     : booking.ticket_qty
       ? `${booking.ticket_qty} ticket${booking.ticket_qty === 1 ? "" : "s"}`
       : "—";
+  const seatsLabel = eventBookingSeatsLabel(booking.items);
 
   return (
     <div
@@ -247,6 +253,9 @@ function EventTicketCardConfirmation({
         <div className="mt-5 grid grid-cols-1 min-[420px]:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-4 sm:gap-x-6 sm:gap-y-5">
           <ConfirmationDetailCell icon={User} label="Guest Name" value={guestName} />
           <ConfirmationDetailCell icon={Ticket} label="Ticket Type" value={ticketTypeDisplay} />
+          {seatsLabel ? (
+            <ConfirmationDetailCell icon={Ticket} label="Seats" value={seatsLabel} />
+          ) : null}
           <ConfirmationDetailCell icon={Phone} label="Contact" value={contact} />
           <ConfirmationDetailCell
             icon={Smartphone}
@@ -497,6 +506,7 @@ export function EventTicketCard({
     : booking.ticket_qty
       ? `${booking.ticket_qty}`
       : "—";
+  const seatsLabel = eventBookingSeatsLabel(booking.items);
   const guestName = booking.guest_name?.trim();
 
   return (
@@ -564,7 +574,10 @@ export function EventTicketCard({
             value: booking.starts_at ? `${formatTime12h(booking.starts_at)} Onwards` : "—",
           },
           { label: "Tickets", value: ticketLabel },
-          { label: "Ticket mode", value: ticketModeLabel(ticketMode) },
+          {
+            label: seatsLabel ? "Seats" : "Ticket mode",
+            value: seatsLabel || ticketModeLabel(ticketMode),
+          },
         ].map((col, i, arr) => (
           <div
             key={col.label}

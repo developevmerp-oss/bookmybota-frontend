@@ -30,7 +30,6 @@ import {
   useGetEventInterestQuery,
   useGetEventInterestCountQuery,
   useToggleEventInterestMutation,
-  type PublicEvent,
 } from "@/services/api";
 import { formatDateCustomer, formatTime12h } from "@/lib/dateFormat";
 import { parseEventLanguages } from "@/lib/eventValidation";
@@ -43,7 +42,6 @@ import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
 import { extractApiError } from "@/lib/apiErrors";
 import SafeCoverImage, {
-  EventImageFallback,
   ArtistImageFallback,
   ARTIST_IMAGE_FALLBACK_CLASS,
 } from "@/components/Shared/SafeCoverImage";
@@ -55,8 +53,10 @@ import EventGallerySection from "@/components/EventLandingPage/EventGallerySecti
 import EventVenuesModal from "@/components/EventLandingPage/EventVenuesModal";
 import CustomerAuthModal from "@/components/Shared/CustomerAuthModal";
 import Footer from "@/components/LandingPage/Footer";
-import { eventPlaceLine } from "@/components/LandingPage/homeUtils";
+import { EventPosterCard } from "@/components/LandingPage/PosterCard";
+import AdaptiveCardRow from "@/components/LandingPage/AdaptiveCardRow";
 import ShinyBlackButton from "@/components/Shared/ShinyBlackButton";
+import { scrollRailBy } from "@/lib/useHorizontalScrollEdges";
 
 const BRAND = "#6900AA";
 type StaticArtist = {
@@ -125,77 +125,6 @@ function MetaRow({ icon, children }: { icon: ReactNode; children: ReactNode }) {
         {children}
       </div>
     </div>
-  );
-}
-
-/** Same shell + body layout as event landing / Popular Events poster cards. */
-function relatedDateLine(iso?: string) {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  const weekday = d.toLocaleString("en-GB", { weekday: "short" });
-  const dateLabel = formatDateCustomer(iso);
-  const time = formatTime12h(iso);
-  if (!dateLabel || dateLabel === "—") return "";
-  return `${weekday}, ${dateLabel}, ${time}`;
-}
-
-function RelatedCard({
-  event,
-  className = "",
-}: {
-  event: Pick<
-    PublicEvent,
-    | "id"
-    | "name"
-    | "poster_vertical_url"
-    | "poster_horizontal_url"
-    | "category_name"
-    | "next_showtime"
-  > &
-    Partial<Pick<PublicEvent, "venue_name" | "city_name">>;
-  className?: string;
-}) {
-  const image = resolveMediaUrl(event.poster_vertical_url || event.poster_horizontal_url);
-  const dateLine = relatedDateLine(event.next_showtime);
-  const place = eventPlaceLine(event as PublicEvent);
-  const eventType = event.category_name?.trim() || "";
-
-  return (
-    <Link
-      href={`/events/${event.id}`}
-      className={`group flex h-full min-w-0 w-full flex-col overflow-hidden rounded-2xl border border-[#E5E5E5] bg-white shadow-[0_1px_3px_rgba(17,17,17,0.06)] transition-[box-shadow,transform] duration-300 lg:hover:-translate-y-0.5 lg:hover:shadow-[0_8px_24px_rgba(17,17,17,0.1)] ${className}`}
-    >
-      <div className="relative aspect-[3/4] w-full shrink-0 overflow-hidden bg-slate-100">
-        <SafeCoverImage
-          src={image}
-          alt={event.name}
-          className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.04]"
-          fallbackClassName="absolute inset-0 flex h-full w-full items-center justify-center bg-[#F3F4F6] text-slate-300"
-          fallback={<EventImageFallback size={32} />}
-        />
-      </div>
-      <div className="flex-1 space-y-1 px-3.5 py-3 sm:px-4 sm:py-3.5">
-        {dateLine ? (
-          <p className="truncate text-sm font-semibold leading-snug tracking-wide text-[#B59B2A]">
-            {dateLine}
-          </p>
-        ) : null}
-        <h3 className="break-words text-base font-bold leading-snug tracking-wide text-[#1C1C1C] sm:text-lg">
-          {event.name}
-        </h3>
-        {place ? (
-          <p className="truncate text-sm font-medium leading-snug tracking-wide text-gray-600">
-            {place}
-          </p>
-        ) : null}
-        {eventType ? (
-          <p className="truncate text-sm font-medium leading-snug tracking-wide text-gray-600">
-            {eventType}
-          </p>
-        ) : null}
-      </div>
-    </Link>
   );
 }
 
@@ -532,33 +461,24 @@ export default function PublicEventDetailPage({
     router.push(`/events/${id}/book${qs}`);
   };
 
-  /** Mobile/tablet header back — router.back() often no-ops on cold open; fall back to /events */
+  /** Event category listing for this event (e.g. /events?category=concert). */
+  const categoryBrowseHref = useMemo(() => {
+    const slug = String(event?.category_slug || "").trim();
+    if (slug) return `/events?category=${encodeURIComponent(slug)}`;
+    const name = String(event?.category_name || "").trim();
+    if (name) {
+      const fromName = name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "");
+      if (fromName) return `/events?category=${encodeURIComponent(fromName)}`;
+    }
+    return "/events";
+  }, [event?.category_slug, event?.category_name]);
+
+  /** Mobile/tablet header back → this event’s category page (not history / booking). */
   const handleMobileBack = () => {
-    if (typeof window === "undefined") {
-      router.push("/events");
-      return;
-    }
-    const startedPath = window.location.pathname;
-    let navigated = false;
-    try {
-      const ref = document.referrer;
-      const sameOrigin = Boolean(ref) && new URL(ref).origin === window.location.origin;
-      if (sameOrigin && window.history.length > 1) {
-        router.back();
-        navigated = true;
-      }
-    } catch {
-      /* ignore referrer parse errors */
-    }
-    if (!navigated) {
-      router.push("/events");
-      return;
-    }
-    window.setTimeout(() => {
-      if (window.location.pathname === startedPath) {
-        router.push("/events");
-      }
-    }, 200);
+    router.push(categoryBrowseHref);
   };
 
   if (isLoading) {
@@ -924,7 +844,7 @@ export default function PublicEventDetailPage({
               <h2 className="text-[1.25rem] sm:text-[1.375rem] lg:text-[1.4rem] font-semibold text-[#1A1A1A] mb-2.5 sm:mb-2">
                 {group.title}
               </h2>
-              <div className="flex gap-3 sm:gap-4 lg:gap-5 overflow-x-auto pb-1 -mx-5 px-5 sm:mx-0 sm:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <div className="flex gap-3 sm:gap-4 lg:gap-5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 {group.list.map((artist, i) => (
                   <button
                     key={`${artist.name}-${i}`}
@@ -1007,39 +927,50 @@ export default function PublicEventDetailPage({
             )}
 
             {related.length > 0 && (
-              <section className="mt-8 sm:mt-10 pt-6 sm:pt-7 border-t border-slate-200">
+              <section className="mt-8 sm:mt-10 pt-6 sm:pt-7 border-t border-slate-200 min-w-0">
                 <h2 className="text-[1.25rem] sm:text-[1.375rem] lg:text-[1.4rem] font-semibold text-[#1A1A1A]">
                   You May Also Like
                 </h2>
                 <p className="text-[0.9375rem] sm:text-[1rem] text-[#6B6B6B] mt-1 mb-3.5 sm:mb-4">
                   Events around you, book now.
                 </p>
-                <div className="relative">
-                  <div
-                    ref={relatedRef}
-                    className="flex gap-3 sm:gap-4 overflow-x-auto scroll-smooth pb-1 -mx-5 px-5 sm:mx-0 sm:px-0 snap-x snap-mandatory scroll-pl-5 scroll-pr-5 sm:scroll-pl-0 sm:scroll-pr-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                <div className="relative min-w-0">
+                  {/* Keep inside section gutters so the first card lines up with the title */}
+                  <AdaptiveCardRow
+                    minVisible={3.5}
+                    scrollerRef={relatedRef}
+                    className="!mt-0 !mb-0 !pt-0 !pb-1"
                   >
                     {related.map((e) => (
-                      <div
-                        key={e.id}
-                        className="shrink-0 snap-start w-[min(72vw,15.5rem)] sm:w-[200px] md:w-[220px] lg:w-[240px]"
-                      >
-                        <RelatedCard event={e} />
-                      </div>
+                      <EventPosterCard key={e.id} event={e} fullWidth />
                     ))}
-                    {/* Trailing spacer so the last card can snap with right inset on mobile */}
-                    <span className="w-px shrink-0 sm:hidden" aria-hidden />
-                  </div>
-                  {related.length > 3 && (
-                    <button
-                      type="button"
-                      aria-label="Next recommendations"
-                      onClick={() => relatedRef.current?.scrollBy({ left: 240, behavior: "smooth" })}
-                      className="hidden lg:flex absolute -right-2 2xl:-right-3 top-[42%] -translate-y-1/2 w-9 h-9 2xl:w-10 2xl:h-10 rounded-full bg-[#3A3A3A] text-white items-center justify-center cursor-pointer"
-                    >
-                      <ChevronRight size={16} />
-                    </button>
-                  )}
+                  </AdaptiveCardRow>
+                  {related.length > 1 ? (
+                    <>
+                      <button
+                        type="button"
+                        aria-label="Previous recommendations"
+                        onClick={() => {
+                          const el = relatedRef.current;
+                          if (el) scrollRailBy(el, -1);
+                        }}
+                        className="absolute left-0 top-[36%] -translate-y-1/2 z-20 flex size-9 rounded-full bg-[#3A3A3A] text-white items-center justify-center cursor-pointer shadow-md"
+                      >
+                        <ChevronLeft size={16} />
+                      </button>
+                      <button
+                        type="button"
+                        aria-label="Next recommendations"
+                        onClick={() => {
+                          const el = relatedRef.current;
+                          if (el) scrollRailBy(el, 1);
+                        }}
+                        className="absolute right-0 top-[36%] -translate-y-1/2 z-20 flex size-9 rounded-full bg-[#3A3A3A] text-white items-center justify-center cursor-pointer shadow-md"
+                      >
+                        <ChevronRight size={16} />
+                      </button>
+                    </>
+                  ) : null}
                 </div>
               </section>
             )}
@@ -1047,7 +978,7 @@ export default function PublicEventDetailPage({
           </div>
 
           <aside
-            className="hidden lg:block lg:sticky lg:self-start lg:z-30 lg:col-start-2 lg:row-start-2 lg:overflow-y-auto"
+            className="hidden lg:block lg:sticky lg:self-start lg:col-start-2 lg:row-start-2 lg:overflow-y-auto"
             style={{
               top: bookingCardTop,
               maxHeight: `calc(100dvh - ${bookingCardTop + 16}px)`,
@@ -1199,7 +1130,7 @@ export default function PublicEventDetailPage({
                 <div className="mt-5 sm:mt-6">
                   <p className="text-[1.125rem] font-bold text-[#1A1A1A]">Events</p>
                   <div className="mt-3 w-[min(72vw,15.5rem)] sm:w-[200px]">
-                    <RelatedCard
+                    <EventPosterCard
                       event={{
                         id: event.id,
                         name: event.name,
@@ -1209,6 +1140,7 @@ export default function PublicEventDetailPage({
                         next_showtime: nextShowtime?.starts_at,
                         venue_name: nextShowtime?.venue_name,
                       }}
+                      fullWidth
                     />
                   </div>
                 </div>

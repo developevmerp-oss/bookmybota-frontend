@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import ClassicSeatMap from "@/components/venue/ClassicSeatMap";
+import ConfirmDialog from "@/components/Shared/ConfirmDialog";
 import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import { toast } from "sonner";
@@ -21,6 +23,7 @@ import {
   type VenueLayoutTemplate,
 } from "@/services/api";
 import { extractApiError } from "@/lib/apiErrors";
+import { CINEMA_SCREEN_TYPES } from "@/lib/cinemaScreenTypes";
 import LayoutSeatPreview from "@/components/venue/LayoutSeatPreview";
 import { buildCinemaSeatTypeZones, CINEMA_SEAT_TYPE_FIELDS, seatTypesTotal } from "@/lib/cinemaSeatTypes";
 import {
@@ -43,12 +46,7 @@ const btnSecondary =
 const btnDanger =
   "inline-flex items-center justify-center gap-1.5 rounded-xl border border-rose-200 bg-white px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer";
 
-const SCREEN_TYPES = [
-  { value: "standard", label: "Standard" },
-  { value: "imax", label: "IMAX" },
-  { value: "4dx", label: "4DX" },
-  { value: "other", label: "Other" },
-];
+const SCREEN_TYPES = CINEMA_SCREEN_TYPES;
 
 type LayoutPhase = "none" | "draft" | "awaiting_admin" | "ready_to_approve" | "shortlisted" | "awaiting_live" | "approved" | "rejected";
 
@@ -70,7 +68,7 @@ const PHASE_META: Record<LayoutPhase, { label: string; hint: string; badge: stri
   draft: { label: "Draft request", hint: "Finish and send this request.", badge: "bg-slate-100 text-slate-700 border-slate-200" },
   awaiting_admin: {
     label: "Request sent",
-    hint: "The admin team is building this screen's seat map. It will appear in Admin provided layouts.",
+    hint: "The admin team is building this screen's seat map. You will be asked to approve it here.",
     badge: "bg-amber-50 text-amber-700 border-amber-200",
   },
   ready_to_approve: { label: "Ready to review", hint: "A layout is waiting for your approval.", badge: "bg-sky-50 text-sky-700 border-sky-200" },
@@ -117,6 +115,7 @@ export default function CinemaScreensPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [requestScreenId, setRequestScreenId] = useState<string | null | "pick">(null);
   const [requestNotes, setRequestNotes] = useState("");
+  const [confirmSend, setConfirmSend] = useState(false);
   const [requestPicked, setRequestPicked] = useState("");
   const [rejectId, setRejectId] = useState<string | null>(null);
   const [viewingTemplateId, setViewingTemplateId] = useState<string | null>(null);
@@ -270,12 +269,12 @@ export default function CinemaScreensPage() {
     try {
       if (!opt.venue_approved_at) await approveLayout({ bizId, templateId: opt.id }).unwrap();
       await publishLayout({ bizId, templateId: opt.id }).unwrap();
-      toast.success("Layout approved. The admin team will confirm it and it goes live.");
+      toast.success("Layout approved and live on the screen.");
       setViewingTemplateId(null);
     } catch (err) {
       toast.error(extractApiError(err, "Could not approve this layout"));
     } finally {
-      refetch();
+      await refetch();
     }
   };
 
@@ -310,7 +309,7 @@ export default function CinemaScreensPage() {
   const optionCard = (opt: VenueLayoutTemplate, state: "waiting" | "approved" | "going_live") => (
     <div key={opt.id} className={`${card} overflow-hidden flex flex-col`}>
       <div className="p-3 border-b border-slate-100 bg-slate-50">
-        <LayoutSeatPreview seats={opt.seats_json} config={opt.seating_config} heightClass="h-40" className="bg-white" />
+        <ClassicSeatMap seats={opt.seats_json} heightClass="h-40" fitAll />
       </div>
       <div className="p-4 flex flex-1 flex-col gap-3">
         <div className="flex items-start justify-between gap-2">
@@ -329,13 +328,18 @@ export default function CinemaScreensPage() {
                   : "bg-amber-50 text-amber-700 border-amber-200"
             }`}
           >
-            {state === "going_live" ? "Going live" : state === "approved" ? "Approved" : "Needs your approval"}
+            {state === "going_live" ? "Approved" : state === "approved" ? "Approved" : "Needs your approval"}
           </span>
         </div>
         <div className="mt-auto flex flex-wrap gap-2 pt-2 border-t border-slate-100">
           <button type="button" className={btnSecondary} onClick={() => setViewingTemplateId(opt.id)}>
             <Eye size={13} /> View
           </button>
+          {state === "going_live" && (
+            <button type="button" className={btnPrimary} disabled={publishing} onClick={() => approveOption(opt)}>
+              <Check size={13} /> {publishing ? "Going live…" : "Go live now"}
+            </button>
+          )}
           {state !== "going_live" && (
             <>
               <button type="button" className={btnPrimary} disabled={approving || publishing} onClick={() => approveOption(opt)}>
@@ -366,24 +370,17 @@ export default function CinemaScreensPage() {
           <h2 className="text-xl font-extrabold text-slate-900 flex items-center gap-2">
             <Clapperboard size={20} className="text-[#e11d48]" /> Screens &amp; layouts
           </h2>
-          <p className="text-sm text-slate-500 mt-1 max-w-2xl">
-            Add your screens and ask the admin team for a seat layout. Approve or reject the layouts they send. Once a layout is live, run
-            shows from Shows &amp; Seats, where you can also block damaged seats.
-          </p>
         </div>
         <div className="flex gap-2">
           <button type="button" className={btnSecondary} onClick={() => setAddOpen(true)}>
             <Plus size={14} /> Add screen
-          </button>
-          <button type="button" className={btnPrimary} onClick={() => openRequest("pick")} disabled={screens.length === 0}>
-            <FilePlus2 size={14} /> Request layout
           </button>
         </div>
       </div>
 
       <div className="flex border-b border-slate-200">
         {tabBtn("active", "Active layouts", activeScreens.length)}
-        {tabBtn("admin", "Admin provided layouts", adminCount)}
+        {tabBtn("admin", "Layout approvals", adminCount)}
       </div>
 
       {isLoading ? (
@@ -397,8 +394,8 @@ export default function CinemaScreensPage() {
               {screens.length === 0
                 ? "Add a screen, then request its layout."
                 : adminCount > 0
-                  ? "You have layouts waiting for approval under Admin provided layouts."
-                  : "Request a layout and approve the one the admin team sends."}
+                  ? "You have layouts waiting for approval under Layout approvals."
+                  : "Approve the layout the admin team sends and it goes live here."}
             </p>
           </div>
         ) : (
@@ -418,7 +415,7 @@ export default function CinemaScreensPage() {
                   </span>
                 </div>
                 <div className="rounded-xl border border-slate-100 bg-slate-50 p-2">
-                  <LayoutSeatPreview seats={screen.layout_seats_json} config={screen.layout_seating_config} heightClass="h-44" className="bg-white" />
+                  <ClassicSeatMap seats={screen.layout_seats_json} heightClass="h-44" fitAll />
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <button
@@ -446,9 +443,6 @@ export default function CinemaScreensPage() {
                   <a href="/movie/shows" className={btnSecondary}>
                     Shows &amp; seats
                   </a>
-                  <button type="button" className={btnSecondary} onClick={() => openRequest(screen.id)} disabled={!screen.hall_id}>
-                    <RefreshCw size={13} /> Request update
-                  </button>
                 </div>
               </div>
             ))}
@@ -470,16 +464,16 @@ export default function CinemaScreensPage() {
           {goingLiveOptions.length > 0 && (
             <section className="space-y-3">
               <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-1.5">
-                <Clock size={14} className="text-purple-500" /> Approved — waiting for the admin team to go live
+                <Clock size={14} className="text-purple-500" /> Approved — send these live
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">{goingLiveOptions.map((opt) => optionCard(opt, "going_live"))}</div>
             </section>
           )}
 
           <section className="space-y-3">
-            <h3 className="text-sm font-extrabold text-slate-900">Your layout requests</h3>
+            <h3 className="text-sm font-extrabold text-slate-900">Screens without a live layout</h3>
             {requestScreens.length === 0 ? (
-              <p className="text-sm text-slate-500">Every screen already has a layout. Use Request layout to ask for an update.</p>
+              <p className="text-sm text-slate-500">Every screen has a live layout.</p>
             ) : (
               <div className={`${card} divide-y divide-slate-100`}>
                 {requestScreens.map((screen) => {
@@ -601,12 +595,38 @@ export default function CinemaScreensPage() {
             <button type="button" className={btnSecondary} onClick={() => setRequestScreenId(null)}>
               Cancel
             </button>
-            <button type="button" className={btnPrimary} onClick={submitRequest} disabled={sendingRequest}>
+            <button
+              type="button"
+              className={btnPrimary}
+              disabled={sendingRequest}
+              onClick={() => {
+                if (!requestNotes.trim()) {
+                  toast.error("Add a short note so the admin team knows what you need.");
+                  return;
+                }
+                setConfirmSend(true);
+              }}
+            >
               {sendingRequest ? "Sending…" : "Send request"}
             </button>
           </div>
         </Modal>
       )}
+
+      <ConfirmDialog
+        open={confirmSend}
+        theme="light"
+        variant="warning"
+        title="Request this layout?"
+        body="Are you sure you want to request this layout? Once sent, the request cannot be deleted. The admin team will build the layout and send it back for your approval."
+        confirmLabel="Yes, send request"
+        busy={sendingRequest}
+        onCancel={() => setConfirmSend(false)}
+        onConfirm={async () => {
+          await submitRequest();
+          setConfirmSend(false);
+        }}
+      />
 
       {rejectId && (
         <Modal title="Reject this layout" onClose={() => setRejectId(null)}>
@@ -643,7 +663,7 @@ export default function CinemaScreensPage() {
           <p className="text-xs text-slate-500 -mt-2">
             {viewingLayout.hall_name || "Screen"} · {viewingLayout.seat_count || 0} seats mapped · capacity {viewingLayout.capacity}
           </p>
-          <LayoutSeatPreview seats={viewingLayout.seats_json} config={viewingLayout.seating_config} heightClass="h-[420px]" className="bg-white" />
+          <ClassicSeatMap seats={viewingLayout.seats_json} heightClass="h-[420px]" />
           {!viewingLayout.is_default && !viewingLayout.venue_live_requested_at && viewingLayout.status === "PUBLISHED" && (
             <div className="flex justify-end gap-2">
               <button
@@ -764,11 +784,9 @@ function DamagedSeatsModal({ bizId, screen, startInDamageMode, onClose }: { bizI
           </button>
         </div>
 
-        <LayoutSeatPreview
+        <ClassicSeatMap
           seats={seats as never}
-          config={screen.layout_seating_config}
           heightClass="h-[min(56vh,480px)]"
-          className="bg-white"
           seatMarker={(raw, idx) => {
             const seat = raw as unknown as LayoutSeatRecord;
             const key = seatKeyOf(seat, idx);

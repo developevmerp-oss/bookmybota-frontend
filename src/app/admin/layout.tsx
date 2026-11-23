@@ -96,7 +96,6 @@ const navigation: NavItem[] = [
     icon: LayoutGrid,
     children: [
       { name: "Venue & Cinema Layouts", href: "/admin/venue-layouts", icon: Map },
-      { name: "Universal Venue Designer", href: "/admin/venue-designer", icon: Compass },
       { name: "Event Layouts", href: "/admin/event-layouts", icon: Map },
     ],
   },

@@ -656,11 +656,11 @@ export default function CinemaBeveragesPage() {
                 </button>
                 <button
                   type="submit"
-                  disabled={isCreating || isUpdating}
+                  disabled={isCreating || isUpdating || isUploading}
                   className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-fuchsia-600 to-pink-600 hover:from-fuchsia-500 hover:to-pink-500 text-white text-xs font-semibold shadow-lg shadow-fuchsia-600/20 transition-all disabled:opacity-50"
                 >
-                  {(isCreating || isUpdating) && <Loader2 size={14} className="animate-spin" />}
-                  <span>{editingItem ? "Save Changes" : "Create Item"}</span>
+                  {(isCreating || isUpdating || isUploading) && <Loader2 size={14} className="animate-spin" />}
+                  <span>{isUploading ? "Uploading photo…" : editingItem ? "Save Changes" : "Create Item"}</span>
                 </button>
               </div>
             </form>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import ClassicSeatMap from "@/components/venue/ClassicSeatMap";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
@@ -57,7 +58,7 @@ export default function MovieCounterBookingPage() {
   const [email, setEmail] = useState("");
   const [method, setMethod] = useState<"CASH" | "CARD" | "MOBILE_MONEY">("CASH");
   const [receipt, setReceipt] = useState<CounterBookingResult | null>(null);
-  const [errors, setErrors] = useState<{ name?: string; phone?: string; email?: string }>({});
+  const [errors, setErrors] = useState<{ name?: string; phone?: string; email?: string; cash?: string }>({});
 
   const seatByKey = useMemo(() => new Map((map?.seats ?? []).map((s) => [s.key, s])), [map?.seats]);
   // Seats that were sold or taken while picking drop out of the selection
@@ -66,6 +67,11 @@ export default function MovieCounterBookingPage() {
     [picked, seatByKey]
   );
   const total = chosen.reduce((sum, s) => sum + s.price, 0);
+  const [partCash, setPartCash] = useState(false);
+  const [cashReceived, setCashReceived] = useState("");
+  const [otherMethod, setOtherMethod] = useState<"CARD" | "MOBILE_MONEY">("CARD");
+  const cashNum = Number(cashReceived) || 0;
+  const remaining = Math.max(0, total - cashNum);
   // Seats of the same category and price share one ticket line: "Premium × 3"
   const ticketGroups = useMemo(() => {
     const groups = new Map<string, { section: string; price: number; seats: ShowSeatMapSeat[] }>();
@@ -85,6 +91,8 @@ export default function MovieCounterBookingPage() {
         coordinate_y: s.y,
         color: s.color,
         section_name: s.section,
+        row_label: s.row,
+        seat_label: s.number,
         status: "AVAILABLE",
       })),
     [map?.seats]
@@ -113,6 +121,12 @@ export default function MovieCounterBookingPage() {
       return;
     }
     if (!validate()) return;
+    if (partCash) {
+      if (!(cashNum > 0) || cashNum >= total) {
+        setErrors((prev) => ({ ...prev, cash: `Enter cash between 1 and ${money(total - 1)} ETB` }));
+        return;
+      }
+    }
     try {
       const res = await book({
         bizId,
@@ -122,6 +136,7 @@ export default function MovieCounterBookingPage() {
         guest_phone: phone.trim(),
         guest_email: email.trim() || undefined,
         payment_method: method,
+        ...(partCash ? { split_payment: { cash_amount: cashNum, other_method: otherMethod } } : {}),
       }).unwrap();
       setReceipt(res.data);
       setPicked([]);
@@ -180,7 +195,7 @@ export default function MovieCounterBookingPage() {
             <Film size={20} className="text-slate-300" />
           )}
         </div>
-        <div className="min-w-0">
+        <div className="min-w-[9rem] flex-1">
           <h2 className="text-xl font-extrabold text-slate-900 truncate">{st.movie_title}</h2>
           <p className="text-xs text-slate-500 flex flex-wrap items-center gap-x-3 gap-y-0.5">
             <span className="inline-flex items-center gap-1">
@@ -219,11 +234,9 @@ export default function MovieCounterBookingPage() {
           <p className="py-16 text-center text-sm text-slate-500">This screen has no live seat layout yet.</p>
         ) : (
           <>
-            <LayoutSeatPreview
+            <ClassicSeatMap
               seats={previewSeats}
-              config={map.layout?.seating_config}
               heightClass="h-[min(76vh,720px)]"
-              className="bg-white"
               seatMarker={(raw) => {
                 const live = seatByKey.get(String((raw as { key?: string }).key || ""));
                 if (!live) return null;
@@ -240,7 +253,7 @@ export default function MovieCounterBookingPage() {
               }}
             />
             <div className="mt-3 pt-3 border-t border-slate-100 flex flex-wrap gap-x-4 gap-y-2 text-[11px] text-slate-600">
-              <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-blue-500" /> Available</span>
+              <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded border-2 border-emerald-500 bg-white" /> Available</span>
               <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-rose-600" /> Selected</span>
               <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-slate-400" /> Sold</span>
               <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-amber-500" /> Held online</span>
@@ -371,7 +384,10 @@ export default function MovieCounterBookingPage() {
                   <button
                     key={id}
                     type="button"
-                    onClick={() => setMethod(id)}
+                    onClick={() => {
+                      setMethod(id);
+                      if (id !== "CASH") setPartCash(false);
+                    }}
                     className={`rounded-lg border px-2 py-2 text-xs font-bold cursor-pointer ${
                       method === id ? "border-[#e11d48] bg-rose-50 text-[#e11d48]" : "border-slate-200 text-slate-600 hover:border-slate-300"
                     }`}
@@ -380,6 +396,65 @@ export default function MovieCounterBookingPage() {
                   </button>
                 ))}
               </div>
+              {method === "CASH" && (
+                <label className="mt-2 flex cursor-pointer items-center gap-2 text-xs font-semibold text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={partCash}
+                    onChange={(e) => {
+                      setPartCash(e.target.checked);
+                      setErrors((prev) => ({ ...prev, cash: undefined }));
+                    }}
+                    className="h-4 w-4 accent-[#e11d48]"
+                  />
+                  Part cash payment
+                </label>
+              )}
+              {method === "CASH" && partCash && (
+                <div className="mt-2 space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                  <div>
+                    <label className={labelCls}>Cash received (ETB)</label>
+                    <input
+                      className={inputCls}
+                      type="text"
+                      inputMode="numeric"
+                      value={cashReceived}
+                      onChange={(e) => {
+                        setCashReceived(e.target.value.replace(/[^\d.]/g, "").slice(0, 9));
+                        setErrors((prev) => ({ ...prev, cash: undefined }));
+                      }}
+                      placeholder="0"
+                    />
+                    {errors.cash && <p className="mt-1 text-xs font-medium text-rose-600">{errors.cash}</p>}
+                  </div>
+                  <div>
+                    <label className={labelCls}>Rest paid by</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {(
+                        [
+                          ["CARD", "Card"],
+                          ["MOBILE_MONEY", "Mobile money"],
+                        ] as const
+                      ).map(([id, label]) => (
+                        <button
+                          key={id}
+                          type="button"
+                          onClick={() => setOtherMethod(id)}
+                          className={`rounded-lg border px-2 py-2 text-xs font-bold cursor-pointer ${
+                            otherMethod === id ? "border-[#e11d48] bg-rose-50 text-[#e11d48]" : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between rounded-lg bg-white px-3 py-2 text-sm">
+                    <span className="text-slate-600">Remaining by {otherMethod === "CARD" ? "card" : "mobile money"}</span>
+                    <b className="text-slate-900">{money(remaining)} ETB</b>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

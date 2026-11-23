@@ -1,6 +1,9 @@
 import React, { useState, Fragment } from "react";
 
 type SeatLike = {
+  row_label?: string | null;
+  seat_label?: string | null;
+  grid_id?: string | null;
   coordinate_x?: number;
   coordinate_y?: number;
   color?: string | null;
@@ -30,6 +33,7 @@ type ShapeLike = {
   stroke?: string;
   strokeWidth?: number;
   cornerRadius?: number;
+  points?: number[];
 };
 
 type LabelLike = {
@@ -190,6 +194,12 @@ function ShapeVisual({ shape }: { shape: ShapeLike }) {
     );
   }
 
+  if (type === "polygon" && Array.isArray(shape.points) && shape.points.length >= 6) {
+    const pts: string[] = [];
+    for (let i = 0; i + 1 < shape.points.length; i += 2) pts.push(`${shape.points[i]},${shape.points[i + 1]}`);
+    return <polygon points={pts.join(" ")} {...common} />;
+  }
+
   if (type === "diamond") {
     const points = [
       `${x + w / 2},${y}`,
@@ -295,7 +305,10 @@ export default function LayoutSeatPreview({
   selectedBlockId: controlledSelectedBlockId,
   onSelectBlock: controlledOnSelectBlock,
   seatMarker,
+  showLabels = false,
 }: {
+  /** Draw seat numbers inside the seats and row letters beside each row (use on large previews) */
+  showLabels?: boolean;
   seats?: unknown;
   config?: unknown;
   className?: string;
@@ -1220,6 +1233,40 @@ export default function LayoutSeatPreview({
   const height = Math.max(maxY - minY + pad * 2, 80);
   const radius = Math.max(1.6, Math.min(width, height) / 85);
 
+  // Seat size follows the real spacing between neighbouring seats, so seats look like the designer's squares
+  let spacing = 0;
+  if (seatList.length > 1) {
+    const pts = seatList.map((st) => [Number(st.coordinate_x) || 0, Number(st.coordinate_y) || 0]);
+    const step = Math.max(1, Math.floor(pts.length / 150));
+    const nn: number[] = [];
+    for (let i = 0; i < pts.length; i += step) {
+      let best = Infinity;
+      for (let j = 0; j < pts.length; j++) {
+        if (j === i) continue;
+        const d = Math.hypot(pts[i][0] - pts[j][0], pts[i][1] - pts[j][1]);
+        if (d > 0.5 && d < best) best = d;
+      }
+      if (Number.isFinite(best)) nn.push(best);
+    }
+    nn.sort((a, b) => a - b);
+    spacing = nn.length ? nn[Math.floor(nn.length / 2)] : 0;
+  }
+  const side = spacing > 0 ? spacing * 0.86 : radius * 2;
+  const approxPx = (side * 620) / Math.max(width, height);
+  const drawNumbers = showLabels && approxPx >= 9;
+  const rowStarts = new Map<string, { x: number; maxX: number; y: number; label: string }>();
+  if (showLabels) {
+    for (const st of seatList) {
+      const label = String(st.row_label || "");
+      if (!label) continue;
+      const key = `${st.grid_id || ""}|${label}|${Math.round((Number(st.coordinate_y) || 0) / 4)}`;
+      const x = Number(st.coordinate_x) || 0;
+      const cur = rowStarts.get(key);
+      if (!cur) rowStarts.set(key, { x, maxX: x, y: Number(st.coordinate_y) || 0, label });
+      else rowStarts.set(key, { ...cur, x: Math.min(cur.x, x), maxX: Math.max(cur.maxX, x) });
+    }
+  }
+
   return (
     <svg
       viewBox={`${minX - pad} ${minY - pad} ${width} ${height}`}
@@ -1264,10 +1311,12 @@ export default function LayoutSeatPreview({
         return (
           <g key={`seat-${idx}`}>
             {marker?.title ? <title>{marker.title}</title> : null}
-            <circle
-              cx={Number(seat.coordinate_x) || 0}
-              cy={Number(seat.coordinate_y) || 0}
-              r={marker?.onClick ? radius * 1.15 : radius}
+            <rect
+              x={(Number(seat.coordinate_x) || 0) - (marker?.onClick ? side * 0.575 : side / 2)}
+              y={(Number(seat.coordinate_y) || 0) - (marker?.onClick ? side * 0.575 : side / 2)}
+              width={marker?.onClick ? side * 1.15 : side}
+              height={marker?.onClick ? side * 1.15 : side}
+              rx={side * 0.22}
               fill={fill}
               stroke={stroke}
               strokeWidth={strokeWidth}
@@ -1275,10 +1324,35 @@ export default function LayoutSeatPreview({
               onClick={marker?.onClick}
             >
               {marker?.title ? <title>{marker.title}</title> : null}
-            </circle>
+            </rect>
+            {drawNumbers && seat.seat_label ? (
+              <text
+                x={Number(seat.coordinate_x) || 0}
+                y={Number(seat.coordinate_y) || 0}
+                fontSize={Math.max(3, side * 0.46)}
+                fontWeight={700}
+                fill={contrastTextColor(fill)}
+                textAnchor="middle"
+                dominantBaseline="central"
+                style={{ pointerEvents: "none" }}
+              >
+                {String(seat.seat_label)}
+              </text>
+            ) : null}
           </g>
         );
       })}
+
+      {showLabels
+        ? Array.from(rowStarts.values()).flatMap((r, i) => [
+            <text key={`row-${i}`} x={r.x - side * 0.9} y={r.y} fontSize={Math.max(4, side * 0.5)} fontWeight={700} fill="#64748b" textAnchor="end" dominantBaseline="central">
+              {r.label}
+            </text>,
+            <text key={`rowr-${i}`} x={r.maxX + side * 0.9} y={r.y} fontSize={Math.max(4, side * 0.5)} fontWeight={700} fill="#64748b" textAnchor="start" dominantBaseline="central">
+              {r.label}
+            </text>,
+          ])
+        : null}
 
       {labels.map((label, idx) => {
         const x = Number(label.x) || 0;

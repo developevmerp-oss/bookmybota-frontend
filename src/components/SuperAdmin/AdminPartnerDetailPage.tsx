@@ -3,7 +3,10 @@
 import Link from "next/link";
 import { DetailFormShimmer, AdminListShimmer } from "@/components/Shared/Shimmer";
 import { useMemo, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import PartnerLayoutsTab from "./PartnerLayoutsTab";
+import PartnerMovieCatalogTab from "@/components/SuperAdmin/PartnerMovieCatalogTab";
+import PartnerContractTab from "@/components/SuperAdmin/PartnerContractTab";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
   Archive,
   ArrowLeft,
@@ -40,7 +43,7 @@ interface AdminPartnerDetailPageProps {
   module: "dining" | "event" | "venue" | "artist" | "cinema";
 }
 
-type DetailTab = "overview" | "promotions";
+type DetailTab = "overview" | "promotions" | "layouts" | "movie_catalog" | "contract";
 
 function InfoRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -257,7 +260,11 @@ export default function AdminPartnerDetailPage({ module }: AdminPartnerDetailPag
   const [unarchiveBusiness, { isLoading: isUnarchiving }] = useUnarchiveBusinessMutation();
   const [confirmAction, setConfirmAction] = useState<"archive" | "unarchive" | null>(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
-  const [tab, setTab] = useState<DetailTab>("overview");
+  const searchParams = useSearchParams();
+  const initialTab = searchParams.get("tab");
+  const [tab, setTab] = useState<DetailTab>(
+    initialTab === "layouts" || initialTab === "promotions" || initialTab === "movie_catalog" || initialTab === "contract" ? initialTab : "overview"
+  );
   const [galleryPreviewIndex, setGalleryPreviewIndex] = useState(-1);
 
   const { data: promotionsData, isLoading: promotionsLoading } = useGetMarketingCampaignsQuery(
@@ -319,8 +326,13 @@ export default function AdminPartnerDetailPage({ module }: AdminPartnerDetailPag
   const tabs = useMemo(() => {
     const items: Array<{ id: DetailTab; label: string }> = [{ id: "overview", label: "Overview" }];
     if (showPromotions) items.push({ id: "promotions", label: "Promotions" });
+    if (isCinema) {
+      items.push({ id: "layouts", label: "Layouts" });
+      items.push({ id: "movie_catalog", label: "Movie catalog" });
+      items.push({ id: "contract", label: "Contract" });
+    }
     return items;
-  }, [showPromotions]);
+  }, [showPromotions, isCinema]);
 
   const goToList = () => {
     router.push(listHref);
@@ -434,22 +446,6 @@ export default function AdminPartnerDetailPage({ module }: AdminPartnerDetailPag
               Review venue layouts
             </Link>
           )}
-          {isCinema && (
-            <>
-              <Link
-                href={`/admin/venue-layouts?business_id=${biz.id}`}
-                className="btn-secondary !py-2 !px-3 text-sm flex-1 sm:flex-none justify-center"
-              >
-                Review screen layouts
-              </Link>
-              <Link
-                href="/admin/movies"
-                className="btn-secondary !py-2 !px-3 text-sm flex-1 sm:flex-none justify-center"
-              >
-                Movie catalog
-              </Link>
-            </>
-          )}
           {!isArchived ? (
             <>
               <Link
@@ -508,6 +504,10 @@ export default function AdminPartnerDetailPage({ module }: AdminPartnerDetailPag
           ))}
         </div>
       ) : null}
+
+      {tab === "layouts" && isCinema ? <PartnerLayoutsTab businessId={biz.id} isCinema /> : null}
+      {tab === "movie_catalog" && isCinema ? <PartnerMovieCatalogTab businessId={biz.id} /> : null}
+      {tab === "contract" && isCinema ? <PartnerContractTab businessId={biz.id} /> : null}
 
       {tab === "overview" ? (
         <>
@@ -745,7 +745,7 @@ export default function AdminPartnerDetailPage({ module }: AdminPartnerDetailPag
             className="!shadow-sm"
           />
         </>
-      ) : (
+      ) : tab === "promotions" ? (
         <section className="rounded-xl border border-slate-200 bg-white shadow-sm p-3 sm:p-4 md:p-5 space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
@@ -787,7 +787,7 @@ export default function AdminPartnerDetailPage({ module }: AdminPartnerDetailPag
             </div>
           )}
         </section>
-      )}
+      ) : null}
 
       <GalleryLightbox
         images={galleryImages}

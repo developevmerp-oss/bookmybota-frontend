@@ -196,16 +196,6 @@ export function formatTime(iso: string) {
 export function formatDateHeader(isoDateStr: string) {
   const d = new Date(isoDateStr + "T00:00:00");
   if (isNaN(d.getTime())) return formatDate(isoDateStr);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const target = new Date(d);
-  target.setHours(0, 0, 0, 0);
-
-  const diffDays = Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
   const weekday = d.toLocaleDateString("en-US", { weekday: "long" });
-  const base = `${weekday}, ${formatDate(isoDateStr)}`;
-  if (diffDays === 0) return `Today · ${base}`;
-  if (diffDays === 1) return `Tomorrow · ${base}`;
-  if (diffDays === -1) return `Yesterday · ${base}`;
-  return base;
+  return `${weekday}, ${formatDate(isoDateStr)}`;
 }

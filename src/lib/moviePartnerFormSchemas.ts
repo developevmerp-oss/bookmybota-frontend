@@ -1,4 +1,5 @@
 import * as yup from "yup";
+import { CINEMA_SCREEN_TYPE_VALUES } from "./cinemaScreenTypes";
 import { isVenueWallTimeReached, venueDateStr } from "@/lib/dateFormat";
 
 /** Cinema partner — schedule / edit movie showtime */
@@ -101,7 +102,7 @@ export const cinemaScreenFormSchema = yup
       .max(120, "Screen name must be at most 120 characters."),
     screen_type: yup
       .string()
-      .oneOf(["standard", "imax", "4dx", "other"], "Select a valid screen type.")
+      .oneOf(CINEMA_SCREEN_TYPE_VALUES, "Select a valid screen type.")
       .required("Screen type is required."),
     capacity: yup
       .string()

@@ -23,6 +23,7 @@ type Props = {
   venueTypeName?: string | null;
   specSnapshot?: Snapshot | null;
   compact?: boolean;
+  hideWhenEmpty?: boolean;
 };
 
 function resolveSnapshot(props: Props): {
@@ -53,7 +54,7 @@ function resolveSnapshot(props: Props): {
   };
 }
 
-export default function VenueProfileLayoutSummary({ compact, ...props }: Props) {
+export default function VenueProfileLayoutSummary({ compact, hideWhenEmpty, ...props }: Props) {
   const { fields, slug, label, gross, sellable, damaged } = resolveSnapshot(props);
   const fieldDefs = getVenueTypeFields(slug);
   const sections = groupVenueFieldsBySection(fieldDefs).filter((section) =>
@@ -67,6 +68,7 @@ export default function VenueProfileLayoutSummary({ compact, ...props }: Props) 
   const hasFields = sections.length > 0;
 
   if (!hasCapacity && !hasFields) {
+    if (hideWhenEmpty) return null;
     return (
       <p className="text-sm text-zinc-500">
         No venue profile details attached. Ask the venue admin to complete their profile.

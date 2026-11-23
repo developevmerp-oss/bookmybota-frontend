@@ -82,6 +82,7 @@ function MovieShell({ children }: { children: React.ReactNode }) {
       label: "Operations",
       items: [
         { name: "Shows & Seats", href: "/movie/shows", icon: Clapperboard },
+        { name: "Screen Audit", href: "/movie/screen-audit", icon: BarChart3 },
         { name: "Bookings", href: "/movie/bookings", icon: Ticket },
         { name: "Scan Tickets", href: "/movie/scan", icon: QrCode },
       ],
@@ -119,7 +120,7 @@ function MovieShell({ children }: { children: React.ReactNode }) {
   const allLinks = [cinemaSection, ...laterSections].flatMap((s) => s.items).concat(profileLink);
 
   // Direct URLs to locked pages go back to the dashboard until the contract is signed
-  const lockedAllowed = ["/movie/dashboard", "/movie/screens", "/movie/contract", "/movie/shows", "/movie/profile", "/movie/change-password"];
+  const lockedAllowed = ["/movie/dashboard", "/movie/screens", "/movie/contract", "/movie/shows", "/movie/screen-audit", "/movie/profile", "/movie/change-password"];
   const onLockedPage = !lockedAllowed.some((href) => pathname === href || pathname.startsWith(`${href}/`));
   useEffect(() => {
     if (!contractLoading && !unlocked && onLockedPage) router.replace("/movie/dashboard");

@@ -1,36 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import ClassicSeatMap from "@/components/venue/ClassicSeatMap";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import {
-  AlertCircle,
-  Ban,
-  Calendar,
-  Check,
-  ChevronLeft,
-  ChevronRight,
-  Clock,
-  Copy,
-  Edit2,
-  Eye,
-  FileSignature,
-  Film,
-  Globe,
-  History,
-  Info,
-  Lock,
-  Monitor,
-  Plug,
-  Plus,
-  RefreshCw,
-  Store,
-  Tag,
-  Ticket,
-  Trash2,
-  X,
-} from "lucide-react";
+import { AlertCircle, Ban, Calendar, Check, ChevronLeft, ChevronRight, Clock, Edit2, Eye, FileSignature, Film, Globe, History, Info, Lock, Monitor, Plus, RefreshCw, Store, Tag, Ticket, Trash2, X, MoreVertical, BarChart3 } from "lucide-react";
 import { useAppSelector } from "@/lib/hooks";
 import {
   useDeletePartnerMovieShowtimeMutation,
@@ -50,7 +25,6 @@ import {
 } from "@/services/api";
 import { extractApiError } from "@/lib/apiErrors";
 import { isVenueWallTimeReached, venueDateStr } from "@/lib/dateFormat";
-import { getApiBaseUrl } from "@/lib/apiBaseUrl";
 import { AdminListShimmer } from "@/components/Shared/Shimmer";
 import ConfirmDialog from "@/components/Shared/ConfirmDialog";
 import LayoutSeatPreview from "@/components/venue/LayoutSeatPreview";
@@ -96,7 +70,6 @@ export default function MovieShowsSeatsPage() {
   const [layoutOpen, setLayoutOpen] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
   const [contractDialogOpen, setContractDialogOpen] = useState(false);
-  const [copied, setCopied] = useState(false);
   const [formRequest, setFormRequest] = useState<ShowtimeFormRequest | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<MovieShowtime | null>(null);
   const [statusConfirm, setStatusConfirm] = useState<{ action: "enable" | "disable"; showtime: MovieShowtime } | null>(null);
@@ -105,7 +78,12 @@ export default function MovieShowsSeatsPage() {
 
   const { data: contract, isLoading: loadingContract } = useGetCinemaContractQuery();
   const isContractActive = contract?.status === "ACTIVE";
-  const { data: screens = [] } = useGetCinemaScreensQuery(bizId, { skip: !bizId });
+  const { data: allScreens = [] } = useGetCinemaScreensQuery(bizId, { skip: !bizId });
+  // Only screens whose layout is live can run shows
+  const screens = useMemo(
+    () => allScreens.filter((sc) => sc.layout_is_default && (sc.venue_layout_template_id || sc.layout_template_id)),
+    [allScreens]
+  );
   const { data: catalogData } = useGetPartnerMovieCatalogQuery({ page: 1, limit: 100 });
   const catalogMovies = useMemo(() => catalogData?.items ?? [], [catalogData]);
   const activeScreenId = screenFilter || screens[0]?.id || "";
@@ -169,17 +147,6 @@ export default function MovieShowsSeatsPage() {
     { skip: !bizId || !activeScreenId }
   );
   const screenHasLayout = Array.isArray(activeScreen?.layout_seats_json) && (activeScreen?.layout_seats_json?.length ?? 0) > 0;
-
-  const feedUrl = showId ? `${getApiBaseUrl()}/movies/showtimes/${showId}/layout` : "";
-  const copyFeed = async () => {
-    try {
-      await navigator.clipboard.writeText(feedUrl);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch {
-      toast.error("Could not copy. Select the URL and copy it manually.");
-    }
-  };
 
   const openCreate = () => {
     if (!isContractActive) {
@@ -252,95 +219,90 @@ export default function MovieShowsSeatsPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-[25rem_minmax(0,1fr)] gap-4 lg:h-[calc(100vh-9rem)] lg:min-h-[34rem]">
-        {/* ───────── Left: shows and seat tools ───────── */}
-        <div className="space-y-4 lg:overflow-y-auto lg:pr-1 min-w-0">
-          <div className={`${card} p-4 space-y-3`}>
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <h2 className="text-lg font-extrabold text-slate-900 leading-tight">Shows &amp; Seats</h2>
-                <p className="text-xs text-slate-500 mt-0.5">Schedule movies, set prices and run each show&apos;s seats.</p>
-              </div>
-              <button
-                type="button"
-                className={btnSecondary}
-                onClick={() => {
-                  refetchShows();
-                  if (!mapSkip) refetchMap();
-                }}
-                aria-label="Refresh"
-                title="Refresh"
-              >
-                <RefreshCw size={14} className={showsFetching || mapLoading ? "animate-spin" : ""} />
-              </button>
-            </div>
-
-            <div className="flex items-center gap-1.5">
-              <button type="button" className={`${btnSecondary} !px-2`} onClick={() => setSelectedDate((d) => shiftYmd(d, -1))} aria-label="Previous day">
-                <ChevronLeft size={16} />
-              </button>
-              <label className="relative flex-1 inline-flex h-9 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 hover:border-slate-300 focus-within:border-rose-400 cursor-pointer">
-                <Calendar size={15} className="shrink-0 text-[#e11d48] pointer-events-none" aria-hidden />
-                <input
-                  type="date"
-                  value={selectedDate}
-                  onChange={(e) => /^\d{4}-\d{2}-\d{2}$/.test(e.target.value) && setSelectedDate(e.target.value)}
-                  className="min-w-0 flex-1 bg-transparent text-sm font-semibold text-slate-900 focus:outline-none cursor-pointer [color-scheme:light]"
-                  aria-label="Show date"
-                />
-              </label>
-              <button type="button" className={`${btnSecondary} !px-2`} onClick={() => setSelectedDate((d) => shiftYmd(d, 1))} aria-label="Next day">
-                <ChevronRight size={16} />
-              </button>
-              {selectedDate !== todayStr && (
-                <button type="button" className="text-xs font-bold text-[#e11d48] hover:underline px-1" onClick={() => setSelectedDate(todayStr)}>
-                  Today
-                </button>
-              )}
-            </div>
-
-            <div className="flex gap-2">
-              <select
-                value={activeScreenId}
-                onChange={(e) => setScreenFilter(e.target.value)}
-                className="h-9 min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-800 focus:outline-none focus:border-rose-400 cursor-pointer"
-                aria-label="Filter by screen"
-              >
-                {screens.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {displayScreenName(s.name)} ({s.screen_type?.toUpperCase() || "STANDARD"})
-                  </option>
-                ))}
-              </select>
-              <button
-                type="button"
-                className={btnPrimary}
-                onClick={openCreate}
-                disabled={screens.length === 0 || catalogMovies.length === 0}
-                title="Schedule a new show"
-              >
-                <Plus size={15} /> Schedule show
-              </button>
-            </div>
+      <div className={`${card} overflow-hidden`}>
+        {/* Toolbar: everything for choosing what you are looking at */}
+        <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-slate-50/60 px-4 py-3">
+          <div className="mr-auto min-w-0">
+            <h2 className="text-lg font-extrabold leading-tight text-slate-900">Shows &amp; Seats</h2>
+            {activeScreen ? (
+              <p className="truncate text-xs text-slate-500">
+                {displayScreenName(activeScreen.name)} · {(activeScreen.screen_type || "standard").toUpperCase()} ·{" "}
+                {activeScreen.layout_seat_count || activeScreen.capacity || 0} seats
+                {activeScreen.layout_name ? ` · ${activeScreen.layout_name}` : ""}
+              </p>
+            ) : (
+              <p className="text-xs text-slate-500">Approve a layout under Screens &amp; Layouts to start scheduling shows.</p>
+            )}
           </div>
 
-          {/* Show list */}
-          <div className={`${card} p-3`}>
+          <div className="flex items-center gap-1.5">
+            <button type="button" className={`${btnSecondary} !px-2`} onClick={() => setSelectedDate((d) => shiftYmd(d, -1))} aria-label="Previous day">
+              <ChevronLeft size={16} />
+            </button>
+            <label className="relative inline-flex h-9 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 hover:border-slate-300 focus-within:border-rose-400 cursor-pointer">
+              <Calendar size={15} className="shrink-0 text-[#e11d48] pointer-events-none" aria-hidden />
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => /^\d{4}-\d{2}-\d{2}$/.test(e.target.value) && setSelectedDate(e.target.value)}
+                className="bg-transparent text-sm font-semibold text-slate-900 focus:outline-none cursor-pointer [color-scheme:light]"
+                aria-label="Show date"
+              />
+            </label>
+            <button type="button" className={`${btnSecondary} !px-2`} onClick={() => setSelectedDate((d) => shiftYmd(d, 1))} aria-label="Next day">
+              <ChevronRight size={16} />
+            </button>
+            {selectedDate !== todayStr && (
+              <button type="button" className="px-1 text-xs font-bold text-[#e11d48] hover:underline" onClick={() => setSelectedDate(todayStr)}>
+                Today
+              </button>
+            )}
+          </div>
+
+          <select
+            value={activeScreenId}
+            onChange={(e) => setScreenFilter(e.target.value)}
+            className="h-9 rounded-xl border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-800 focus:outline-none focus:border-rose-400 cursor-pointer"
+            aria-label="Filter by screen"
+          >
+            {screens.map((sc) => (
+              <option key={sc.id} value={sc.id}>
+                {displayScreenName(sc.name)} ({sc.screen_type?.toUpperCase() || "STANDARD"})
+              </option>
+            ))}
+          </select>
+
+          <button type="button" className={btnPrimary} onClick={openCreate} disabled={screens.length === 0 || catalogMovies.length === 0} title="Schedule a new show">
+            <Plus size={15} /> Schedule show
+          </button>
+          <button
+            type="button"
+            className={btnSecondary}
+            onClick={() => {
+              refetchShows();
+              if (!mapSkip) refetchMap();
+            }}
+            aria-label="Refresh"
+            title="Refresh"
+          >
+            <RefreshCw size={14} className={showsFetching || mapLoading ? "animate-spin" : ""} />
+          </button>
+          <ScreenActions screen={activeScreen} hasLayout={screenHasLayout} onOpenLayout={() => setLayoutOpen(true)} onOpenInfo={() => setInfoOpen(true)} />
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-[21rem_minmax(0,1fr)]">
+          {/* Shows on the chosen day */}
+          <div className="border-b border-slate-200 p-3 lg:border-b-0 lg:border-r">
             <div className="px-1 pb-2 text-[11px] font-bold uppercase tracking-wide text-slate-500">
               {formatDateHeader(selectedDate)} · {sortedShows.length} show{sortedShows.length === 1 ? "" : "s"}
             </div>
             {showsLoading ? (
               <p className="px-1 py-3 text-sm text-slate-500">Loading shows…</p>
             ) : sortedShows.length === 0 ? (
-              <div className="px-2 py-6 text-center space-y-2">
+              <div className="space-y-2 px-2 py-8 text-center">
                 <Film size={28} className="mx-auto text-slate-300" />
                 <p className="text-sm text-slate-600">No shows on this date.</p>
-                <button
-                  type="button"
-                  className={btnPrimary}
-                  onClick={openCreate}
-                  disabled={screens.length === 0 || catalogMovies.length === 0}
-                >
+                <button type="button" className={btnPrimary} onClick={openCreate} disabled={screens.length === 0 || catalogMovies.length === 0}>
                   <Plus size={14} /> Schedule a show
                 </button>
               </div>
@@ -354,8 +316,8 @@ export default function MovieShowsSeatsPage() {
                       <button
                         type="button"
                         onClick={() => setShowId(st.id)}
-                        className={`w-full text-left rounded-xl border px-3 py-2.5 transition-colors cursor-pointer ${
-                          active ? "border-rose-500 bg-rose-50" : "border-slate-200 hover:border-rose-300 bg-white"
+                        className={`w-full cursor-pointer rounded-xl border px-3 py-2.5 text-left transition-colors ${
+                          active ? "border-rose-500 bg-rose-50" : "border-slate-200 bg-white hover:border-rose-300"
                         } ${st.is_active ? "" : "opacity-60"}`}
                       >
                         <div className="flex items-center justify-between gap-2">
@@ -376,7 +338,7 @@ export default function MovieShowsSeatsPage() {
                           </span>
                         </div>
                         <div className="mt-0.5 truncate text-sm font-semibold text-slate-800">{st.movie_title}</div>
-                        <div className="text-[11px] text-slate-500 inline-flex items-center gap-1.5">
+                        <div className="inline-flex items-center gap-1.5 text-[11px] text-slate-500">
                           <Monitor size={11} className="text-rose-500" />
                           {displayScreenName(st.screen_name)} · {st.format || "2D"} · {st.language || "—"}
                         </div>
@@ -388,137 +350,134 @@ export default function MovieShowsSeatsPage() {
             )}
           </div>
 
-          {/* Selected show: details and actions */}
-          {selectedShow && (
-            <div className={`${card} p-4 space-y-3`}>
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="truncate font-bold text-slate-900">{selectedShow.movie_title}</div>
-                  <div className="text-xs text-slate-500">
-                    {displayScreenName(selectedShow.screen_name)} · {formatTime(selectedShow.starts_at)}
+          {/* The show you picked */}
+          <div className="min-w-0 space-y-4 p-4">
+            {!selectedShow ? (
+              <div className="flex h-full min-h-[10rem] flex-col items-center justify-center text-center text-slate-500">
+                <Ticket size={30} className="mb-2 text-slate-300" />
+                <p className="text-sm font-semibold text-slate-700">Pick a show to see its prices and sales</p>
+              </div>
+            ) : (
+              <>
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="truncate text-base font-extrabold text-slate-900">{selectedShow.movie_title}</div>
+                    <div className="text-xs text-slate-500">
+                      {displayScreenName(selectedShow.screen_name)} · {formatTime(selectedShow.starts_at)}
+                      {selectedShow.ends_at ? ` → ${formatTime(selectedShow.ends_at)}` : ""} · {selectedShow.format || "2D"} · {selectedShow.language || "—"}
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 gap-1.5">
+                    <button type="button" className={`${btnSecondary} !px-2`} onClick={() => openEdit(selectedShow)} title="Edit show and prices" aria-label="Edit show">
+                      <Edit2 size={14} />
+                    </button>
+                    <button
+                      type="button"
+                      className={btnSecondary}
+                      disabled={updating}
+                      onClick={() => setStatusConfirm({ action: selectedShow.is_active ? "disable" : "enable", showtime: selectedShow })}
+                    >
+                      {selectedShow.is_active ? "Disable" : "Enable"}
+                    </button>
+                    <button
+                      type="button"
+                      className="inline-flex cursor-pointer items-center rounded-xl border border-rose-200 px-2 text-rose-600 hover:bg-rose-50"
+                      onClick={() => setDeleteTarget(selectedShow)}
+                      title="Remove show"
+                      aria-label="Remove show"
+                    >
+                      <Trash2 size={14} />
+                    </button>
                   </div>
                 </div>
-                <div className="flex gap-1.5 shrink-0">
-                  <button type="button" className={`${btnSecondary} !px-2`} onClick={() => openEdit(selectedShow)} title="Edit show and prices" aria-label="Edit show">
-                    <Edit2 size={14} />
-                  </button>
-                  <button
-                    type="button"
-                    className={btnSecondary}
-                    disabled={updating}
-                    onClick={() =>
-                      setStatusConfirm({ action: selectedShow.is_active ? "disable" : "enable", showtime: selectedShow })
-                    }
-                  >
-                    {selectedShow.is_active ? "Disable" : "Enable"}
-                  </button>
-                  <button
-                    type="button"
-                    className="inline-flex items-center rounded-xl border border-rose-200 px-2 text-rose-600 hover:bg-rose-50 cursor-pointer"
-                    onClick={() => setDeleteTarget(selectedShow)}
-                    title="Remove show"
-                    aria-label="Remove show"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              </div>
 
-              <PriceEditor
-                key={`${selectedShow.id}-${tiers.map((t) => `${t.tier_name}:${t.price}`).join("|")}`}
-                tiers={tiers}
-                locked={isVenueWallTimeReached(selectedShow.starts_at)}
-                saving={updating}
-                onSave={(next) => savePrices(selectedShow, next)}
-              />
-
-              {!showLive && (
-                <p className="text-xs text-slate-500 rounded-lg bg-slate-50 border border-slate-200 p-2.5">
-                  This show is {selectedShow.status === "CANCELLED" ? "cancelled" : "disabled"}, so seats cannot be managed. Enable it to open the seat layout.
-                </p>
-              )}
-            </div>
-          )}
-
-          {showLive && map && (
-            <>
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  { label: "Available", value: map.counts.available, tone: "text-emerald-600" },
-                  { label: "Sold", value: map.counts.booked, tone: "text-slate-900" },
-                  { label: "Held", value: map.counts.held, tone: "text-amber-600" },
-                  { label: "Damaged", value: map.counts.screen_blocked, tone: "text-orange-600" },
-                  { label: "Blocked (this show)", value: map.counts.blocked, tone: "text-rose-600" },
-                  { label: "Revenue", value: money(map.revenue), tone: "text-slate-900" },
-                ].map((c) => (
-                  <div key={c.label} className={`${card} px-3 py-2`}>
-                    <div className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">{c.label}</div>
-                    <div className={`text-lg font-black leading-tight ${c.tone}`}>{c.value}</div>
-                  </div>
-                ))}
-              </div>
-
-              <div className={`${card} p-4`}>
-                <div className="font-bold text-slate-900 text-sm flex items-center gap-2 mb-3">
-                  <Ticket size={15} className="text-[#e11d48]" /> Sold by channel
-                </div>
-                {channels.length === 0 ? (
-                  <p className="text-xs text-slate-500">No tickets sold for this show yet.</p>
-                ) : (
-                  <ul className="space-y-2">
-                    {channels.map((c) => (
-                      <li key={c.channel} className="flex items-center justify-between text-sm">
-                        <span className="inline-flex items-center gap-2 text-slate-700">
-                          {c.channel === "COUNTER" ? <Store size={14} /> : <Globe size={14} />}
-                          {CHANNEL_LABEL[c.channel] || c.channel}
-                        </span>
-                        <span className="text-right">
-                          <b>{c.seats}</b> <span className="text-xs text-slate-500">seats · {money(c.amount)} ETB</span>
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
+                {!showLive && (
+                  <p className="rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-xs text-slate-500">
+                    This show is {selectedShow.status === "CANCELLED" ? "cancelled" : "disabled"}, so seats cannot be managed. Enable it to open the seat layout.
+                  </p>
                 )}
-              </div>
 
-              <div className={`${card} p-4`}>
-                <div className="font-bold text-slate-900 text-sm flex items-center gap-2 mb-2">
-                  <Plug size={15} className="text-[#e11d48]" /> Partner &amp; app connection
-                </div>
-                <p className="text-xs text-slate-600 mb-3">
-                  The website, your app and partner apps read this one live seat feed, so a seat sold or blocked here disappears everywhere at once.
-                </p>
-                <div className="flex gap-2">
-                  <input
-                    readOnly
-                    value={feedUrl}
-                    onFocus={(e) => e.currentTarget.select()}
-                    className="min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-[11px] font-mono text-slate-700"
+                {showLive && map && (
+                  <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+                    {[
+                      { label: "Available", value: map.counts.available, tone: "text-emerald-600" },
+                      { label: "Sold", value: map.counts.booked, tone: "text-slate-900" },
+                      { label: "Held", value: map.counts.held, tone: "text-amber-600" },
+                      { label: "Damaged", value: map.counts.screen_blocked, tone: "text-orange-600" },
+                      { label: "Blocked", value: map.counts.blocked, tone: "text-rose-600" },
+                      { label: "Revenue", value: money(map.revenue), tone: "text-slate-900" },
+                    ].map((c) => (
+                      <div key={c.label} className="rounded-xl border border-slate-200 bg-white px-3 py-2">
+                        <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">{c.label}</div>
+                        <div className={`text-lg font-black leading-tight ${c.tone}`}>{c.value}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+                  <PriceEditor
+                    key={`${selectedShow.id}-${tiers.map((t) => `${t.tier_name}:${t.price}`).join("|")}`}
+                    tiers={tiers}
+                    locked={isVenueWallTimeReached(selectedShow.starts_at)}
+                    saving={updating}
+                    onSave={(next) => savePrices(selectedShow, next)}
                   />
-                  <button type="button" className={`${btnSecondary} !px-2`} onClick={copyFeed} aria-label="Copy feed URL">
-                    {copied ? <Check size={14} /> : <Copy size={14} />}
-                  </button>
-                </div>
-                <p className="text-[11px] text-slate-500 mt-2 flex gap-1">
-                  <Info size={11} className="mt-0.5 shrink-0" /> Public read-only feed.
-                </p>
-              </div>
-            </>
-          )}
-        </div>
 
-        {/* ───────── Right: screen audit ───────── */}
-        <ScreenAuditPanel
-          screen={activeScreen}
-          row={auditRow}
-          rows={auditRows}
-          log={auditLog}
-          todayShows={todayShows}
-          hasLayout={screenHasLayout}
-          onSelectScreen={(id) => setScreenFilter(id)}
-          onOpenLayout={() => setLayoutOpen(true)}
-          onOpenInfo={() => setInfoOpen(true)}
-        />
+                  {showLive && map && (
+                    <div className="rounded-xl border border-slate-200 p-3">
+                      <div className="mb-2 flex items-center gap-2 text-xs font-bold text-slate-700">
+                        <Ticket size={13} className="text-[#e11d48]" /> Sold by channel
+                      </div>
+                      {channels.length === 0 ? (
+                        <p className="text-xs text-slate-500">No tickets sold for this show yet.</p>
+                      ) : (
+                        <ul className="space-y-2">
+                          {channels.map((c) => (
+                            <li key={c.channel} className="flex items-center justify-between text-sm">
+                              <span className="inline-flex items-center gap-2 text-slate-700">
+                                {c.channel === "COUNTER" ? <Store size={14} /> : <Globe size={14} />}
+                                {CHANNEL_LABEL[c.channel] || c.channel}
+                              </span>
+                              <span className="text-right">
+                                <b>{c.seats}</b> <span className="text-xs text-slate-500">seats · {money(c.amount)} ETB</span>
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Partner & app connection — hidden for now
+                {showLive && map && (
+                  <div className="rounded-xl border border-slate-200 p-3">
+                    <div className="mb-1.5 flex items-center gap-2 text-xs font-bold text-slate-700">
+                      <Plug size={13} className="text-[#e11d48]" /> Partner &amp; app connection
+                    </div>
+                    <div className="flex gap-2">
+                      <input
+                        readOnly
+                        value={feedUrl}
+                        onFocus={(e) => e.currentTarget.select()}
+                        className="min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-2 py-1.5 font-mono text-[11px] text-slate-700"
+                        aria-label="Live seat feed URL"
+                      />
+                      <button type="button" className={`${btnSecondary} !px-2`} onClick={copyFeed} aria-label="Copy feed URL">
+                        {copied ? <Check size={14} /> : <Copy size={14} />}
+                      </button>
+                    </div>
+                    <p className="mt-1.5 flex gap-1 text-[11px] text-slate-500">
+                      <Info size={11} className="mt-0.5 shrink-0" /> One live read-only feed for the website, your app and partner apps.
+                    </p>
+                  </div>
+                )}
+                */}
+              </>
+            )}
+          </div>
+        </div>
       </div>
 
       <ShowtimeFormModal
@@ -643,236 +602,52 @@ function Stat({ label, value, tone = "text-slate-900", hint }: { label: string; 
   );
 }
 
-/** Per-screen numbers: shows created (past, running, upcoming), revenue, blocked seats, and who blocked which seats. */
-function ScreenAuditPanel({
+/** View layout and the 3-dot menu for the chosen screen. */
+function ScreenActions({
   screen,
-  row,
-  rows,
-  log,
-  todayShows,
   hasLayout,
-  onSelectScreen,
   onOpenLayout,
   onOpenInfo,
 }: {
   screen: CinemaScreen | null;
-  row: CinemaScreenAuditRow | null;
-  rows: CinemaScreenAuditRow[];
-  log: CinemaScreenSeatAuditEntry[];
-  todayShows: MovieShowtime[];
   hasLayout: boolean;
-  onSelectScreen: (id: string) => void;
   onOpenLayout: () => void;
   onOpenInfo: () => void;
 }) {
-  if (!screen) {
-    return (
-      <div className={`${card} p-5 flex flex-col items-center justify-center text-center text-slate-500 min-h-[18rem]`}>
-        <Monitor size={40} className="text-slate-300 mb-3" />
-        <p className="font-semibold text-slate-700">No screen yet</p>
-        <p className="text-sm mt-1 max-w-xs">Add a screen under Screens &amp; Layouts first.</p>
-      </div>
-    );
-  }
-  const totals = rows.reduce(
-    (acc, r) => ({
-      revenue: acc.revenue + r.revenue.total,
-      shows: acc.shows + r.shows.total,
-      tickets: acc.tickets + r.revenue.tickets,
-    }),
-    { revenue: 0, shows: 0, tickets: 0 }
-  );
+  const [menuOpen, setMenuOpen] = useState(false);
+  if (!screen) return null;
   return (
-    <div className={`${card} p-4 sm:p-5 min-w-0 lg:overflow-y-auto space-y-5`}>
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="min-w-0">
-          <div className="text-lg font-extrabold text-slate-900 truncate">{displayScreenName(screen.name)} · audit</div>
-          <div className="text-xs text-slate-500">
-            {(screen.screen_type || "standard").toUpperCase()} · {screen.layout_name ? `${screen.layout_name} · ` : ""}
-            {screen.layout_seat_count || screen.capacity || 0} seats
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <button type="button" className={`${btnSecondary} !px-2.5`} onClick={onOpenInfo} title="About this screen" aria-label="About this screen">
-            <Info size={15} />
-          </button>
-          <button type="button" className={btnSecondary} onClick={onOpenLayout} disabled={!hasLayout} title={hasLayout ? "View the live layout" : "No live layout yet"}>
-            <Eye size={14} /> View layout
-          </button>
-        </div>
-      </div>
-
-      {!row ? (
-        <p className="text-sm text-slate-500">Loading numbers for this screen…</p>
-      ) : (
+    <div className="relative flex gap-2">
+      <button type="button" className={btnSecondary} onClick={onOpenLayout} disabled={!hasLayout} title={hasLayout ? "View the live layout" : "No live layout yet"}>
+        <Eye size={14} /> View layout
+      </button>
+      <button type="button" className={`${btnSecondary} !px-2.5`} onClick={() => setMenuOpen((v) => !v)} aria-label="More actions" aria-haspopup="menu" aria-expanded={menuOpen}>
+        <MoreVertical size={15} />
+      </button>
+      {menuOpen ? (
         <>
-          <div>
-            <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500 mb-2">Shows on this screen</div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              <Stat label="Created" value={row.shows.total} />
-              <Stat label="Running now" value={row.shows.current} tone="text-emerald-600" />
-              <Stat label="Upcoming" value={row.shows.upcoming} tone="text-sky-600" />
-              <Stat label="Completed" value={row.shows.past} tone="text-slate-600" />
-            </div>
-            <p className="text-[11px] text-slate-500 mt-2">
-              {row.shows.today} today
-              {row.shows.disabled > 0 ? ` · ${row.shows.disabled} disabled` : ""}
-              {row.shows.cancelled > 0 ? ` · ${row.shows.cancelled} cancelled` : ""}
-            </p>
-          </div>
-
-          <div>
-            <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500 mb-2">Today on this screen</div>
-            {todayShows.length === 0 ? (
-              <p className="text-xs text-slate-500">No shows scheduled for today.</p>
-            ) : (
-              <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200">
-                {[...todayShows]
-                  .sort((a, b) => String(a.starts_at).localeCompare(String(b.starts_at)))
-                  .map((st) => {
-                    const ended = !!st.ends_at && isVenueWallTimeReached(st.ends_at);
-                    const started = isVenueWallTimeReached(st.starts_at);
-                    const state = st.status === "CANCELLED" ? "Cancelled" : !st.is_active ? "Disabled" : ended ? "Completed" : started ? "Running now" : "Upcoming";
-                    const tone =
-                      state === "Running now" ? "bg-emerald-50 text-emerald-700 border-emerald-200" : state === "Upcoming" ? "bg-sky-50 text-sky-700 border-sky-200" : "bg-slate-100 text-slate-600 border-slate-200";
-                    return (
-                      <li key={st.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-xs">
-                        <span className="min-w-0">
-                          <span className="font-bold text-slate-900">{formatTime(st.starts_at)}</span>{" "}
-                          <span className="text-slate-700">{st.movie_title}</span>
-                          <span className="text-slate-400"> · {st.format || "2D"} · {st.language || "—"}</span>
-                        </span>
-                        <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${tone}`}>{state}</span>
-                      </li>
-                    );
-                  })}
-              </ul>
-            )}
-          </div>
-
-          <div>
-            <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500 mb-2">Revenue from this screen</div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              <Stat label="Total" value={`${money(row.revenue.total)}`} hint="ETB, tickets" />
-              <Stat label="Today's shows" value={`${money(row.revenue.today)}`} hint="ETB" />
-              <Stat label="Advance sales" value={`${money(row.revenue.advance)}`} hint="ETB, shows still to come" />
-              <Stat label="Tickets sold" value={row.revenue.tickets} />
-            </div>
-          </div>
-
-          <div>
-            <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500 mb-2">Sold by platform</div>
-            {row.channels.length === 0 ? (
-              <p className="text-xs text-slate-500">No tickets sold on this screen yet.</p>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                {row.channels.map((c) => (
-                  <div key={c.channel} className="rounded-xl border border-slate-200 bg-white px-3 py-2.5">
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
-                      {c.channel === "COUNTER" ? <Store size={13} className="text-[#e11d48]" /> : <Globe size={13} className="text-sky-500" />}
-                      {CHANNEL_LABEL[c.channel] || c.channel}
-                    </div>
-                    <div className="text-lg font-black text-slate-900 leading-tight mt-1">{money(c.amount)} <span className="text-[10px] font-semibold text-slate-500">ETB</span></div>
-                    <div className="text-[11px] text-slate-500">
-                      {c.tickets} ticket{c.tickets === 1 ? "" : "s"} · {c.bookings} booking{c.bookings === 1 ? "" : "s"}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-            <p className="text-[11px] text-slate-400 mt-1.5">Box office is offline sales taken by your staff. Website &amp; app are online sales.</p>
-          </div>
-
-          <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
-            <div>
-              <div className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
-                <Ban size={14} className="text-orange-500" /> Damaged seats on this screen
-              </div>
-              <div className="text-xs text-slate-500">
-                Hidden from every show and from customers. Mark or repair them under{" "}
-                <Link href="/movie/screens" className="font-semibold text-[#e11d48] hover:underline">
-                  Screens &amp; Layouts
-                </Link>
-                .
-              </div>
-            </div>
-            <div className="text-2xl font-black text-orange-600">{row.seats.blocked}</div>
+          <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
+          <div role="menu" className="absolute right-0 top-full z-20 mt-1 w-52 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-xl">
+            <button
+              type="button"
+              role="menuitem"
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+              onClick={() => {
+                setMenuOpen(false);
+                onOpenInfo();
+              }}
+            >
+              <Info size={14} /> About this screen
+            </button>
+            <Link href="/movie/screens" role="menuitem" className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50" onClick={() => setMenuOpen(false)}>
+              <Ban size={14} /> Damaged seats
+            </Link>
+            <Link href={`/movie/screen-audit?screen=${screen.id}`} role="menuitem" className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50" onClick={() => setMenuOpen(false)}>
+              <BarChart3 size={14} /> Screen audit
+            </Link>
           </div>
         </>
-      )}
-
-      <div>
-        <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500 mb-2">All screens</div>
-        <div className="overflow-x-auto rounded-xl border border-slate-200">
-          <table className="w-full min-w-[34rem] text-left text-xs">
-            <thead className="bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500">
-              <tr>
-                <th className="px-3 py-2">Screen</th>
-                <th className="px-2 py-2 text-right">Shows</th>
-                <th className="px-2 py-2 text-right">Now</th>
-                <th className="px-2 py-2 text-right">Upcoming</th>
-                <th className="px-2 py-2 text-right">Damaged</th>
-                <th className="px-3 py-2 text-right">Revenue (ETB)</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {rows.map((r) => (
-                <tr
-                  key={r.screen_id}
-                  onClick={() => onSelectScreen(r.screen_id)}
-                  className={`cursor-pointer hover:bg-rose-50/50 ${r.screen_id === screen.id ? "bg-rose-50" : ""}`}
-                >
-                  <td className="px-3 py-2 font-semibold text-slate-800">{displayScreenName(r.name)}</td>
-                  <td className="px-2 py-2 text-right">{r.shows.total}</td>
-                  <td className="px-2 py-2 text-right text-emerald-600">{r.shows.current}</td>
-                  <td className="px-2 py-2 text-right text-sky-600">{r.shows.upcoming}</td>
-                  <td className="px-2 py-2 text-right text-orange-600">{r.seats.blocked}</td>
-                  <td className="px-3 py-2 text-right font-bold">{money(r.revenue.total)}</td>
-                </tr>
-              ))}
-              {rows.length > 1 && (
-                <tr className="bg-slate-50 font-bold">
-                  <td className="px-3 py-2">All screens</td>
-                  <td className="px-2 py-2 text-right">{totals.shows}</td>
-                  <td colSpan={2} />
-                  <td className="px-2 py-2 text-right text-slate-500">{totals.tickets} tickets</td>
-                  <td className="px-3 py-2 text-right">{money(totals.revenue)}</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <div>
-        <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500 mb-2 flex items-center gap-1.5">
-          <History size={12} /> Damaged seat history
-        </div>
-        {log.length === 0 ? (
-          <p className="text-xs text-slate-500">No seats have been marked damaged or repaired on this screen yet.</p>
-        ) : (
-          <ul className="space-y-2">
-            {log.map((e) => (
-              <li key={e.id} className="rounded-xl border border-slate-200 px-3 py-2 text-xs">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className={`font-bold ${e.action === "BLOCK" ? "text-orange-600" : "text-emerald-600"}`}>
-                    {e.action === "BLOCK" ? "Marked damaged" : "Repaired"} · {e.seat_count} seat{e.seat_count === 1 ? "" : "s"}
-                  </span>
-                  <span className="text-slate-500">
-                    {when(e.created_at)}
-                    {e.user_name ? ` · ${e.user_name}` : ""}
-                  </span>
-                </div>
-                <div className="mt-0.5 text-slate-700 break-words">
-                  {e.seat_labels.slice(0, 24).join(", ")}
-                  {e.seat_labels.length > 24 ? ` +${e.seat_labels.length - 24} more` : ""}
-                </div>
-                {e.note ? <div className="mt-0.5 text-slate-500 italic">“{e.note}”</div> : null}
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+      ) : null}
     </div>
   );
 }
@@ -945,11 +720,9 @@ function ScreenLayoutModal({ screen, onClose }: { screen: CinemaScreen; onClose:
             <X size={18} />
           </button>
         </div>
-        <LayoutSeatPreview
+        <ClassicSeatMap
           seats={seats as never}
-          config={screen.layout_seating_config}
           heightClass="h-[min(60vh,520px)]"
-          className="bg-white"
           seatMarker={(raw) => {
             const seat = raw as unknown as LayoutSeatRecord;
             const status = seatStatusOf(seat);

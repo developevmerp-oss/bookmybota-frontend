@@ -8,7 +8,7 @@ import { useGetCinemaScreensQuery, useGetPartnerMovieShowtimesQuery, type MovieS
 import { isVenueWallTimeReached, venueDateStr } from "@/lib/dateFormat";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { AdminListShimmer } from "@/components/Shared/Shimmer";
-import { displayScreenName, formatDateHeader, formatTime, shiftYmd, sortedTierPricing, toYmdLocal } from "./showtimeHelpers";
+import { displayScreenName, formatDateHeader, formatTime, shiftYmd, toYmdLocal } from "./showtimeHelpers";
 
 const card = "rounded-2xl border border-slate-200 bg-white shadow-sm";
 const selectCls =
@@ -136,25 +136,19 @@ export default function MovieBookTicketsBrowser() {
     const off = !st.is_active || st.status === "CANCELLED";
     const soldOut = capacity > 0 && left === 0;
     const closed = started || off || soldOut;
-    const from = sortedTierPricing(st.tier_pricing)[0]?.price;
     const label = off ? (st.status === "CANCELLED" ? "Cancelled" : "Disabled") : started ? "Started" : soldOut ? "Sold out" : `${left} left`;
     const body = (
       <>
         <span className="block text-sm font-extrabold leading-tight">{formatTime(st.starts_at)}</span>
-        <span className="block text-[11px] font-semibold opacity-80">{displayScreenName(st.screen_name)}</span>
         <span className="block text-[10px] opacity-70">
           {st.format || "2D"} · {st.language || "—"}
-        </span>
-        <span className="block text-[10px] font-bold mt-0.5">
-          {label}
-          {from != null && !closed ? ` · from ${from} ETB` : ""}
         </span>
       </>
     );
     return closed ? (
       <span
         key={st.id}
-        title={label}
+        title={`${displayScreenName(st.screen_name)} · ${label}`}
         className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-slate-400 cursor-not-allowed select-none"
       >
         {body}
@@ -163,7 +157,7 @@ export default function MovieBookTicketsBrowser() {
       <Link
         key={st.id}
         href={`/movie/bookings/new?show=${st.id}`}
-        title="Open the seat layout and book seats"
+        title={`${displayScreenName(st.screen_name)} · Open the seat layout and book seats`}
         className="rounded-xl border border-emerald-300 bg-emerald-50/60 px-3 py-2 text-emerald-800 hover:border-emerald-500 hover:bg-emerald-50 transition-colors"
       >
         {body}

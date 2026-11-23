@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import ClassicSeatMap from "@/components/venue/ClassicSeatMap";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -221,6 +222,8 @@ export default function MovieSeatManagerPage() {
         coordinate_y: s.y,
         color: s.color,
         section_name: s.section,
+        row_label: s.row,
+        seat_label: s.number,
         status: "AVAILABLE",
       })),
     [map?.seats]
@@ -467,11 +470,9 @@ export default function MovieSeatManagerPage() {
                       );
                     })}
                   </div>
-                  <LayoutSeatPreview
+                  <ClassicSeatMap
                     seats={previewSeats}
-                    config={map.layout?.seating_config}
                     heightClass="h-[min(68vh,560px)]"
-                    className="bg-white dark:bg-zinc-950"
                     seatMarker={(raw) => {
                       const key = String((raw as { key?: string }).key || "");
                       const live = seatByKey.get(key);

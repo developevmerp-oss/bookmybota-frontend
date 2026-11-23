@@ -1,34 +1,31 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { AdminListShimmer } from "@/components/Shared/Shimmer";
+import ClassicSeatMap from "@/components/venue/ClassicSeatMap";
+import ConfirmDialog from "@/components/Shared/ConfirmDialog";
 import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import { toast } from "sonner";
-import { CheckCircle, CheckCircle2, Clapperboard, Clock, Ban, Eye, Layers, Plus, RefreshCw, X } from "lucide-react";
+import { Ban, Check, Clapperboard, Clock, Eye, FilePlus2, MonitorPlay, Plus, RefreshCw, X } from "lucide-react";
+import { AdminListShimmer } from "@/components/Shared/Shimmer";
 import { useAppSelector } from "@/lib/hooks";
 import {
   useApproveVenueLayoutTemplateMutation,
-  usePublishVenueLayoutTemplateMutation,
   useCreateCinemaScreenMutation,
   useCreateVenueLayoutRequestMutation,
   useGetCinemaScreensQuery,
-  useGetVenueLayoutTemplatesQuery,
   useGetVenueLayoutTemplateQuery,
+  useGetVenueLayoutTemplatesQuery,
+  usePublishVenueLayoutTemplateMutation,
   useRejectVenueLayoutTemplateMutation,
-  useRejectAllVenueLayoutTemplatesMutation,
-  useUpdateCinemaScreenMutation,
   useUpdateCinemaScreenSeatStatusesMutation,
   type CinemaScreen,
   type VenueLayoutTemplate,
 } from "@/services/api";
 import { extractApiError } from "@/lib/apiErrors";
+import { CINEMA_SCREEN_TYPES } from "@/lib/cinemaScreenTypes";
 import LayoutSeatPreview from "@/components/venue/LayoutSeatPreview";
-import {
-  buildCinemaSeatTypeZones,
-  CINEMA_SEAT_TYPE_FIELDS,
-  seatTypesTotal,
-} from "@/lib/cinemaSeatTypes";
+import { buildCinemaSeatTypeZones, CINEMA_SEAT_TYPE_FIELDS, seatTypesTotal } from "@/lib/cinemaSeatTypes";
 import {
   cinemaScreenFormSchema,
   emptyCinemaScreenFormValues,
@@ -37,176 +34,93 @@ import {
   type LayoutRejectReasonValues,
 } from "@/lib/moviePartnerFormSchemas";
 
-const fieldErrorClass = "mt-1.5 text-xs text-rose-400 font-medium";
+const card = "rounded-2xl border border-slate-200 bg-white shadow-sm";
+const inputCls =
+  "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:border-rose-400 focus:ring-1 focus:ring-rose-500/20";
+const labelCls = "block text-xs font-semibold text-slate-600 mb-1";
+const errCls = "mt-1 text-xs text-rose-600 font-medium";
+const btnPrimary =
+  "inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#e11d48] px-3.5 py-2 text-xs font-bold text-white hover:bg-[#be123c] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer";
+const btnSecondary =
+  "inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:border-slate-300 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer";
+const btnDanger =
+  "inline-flex items-center justify-center gap-1.5 rounded-xl border border-rose-200 bg-white px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer";
 
-function RequiredMark() {
-  return <span className="text-rose-500">*</span>;
-}
+const SCREEN_TYPES = CINEMA_SCREEN_TYPES;
 
-const SCREEN_TYPES = [
-  { value: "standard", label: "Standard" },
-  { value: "imax", label: "IMAX" },
-  { value: "4dx", label: "4DX" },
-  { value: "other", label: "Other" },
-];
-
-type LayoutPhase =
-  | "none"
-  | "draft"
-  | "awaiting_admin"
-  | "ready_to_approve"
-  | "shortlisted"
-  | "awaiting_live"
-  | "approved"
-  | "rejected";
+type LayoutPhase = "none" | "draft" | "awaiting_admin" | "ready_to_approve" | "shortlisted" | "awaiting_live" | "approved" | "rejected";
 
 function resolveLayoutPhase(screen: CinemaScreen): LayoutPhase {
-  if (screen.layout_is_default && (screen.venue_layout_template_id || screen.layout_template_id)) {
-    return "approved";
-  }
-  if (Number(screen.awaiting_live_count || 0) > 0) {
-    return "awaiting_live";
-  }
-  if (Number(screen.pending_options_count || 0) > 0) {
-    return "ready_to_approve";
-  }
-  if (Number(screen.shortlisted_options_count || 0) > 0) {
-    return "shortlisted";
-  }
-  if (screen.pending_template_id) {
-    return "ready_to_approve";
-  }
+  if (screen.layout_is_default && (screen.venue_layout_template_id || screen.layout_template_id)) return "approved";
+  if (Number(screen.awaiting_live_count || 0) > 0) return "awaiting_live";
+  if (Number(screen.pending_options_count || 0) > 0) return "ready_to_approve";
+  if (Number(screen.shortlisted_options_count || 0) > 0) return "shortlisted";
+  if (screen.pending_template_id) return "ready_to_approve";
   const reqStatus = String(screen.layout_request_status || "").toUpperCase();
   if (reqStatus === "REJECTED") return "rejected";
   if (reqStatus === "DRAFT") return "draft";
-  if (reqStatus === "SUBMITTED" || reqStatus === "UNDER_REVIEW" || reqStatus === "APPROVED") {
-    return "awaiting_admin";
-  }
+  if (reqStatus === "SUBMITTED" || reqStatus === "UNDER_REVIEW" || reqStatus === "APPROVED") return "awaiting_admin";
   return "none";
 }
 
-const PHASE_META: Record<
-  LayoutPhase,
-  { label: string; hint: string; badgeClass: string }
-> = {
-  none: {
-    label: "No layout",
-    hint: "Request a seat layout from Super Admin.",
-    badgeClass: "bg-slate-100 text-slate-600 border-slate-200",
-  },
-  draft: {
-    label: "Draft request",
-    hint: "Finish and submit this request to Super Admin.",
-    badgeClass: "bg-slate-100 text-slate-700 border-slate-200",
-  },
+const PHASE_META: Record<LayoutPhase, { label: string; hint: string; badge: string }> = {
+  none: { label: "No layout yet", hint: "Request a seat layout from the admin team.", badge: "bg-slate-100 text-slate-600 border-slate-200" },
+  draft: { label: "Draft request", hint: "Finish and send this request.", badge: "bg-slate-100 text-slate-700 border-slate-200" },
   awaiting_admin: {
-    label: "Awaiting layout",
-    hint: "Super Admin is building this screen’s seat map. You’ll see Review layout when it’s ready.",
-    badgeClass: "bg-amber-50 text-amber-700 border-amber-200",
+    label: "Request sent",
+    hint: "The admin team is building this screen's seat map. You will be asked to approve it here.",
+    badge: "bg-amber-50 text-amber-700 border-amber-200",
   },
-  ready_to_approve: {
-    label: "Ready to review",
-    hint: "Super Admin published layout option(s). Review and approve the ones you like.",
-    badgeClass: "bg-sky-50 text-sky-700 border-sky-200",
-  },
-  shortlisted: {
-    label: "Options approved",
-    hint: "Pick an approved layout and request it to go live.",
-    badgeClass: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  },
-  awaiting_live: {
-    label: "Awaiting go-live",
-    hint: "Go-live request sent. Super Admin will confirm before publishing.",
-    badgeClass: "bg-purple-50 text-purple-700 border-purple-200",
-  },
-  approved: {
-    label: "Layout ready",
-    hint: "Approved seat map is active on this screen.",
-    badgeClass: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  },
-  rejected: {
-    label: "Rejected",
-    hint: "Previous layout was rejected. Submit a new request.",
-    badgeClass: "bg-rose-50 text-rose-700 border-rose-200",
-  },
+  ready_to_approve: { label: "Ready to review", hint: "A layout is waiting for your approval.", badge: "bg-sky-50 text-sky-700 border-sky-200" },
+  shortlisted: { label: "Approved", hint: "Approved. Send it live.", badge: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+  awaiting_live: { label: "Going live", hint: "Approved. The admin team will confirm before it goes live.", badge: "bg-purple-50 text-purple-700 border-purple-200" },
+  approved: { label: "Live", hint: "This layout is live on the screen.", badge: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+  rejected: { label: "Rejected", hint: "The last layout was rejected. Send a new request.", badge: "bg-rose-50 text-rose-700 border-rose-200" },
 };
 
-const LAYOUT_STEPS = ["Screen added", "Layout requested", "Review & approve", "Go-live", "Live"];
-
-/** Which of LAYOUT_STEPS is current (0-based) for a phase. */
-function phaseStep(phase: LayoutPhase): number {
-  switch (phase) {
-    case "none":
-    case "draft":
-    case "rejected":
-      return 0;
-    case "awaiting_admin":
-      return 1;
-    case "ready_to_approve":
-    case "shortlisted":
-      return 2;
-    case "awaiting_live":
-      return 3;
-    case "approved":
-      return 4;
-  }
-}
-
-function LayoutStepper({ phase }: { phase: LayoutPhase }) {
-  const current = phaseStep(phase);
+function Modal({ title, onClose, children, wide }: { title: string; onClose: () => void; children: React.ReactNode; wide?: boolean }) {
   return (
-    <ol className="flex flex-wrap items-center gap-x-1 gap-y-1 text-[11px]" aria-label="Layout progress">
-      {LAYOUT_STEPS.map((label, i) => {
-        const done = i < current || phase === "approved";
-        const active = i === current && phase !== "approved";
-        return (
-          <li key={label} className="flex items-center gap-1">
-            <span
-              className={`inline-flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold ${
-                done
-                  ? "bg-emerald-500 text-white"
-                  : active
-                    ? "bg-fuchsia-500 text-white ring-2 ring-fuchsia-300/40"
-                    : "bg-zinc-700/60 text-zinc-400"
-              }`}
-            >
-              {done ? "✓" : i + 1}
-            </span>
-            <span className={active ? "font-semibold text-white" : done ? "text-zinc-300" : "text-zinc-500"}>
-              {label}
-            </span>
-            {i < LAYOUT_STEPS.length - 1 && <span className="mx-1 text-zinc-600">›</span>}
-          </li>
-        );
-      })}
-    </ol>
+    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        className={`w-full ${wide ? "max-w-3xl" : "max-w-lg"} max-h-[92vh] overflow-y-auto rounded-2xl bg-white border border-slate-200 shadow-2xl p-5 space-y-4`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <h3 className="text-base font-extrabold text-slate-900">{title}</h3>
+          <button type="button" onClick={onClose} aria-label="Close" className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer">
+            <X size={18} />
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
   );
 }
 
 export default function CinemaScreensPage() {
   const user = useAppSelector((state) => state.auth.user);
   const bizId = user?.business_id ?? "";
-  const { data: screens = [], isLoading, refetch } = useGetCinemaScreensQuery(bizId, {
-    skip: !bizId,
-  });
+
+  const { data: screens = [], isLoading, refetch } = useGetCinemaScreensQuery(bizId, { skip: !bizId });
   const { data: layoutOptions = [] } = useGetVenueLayoutTemplatesQuery(bizId, { skip: !bizId });
   const [createScreen, { isLoading: creating }] = useCreateCinemaScreenMutation();
-  const [updateScreen, { isLoading: updating }] = useUpdateCinemaScreenMutation();
-  const [createLayoutRequest, { isLoading: submittingLayout }] = useCreateVenueLayoutRequestMutation();
+  const [createLayoutRequest, { isLoading: sendingRequest }] = useCreateVenueLayoutRequestMutation();
   const [approveLayout, { isLoading: approving }] = useApproveVenueLayoutTemplateMutation();
   const [publishLayout, { isLoading: publishing }] = usePublishVenueLayoutTemplateMutation();
   const [rejectLayout, { isLoading: rejecting }] = useRejectVenueLayoutTemplateMutation();
-  const [rejectAllLayouts, { isLoading: rejectingAll }] = useRejectAllVenueLayoutTemplatesMutation();
-  const [updateSeatStatuses, { isLoading: isUpdatingSeatStatuses }] =
-    useUpdateCinemaScreenSeatStatusesMutation();
-  const [rejectId, setRejectId] = useState<string | null>(null);
-  const [rejectAllScreenId, setRejectAllScreenId] = useState<string | null>(null);
-  const [viewingTemplateId, setViewingTemplateId] = useState<string | null>(null);
 
-  const [layoutScreenId, setLayoutScreenId] = useState<string | null>(null);
+  const [tab, setTab] = useState<"active" | "admin">("active");
+  const [addOpen, setAddOpen] = useState(false);
+  const [requestScreenId, setRequestScreenId] = useState<string | null | "pick">(null);
+  const [requestNotes, setRequestNotes] = useState("");
+  const [confirmSend, setConfirmSend] = useState(false);
+  const [requestPicked, setRequestPicked] = useState("");
+  const [rejectId, setRejectId] = useState<string | null>(null);
+  const [viewingTemplateId, setViewingTemplateId] = useState<string | null>(null);
   const [previewScreenId, setPreviewScreenId] = useState<string | null>(null);
-  const [reviewScreenId, setReviewScreenId] = useState<string | null>(null);
-  const [editingScreenId, setEditingScreenId] = useState<string | null>(null);
+  const [damageMode, setDamageMode] = useState(false);
 
   const { data: viewingLayout } = useGetVenueLayoutTemplateQuery(
     { bizId, templateId: viewingTemplateId || "" },
@@ -217,7 +131,6 @@ export default function CinemaScreensPage() {
     register: registerScreen,
     handleSubmit: handleScreenSubmit,
     reset: resetScreenForm,
-    getValues: getScreenValues,
     watch: watchScreen,
     formState: { errors: screenErrors },
   } = useForm<CinemaScreenFormValues>({
@@ -226,14 +139,9 @@ export default function CinemaScreensPage() {
     defaultValues: emptyCinemaScreenFormValues(),
     mode: "onSubmit",
   });
-
-  const watchedCapacity = watchScreen("capacity");
-  const watchedRegular = watchScreen("regular_seats");
-  const watchedRecliner = watchScreen("recliner_seats");
-  const watchedCouple = watchScreen("couple_seats");
   const assignedSeats =
-    (Number(watchedRegular) || 0) + (Number(watchedRecliner) || 0) + (Number(watchedCouple) || 0);
-  const totalCapacity = Number(watchedCapacity) || 0;
+    (Number(watchScreen("regular_seats")) || 0) + (Number(watchScreen("recliner_seats")) || 0) + (Number(watchScreen("couple_seats")) || 0);
+  const totalCapacity = Number(watchScreen("capacity")) || 0;
   const remainingSeats = totalCapacity - assignedSeats;
 
   const {
@@ -248,106 +156,24 @@ export default function CinemaScreensPage() {
     mode: "onSubmit",
   });
 
-  const selectedScreen = useMemo(
-    () => screens.find((s) => s.id === layoutScreenId) || null,
-    [screens, layoutScreenId]
+  const phaseOf = useMemo(() => new Map(screens.map((s) => [s.id, resolveLayoutPhase(s)])), [screens]);
+  const activeScreens = screens.filter((s) => phaseOf.get(s.id) === "approved");
+  const hasLiveLayoutFor = (opt: VenueLayoutTemplate) =>
+    screens.some((s) => phaseOf.get(s.id) === "approved" && !!s.hall_id && s.hall_id === opt.hall_id);
+
+  // Layouts the admin team provided that are still waiting on this cinema
+  const waitingOptions = layoutOptions.filter(
+    (o) => o.status === "PUBLISHED" && !o.is_default && !o.venue_live_requested_at && !hasLiveLayoutFor(o)
   );
-  const previewScreen = useMemo(
-    () => screens.find((s) => s.id === previewScreenId) || null,
-    [screens, previewScreenId]
-  );
-  const reviewScreen = useMemo(
-    () => screens.find((s) => s.id === reviewScreenId) || null,
-    [screens, reviewScreenId]
-  );
-  const editingScreen = useMemo(
-    () => screens.find((s) => s.id === editingScreenId) || null,
-    [screens, editingScreenId]
-  );
+  const goingLiveOptions = layoutOptions.filter((o) => o.status === "PUBLISHED" && !o.is_default && !!o.venue_live_requested_at);
+  const requestScreens = screens.filter((s) => {
+    const p = phaseOf.get(s.id);
+    return p === "none" || p === "draft" || p === "awaiting_admin" || p === "rejected";
+  });
+  const adminCount = waitingOptions.length + goingLiveOptions.length;
 
-  const screenLayoutOptions = useMemo(() => {
-    if (!reviewScreen) return [];
-    return layoutOptions.filter(
-      (o) =>
-        (reviewScreen.hall_id && o.hall_id === reviewScreen.hall_id) ||
-        (reviewScreen.layout_request_id && o.request_id === reviewScreen.layout_request_id) ||
-        (reviewScreen.pending_template_id && o.id === reviewScreen.pending_template_id)
-    );
-  }, [layoutOptions, reviewScreen]);
-
-  const pendingScreenOptions = useMemo(
-    () =>
-      screenLayoutOptions.filter(
-        (o) =>
-          o.status === "PUBLISHED" &&
-          !o.is_default &&
-          !o.venue_approved_at &&
-          !o.venue_live_requested_at
-      ),
-    [screenLayoutOptions]
-  );
-
-  const shortlistedScreenOptions = useMemo(
-    () =>
-      screenLayoutOptions.filter(
-        (o) =>
-          o.status === "PUBLISHED" &&
-          !o.is_default &&
-          !!o.venue_approved_at &&
-          !o.venue_live_requested_at
-      ),
-    [screenLayoutOptions]
-  );
-
-  const screenAwaitingLive = useMemo(
-    () => screenLayoutOptions.filter((o) => !!o.venue_live_requested_at && !o.is_default),
-    [screenLayoutOptions]
-  );
-
-  const screenReviewLocked = useMemo(
-    () => screenLayoutOptions.some((o) => o.is_default || !!o.venue_live_requested_at),
-    [screenLayoutOptions]
-  );
-
-  const editingTemplate = useMemo(() => {
-    if (!editingScreen) return null;
-    const tId = editingScreen.venue_layout_template_id || editingScreen.layout_template_id;
-    return layoutOptions.find((t) => t.id === tId) || null;
-  }, [editingScreen, layoutOptions]);
-
-  const editingInitialSeats = useMemo(() => {
-    if (!editingScreen) return [];
-    const raw = editingTemplate?.seats_json ?? editingScreen.layout_seats_json;
-    if (Array.isArray(raw)) return raw;
-    if (typeof raw === "string") {
-      try {
-        return JSON.parse(raw);
-      } catch {
-        return [];
-      }
-    }
-    return [];
-  }, [editingScreen, editingTemplate]);
-
-  const editingInitialConfig = useMemo(() => {
-    if (!editingScreen) return undefined;
-    const raw = editingTemplate?.seating_config ?? editingScreen.layout_seating_config;
-    if (raw && typeof raw === "object") return raw;
-    if (typeof raw === "string") {
-      try {
-        return JSON.parse(raw);
-      } catch {
-        return undefined;
-      }
-    }
-    return undefined;
-  }, [editingScreen, editingTemplate]);
-
-  const openRejectModal = (templateId: string) => {
-    setRejectId(templateId);
-    setRejectAllScreenId(null);
-    resetRejectForm({ reason: "" });
-  };
+  const previewScreen = screens.find((s) => s.id === previewScreenId) || null;
+  const requestScreen = requestScreenId && requestScreenId !== "pick" ? screens.find((s) => s.id === requestScreenId) || null : null;
 
   const onCreate = async (values: CinemaScreenFormValues) => {
     if (!bizId) return;
@@ -367,101 +193,31 @@ export default function CinemaScreensPage() {
       }).unwrap();
       toast.success((res as { message?: string })?.message || "Screen created");
       resetScreenForm(emptyCinemaScreenFormValues());
+      setAddOpen(false);
     } catch (err) {
       toast.error(extractApiError(err, "Failed to create screen"));
     }
   };
 
-  const onReject = async (values: LayoutRejectReasonValues) => {
-    if (!bizId) return;
-    try {
-      if (rejectAllScreenId) {
-        const screenToReject = screens.find((s) => s.id === rejectAllScreenId);
-        await rejectAllLayouts({
-          bizId,
-          hall_id: screenToReject?.hall_id || undefined,
-          request_id: screenToReject?.layout_request_id || undefined,
-          reason: values.reason.trim(),
-        }).unwrap();
-        toast.success("All pending layout options rejected.");
-        setRejectAllScreenId(null);
-      } else if (rejectId) {
-        const res = await rejectLayout({
-          bizId,
-          templateId: rejectId,
-          reason: values.reason.trim(),
-        }).unwrap();
-        toast.success((res as { message?: string })?.message || "Layout rejected");
-        setRejectId(null);
-      }
-      resetRejectForm({ reason: "" });
-      refetch();
-    } catch (err) {
-      toast.error(extractApiError(err, "Reject failed"));
-    }
+  const openRequest = (screenId: string | "pick") => {
+    setRequestNotes("");
+    setRequestPicked(screenId === "pick" ? requestScreens[0]?.id || screens[0]?.id || "" : screenId);
+    setRequestScreenId(screenId);
   };
 
-  const handleApproveOption = async (templateId: string) => {
-    if (!bizId) return;
-    try {
-      await approveLayout({ bizId, templateId }).unwrap();
-      toast.success("Layout approved. You can approve more options, then request one to go live.");
-      refetch();
-    } catch (err) {
-      toast.error(extractApiError(err, "Failed to approve layout"));
-    }
-  };
-
-  /** One click: approve this option and ask Super Admin to make it live (they still confirm). */
-  const handleApproveAndGoLive = async (templateId: string) => {
-    if (!bizId) return;
-    try {
-      await approveLayout({ bizId, templateId }).unwrap();
-      await publishLayout({ bizId, templateId }).unwrap();
-      toast.success("Layout approved and go-live requested. Super Admin will confirm before it goes live.");
-    } catch (err) {
-      toast.error(extractApiError(err, "Could not approve and request go live"));
-    } finally {
-      refetch();
-    }
-  };
-
-  const handleRequestGoLive = async (templateId: string) => {
-    if (!bizId) return;
-    try {
-      await publishLayout({ bizId, templateId }).unwrap();
-      toast.success("Go-live request sent. Super Admin will confirm before this layout goes live.");
-      refetch();
-    } catch (err) {
-      toast.error(extractApiError(err, "Failed to request go live"));
-    }
-  };
-
-  const toggleActive = async (screen: CinemaScreen) => {
-    if (!bizId) return;
-    try {
-      const res = await updateScreen({
-        bizId,
-        screenId: screen.id,
-        body: { is_active: !screen.is_active },
-      }).unwrap();
-      toast.success(
-        (res as { message?: string })?.message ||
-          (screen.is_active ? "Screen disabled" : "Screen enabled")
-      );
-    } catch (err) {
-      toast.error(extractApiError(err, "Failed to update screen"));
-    }
-  };
-
-  const submitLayout = async (submitNow: boolean) => {
-    if (!bizId || !selectedScreen?.hall_id) {
-      toast.error("This screen is missing a linked hall. Recreate the screen.");
+  const submitRequest = async () => {
+    const target = screens.find((s) => s.id === (requestScreenId === "pick" ? requestPicked : requestScreenId));
+    if (!bizId || !target?.hall_id) {
+      toast.error("Pick a screen first. (A screen needs to be created before it can get a layout.)");
       return;
     }
-    const formCapacity = Number(getScreenValues("capacity")) || 0;
-    const cap = Number(selectedScreen.capacity) || formCapacity || 100;
-    const rawTypes = (selectedScreen.seat_types_json || {}) as Record<string, unknown>;
+    const notes = requestNotes.trim();
+    if (!notes) {
+      toast.error("Add a short note so the admin team knows what you need.");
+      return;
+    }
+    const cap = Number(target.capacity) || 100;
+    const rawTypes = (target.seat_types_json || {}) as Record<string, unknown>;
     const seatTypes = {
       regular: Number(rawTypes.regular) || 0,
       recliner: Number(rawTypes.recliner) || 0,
@@ -475,1101 +231,627 @@ export default function CinemaScreensPage() {
             { name: "Recliner", capacity: Math.max(1, Math.round(cap * 0.2)), seat_type: "recliner" as const },
             { name: "Couple", capacity: Math.max(1, Math.round(cap * 0.1)), seat_type: "couple" as const },
           ];
-    const phase = resolveLayoutPhase(selectedScreen);
+    const phase = resolveLayoutPhase(target);
     try {
       const res = await createLayoutRequest({
         bizId,
-        ...(phase === "draft" && selectedScreen.layout_request_id
-          ? { request_id: selectedScreen.layout_request_id }
-          : {}),
-        hall_id: selectedScreen.hall_id,
-        hall_name: selectedScreen.name,
+        ...(phase === "draft" && target.layout_request_id ? { request_id: target.layout_request_id } : {}),
+        hall_id: target.hall_id,
+        hall_name: target.name,
         hall_capacity: cap,
-        layout_name: `${selectedScreen.name} seating`,
+        layout_name: `${target.name} seating`,
         layout_type: "theater",
         capacity: cap,
         is_indoor: true,
         spec_json: {
-          hall_name: selectedScreen.name,
+          hall_name: target.name,
           hall_capacity: cap,
           zones,
           seat_types: seatTypes,
-          notes: `Cinema screen layout for ${selectedScreen.name}`,
+          notes,
           intake_mode: "structured_request",
         },
-        submit_now: submitNow,
+        submit_now: true,
       }).unwrap();
-      toast.success(
-        (res as { message?: string })?.message ||
-          (submitNow ? "Layout request submitted to Super Admin" : "Layout draft saved")
-      );
-      setLayoutScreenId(null);
+      toast.success((res as { message?: string })?.message || "Layout request sent");
+      setRequestScreenId(null);
+      setRequestNotes("");
+      setTab("admin");
       refetch();
     } catch (err) {
-      toast.error(extractApiError(err, "Failed to submit layout request"));
+      toast.error(extractApiError(err, "Failed to send the layout request"));
     }
   };
 
-  if (!bizId) {
-    return <p className="text-zinc-400">Cinema business not linked to this account.</p>;
-  }
+  /** Approve a layout the admin team provided. It is sent for go-live straight away (they confirm). */
+  const approveOption = async (opt: VenueLayoutTemplate) => {
+    if (!bizId) return;
+    try {
+      if (!opt.venue_approved_at) await approveLayout({ bizId, templateId: opt.id }).unwrap();
+      await publishLayout({ bizId, templateId: opt.id }).unwrap();
+      toast.success("Layout approved and live on the screen.");
+      setViewingTemplateId(null);
+    } catch (err) {
+      toast.error(extractApiError(err, "Could not approve this layout"));
+    } finally {
+      await refetch();
+    }
+  };
+
+  const onReject = async (values: LayoutRejectReasonValues) => {
+    if (!bizId || !rejectId) return;
+    try {
+      const res = await rejectLayout({ bizId, templateId: rejectId, reason: values.reason.trim() }).unwrap();
+      toast.success((res as { message?: string })?.message || "Layout rejected");
+      setRejectId(null);
+      setViewingTemplateId(null);
+      resetRejectForm({ reason: "" });
+      refetch();
+    } catch (err) {
+      toast.error(extractApiError(err, "Reject failed"));
+    }
+  };
+
+  if (!bizId) return <p className="text-slate-500">Cinema business not linked to this account.</p>;
+
+  const tabBtn = (id: "active" | "admin", label: string, count: number) => (
+    <button
+      type="button"
+      onClick={() => setTab(id)}
+      className={`px-4 py-2 text-sm font-bold border-b-2 -mb-px cursor-pointer ${
+        tab === id ? "border-[#e11d48] text-[#e11d48]" : "border-transparent text-slate-500 hover:text-slate-800"
+      }`}
+    >
+      {label} <span className="ml-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600">{count}</span>
+    </button>
+  );
+
+  const optionCard = (opt: VenueLayoutTemplate, state: "waiting" | "approved" | "going_live") => (
+    <div key={opt.id} className={`${card} overflow-hidden flex flex-col`}>
+      <div className="p-3 border-b border-slate-100 bg-slate-50">
+        <ClassicSeatMap seats={opt.seats_json} heightClass="h-40" fitAll />
+      </div>
+      <div className="p-4 flex flex-1 flex-col gap-3">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="truncate text-sm font-bold text-slate-900">{opt.name}</p>
+            <p className="text-xs text-slate-500">
+              {opt.hall_name || "Screen"} · {opt.seat_count ?? 0} seats · capacity {opt.capacity}
+            </p>
+          </div>
+          <span
+            className={`shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase ${
+              state === "going_live"
+                ? "bg-purple-50 text-purple-700 border-purple-200"
+                : state === "approved"
+                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                  : "bg-amber-50 text-amber-700 border-amber-200"
+            }`}
+          >
+            {state === "going_live" ? "Approved" : state === "approved" ? "Approved" : "Needs your approval"}
+          </span>
+        </div>
+        <div className="mt-auto flex flex-wrap gap-2 pt-2 border-t border-slate-100">
+          <button type="button" className={btnSecondary} onClick={() => setViewingTemplateId(opt.id)}>
+            <Eye size={13} /> View
+          </button>
+          {state === "going_live" && (
+            <button type="button" className={btnPrimary} disabled={publishing} onClick={() => approveOption(opt)}>
+              <Check size={13} /> {publishing ? "Going live…" : "Go live now"}
+            </button>
+          )}
+          {state !== "going_live" && (
+            <>
+              <button type="button" className={btnPrimary} disabled={approving || publishing} onClick={() => approveOption(opt)}>
+                <Check size={13} /> {approving || publishing ? "Working…" : "Approve"}
+              </button>
+              <button
+                type="button"
+                className={btnDanger}
+                disabled={rejecting}
+                onClick={() => {
+                  resetRejectForm({ reason: "" });
+                  setRejectId(opt.id);
+                }}
+              >
+                Reject
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 
   return (
-    <div className="w-full space-y-6">
-      <div>
-        <h2 className="text-xl font-bold text-white flex items-center gap-2">
-          <Clapperboard size={20} className="text-fuchsia-400" /> Screens & layouts
-        </h2>
-        <p className="text-sm text-zinc-400 mt-1">
-          Add a screen, request its seat layout, then approve it — each screen shows exactly which step it is on and
-          what to do next. Once a layout is live, block seats and change prices for each show from Seat Manager.
-        </p>
+    <div className="w-full space-y-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-extrabold text-slate-900 flex items-center gap-2">
+            <Clapperboard size={20} className="text-[#e11d48]" /> Screens &amp; layouts
+          </h2>
+        </div>
+        <div className="flex gap-2">
+          <button type="button" className={btnSecondary} onClick={() => setAddOpen(true)}>
+            <Plus size={14} /> Add screen
+          </button>
+        </div>
       </div>
 
-      <form
-        onSubmit={handleScreenSubmit(onCreate)}
-        className="glass-panel rounded-2xl border border-white/10 p-5 space-y-4"
-        noValidate
-      >
-        <h3 className="text-white font-semibold">Add screen</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div>
-            <label className="portal-label">
-              Screen name <RequiredMark />
-            </label>
-            <input
-              className="input-field"
-              placeholder="Screen 1 / IMAX"
-              {...registerScreen("name")}
-            />
-            {screenErrors.name && <p className={fieldErrorClass}>{screenErrors.name.message}</p>}
-          </div>
-          <div>
-            <label className="portal-label">Screen type</label>
-            <select className="input-field" {...registerScreen("screen_type")}>
-              {SCREEN_TYPES.map((type) => (
-                <option key={type.value} value={type.value}>
-                  {type.label}
-                </option>
-              ))}
-            </select>
-            {screenErrors.screen_type && (
-              <p className={fieldErrorClass}>{screenErrors.screen_type.message}</p>
-            )}
-          </div>
-          <div>
-            <label className="portal-label">
-              Expected capacity (total seats) <RequiredMark />
-            </label>
-            <input
-              className="input-field"
-              type="number"
-              min={1}
-              {...registerScreen("capacity")}
-            />
-            {screenErrors.capacity && (
-              <p className={fieldErrorClass}>{screenErrors.capacity.message}</p>
-            )}
-          </div>
-          <div>
-            <label className="portal-label">Notes</label>
-            <input className="input-field" {...registerScreen("description")} />
-          </div>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          {CINEMA_SEAT_TYPE_FIELDS.map((field) => (
-            <div key={field.key}>
-              <label className="portal-label">{field.label}</label>
-              <input
-                className="input-field"
-                type="number"
-                min={0}
-                placeholder="0"
-                {...registerScreen(
-                  field.key === "regular"
-                    ? "regular_seats"
-                    : field.key === "recliner"
-                      ? "recliner_seats"
-                      : "couple_seats"
-                )}
-              />
-              {screenErrors[
-                field.key === "regular"
-                  ? "regular_seats"
-                  : field.key === "recliner"
-                    ? "recliner_seats"
-                    : "couple_seats"
-              ] && (
-                <p className={fieldErrorClass}>
-                  {
-                    screenErrors[
-                      field.key === "regular"
-                        ? "regular_seats"
-                        : field.key === "recliner"
-                          ? "recliner_seats"
-                          : "couple_seats"
-                    ]?.message
-                  }
-                </p>
-              )}
-            </div>
-          ))}
-        </div>
-        <p
-          className={`text-xs ${
-            remainingSeats === 0 && assignedSeats > 0
-              ? "text-emerald-400"
-              : remainingSeats < 0
-                ? "text-rose-400"
-                : "text-zinc-500"
-          }`}
-        >
-          Total capacity {totalCapacity || 0}. Assigned {assignedSeats}
-          {totalCapacity > 0
-            ? remainingSeats === 0
-              ? " — all seats assigned."
-              : remainingSeats > 0
-                ? ` — ${remainingSeats} still to assign across Regular / Recliner / Couple.`
-                : ` — over by ${Math.abs(remainingSeats)}. Reduce seat type counts.`
-            : ". Enter total capacity first, then split into Regular, Recliner, and Couple."}
-        </p>
-        <button
-          type="submit"
-          disabled={creating}
-          className="btn-primary inline-flex items-center gap-2"
-        >
-          <Plus size={16} /> {creating ? "Creating…" : "Create screen"}
-        </button>
-      </form>
+      <div className="flex border-b border-slate-200">
+        {tabBtn("active", "Active layouts", activeScreens.length)}
+        {tabBtn("admin", "Layout approvals", adminCount)}
+      </div>
 
-      {layoutOptions.filter(
-        (opt) =>
-          opt.status === "PUBLISHED" &&
-          !opt.is_default &&
-          !opt.venue_approved_at &&
-          !opt.venue_live_requested_at &&
-          !layoutOptions.some((o) => o.is_default || o.venue_live_requested_at)
-      ).length > 0 && (
-        <div className="glass-panel rounded-2xl border border-amber-500/20 p-5 space-y-3">
-          <h3 className="text-white font-semibold">Layouts waiting for your approval</h3>
-          <p className="text-sm text-zinc-400">
-            Happy with a layout? Use <span className="text-zinc-200 font-medium">Approve &amp; go live</span> — one
-            click. BookMyBota confirms before it publishes. Comparing several? Use Approve only, then request go live
-            on your favourite.
-          </p>
-          {layoutOptions
-            .filter(
-              (opt) =>
-                opt.status === "PUBLISHED" &&
-                !opt.is_default &&
-                !opt.venue_approved_at &&
-                !opt.venue_live_requested_at &&
-                !layoutOptions.some((o) => o.is_default || o.venue_live_requested_at)
-            )
-            .map((opt) => (
-              <div
-                key={opt.id}
-                className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl border border-white/10 p-3"
-              >
-                <div>
-                  <p className="text-white text-sm font-medium">{opt.name}</p>
-                  <p className="text-xs text-zinc-500">
-                    {opt.hall_name || "Screen"} · capacity {opt.capacity} · {opt.seat_count ?? 0} seats
-                  </p>
+      {isLoading ? (
+        <AdminListShimmer rows={4} columns={4} showToolbar={false} />
+      ) : tab === "active" ? (
+        activeScreens.length === 0 ? (
+          <div className={`${card} p-10 text-center text-slate-500`}>
+            <MonitorPlay size={36} className="mx-auto mb-3 text-slate-300" />
+            <p className="font-semibold text-slate-700">No live layout yet</p>
+            <p className="text-sm mt-1">
+              {screens.length === 0
+                ? "Add a screen, then request its layout."
+                : adminCount > 0
+                  ? "You have layouts waiting for approval under Layout approvals."
+                  : "Approve the layout the admin team sends and it goes live here."}
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+            {activeScreens.map((screen) => (
+              <div key={screen.id} className={`${card} p-4 flex flex-col gap-3`}>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-base font-extrabold text-slate-900 truncate">{screen.name}</p>
+                    <p className="text-xs text-slate-500">
+                      {(screen.screen_type || "standard").toUpperCase()} · capacity {screen.capacity} · {Number(screen.layout_seat_count || 0)} seats mapped
+                      {screen.layout_name ? ` · ${screen.layout_name}` : ""}
+                    </p>
+                  </div>
+                  <span className="shrink-0 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-bold uppercase text-emerald-700">
+                    Live
+                  </span>
+                </div>
+                <div className="rounded-xl border border-slate-100 bg-slate-50 p-2">
+                  <ClassicSeatMap seats={screen.layout_seats_json} heightClass="h-44" fitAll />
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
-                    className="btn-primary text-sm"
-                    disabled={approving || publishing}
-                    onClick={() => handleApproveAndGoLive(opt.id)}
-                  >
-                    {approving || publishing ? "Working…" : "Approve & go live"}
-                  </button>
-                  <button
-                    type="button"
-                    className="btn-secondary text-sm"
-                    disabled={approving}
-                    title="Keep this option on your shortlist and compare other layouts first"
-                    onClick={async () => {
-                      try {
-                        const res = await approveLayout({ bizId, templateId: opt.id }).unwrap();
-                        toast.success(
-                          (res as { message?: string })?.message ||
-                            "Layout approved — pick one to make public when ready."
-                        );
-                        refetch();
-                      } catch (err) {
-                        toast.error(extractApiError(err, "Approve failed"));
-                      }
+                    className={btnPrimary}
+                    onClick={() => {
+                      setDamageMode(false);
+                      setPreviewScreenId(screen.id);
                     }}
                   >
-                    Approve only
+                    <Eye size={13} /> View layout
                   </button>
                   <button
                     type="button"
-                    className="btn-secondary text-sm"
-                    disabled={rejecting}
-                    onClick={() => openRejectModal(opt.id)}
+                    className={btnSecondary}
+                    onClick={() => {
+                      setDamageMode(true);
+                      setPreviewScreenId(screen.id);
+                    }}
+                    title="Mark seats that are broken or unusable. They disappear from every show and from the customer seat map."
                   >
-                    Reject
+                    <Ban size={13} /> Damaged seats
+                    {damagedCount(screen) > 0 ? <span className="rounded-full bg-rose-100 px-1.5 text-[10px] font-bold text-rose-700">{damagedCount(screen)}</span> : null}
                   </button>
+                  <a href="/movie/shows" className={btnSecondary}>
+                    Shows &amp; seats
+                  </a>
                 </div>
               </div>
             ))}
-        </div>
-      )}
-
-      {layoutOptions.filter(
-        (opt) =>
-          opt.status === "PUBLISHED" &&
-          !opt.is_default &&
-          opt.venue_approved_at &&
-          !opt.venue_live_requested_at &&
-          !layoutOptions.some((o) => o.is_default || o.venue_live_requested_at)
-      ).length > 0 && (
-        <div className="glass-panel rounded-2xl border border-sky-500/20 p-5 space-y-3">
-          <h3 className="text-white font-semibold">Approved — request one to go live</h3>
-          {layoutOptions
-            .filter(
-              (opt) =>
-                opt.status === "PUBLISHED" &&
-                !opt.is_default &&
-                opt.venue_approved_at &&
-                !opt.venue_live_requested_at &&
-                !layoutOptions.some((o) => o.is_default || o.venue_live_requested_at)
-            )
-            .map((opt) => (
-              <div
-                key={opt.id}
-                className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl border border-white/10 p-3"
-              >
-                <div>
-                  <p className="text-white text-sm font-medium">{opt.name}</p>
-                  <p className="text-xs text-zinc-500">
-                    {opt.hall_name || "Screen"} · capacity {opt.capacity} · {opt.seat_count ?? 0} seats
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  className="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-sm font-semibold disabled:opacity-50"
-                  disabled={publishing}
-                  onClick={async () => {
-                    try {
-                      const res = await publishLayout({ bizId, templateId: opt.id }).unwrap();
-                      toast.success(
-                        (res as { message?: string })?.message || "Go-live request sent to BookMyBota"
-                      );
-                      refetch();
-                    } catch (err) {
-                      toast.error(extractApiError(err, "Publish failed"));
-                    }
-                  }}
-                >
-                  Request go live
-                </button>
-              </div>
-            ))}
-        </div>
-      )}
-
-      {(rejectId || rejectAllScreenId) && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
-          <form
-            onSubmit={handleRejectSubmit(onReject)}
-            className="w-full max-w-md rounded-2xl border border-white/10 bg-zinc-950 p-5 space-y-3"
-            noValidate
-          >
-            <h3 className="text-white font-semibold">
-              {rejectAllScreenId ? "Reject all options for this screen" : "Reject layout option"}
-            </h3>
-            <div>
-              <label className="portal-label">
-                {rejectAllScreenId ? "Tell Super Admin why none of these layout options work" : "Reason for Super Admin"} <RequiredMark />
-              </label>
-              <textarea
-                className="input-field min-h-[88px]"
-                placeholder={rejectAllScreenId ? "Explain what changes are needed across the layout options..." : "Explain why this layout option is rejected..."}
-                {...registerReject("reason")}
-              />
-              {rejectErrors.reason && (
-                <p className={fieldErrorClass}>{rejectErrors.reason.message}</p>
-              )}
-            </div>
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                className="btn-secondary"
-                onClick={() => {
-                  setRejectId(null);
-                  setRejectAllScreenId(null);
-                  resetRejectForm({ reason: "" });
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="btn-primary bg-rose-600 hover:bg-rose-500"
-                disabled={rejecting || rejectingAll}
-              >
-                {rejecting || rejectingAll ? "Rejecting…" : "Reject"}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      <div className="glass-panel rounded-2xl border border-white/10 overflow-hidden">
-        {isLoading ? (
-          <AdminListShimmer rows={5} columns={4} showToolbar={false} />
-        ) : screens.length === 0 ? (
-          <p className="p-8 text-center text-zinc-500">No screens yet. Create Screen 1 to get started.</p>
-        ) : (
-          <div className="divide-y divide-white/5">
-            {screens.map((screen) => {
-              const phase = resolveLayoutPhase(screen);
-              const meta = PHASE_META[phase];
-              const seatCount =
-                phase === "approved"
-                  ? Number(screen.layout_seat_count || 0)
-                  : phase === "ready_to_approve"
-                    ? Number(screen.pending_seat_count || 0)
-                    : 0;
-
-              return (
-                <div
-                  key={screen.id}
-                  className="p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4"
-                >
-                  <div className="min-w-0 space-y-2">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-white font-semibold">{screen.name}</p>
-                      <span
-                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border ${meta.badgeClass}`}
-                      >
-                        {phase === "approved" ? <CheckCircle size={12} /> : null}
-                        {meta.label}
-                      </span>
-                      {!screen.is_active && (
-                        <span className="px-2 py-0.5 rounded text-[0.65rem] font-bold uppercase tracking-wider bg-zinc-800 text-zinc-400 border border-white/10">
-                          Disabled
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-sm text-zinc-400">
-                      {(screen.screen_type || "standard").toUpperCase()} · capacity {screen.capacity}
-                      {screen.seat_types_json &&
-                      (Number(screen.seat_types_json.regular) > 0 ||
-                        Number(screen.seat_types_json.recliner) > 0 ||
-                        Number(screen.seat_types_json.couple) > 0) ? (
-                        <span className="block text-xs text-zinc-500 mt-0.5">
-                          Regular {Number(screen.seat_types_json.regular) || 0} · Recliner{" "}
-                          {Number(screen.seat_types_json.recliner) || 0} · Couple{" "}
-                          {Number(screen.seat_types_json.couple) || 0}
-                        </span>
-                      ) : null}
-                      {seatCount > 0 ? ` · ${seatCount} seats mapped` : ""}
-                      {screen.layout_name ? ` · ${screen.layout_name}` : ""}
-                    </p>
-                    <LayoutStepper phase={phase} />
-                    <p className="text-xs text-zinc-500">{meta.hint}</p>
-                    {phase === "rejected" && (screen.latest_rejection_reason || screen.pending_rejection_reason) && (
-                      <p className="text-xs text-rose-400">
-                        Reason: {screen.latest_rejection_reason || screen.pending_rejection_reason}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-2 shrink-0">
-                    {phase === "none" && (
-                      <button
-                        type="button"
-                        onClick={() => setLayoutScreenId(screen.id)}
-                        className="btn-primary text-sm"
-                        disabled={!screen.hall_id}
-                      >
-                        Request layout
-                      </button>
-                    )}
-
-                    {phase === "draft" && (
-                      <button
-                        type="button"
-                        onClick={() => setLayoutScreenId(screen.id)}
-                        className="btn-primary text-sm"
-                        disabled={!screen.hall_id}
-                      >
-                        Continue request
-                      </button>
-                    )}
-
-                    {phase === "awaiting_admin" && (
-                      <button
-                        type="button"
-                        disabled
-                        title="Layout request sent. Super Admin is building the seat map for this screen. When they publish it, this becomes Review layout."
-                        className="px-3 py-2 rounded-xl text-sm border border-amber-500/30 bg-amber-500/10 text-amber-300 cursor-help"
-                      >
-                        Awaiting layout
-                      </button>
-                    )}
-
-                    {phase === "ready_to_approve" && (
-                      <button
-                        type="button"
-                        onClick={() => setReviewScreenId(screen.id)}
-                        className="btn-primary text-sm inline-flex items-center gap-1.5"
-                      >
-                        <Eye size={14} /> Review layout{Number(screen.total_reviewable_options_count || 0) > 1 ? ` (${screen.total_reviewable_options_count} options)` : ""}
-                      </button>
-                    )}
-
-                    {phase === "shortlisted" && (
-                      <button
-                        type="button"
-                        onClick={() => setReviewScreenId(screen.id)}
-                        className="btn-primary text-sm inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500"
-                      >
-                        <Eye size={14} /> Choose live layout{Number(screen.shortlisted_options_count || 0) > 0 ? ` (${screen.shortlisted_options_count} approved)` : ""}
-                      </button>
-                    )}
-
-                    {phase === "awaiting_live" && (
-                      <button
-                        type="button"
-                        onClick={() => setReviewScreenId(screen.id)}
-                        className="px-3 py-2 rounded-xl text-sm border border-purple-500/30 bg-purple-500/10 text-purple-300 hover:bg-purple-500/20 inline-flex items-center gap-1.5"
-                      >
-                        <Clock size={14} /> Awaiting confirmation
-                      </button>
-                    )}
-
-                    {phase === "approved" && (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => setPreviewScreenId(screen.id)}
-                          className="btn-primary text-sm inline-flex items-center gap-1.5"
-                        >
-                          <Eye size={14} /> View layout
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setEditingScreenId(screen.id)}
-                          className="btn-secondary text-sm inline-flex items-center gap-1.5"
-                          title="Block or unblock seats for customers (layout geometry is locked)"
-                        >
-                          <Ban size={14} /> Block seats
-                        </button>
-                        <a
-                          href="/movie/seat-manager"
-                          className="btn-secondary text-sm inline-flex items-center gap-1.5"
-                          title="Block seats, change prices and sell at the counter for a specific show"
-                        >
-                          Manage seats per show
-                        </a>
-                        <button
-                          type="button"
-                          onClick={() => setLayoutScreenId(screen.id)}
-                          className="px-3 py-2 rounded-xl text-sm border border-white/10 text-zinc-400 hover:text-white hover:bg-white/5 inline-flex items-center gap-1.5"
-                          disabled={!screen.hall_id}
-                          title="Ask Super Admin for an updated seat map"
-                        >
-                          <RefreshCw size={14} /> Request update
-                        </button>
-                      </>
-                    )}
-
-                    {phase === "rejected" && (
-                      <button
-                        type="button"
-                        onClick={() => setLayoutScreenId(screen.id)}
-                        className="btn-primary text-sm inline-flex items-center gap-1.5"
-                        disabled={!screen.hall_id}
-                      >
-                        <RefreshCw size={14} /> Request again
-                      </button>
-                    )}
-
-                    <button
-                      type="button"
-                      onClick={() => toggleActive(screen)}
-                      disabled={updating}
-                      className="px-3 py-2 rounded-xl text-sm border border-white/10 text-zinc-300 hover:bg-white/5"
-                    >
-                      {screen.is_active ? "Disable" : "Enable"}
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
           </div>
-        )}
-      </div>
-
-      {selectedScreen && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
-          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-zinc-950 p-5 space-y-4">
-            <h3 className="text-white font-semibold">
-              {resolveLayoutPhase(selectedScreen) === "draft"
-                ? "Continue layout request"
-                : resolveLayoutPhase(selectedScreen) === "approved"
-                  ? "Request layout update"
-                  : resolveLayoutPhase(selectedScreen) === "rejected"
-                    ? "Request layout again"
-                    : "Request layout"}{" "}
-              — {selectedScreen.name}
-            </h3>
-            <p className="text-sm text-zinc-400">
-              This sends a theater layout request to Super Admin. After they publish a seat map,
-              you will see <span className="text-zinc-200">Review layout</span> on this screen.
-            </p>
-            <div className="flex justify-end gap-2">
-              <button type="button" className="btn-secondary" onClick={() => setLayoutScreenId(null)}>
-                Cancel
-              </button>
-              {resolveLayoutPhase(selectedScreen) === "draft" && (
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  disabled={submittingLayout}
-                  onClick={() => submitLayout(false)}
-                >
-                  Save draft
-                </button>
-              )}
-              <button
-                type="button"
-                className="btn-primary"
-                disabled={submittingLayout}
-                onClick={() => submitLayout(true)}
-              >
-                {submittingLayout ? "Submitting…" : "Submit to Super Admin"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {previewScreen && (
-        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
-          <div className="w-full max-w-2xl rounded-2xl border border-white/10 bg-zinc-950 p-5 space-y-4">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h3 className="text-white font-semibold">Layout — {previewScreen.name}</h3>
-                <p className="text-sm text-zinc-400 mt-1">
-                  {previewScreen.layout_name || "Approved layout"} ·{" "}
-                  {Number(previewScreen.layout_seat_count || 0)} seats
-                </p>
-              </div>
-              <button type="button" className="btn-secondary text-sm" onClick={() => setPreviewScreenId(null)}>
-                Close
-              </button>
-            </div>
-            <LayoutSeatPreview
-              seats={previewScreen.layout_seats_json}
-              config={previewScreen.layout_seating_config}
-              heightClass="h-64"
-              className="bg-zinc-900"
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Full View Modal for a single template */}
-      {viewingLayout && (
-        <div className="fixed inset-0 z-[60] bg-black/85 flex items-center justify-center p-3 sm:p-5">
-          <div className="w-full max-w-5xl bg-zinc-950 border border-white/10 rounded-2xl p-5 sm:p-6 space-y-4 max-h-[92vh] overflow-y-auto">
-            <div className="flex items-center justify-between pb-3 border-b border-white/10">
-              <div>
-                <h3 className="font-bold text-lg sm:text-xl text-white">{viewingLayout.name}</h3>
-                <p className="text-xs sm:text-sm text-zinc-400 mt-0.5">
-                  {viewingLayout.hall_name || "Screen"} · {viewingLayout.layout_type} · {viewingLayout.seat_count || 0} seats mapped · capacity {viewingLayout.capacity}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setViewingTemplateId(null)}
-                className="p-1.5 text-zinc-400 hover:text-white rounded-lg hover:bg-white/10"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <div className="rounded-xl border border-white/10 bg-zinc-900/90 p-4">
-              <LayoutSeatPreview
-                seats={viewingLayout.seats_json}
-                config={viewingLayout.seating_config}
-                heightClass="h-[440px]"
-                className="bg-zinc-900"
-              />
-            </div>
-
-            <div className="flex flex-wrap items-center justify-end gap-2 pt-2 border-t border-white/10">
-              <button
-                type="button"
-                className="btn-secondary text-sm"
-                onClick={() => setViewingTemplateId(null)}
-              >
-                Close
-              </button>
-              {!viewingLayout.is_default && !viewingLayout.venue_live_requested_at && !viewingLayout.venue_approved_at && viewingLayout.status === "PUBLISHED" && (
-                <>
-                  <button
-                    type="button"
-                    disabled={approving}
-                    onClick={async () => {
-                      await handleApproveOption(viewingLayout.id);
-                      setViewingTemplateId(null);
-                    }}
-                    className="btn-primary text-sm"
-                  >
-                    {approving ? "Approving…" : "Approve this option"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setRejectId(viewingLayout.id);
-                      setViewingTemplateId(null);
-                    }}
-                    className="px-4 py-2 rounded-xl border border-rose-400/40 text-rose-300 text-sm hover:bg-rose-500/10"
-                  >
-                    Reject
-                  </button>
-                </>
-              )}
-              {!viewingLayout.is_default && !viewingLayout.venue_live_requested_at && !!viewingLayout.venue_approved_at && viewingLayout.status === "PUBLISHED" && (
-                <>
-                  <button
-                    type="button"
-                    disabled={publishing}
-                    onClick={async () => {
-                      await handleRequestGoLive(viewingLayout.id);
-                      setViewingTemplateId(null);
-                    }}
-                    className="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-sm font-semibold"
-                  >
-                    {publishing ? "…" : "Request go live"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setRejectId(viewingLayout.id);
-                      setViewingTemplateId(null);
-                    }}
-                    className="px-4 py-2 rounded-xl border border-rose-400/40 text-rose-300 text-sm hover:bg-rose-500/10"
-                  >
-                    Reject
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Multi-Layout Review Modal for Selected Screen */}
-      {reviewScreen && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-3 sm:p-5">
-          <div className="w-full max-w-5xl bg-zinc-950 border border-white/10 rounded-2xl p-5 sm:p-6 space-y-5 max-h-[92vh] overflow-y-auto">
-            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 pb-4 border-b border-white/10">
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="text-white font-bold text-lg sm:text-xl">
-                    Layout options — {reviewScreen.name}
-                  </h3>
-                  <span className="px-2 py-0.5 text-xs font-semibold rounded bg-zinc-800 text-zinc-300 font-mono">
-                    Capacity {reviewScreen.capacity}
-                  </span>
-                </div>
-                <p className="text-sm text-zinc-400 mt-1">
-                  {screenAwaitingLive.length > 0
-                    ? "Your go-live request has been submitted to Super Admin. Awaiting confirmation."
-                    : pendingScreenOptions.length > 0
-                      ? `${pendingScreenOptions.length} option${pendingScreenOptions.length === 1 ? "" : "s"} waiting for your review. Approve the ones you like, then request one to go live.`
-                      : shortlistedScreenOptions.length > 0
-                        ? `${shortlistedScreenOptions.length} approved option${shortlistedScreenOptions.length === 1 ? "" : "s"} — choose your preferred layout and request it to go live.`
-                        : screenLayoutOptions.length > 0
-                          ? "Review your layout options below."
-                          : "Super Admin has not published layout options for this screen yet."}
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2 shrink-0">
-                {pendingScreenOptions.length > 0 && !screenReviewLocked && (
-                  <button
-                    type="button"
-                    disabled={rejectingAll}
-                    onClick={() => {
-                      setRejectAllScreenId(reviewScreen.id);
-                      resetRejectForm({ reason: "" });
-                    }}
-                    className="px-3.5 py-1.5 rounded-xl border border-rose-400/40 text-rose-300 text-xs font-semibold hover:bg-rose-500/10 disabled:opacity-50"
-                  >
-                    Reject all ({pendingScreenOptions.length})
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => setReviewScreenId(null)}
-                  className="p-1.5 text-zinc-400 hover:text-white rounded-lg hover:bg-white/10"
-                >
-                  <X size={20} />
-                </button>
-              </div>
-            </div>
-
-            {/* Status notice */}
-            {screenAwaitingLive.length > 0 && (
-              <div className="rounded-xl border border-purple-500/30 bg-purple-950/30 px-4 py-3 text-xs sm:text-sm text-purple-300 flex items-center gap-2">
-                <Clock size={16} className="shrink-0 text-purple-400" />
-                <span>
-                  Go-live request has been submitted to Super Admin. Once Super Admin confirms, this layout will become active in the system.
-                </span>
+        )
+      ) : (
+        <div className="space-y-6">
+          <section className="space-y-3">
+            <h3 className="text-sm font-extrabold text-slate-900">Waiting for your approval</h3>
+            {waitingOptions.length === 0 ? (
+              <p className="text-sm text-slate-500">Nothing to approve right now.</p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                {waitingOptions.map((opt) => optionCard(opt, opt.venue_approved_at ? "approved" : "waiting"))}
               </div>
             )}
+          </section>
 
-            {/* Options list */}
-            {screenLayoutOptions.length === 0 ? (
-              reviewScreen.pending_template_id ? (
-                // Fallback single option if screenLayoutOptions has not yet populated
-                <div className="rounded-xl border border-white/10 bg-zinc-900/50 p-6 text-center space-y-4">
-                  <p className="text-sm text-zinc-300 font-semibold">{reviewScreen.pending_template_name || "Screen Layout"}</p>
-                  <LayoutSeatPreview
-                    seats={reviewScreen.pending_seats_json}
-                    config={reviewScreen.pending_seating_config}
-                    heightClass="h-56"
-                    className="bg-zinc-900"
-                  />
-                  <div className="flex justify-center gap-2">
-                    <button
-                      type="button"
-                      className="btn-secondary text-sm"
-                      onClick={() => openRejectModal(reviewScreen.pending_template_id!)}
-                    >
-                      Reject
-                    </button>
-                    <button
-                      type="button"
-                      className="btn-primary text-sm"
-                      onClick={() => handleApproveOption(reviewScreen.pending_template_id!)}
-                    >
-                      Approve layout
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="rounded-xl border border-dashed border-white/10 p-10 text-center text-zinc-400 text-sm">
-                  No layout options available yet for this screen.
-                </div>
-              )
+          {goingLiveOptions.length > 0 && (
+            <section className="space-y-3">
+              <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-1.5">
+                <Clock size={14} className="text-purple-500" /> Approved — send these live
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">{goingLiveOptions.map((opt) => optionCard(opt, "going_live"))}</div>
+            </section>
+          )}
+
+          <section className="space-y-3">
+            <h3 className="text-sm font-extrabold text-slate-900">Screens without a live layout</h3>
+            {requestScreens.length === 0 ? (
+              <p className="text-sm text-slate-500">Every screen has a live layout.</p>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {screenLayoutOptions.map((option, index) => {
-                  const waiting =
-                    option.status === "PUBLISHED" &&
-                    !option.is_default &&
-                    !option.venue_approved_at &&
-                    !option.venue_live_requested_at;
-                  const shortlisted =
-                    option.status === "PUBLISHED" &&
-                    !option.is_default &&
-                    !!option.venue_approved_at &&
-                    !option.venue_live_requested_at;
-                  const awaitingLive = !!option.venue_live_requested_at && !option.is_default;
-                  const rejected = option.status === "REJECTED";
-                  const live = option.is_default && option.status === "PUBLISHED";
-
+              <div className={`${card} divide-y divide-slate-100`}>
+                {requestScreens.map((screen) => {
+                  const phase = phaseOf.get(screen.id) || "none";
+                  const meta = PHASE_META[phase];
                   return (
-                    <div
-                      key={option.id}
-                      className={`rounded-2xl border overflow-hidden flex flex-col ${
-                        live
-                          ? "border-sky-500/40 bg-sky-950/20"
-                          : awaitingLive
-                            ? "border-purple-500/40 bg-purple-950/20"
-                            : shortlisted
-                              ? "border-emerald-500/40 bg-emerald-950/20"
-                              : rejected
-                                ? "border-rose-500/30 bg-rose-950/10"
-                                : waiting
-                                  ? "border-amber-500/30 bg-zinc-900/60"
-                                  : "border-white/10 bg-zinc-900/40"
-                      }`}
-                    >
-                      <div className="p-3 border-b border-white/5 bg-black/30">
-                        <LayoutSeatPreview
-                          seats={option.seats_json}
-                          config={option.seating_config}
-                          heightClass="h-40"
-                          className="bg-zinc-900"
-                        />
-                      </div>
-                      <div className="p-4 flex-1 flex flex-col gap-3">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <p className="text-[11px] font-bold uppercase tracking-wider text-amber-400">
-                              Option {index + 1}
-                            </p>
-                            <p className="font-semibold text-white truncate text-base">{option.name}</p>
-                            <p className="text-xs text-zinc-400 mt-1">
-                              {option.seat_count ? `${option.seat_count} seats mapped` : "Seats mapped"} · capacity {option.capacity}
-                            </p>
-                          </div>
-                          <span
-                            className={`shrink-0 text-[10px] font-bold uppercase px-2.5 py-1 rounded-full border ${
-                              live
-                                ? "bg-sky-500/15 text-sky-300 border-sky-500/30"
-                                : awaitingLive
-                                  ? "bg-purple-500/15 text-purple-300 border-purple-500/30"
-                                  : shortlisted
-                                    ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
-                                    : rejected
-                                      ? "bg-rose-500/15 text-rose-300 border-rose-500/30"
-                                      : waiting
-                                        ? "bg-amber-500/15 text-amber-300 border-amber-500/30"
-                                        : "bg-zinc-500/15 text-zinc-400 border-zinc-500/30"
-                            }`}
-                          >
-                            {live
-                              ? "Live in system"
-                              : awaitingLive
-                                ? "Awaiting confirmation"
-                                : shortlisted
-                                  ? "Approved"
-                                  : rejected
-                                    ? "Rejected"
-                                    : waiting
-                                      ? "Pending"
-                                      : option.status}
-                          </span>
+                    <div key={screen.id} className="p-4 flex flex-wrap items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-bold text-slate-900">{screen.name}</p>
+                          <span className={`rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${meta.badge}`}>{meta.label}</span>
                         </div>
-
-                        {rejected && option.rejection_reason && (
-                          <p className="text-xs text-rose-300 line-clamp-2 bg-rose-950/40 p-2 rounded-lg border border-rose-900/40">
-                            Reason: {option.rejection_reason}
-                          </p>
+                        <p className="text-xs text-slate-500 mt-0.5">{meta.hint}</p>
+                        {phase === "rejected" && (screen.latest_rejection_reason || screen.pending_rejection_reason) && (
+                          <p className="text-xs text-rose-600 mt-0.5">Reason: {screen.latest_rejection_reason || screen.pending_rejection_reason}</p>
                         )}
-
-                        <div className="flex flex-wrap gap-2 mt-auto pt-2 border-t border-white/5">
-                          <button
-                            type="button"
-                            onClick={() => setViewingTemplateId(option.id)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-white/10 text-xs text-zinc-300 hover:text-white hover:bg-white/5"
-                          >
-                            <Eye size={13} /> View full
-                          </button>
-                          {!screenReviewLocked && waiting && (
-                            <>
-                              <button
-                                type="button"
-                                disabled={approving || publishing}
-                                onClick={async () => {
-                                  await handleApproveAndGoLive(option.id);
-                                  setReviewScreenId(null);
-                                }}
-                                className="btn-primary text-xs py-1.5 px-3 disabled:opacity-50"
-                              >
-                                {approving || publishing ? "…" : "Approve & go live"}
-                              </button>
-                              <button
-                                type="button"
-                                disabled={approving}
-                                onClick={() => handleApproveOption(option.id)}
-                                className="px-3 py-1.5 rounded-xl border border-white/10 text-xs text-zinc-300 hover:bg-white/5 disabled:opacity-50"
-                              >
-                                Approve only
-                              </button>
-                              <button
-                                type="button"
-                                disabled={rejecting}
-                                onClick={() => openRejectModal(option.id)}
-                                className="px-3 py-1.5 rounded-xl border border-rose-400/40 text-rose-300 text-xs hover:bg-rose-500/10 disabled:opacity-50"
-                              >
-                                Reject
-                              </button>
-                            </>
-                          )}
-                          {!screenReviewLocked && shortlisted && (
-                            <>
-                              <button
-                                type="button"
-                                disabled={publishing}
-                                onClick={() => handleRequestGoLive(option.id)}
-                                className="px-3 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold disabled:opacity-50"
-                              >
-                                {publishing ? "…" : "Request go live"}
-                              </button>
-                              <button
-                                type="button"
-                                disabled={rejecting}
-                                onClick={() => openRejectModal(option.id)}
-                                className="px-3 py-1.5 rounded-xl border border-rose-400/40 text-rose-300 text-xs hover:bg-rose-500/10 disabled:opacity-50"
-                              >
-                                Reject
-                              </button>
-                            </>
-                          )}
-                        </div>
                       </div>
+                      {phase !== "awaiting_admin" && (
+                        <button type="button" className={btnPrimary} onClick={() => openRequest(screen.id)} disabled={!screen.hall_id}>
+                          {phase === "draft" ? "Continue request" : phase === "rejected" ? "Request again" : "Request layout"}
+                        </button>
+                      )}
                     </div>
                   );
                 })}
               </div>
             )}
-
-            <div className="flex justify-end pt-3 border-t border-white/10">
-              <button
-                type="button"
-                className="btn-secondary text-sm"
-                onClick={() => setReviewScreenId(null)}
-              >
-                Close
-              </button>
-            </div>
-          </div>
+          </section>
         </div>
       )}
 
-      {editingScreen && (
-        <CinemaSeatBlockModal
-          screen={editingScreen}
-          seats={editingInitialSeats as Array<Record<string, unknown>>}
-          saving={isUpdatingSeatStatuses}
-          onClose={() => setEditingScreenId(null)}
-          onSave={async (updates) => {
-            try {
-              const res = await updateSeatStatuses({
-                bizId,
-                screenId: editingScreen.id,
-                seats: updates,
-              }).unwrap();
-              toast.success(res.message || "Seat statuses updated");
-              setEditingScreenId(null);
-              refetch();
-            } catch (err) {
-              toast.error(extractApiError(err, "Failed to update seat statuses"));
-            }
-          }}
+      {addOpen && (
+        <Modal title="Add screen" onClose={() => setAddOpen(false)}>
+          <form onSubmit={handleScreenSubmit(onCreate)} className="space-y-3" noValidate>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className={labelCls}>Screen name *</label>
+                <input className={inputCls} placeholder="Screen 1 / IMAX" {...registerScreen("name")} />
+                {screenErrors.name && <p className={errCls}>{screenErrors.name.message}</p>}
+              </div>
+              <div>
+                <label className={labelCls}>Screen type</label>
+                <select className={inputCls} {...registerScreen("screen_type")}>
+                  {SCREEN_TYPES.map((t) => (
+                    <option key={t.value} value={t.value}>
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className={labelCls}>Expected capacity (total seats) *</label>
+                <input className={inputCls} type="number" min={1} {...registerScreen("capacity")} />
+                {screenErrors.capacity && <p className={errCls}>{screenErrors.capacity.message}</p>}
+              </div>
+              <div>
+                <label className={labelCls}>Notes</label>
+                <input className={inputCls} {...registerScreen("description")} />
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              {CINEMA_SEAT_TYPE_FIELDS.map((field) => {
+                const name = field.key === "regular" ? "regular_seats" : field.key === "recliner" ? "recliner_seats" : "couple_seats";
+                return (
+                  <div key={field.key}>
+                    <label className={labelCls}>{field.label}</label>
+                    <input className={inputCls} type="number" min={0} placeholder="0" {...registerScreen(name)} />
+                    {screenErrors[name] && <p className={errCls}>{screenErrors[name]?.message}</p>}
+                  </div>
+                );
+              })}
+            </div>
+            <p className={`text-xs ${remainingSeats === 0 && assignedSeats > 0 ? "text-emerald-600" : remainingSeats < 0 ? "text-rose-600" : "text-slate-500"}`}>
+              Total capacity {totalCapacity || 0}. Assigned {assignedSeats}
+              {totalCapacity > 0
+                ? remainingSeats === 0
+                  ? " — all seats assigned."
+                  : remainingSeats > 0
+                    ? ` — ${remainingSeats} still to assign across Regular / Recliner / Couple.`
+                    : ` — over by ${Math.abs(remainingSeats)}. Reduce seat type counts.`
+                : ". Enter total capacity first, then split it into Regular, Recliner and Couple."}
+            </p>
+            <div className="flex justify-end gap-2 pt-1">
+              <button type="button" className={btnSecondary} onClick={() => setAddOpen(false)}>
+                Cancel
+              </button>
+              <button type="submit" className={btnPrimary} disabled={creating}>
+                {creating ? "Creating…" : "Create screen"}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {requestScreenId && (
+        <Modal title={requestScreen ? `Request layout — ${requestScreen.name}` : "Request a layout"} onClose={() => setRequestScreenId(null)}>
+          {requestScreenId === "pick" && (
+            <div>
+              <label className={labelCls}>Screen</label>
+              <select className={inputCls} value={requestPicked} onChange={(e) => setRequestPicked(e.target.value)}>
+                {screens.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name} ({(s.screen_type || "standard").toUpperCase()})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          <div>
+            <label className={labelCls}>Notes for the admin team *</label>
+            <textarea
+              className={`${inputCls} min-h-[110px]`}
+              placeholder="Describe the layout you need: rows, aisles, recliner or couple seats, wheelchair spots…"
+              value={requestNotes}
+              onChange={(e) => setRequestNotes(e.target.value)}
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <button type="button" className={btnSecondary} onClick={() => setRequestScreenId(null)}>
+              Cancel
+            </button>
+            <button
+              type="button"
+              className={btnPrimary}
+              disabled={sendingRequest}
+              onClick={() => {
+                if (!requestNotes.trim()) {
+                  toast.error("Add a short note so the admin team knows what you need.");
+                  return;
+                }
+                setConfirmSend(true);
+              }}
+            >
+              {sendingRequest ? "Sending…" : "Send request"}
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      <ConfirmDialog
+        open={confirmSend}
+        theme="light"
+        variant="warning"
+        title="Request this layout?"
+        body="Are you sure you want to request this layout? Once sent, the request cannot be deleted. The admin team will build the layout and send it back for your approval."
+        confirmLabel="Yes, send request"
+        busy={sendingRequest}
+        onCancel={() => setConfirmSend(false)}
+        onConfirm={async () => {
+          await submitRequest();
+          setConfirmSend(false);
+        }}
+      />
+
+      {rejectId && (
+        <Modal title="Reject this layout" onClose={() => setRejectId(null)}>
+          <form onSubmit={handleRejectSubmit(onReject)} className="space-y-3" noValidate>
+            <div>
+              <label className={labelCls}>Tell the admin team why *</label>
+              <textarea className={`${inputCls} min-h-[96px]`} placeholder="Explain what is wrong with this layout…" {...registerReject("reason")} />
+              {rejectErrors.reason && <p className={errCls}>{rejectErrors.reason.message}</p>}
+            </div>
+            <div className="flex justify-end gap-2">
+              <button type="button" className={btnSecondary} onClick={() => setRejectId(null)}>
+                Cancel
+              </button>
+              <button type="submit" className={btnDanger} disabled={rejecting}>
+                {rejecting ? "Rejecting…" : "Reject layout"}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {previewScreen && (
+        <DamagedSeatsModal
+          key={`${previewScreen.id}-${damageMode}`}
+          bizId={bizId}
+          screen={previewScreen}
+          startInDamageMode={damageMode}
+          onClose={() => setPreviewScreenId(null)}
         />
+      )}
+
+      {viewingLayout && (
+        <Modal title={viewingLayout.name} onClose={() => setViewingTemplateId(null)} wide>
+          <p className="text-xs text-slate-500 -mt-2">
+            {viewingLayout.hall_name || "Screen"} · {viewingLayout.seat_count || 0} seats mapped · capacity {viewingLayout.capacity}
+          </p>
+          <ClassicSeatMap seats={viewingLayout.seats_json} heightClass="h-[420px]" />
+          {!viewingLayout.is_default && !viewingLayout.venue_live_requested_at && viewingLayout.status === "PUBLISHED" && (
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                className={btnDanger}
+                onClick={() => {
+                  resetRejectForm({ reason: "" });
+                  setRejectId(viewingLayout.id);
+                }}
+              >
+                Reject
+              </button>
+              <button type="button" className={btnPrimary} disabled={approving || publishing} onClick={() => approveOption(viewingLayout)}>
+                <Check size={13} /> {approving || publishing ? "Working…" : "Approve"}
+              </button>
+            </div>
+          )}
+        </Modal>
       )}
     </div>
   );
 }
 
-function CinemaSeatBlockModal({
-  screen,
-  seats,
-  saving,
-  onClose,
-  onSave,
-}: {
-  screen: CinemaScreen;
-  seats: Array<Record<string, any>>;
-  saving: boolean;
-  onClose: () => void;
-  onSave: (updates: Array<{ seat_key: string; status: "BLOCKED" | "AVAILABLE" }>) => Promise<void>;
-}) {
-  const [localSeats, setLocalSeats] = useState<Array<Record<string, any>>>(() =>
-    seats.map((s) => ({
-      ...s,
-      status: String(s.status || "AVAILABLE").toUpperCase(),
-    }))
-  );
+type LayoutSeatRecord = Record<string, unknown>;
 
-  const toggle = (idx: number) => {
-    setLocalSeats((prev) =>
-      prev.map((seat, i) => {
-        if (i !== idx) return seat;
-        const cur = String(seat.status || "AVAILABLE").toUpperCase();
-        if (cur === "BOOKED" || cur === "RESERVED") return seat;
-        return { ...seat, status: cur === "BLOCKED" ? "AVAILABLE" : "BLOCKED" };
-      })
-    );
+const seatKeyOf = (seat: LayoutSeatRecord, idx: number) => {
+  const id = String(seat.id || seat.internalId || "").trim();
+  const row = String(seat.row_label || seat.row || "").trim();
+  const num = String(seat.seat_label || seat.label || "").trim();
+  return id || (row || num ? `${row}-${num}` : `seat-${idx}`);
+};
+const seatNameOf = (seat: LayoutSeatRecord) => `${String(seat.row_label || seat.row || "")}${String(seat.seat_label || seat.label || "")}`;
+const seatStatusOf = (seat: LayoutSeatRecord) => String(seat.status || "AVAILABLE").toUpperCase();
+
+function damagedCount(screen: CinemaScreen): number {
+  return Array.isArray(screen.layout_seats_json)
+    ? (screen.layout_seats_json as LayoutSeatRecord[]).filter((seat) => seatStatusOf(seat) === "BLOCKED").length
+    : 0;
+}
+
+/**
+ * The live layout of a screen. Pick seats and mark them damaged (or repaired): a damaged seat cannot be booked for any show,
+ * and the customer seat map shows it as unavailable. Every change is saved in the screen's audit history.
+ */
+function DamagedSeatsModal({ bizId, screen, startInDamageMode, onClose }: { bizId: string; screen: CinemaScreen; startInDamageMode: boolean; onClose: () => void }) {
+  const [updateSeats, { isLoading: saving }] = useUpdateCinemaScreenSeatStatusesMutation();
+  const seats = useMemo(() => (Array.isArray(screen.layout_seats_json) ? (screen.layout_seats_json as LayoutSeatRecord[]) : []), [screen.layout_seats_json]);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [note, setNote] = useState("");
+  const [damageMode, setDamageMode] = useState(startInDamageMode);
+
+  const byKey = useMemo(() => new Map(seats.map((seat, i) => [seatKeyOf(seat, i), seat])), [seats]);
+  const damaged = seats.filter((seat) => seatStatusOf(seat) === "BLOCKED").length;
+  const pickedSeats = Array.from(picked)
+    .map((k) => byKey.get(k))
+    .filter(Boolean) as LayoutSeatRecord[];
+  const toDamage = pickedSeats.filter((seat) => seatStatusOf(seat) !== "BLOCKED").length;
+  const toRepair = pickedSeats.filter((seat) => seatStatusOf(seat) === "BLOCKED").length;
+
+  const apply = async (status: "BLOCKED" | "AVAILABLE") => {
+    const chosen = pickedSeats.filter((seat) => (status === "BLOCKED" ? seatStatusOf(seat) !== "BLOCKED" : seatStatusOf(seat) === "BLOCKED"));
+    if (chosen.length === 0) return;
+    try {
+      const res = await updateSeats({
+        bizId,
+        screenId: screen.id,
+        seats: chosen.map((seat) => ({ seat_key: String(seat.id || seat.internalId || `${seat.row_label}-${seat.seat_label}`), status })),
+        note: note.trim() || undefined,
+      }).unwrap();
+      toast.success(
+        status === "BLOCKED"
+          ? `${chosen.length} seat${chosen.length === 1 ? "" : "s"} marked damaged. They are hidden from booking everywhere.`
+          : res.message || "Seats repaired"
+      );
+      setPicked(new Set());
+      setNote("");
+    } catch (err) {
+      toast.error(extractApiError(err, "Failed to update seats"));
+    }
   };
-
-  const handleSave = async () => {
-    const updates = localSeats
-      .map((seat: Record<string, any>) => {
-        const status = String(seat.status || "AVAILABLE").toUpperCase();
-        if (status !== "BLOCKED" && status !== "AVAILABLE") return null;
-        const key = String(seat.id || seat.internalId || "").trim();
-        const row = String(seat.row_label || "").trim();
-        const num = String(seat.seat_label || "").trim();
-        return {
-          seat_key: key || `${row}-${num}`,
-          status: status as "BLOCKED" | "AVAILABLE",
-        };
-      })
-      .filter(Boolean) as Array<{ seat_key: string; status: "BLOCKED" | "AVAILABLE" }>;
-    await onSave(updates);
-  };
-
-  const blockedCount = localSeats.filter((s) => String(s.status).toUpperCase() === "BLOCKED").length;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 flex flex-col items-center justify-center p-2 sm:p-4">
-      <div className="w-full max-w-4xl max-h-[90vh] bg-zinc-950 rounded-2xl overflow-hidden border border-white/10 flex flex-col">
-        <div className="flex items-center justify-between px-5 py-3 border-b border-white/10">
-          <div>
-            <h3 className="font-bold text-white text-base">Block seats — {screen.name}</h3>
-            <p className="text-xs text-zinc-400 mt-0.5">
-              Layout geometry is locked. Click seats to block/unblock. Customers cannot book blocked seats.
-              {blockedCount > 0 ? ` · ${blockedCount} blocked` : ""}
+    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5" onClick={onClose}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        className="w-full max-w-5xl max-h-[94vh] overflow-y-auto rounded-2xl bg-white border border-slate-200 shadow-2xl p-4 sm:p-5 space-y-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h3 className="text-base font-extrabold text-slate-900 truncate">{screen.name} layout</h3>
+            <p className="text-xs text-slate-500">
+              {screen.layout_name ? `${screen.layout_name} · ` : ""}
+              {seats.length} seats · {damaged} damaged
             </p>
           </div>
-          <button type="button" onClick={onClose} className="text-zinc-400 hover:text-white">
+          <button type="button" onClick={onClose} aria-label="Close" className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer">
             <X size={18} />
           </button>
         </div>
-        <div className="flex-1 overflow-auto p-4 space-y-4">
-          <div className="flex flex-wrap gap-2">
-            {localSeats.map((seat, idx) => {
-              const status = String(seat.status || "AVAILABLE").toUpperCase();
-              const locked = status === "BOOKED" || status === "RESERVED";
-              const blocked = status === "BLOCKED";
-              const label = `${seat.row_label || ""}${seat.seat_label || ""}`;
-              return (
-                <button
-                  key={String(seat.id || seat.internalId || idx)}
-                  type="button"
-                  disabled={locked || saving}
-                  onClick={() => toggle(idx)}
-                  title={
-                    locked
-                      ? "Booked seats cannot be changed"
-                      : blocked
-                        ? "Click to unblock"
-                        : "Click to block"
-                  }
-                  className={`min-w-[2.5rem] px-2 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
-                    locked
-                      ? "bg-zinc-800 text-zinc-500 border-zinc-700 cursor-not-allowed"
-                      : blocked
-                        ? "bg-rose-600/80 text-white border-rose-400"
-                        : "bg-emerald-600/20 text-emerald-200 border-emerald-500/40 hover:bg-emerald-600/40"
-                  }`}
-                >
-                  {label || idx + 1}
-                </button>
-              );
-            })}
+
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+          <p className="text-xs text-slate-600">
+            {damageMode
+              ? "Tap the seats that are broken or unusable, then mark them damaged. Tap damaged seats to repair them."
+              : "This is the live layout. Use Mark damaged seats when a seat is broken."}
+          </p>
+          <button
+            type="button"
+            className={damageMode ? btnPrimary : btnSecondary}
+            onClick={() => {
+              setDamageMode((v) => !v);
+              setPicked(new Set());
+            }}
+          >
+            <Ban size={13} /> {damageMode ? "Done picking" : "Mark damaged seats"}
+          </button>
+        </div>
+
+        <ClassicSeatMap
+          seats={seats as never}
+          heightClass="h-[min(56vh,480px)]"
+          seatMarker={(raw, idx) => {
+            const seat = raw as unknown as LayoutSeatRecord;
+            const key = seatKeyOf(seat, idx);
+            const status = seatStatusOf(seat);
+            const isPicked = picked.has(key);
+            const sold = status === "BOOKED" || status === "RESERVED";
+            return {
+              fill: isPicked ? "#e11d48" : status === "BLOCKED" ? "#f97316" : sold ? "#94a3b8" : "",
+              stroke: isPicked ? "#9f1239" : status === "BLOCKED" ? "#c2410c" : "#ffffff",
+              strokeWidth: isPicked ? 3 : status === "BLOCKED" ? 2 : undefined,
+              cursor: damageMode && !sold ? "pointer" : "default",
+              title: `${seatNameOf(seat) || key} · ${status === "BLOCKED" ? "Damaged" : sold ? "Sold" : "Available"}`,
+              onClick:
+                damageMode && !sold
+                  ? () =>
+                      setPicked((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(key)) next.delete(key);
+                        else next.add(key);
+                        return next;
+                      })
+                  : undefined,
+            };
+          }}
+        />
+
+        <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-600">
+          <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-blue-500" /> Available</span>
+          <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-orange-500" /> Damaged</span>
+          <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-rose-600" /> Picked</span>
+        </div>
+
+        {damageMode && (
+          <div className="rounded-xl border border-slate-200 p-3 space-y-2.5">
+            <p className="text-sm font-semibold text-slate-900">
+              {picked.size === 0 ? "No seats picked yet" : `${picked.size} seat${picked.size === 1 ? "" : "s"} picked`}
+              {picked.size > 0 && (
+                <span className="font-normal text-slate-500">
+                  {" "}
+                  — {pickedSeats.slice(0, 10).map(seatNameOf).join(", ")}
+                  {pickedSeats.length > 10 ? ` +${pickedSeats.length - 10}` : ""}
+                </span>
+              )}
+            </p>
+            <input
+              className={inputCls}
+              placeholder="What is wrong? For example: broken recliner (saved in the audit)"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              maxLength={200}
+            />
+            <div className="flex flex-wrap gap-2">
+              <button type="button" className={btnPrimary} disabled={saving || toDamage === 0} onClick={() => apply("BLOCKED")}>
+                <Ban size={13} /> Mark {toDamage > 0 ? toDamage : ""} damaged
+              </button>
+              <button type="button" className={btnSecondary} disabled={saving || toRepair === 0} onClick={() => apply("AVAILABLE")}>
+                <Check size={13} /> Repaired {toRepair > 0 ? toRepair : ""}
+              </button>
+              <button type="button" className={btnSecondary} disabled={picked.size === 0} onClick={() => setPicked(new Set())}>
+                Clear
+              </button>
+            </div>
           </div>
-          {localSeats.length === 0 && (
-            <p className="text-sm text-zinc-500">No seats on this layout yet.</p>
-          )}
-        </div>
-        <div className="flex justify-end gap-2 px-5 py-3 border-t border-white/10">
-          <button type="button" className="btn-secondary" onClick={onClose} disabled={saving}>
-            Cancel
-          </button>
-          <button type="button" className="btn-primary" onClick={handleSave} disabled={saving}>
-            {saving ? "Saving…" : "Save blocked seats"}
-          </button>
-        </div>
+        )}
       </div>
     </div>
   );
 }
-

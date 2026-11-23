@@ -68,7 +68,7 @@ export default function MovieDashboardPage() {
         <div className="flex items-center gap-3">
           <Link
             href="/movie/showtimes"
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#F84464] to-[#6900AA] text-white text-xs sm:text-sm font-bold shadow-lg shadow-[#F84464]/20 hover:opacity-90 transition-opacity"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#F84464] to-[#6900AA] !text-white text-xs sm:text-sm font-bold shadow-lg shadow-[#F84464]/20 hover:opacity-90 transition-opacity"
           >
             <Plus size={16} />
             Schedule Showtime

@@ -323,13 +323,22 @@ interface GridSeat {
   price: number;
   isBooked: boolean;
   isAisleGap?: boolean;
+  /** Real position of the seat on the saved layout, in classic-grid pixels from the left edge of the grid */
+  leftPx?: number;
   /** BMS: popular mid-block seats (same price, orange outline when available) */
   isBestseller?: boolean;
   /** Wheelchair / accessibility seat */
   isAccessible?: boolean;
 }
 
+/** One seat step on the saved layout equals this many pixels in the classic grid (seat 40px + gap 12px) */
+const GEO_PITCH_PX = 52;
+const GEO_SEAT_PX = 40;
+
 interface GridRow {
+  /** Vertical position of the row on the saved layout, and the extra space above it where the layout leaves a gap */
+  y?: number;
+  gapBeforePx?: number;
   rowLabel: string;
   tierName: string;
   price: number;
@@ -395,10 +404,10 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
 
   const [selectedBeverages, setSelectedBeverages] = useState<Record<string, SelectedBeverage>>({});
   const [bevCategoryFilter, setBevCategoryFilter] = useState<string>("ALL");
+  const [billOpen, setBillOpen] = useState(false);
 
-  /** Classic layout only — Interactive Map / Grid / Classic tabs are hidden. */
-  const [viewMode] = useState<"canvas" | "grid" | "classic">("classic");
-  // const [viewMode, setViewMode] = useState<"canvas" | "grid" | "classic">("classic");
+  /** Classic is the original static seat grid. Canvas is the screen layout saved for this show. */
+  const [viewMode, setViewMode] = useState<"canvas" | "grid" | "classic">("classic");
   const [isMapFullscreen, setIsMapFullscreen] = useState(false);
   const [classicZoom, setClassicZoom] = useState(1.0);
   const [showClassicMinimap, setShowClassicMinimap] = useState(false);
@@ -571,21 +580,34 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
   const bookedSet = useMemo(() => {
     const booked = layoutData?.booked_seat_identifiers ?? [];
     const held = layoutData?.held_seat_identifiers ?? [];
+    const showBlocked = layoutData?.show_blocked_seat_identifiers ?? [];
+    const screenBlocked = layoutData?.blocked_seat_identifiers ?? [];
     const set = new Set<string>();
-    for (const raw of [...booked, ...held]) {
-      if (!raw) continue;
-      const s = String(raw).trim();
+    const add = (value: string) => {
+      const s = value.trim();
+      if (!s) return;
       set.add(s);
       set.add(s.toUpperCase());
       set.add(s.toLowerCase());
-      const match = s.match(/^([A-Za-z]+)0*(\d+)$/);
+    };
+    for (const raw of [...booked, ...held, ...showBlocked, ...screenBlocked]) {
+      if (!raw) continue;
+      const s = String(raw).trim();
+      add(s);
+      const match = s.match(/^([A-Za-z]+)[-_ ]?0*(\d+)$/);
       if (match) {
         const prefix = match[1];
         const num = Number(match[2]);
-        set.add(`${prefix}${num}`);
-        set.add(`${prefix}${String(num).padStart(2, "0")}`);
-        set.add(`${prefix.toUpperCase()}${num}`);
-        set.add(`${prefix.toUpperCase()}${String(num).padStart(2, "0")}`);
+        add(`${prefix}${num}`);
+        add(`${prefix}${String(num).padStart(2, "0")}`);
+      }
+      const sectionMatch = s.match(/^(.+)-([A-Za-z]+)-0*(\d+)$/);
+      if (sectionMatch) {
+        const row = sectionMatch[2];
+        const num = Number(sectionMatch[3]);
+        add(`${row}${num}`);
+        add(`${row}${String(num).padStart(2, "0")}`);
+        add(`${sectionMatch[1].trim()} ${row}${num}`);
       }
     }
     return set;
@@ -598,6 +620,10 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
       layoutData.layout_template.seats_json.length > 0
     );
   }, [layoutData]);
+
+  useEffect(() => {
+    if (viewMode === "canvas" && !hasCanvasLayout) setViewMode("classic");
+  }, [viewMode, hasCanvasLayout]);
 
   const getTierPrice = useCallback(
     (sectionName: string, sectionIdx: number = 0): number => {
@@ -739,6 +765,8 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
         .sort((a, b) => a.minY - b.minY);
 
       const rows: GridRow[] = [];
+      const geo: Array<{ seat: GridSeat; x: number }> = [];
+      let geoPitch = Infinity;
 
       sortedSections.forEach((sec, secIdx) => {
         const price = getTierPrice(sec.secName, secIdx);
@@ -768,6 +796,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
             if (diff > 5) steps.push(diff);
           }
           const normalStep = steps.length > 0 ? Math.min(...steps) : 40;
+          if (steps.length > 0) geoPitch = Math.min(geoPitch, normalStep);
 
           const rowSeatLabels = rowSeats.map((s: any) =>
             String(s.seat_label ?? "").trim()
@@ -828,7 +857,9 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
             };
           });
 
+          gridSeats.forEach((gs, i) => geo.push({ seat: gs, x: Number(rowSeats[i].coordinate_x ?? 0) }));
           rows.push({
+            y: rowObj.avgY,
             rowLabel: rowObj.rowLabel,
             tierName: sec.secName,
             price,
@@ -836,6 +867,30 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
           });
         }
       });
+
+      // Place every seat where it really is on the saved layout, so aisles and blocks keep their true spacing
+      if (geo.length > 0 && Number.isFinite(geoPitch) && geoPitch > 0) {
+        const minX = Math.min(...geo.map((g) => g.x));
+        const scale = GEO_PITCH_PX / geoPitch;
+        geo.forEach((g) => {
+          g.seat.leftPx = Math.round((g.x - minX) * scale);
+        });
+      }
+
+      // Keep the empty bands between row groups (for example between rows F and G)
+      let rowStep = Infinity;
+      for (let i = 1; i < rows.length; i++) {
+        if (rows[i].tierName !== rows[i - 1].tierName) continue;
+        const d = (rows[i].y ?? 0) - (rows[i - 1].y ?? 0);
+        if (d > 4) rowStep = Math.min(rowStep, d);
+      }
+      if (Number.isFinite(rowStep)) {
+        for (let i = 1; i < rows.length; i++) {
+          if (rows[i].tierName !== rows[i - 1].tierName) continue;
+          const d = (rows[i].y ?? 0) - (rows[i - 1].y ?? 0);
+          if (d > rowStep * 1.5) rows[i].gapBeforePx = Math.round(((d - rowStep) / rowStep) * 50);
+        }
+      }
 
       if (rows.length > 0) return finalizeBestsellerMarks(rows);
     }
@@ -1820,6 +1875,10 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
   const classicSeatTrackPx = useMemo(() => {
     let max = CLASSIC_SEAT_PX;
     for (const row of gridRows) {
+      if (row.seats.length > 0 && row.seats.every((s) => s.leftPx !== undefined)) {
+        max = Math.max(max, ...row.seats.map((s) => (s.leftPx as number) + GEO_SEAT_PX));
+        continue;
+      }
       let width = 0;
       row.seats.forEach((seat, i) => {
         width += CLASSIC_SEAT_PX;
@@ -2392,22 +2451,35 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
         </div>
       )}
 
-      {/* View tabs (Interactive Map / Grid / Classic) — hidden; classic layout is default
       <div className="flex flex-wrap items-center justify-between gap-3 px-0.5 py-1 shrink-0">
-        <div className="flex items-center gap-1 p-0.5 bg-slate-50 rounded-lg">
+        <div className="flex items-center gap-1 rounded-lg bg-slate-100 p-0.5">
+          <button
+            type="button"
+            onClick={() => setViewMode("classic")}
+            className={`rounded-md px-3 py-1.5 text-xs font-semibold ${
+              viewMode === "classic" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800"
+            }`}
+          >
+            Classic
+          </button>
           {hasCanvasLayout && (
-            <button type="button" onClick={() => setViewMode("canvas")} ...>
-              Interactive Map
+            <button
+              type="button"
+              onClick={() => setViewMode("canvas")}
+              className={`rounded-md px-3 py-1.5 text-xs font-semibold ${
+                viewMode === "canvas" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              Your layout
             </button>
           )}
-          <button type="button" onClick={() => setViewMode("grid")} ...>Grid View</button>
-          <button type="button" onClick={() => setViewMode("classic")} ...>Classic View</button>
         </div>
         <p className="text-xs text-slate-500">
-          Select exactly <span className="text-slate-900 font-bold">{qty}</span> seat{qty === 1 ? "" : "s"}
+          {viewMode === "classic"
+            ? "Original seat grid. Occupied seats stay disabled."
+            : "The layout saved for this screen. Occupied seats stay disabled."}
         </p>
       </div>
-      */}
 
       {viewMode === "canvas" && hasCanvasLayout && canvasLayoutData ? (
         <div className="relative rounded-xl border border-slate-100 bg-white overflow-hidden h-[min(62vh,620px)] sm:h-[min(68vh,680px)] lg:flex-1 lg:min-h-0 lg:h-auto">
@@ -2497,6 +2569,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                           <div
                             key={`classic-row-${idx}-${rowGroup.tierName}-${rowGroup.rowLabel}`}
                             className="space-y-3 sm:space-y-2.5"
+                            style={!isNewTier && rowGroup.gapBeforePx ? { marginTop: rowGroup.gapBeforePx + 24 } : undefined}
                           >
                             {isNewTier && (
                               <div
@@ -2538,8 +2611,16 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                                 className="flex items-center justify-center"
                                 style={{ width: classicSeatTrackPx }}
                               >
-                                <div className="flex items-center gap-2.5 sm:gap-3">
+                                <div
+                                  className={rowGroup.seats.every((s) => s.leftPx !== undefined) ? "relative" : "flex items-center gap-2.5 sm:gap-3"}
+                                  style={
+                                    rowGroup.seats.every((s) => s.leftPx !== undefined)
+                                      ? { width: classicSeatTrackPx, height: GEO_SEAT_PX }
+                                      : undefined
+                                  }
+                                >
                                   {rowGroup.seats.map((seat, seatIdx) => {
+                                    const geometric = seat.leftPx !== undefined && rowGroup.seats.every((s) => s.leftPx !== undefined);
                                     const isSelected = isSeatSelected(
                                       seat.id,
                                       rowGroup.rowLabel,
@@ -2557,6 +2638,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                                       <div
                                         key={`classic-${idx}-${rowGroup.tierName}-${seat.id}-${seatIdx}`}
                                         className="flex items-center"
+                                        style={geometric ? { position: "absolute", left: seat.leftPx, top: 0 } : undefined}
                                       >
                                         <button
                                           type="button"
@@ -2586,7 +2668,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                                             seatLabel
                                           )}
                                         </button>
-                                        {isAisleGap && (
+                                        {isAisleGap && !geometric && (
                                           <div className="w-6 sm:w-8" aria-hidden="true" />
                                         )}
                                       </div>
@@ -2651,6 +2733,21 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                   </span>
                 ))}
               </div>
+            </div>
+
+            <div
+              className="pointer-events-none absolute inset-y-0 right-0 z-20 w-11 sm:w-12 bg-gradient-to-l from-white via-white/90 to-transparent"
+              aria-hidden
+            >
+              {stickyRowLabels.map((item) => (
+                <span
+                  key={`r-${item.key}`}
+                  className="absolute right-1.5 sm:right-2 -translate-y-1/2 text-sm sm:text-base font-bold text-slate-600 leading-none"
+                  style={{ top: item.top }}
+                >
+                  {item.label}
+                </span>
+              ))}
             </div>
 
             {/* Top-right navigator: shows on scroll & zoom on tablet/desktop, hidden on mobile so it never disturbs seat selection */}
@@ -3003,13 +3100,11 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
               </h1>
             ) : step === "beverages" ? (
               <h1 className="truncate text-sm font-bold leading-tight text-slate-900 sm:text-[15px] md:text-base">
-                Select snacks &amp; beverages
+                Add snacks &amp; drinks
               </h1>
             ) : (
               <>
-                <h1 className="truncate text-sm font-bold leading-tight text-slate-900 sm:text-[15px] md:text-base">
-                  {headerTitle}
-                </h1>
+                <h1 className="truncate text-sm font-bold leading-tight text-slate-900 sm:text-[15px] md:text-base">{headerTitle}</h1>
                 <p className="mt-0.5 truncate text-[11px] text-slate-500 sm:text-xs">
                   {headerMeta}
                   {screen?.name ? ` | ${screen.name}` : ""}
@@ -3018,66 +3113,55 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
             )}
           </div>
 
-          {/* Mobile / tablet — back + title + theater (left-aligned, like reference) */}
-          <div className="min-w-0 flex-1 lg:hidden">
-            <h1 className="truncate text-[15px] sm:text-base font-bold leading-tight text-slate-900">
-              {step === "review"
-                ? "Review your booking"
-                : step === "beverages"
-                  ? "Select snacks & beverages"
-                  : headerTitle}
-            </h1>
-            {step === "seats" ? (
-              <p className="mt-0.5 truncate text-[12px] text-slate-500">
-                {[cinema?.name, screen?.name].filter(Boolean).join(" | ")}
-              </p>
-            ) : null}
+          {/* Mobile / tablet title */}
+          <div className="min-w-0 flex-1 text-center lg:hidden">
+            <p className="truncate text-xs font-bold leading-tight text-slate-900 sm:text-sm">
+              {step === "review" ? "Review your booking" : step === "beverages" ? "Add snacks & drinks" : headerTitle}
+            </p>
+            {step === "seats" ? <p className="truncate text-[10px] text-slate-500 sm:text-[11px]">{headerMeta}</p> : null}
           </div>
 
-          {/* Right end — desktop only (hidden on mobile / tablet) */}
-          <div className="relative z-10 ml-auto hidden lg:flex shrink-0 items-center gap-1.5 sm:gap-2">
+          {/* Right: accessibility, tickets and account */}
+          <div className="relative z-10 flex shrink-0 items-center gap-1.5 sm:gap-2">
             {step === "seats" ? (
               <>
-                <button
-                  type="button"
-                  onClick={() => setAccessModalOpen(true)}
-                  className="flex size-9 items-center justify-center rounded-full border border-slate-200 text-slate-700 hover:bg-brand-50 hover:text-brand-4 hover:border-brand-200 cursor-pointer"
-                  title="Accessibility seat selection"
-                  aria-label="Accessibility seat selection"
-                >
-                  <FaUniversalAccess className="size-[18px]" aria-hidden />
-                </button>
+                {accessibilityCategories.length > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => setAccessModalOpen(true)}
+                    className="flex size-9 cursor-pointer items-center justify-center rounded-full text-slate-700 hover:bg-slate-100"
+                    title="Accessible seating"
+                    aria-label="Accessible seating"
+                  >
+                    <FaUniversalAccess className="size-5" />
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   onClick={openQtyEditor}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-primary/40 px-2.5 sm:px-3 py-1.5 text-xs sm:text-sm font-bold text-primary hover:bg-brand-50 cursor-pointer"
+                  className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-[#6900AA]/40 bg-white px-3 py-1.5 text-xs font-bold text-[#6900AA] hover:bg-purple-50"
                   title="Change number of tickets"
                 >
-                  <Pencil className="size-3.5 shrink-0" />
-                  <span>
-                    {qty} Ticket{qty === 1 ? "" : "s"}
-                  </span>
+                  <Pencil className="size-3.5" /> {qty} Ticket{qty === 1 ? "" : "s"}
                 </button>
               </>
             ) : null}
-
             {isCustomerLoggedIn ? (
               <Link
                 href="/customer/profile"
-                className="inline-flex items-center gap-2 rounded-full"
-                title="My profile"
+                className="flex size-9 items-center justify-center rounded-full bg-[#6900AA] text-sm font-bold text-white"
+                title="My account"
+                aria-label="My account"
               >
-                <span className="w-9 h-9 rounded-full bg-primary text-primary-foreground text-sm font-bold flex items-center justify-center">
-                  {(authUser?.name || authUser?.email || "U").toString().charAt(0).toUpperCase()}
-                </span>
+                {String(authUser?.name || authUser?.email || "U").trim().charAt(0).toUpperCase()}
               </Link>
             ) : (
               <button
                 type="button"
                 onClick={() => setAuthModalOpen(true)}
-                className="w-9 h-9 rounded-full bg-slate-100 border border-slate-200 text-slate-700 hover:bg-slate-50 flex items-center justify-center cursor-pointer"
-                title="Login"
-                aria-label="Login"
+                className="flex size-9 cursor-pointer items-center justify-center rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200"
+                title="Sign in"
+                aria-label="Sign in"
               >
                 <User className="size-4" />
               </button>
@@ -3087,18 +3171,14 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
       </header>
 
       {showHasStarted ? (
-        <div className="shrink-0 px-4 py-2.5 text-center text-sm font-semibold border-b bg-[#FFF7ED] border-[#FDBA74] text-[#9A3412]">
-          Heads-up! This show has already started. You can still book seats for late entry.
+        <div className="shrink-0 border-b border-amber-200 bg-amber-50 px-3 py-2 text-center text-xs font-semibold text-amber-900 sm:text-sm">
+          This show has already started, so seats can no longer be booked online.
         </div>
       ) : null}
 
       {secondsLeft !== null && secondsLeft > 0 && (
-        <div
-          className={`shrink-0 px-4 py-2 text-center text-[13px] font-medium border-b flex items-center justify-center gap-3 transition-colors ${secondsLeft <= 60
-            ? "bg-rose-50 border-rose-200 text-rose-700 font-bold animate-pulse"
-            : "bg-[#F3E8FF] border-[#E9D5FF] text-[#6B21A8]"
-            }`}
-        >
+        <div className="shrink-0 flex items-center justify-center gap-3 border-b border-purple-100 bg-purple-50 px-3 py-1.5 text-xs font-semibold text-purple-900 sm:text-sm">
+          <Timer className="size-4 shrink-0" />
           <span>
             {step === "seats"
               ? `Your seats are held! Complete your booking in ${formatCountdown(secondsLeft)}`
@@ -3122,112 +3202,146 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
             {seatMapSection}
           </div>
         ) : step === "beverages" ? (
-          <div className="max-w-6xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 pb-24 lg:pb-16">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start">
-              {/* Beverages catalogue */}
-              <div className="lg:col-span-7 space-y-5">
-                <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm space-y-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                      <UtensilsCrossed className="size-4 text-[#6900AA]" /> Add Snacks &amp; Beverages
-                    </h2>
-                    <p className="text-xs text-slate-400">Optional — skip if you prefer</p>
+          <div
+            className="fixed inset-0 z-[60] flex items-end justify-center bg-slate-900/55 backdrop-blur-sm sm:items-center sm:p-6"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Add snacks and beverages"
+          >
+            <div className="flex h-[94dvh] w-full max-w-[88rem] flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl sm:h-[92vh] sm:w-[96vw] sm:rounded-3xl">
+              {/* Header */}
+              <div className="flex items-start justify-between gap-3 border-b border-slate-100 bg-gradient-to-r from-[#6900AA] to-[#8B2FC9] px-4 py-4 text-white sm:px-6">
+                <div className="min-w-0">
+                  <h2 className="flex items-center gap-2 text-xl font-extrabold sm:text-2xl">
+                    <UtensilsCrossed className="size-5 shrink-0" /> Add snacks &amp; drinks
+                  </h2>
+                  <p className="mt-0.5 text-sm text-white/85 sm:text-base">
+                    Optional. Pick what you like and collect it at the cinema with your tickets.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setStep("seats")}
+                  aria-label="Back to seats"
+                  className="shrink-0 rounded-full bg-white/15 p-2 text-white transition-colors hover:bg-white/25"
+                >
+                  <X className="size-5" />
+                </button>
+              </div>
+
+              {/* Categories */}
+              {(() => {
+                const cats: string[] = ["ALL", ...Array.from(new Set<string>(showtimeBeverages.map((b) => b.category?.toUpperCase() || "OTHER")))];
+                return (
+                  <div className="flex items-center gap-2 overflow-x-auto border-b border-slate-100 bg-white px-4 py-3 sm:px-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                    {cats.map((cat) => {
+                      const count = cat === "ALL" ? showtimeBeverages.length : showtimeBeverages.filter((b) => (b.category?.toUpperCase() || "OTHER") === cat).length;
+                      return (
+                        <button
+                          key={cat}
+                          type="button"
+                          onClick={() => setBevCategoryFilter(cat)}
+                          className={`flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full px-5 py-2.5 text-sm font-bold transition-all sm:text-base ${
+                            bevCategoryFilter === cat ? "bg-[#6900AA] text-white shadow-md shadow-purple-300/50" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                          }`}
+                        >
+                          {cat === "ALL" ? "All" : cat.charAt(0) + cat.slice(1).toLowerCase()}
+                          <span className={`rounded-full px-1.5 text-[10px] ${bevCategoryFilter === cat ? "bg-white/25" : "bg-white text-slate-500"}`}>{count}</span>
+                        </button>
+                      );
+                    })}
                   </div>
+                );
+              })()}
 
-                  {/* Dynamic category filter */}
-                  {(() => {
-                    const cats: string[] = ["ALL", ...Array.from(new Set<string>(showtimeBeverages.map((b) => b.category?.toUpperCase() || "OTHER")))];
-                    return (
-                      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-                        {cats.map((cat) => (
-                          <button
-                            key={cat}
-                            type="button"
-                            onClick={() => setBevCategoryFilter(cat)}
-                            className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${bevCategoryFilter === cat
-                              ? "bg-[#6900AA] text-white shadow-xs"
-                              : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                              }`}
-                          >
-                            {cat === "ALL" ? "All" : cat.charAt(0) + cat.slice(1).toLowerCase()}
-                          </button>
-                        ))}
-                      </div>
-                    );
-                  })()}
-
-                  {/* Beverage grid */}
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {/* Items and live bill */}
+              <div className="flex min-h-0 flex-1">
+              <div className="min-h-0 flex-1 overflow-y-auto bg-slate-50 px-4 py-4 sm:px-6">
+                {showtimeBeverages.length === 0 ? (
+                  <div className="flex h-full flex-col items-center justify-center text-center text-slate-500">
+                    <UtensilsCrossed className="mb-2 size-10 text-slate-300" />
+                    <p className="text-sm font-semibold text-slate-700">No snacks available for this cinema</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-5">
                     {showtimeBeverages
-                      .filter((b) => bevCategoryFilter === "ALL" || b.category?.toUpperCase() === bevCategoryFilter)
+                      .filter((b) => bevCategoryFilter === "ALL" || (b.category?.toUpperCase() || "OTHER") === bevCategoryFilter)
                       .map((bev) => {
                         const sel = selectedBeverages[bev.id];
                         const qty = sel?.quantity || 0;
                         return (
                           <div
                             key={bev.id}
-                            className={`rounded-2xl border flex flex-col overflow-hidden transition-all ${qty > 0
-                              ? "border-[#6900AA] shadow-sm ring-1 ring-[#6900AA]/20 bg-purple-50/20"
-                              : "border-slate-200 hover:border-slate-300"
-                              } ${!bev.is_available ? "opacity-50 pointer-events-none" : ""}`}
+                            className={`flex flex-col overflow-hidden rounded-2xl border bg-white transition-all ${
+                              qty > 0 ? "border-[#6900AA] shadow-lg shadow-purple-200/60 ring-2 ring-[#6900AA]/20" : "border-slate-200 hover:-translate-y-0.5 hover:shadow-md"
+                            } ${!bev.is_available ? "pointer-events-none opacity-55" : ""}`}
                           >
-                            {/* Image */}
-                            <div className="relative w-full aspect-[4/3] bg-slate-100 overflow-hidden">
+                            <div className="relative aspect-[4/3] w-full overflow-hidden bg-slate-100">
                               {bev.image_url ? (
-                                <img src={bev.image_url} alt={bev.name} className="w-full h-full object-cover" />
+                                <img src={bev.image_url} alt={bev.name} loading="lazy" className="h-full w-full object-cover" />
                               ) : (
-                                <div className="w-full h-full flex items-center justify-center text-slate-300">
-                                  <UtensilsCrossed className="size-8" />
+                                <div className="flex h-full w-full items-center justify-center text-slate-300">
+                                  <UtensilsCrossed className="size-9" />
                                 </div>
                               )}
+                              {bev.category ? (
+                                <span className="absolute left-2 top-2 rounded-full bg-white/90 px-2.5 py-1 text-xs font-bold uppercase tracking-wide text-slate-700 shadow-sm">
+                                  {bev.category.toLowerCase()}
+                                </span>
+                              ) : null}
                               {!bev.is_available && (
-                                <div className="absolute inset-0 bg-white/60 flex items-center justify-center">
-                                  <span className="text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">Sold Out</span>
+                                <div className="absolute inset-0 flex items-center justify-center bg-white/70">
+                                  <span className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-bold text-rose-600">Sold out</span>
                                 </div>
                               )}
                               {qty > 0 && (
-                                <span className="absolute top-2 right-2 size-5 rounded-full bg-[#6900AA] text-white text-[10px] font-extrabold flex items-center justify-center shadow-xs">{qty}</span>
+                                <span className="absolute right-2 top-2 flex size-7 items-center justify-center rounded-full bg-[#6900AA] text-sm font-extrabold text-white shadow-md">{qty}</span>
                               )}
                             </div>
 
-                            {/* Info */}
-                            <div className="p-2.5 flex-1 flex flex-col gap-2">
-                              <p className="text-xs font-bold text-slate-900 leading-tight line-clamp-2">{bev.name}</p>
-                              {bev.description && <p className="text-[10px] text-slate-500 line-clamp-1">{bev.description}</p>}
-                              <p className="text-xs font-extrabold text-[#6900AA] mt-auto">{formatMoney(Number(bev.price))}</p>
+                            <div className="flex flex-1 flex-col gap-1.5 p-3">
+                              <p className="line-clamp-2 text-base font-bold leading-tight text-slate-900 sm:text-lg">{bev.name}</p>
+                              {bev.description ? <p className="line-clamp-2 text-sm leading-snug text-slate-500">{bev.description}</p> : null}
+                              <p className="mt-auto pt-1 text-xl font-extrabold text-[#6900AA] sm:text-2xl">{formatMoney(Number(bev.price))}</p>
 
-                              {/* Qty controls */}
                               {qty === 0 ? (
                                 <button
                                   type="button"
-                                  onClick={() => setSelectedBeverages((prev) => ({
-                                    ...prev,
-                                    [bev.id]: { id: bev.id, name: bev.name, price: Number(bev.price), quantity: 1, image_url: bev.image_url, category: bev.category },
-                                  }))}
-                                  className="w-full flex items-center justify-center gap-1 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-bold transition-all cursor-pointer"
+                                  onClick={() =>
+                                    setSelectedBeverages((prev) => ({
+                                      ...prev,
+                                      [bev.id]: { id: bev.id, name: bev.name, price: Number(bev.price), quantity: 1, image_url: bev.image_url, category: bev.category },
+                                    }))
+                                  }
+                                  className="mt-1 flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-slate-900 py-3 text-sm font-bold text-white transition-all hover:bg-[#6900AA] active:scale-95"
                                 >
-                                  <Plus className="size-3" /> Add
+                                  <Plus className="size-3.5" /> Add
                                 </button>
                               ) : (
-                                <div className="flex items-center justify-between gap-2">
+                                <div className="mt-1 flex items-center justify-between rounded-xl bg-purple-50 p-1">
                                   <button
                                     type="button"
-                                    onClick={() => setSelectedBeverages((prev) => {
-                                      const next = { ...prev };
-                                      if (next[bev.id].quantity <= 1) { delete next[bev.id]; } else { next[bev.id] = { ...next[bev.id], quantity: next[bev.id].quantity - 1 }; }
-                                      return next;
-                                    })}
-                                    className="size-7 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-700 cursor-pointer"
+                                    aria-label={`Remove one ${bev.name}`}
+                                    onClick={() =>
+                                      setSelectedBeverages((prev) => {
+                                        const next = { ...prev };
+                                        if (next[bev.id].quantity <= 1) delete next[bev.id];
+                                        else next[bev.id] = { ...next[bev.id], quantity: next[bev.id].quantity - 1 };
+                                        return next;
+                                      })
+                                    }
+                                    className="flex size-10 cursor-pointer items-center justify-center rounded-lg bg-white text-slate-700 shadow-sm active:scale-95"
                                   >
-                                    <Minus className="size-3" />
+                                    <Minus className="size-4" />
                                   </button>
-                                  <span className="text-sm font-extrabold text-slate-900 w-6 text-center">{qty}</span>
+                                  <span className="w-10 text-center text-lg font-extrabold text-slate-900">{qty}</span>
                                   <button
                                     type="button"
+                                    aria-label={`Add one more ${bev.name}`}
                                     onClick={() => setSelectedBeverages((prev) => ({ ...prev, [bev.id]: { ...prev[bev.id], quantity: prev[bev.id].quantity + 1 } }))}
-                                    className="size-7 rounded-lg bg-[#6900AA] hover:bg-[#58008e] flex items-center justify-center text-white cursor-pointer active:scale-95 transition-all"
+                                    className="flex size-10 cursor-pointer items-center justify-center rounded-lg bg-[#6900AA] text-white shadow-sm active:scale-95"
                                   >
-                                    <Plus className="size-3" />
+                                    <Plus className="size-4" />
                                   </button>
                                 </div>
                               )}
@@ -3236,95 +3350,186 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                         );
                       })}
                   </div>
-                </div>
+                )}
               </div>
 
-              {/* Beverage summary sidebar */}
-              <aside className="lg:col-span-5 space-y-4 lg:sticky lg:top-4">
-                <div className="rounded-2xl border border-slate-200 bg-white p-5 space-y-4 shadow-sm">
-                  <h2 className="text-base font-bold text-slate-900">Your order</h2>
-
-                  {/* Selected seats summary */}
-                  <div className="space-y-1.5">
-                    <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Seats</span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {selectedSeats.map((s) => (
-                        <span
-                          key={s.seat_identifier}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-purple-50 border border-purple-200 text-xs font-semibold text-purple-900"
-                          title={s.tier_name ? `${s.tier_name} • ${formatSelectedSeatCode(s)}` : undefined}
-                        >
-                          <Armchair className="size-3.5 text-[#6900AA]" />
-                          {selectedSeatTiers.length > 1
-                            ? formatSelectedSeatLabel(s)
-                            : formatSelectedSeatCode(s)}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Snacks list */}
-                  {Object.values(selectedBeverages).length > 0 && (
-                    <div className="space-y-2 border-t border-slate-100 pt-3">
-                      <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Snacks &amp; Drinks</span>
-                      <div className="space-y-1.5">
-                        {Object.values(selectedBeverages).map((b) => (
-                          <div key={b.id} className="flex items-center justify-between text-sm">
-                            <span className="text-slate-600">{b.name} × {b.quantity}</span>
-                            <span className="font-semibold text-slate-900">{formatMoney(b.price * b.quantity)}</span>
-                          </div>
+              <aside className="hidden w-96 shrink-0 flex-col overflow-y-auto border-l border-slate-200 bg-white p-5 lg:flex" aria-label="Your bill">
+                <h3 className="mb-4 flex items-center gap-2 text-xl font-extrabold text-slate-900">
+                  <ShoppingBag className="size-4 text-[#6900AA]" /> Your bill
+                </h3>
+                  <div className="space-y-4 text-base">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Seats</p>
+                      <div className="mt-1.5 flex flex-wrap gap-1.5">
+                        {selectedSeats.map((seat) => (
+                          <span key={seat.seat_identifier} className="inline-flex items-center gap-1 rounded-lg border border-purple-200 bg-purple-50 px-2.5 py-1 text-sm font-semibold text-purple-900">
+                            <Armchair className="size-3.5 text-[#6900AA]" />
+                            {selectedSeatTiers.length > 1 ? formatSelectedSeatLabel(seat) : formatSelectedSeatCode(seat)}
+                          </span>
                         ))}
                       </div>
                     </div>
-                  )}
-
-                  {/* Pricing breakdown matching Payment summary */}
-                  <div className="space-y-2.5 border-t border-slate-100 pt-3 text-sm">
                     <div className="flex justify-between text-slate-600">
                       <span>Tickets ({selectedSeats.length})</span>
                       <span className="font-semibold text-slate-900">{formatMoney(ticketSubtotal)}</span>
                     </div>
+                    <div className="border-t border-slate-100 pt-3">
+                      <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Snacks &amp; drinks</p>
+                      {Object.values(selectedBeverages).length === 0 ? (
+                        <p className="mt-1.5 text-xs text-slate-500">Nothing added yet. Tap Add on any item.</p>
+                      ) : (
+                        <ul className="mt-2 space-y-2">
+                          {Object.values(selectedBeverages).map((b) => (
+                            <li key={b.id} className="flex items-start gap-2">
+                              <span className="min-w-0 flex-1">
+                                <span className="block truncate text-base font-semibold text-slate-800">{b.name}</span>
+                                <span className="text-sm text-slate-500">{b.quantity} × {formatMoney(b.price)}</span>
+                              </span>
+                              <span className="shrink-0 text-base font-bold text-slate-900">{formatMoney(b.price * b.quantity)}</span>
+                              <button
+                                type="button"
+                                aria-label={`Remove ${b.name}`}
+                                onClick={() =>
+                                  setSelectedBeverages((prev) => {
+                                    const next = { ...prev };
+                                    delete next[b.id];
+                                    return next;
+                                  })
+                                }
+                                className="shrink-0 cursor-pointer rounded-full p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                              >
+                                <X className="size-3.5" />
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
                     {beverageSubtotal > 0 && (
                       <div className="flex justify-between text-slate-600">
-                        <span>Snacks &amp; drinks</span>
+                        <span>Snacks subtotal</span>
                         <span className="font-semibold text-slate-900">{formatMoney(beverageSubtotal)}</span>
                       </div>
                     )}
                     <div className="flex justify-between text-slate-600">
-                      <div>
-                        <span>Convenience fees{convFeePct > 0 ? ` (${convFeePct}%)` : ""}</span>
-                        {convenienceFeeTax > 0 && (
-                          <p className="text-[10px] text-slate-400">
-                            Base: {formatMoney(convenienceFeeBase)} + {convVatPct}% VAT ({formatMoney(convenienceFeeTax)})
-                          </p>
-                        )}
-                      </div>
+                      <span>Convenience fees{convFeePct > 0 ? ` (${convFeePct}%)` : ""}</span>
                       <span className="font-semibold text-slate-900">+{formatMoney(convenienceFee)}</span>
                     </div>
-                    <div className="flex justify-between items-center border-t border-slate-100 pt-3 text-base font-bold text-slate-900">
-                      <span>Subtotal</span>
+                    <div className="flex items-center justify-between border-t border-slate-200 pt-4 text-xl font-extrabold text-slate-900 sm:text-2xl">
+                      <span>Total</span>
                       <span>{formatMoney(orderTotal)}</span>
                     </div>
                   </div>
+              </aside>
+              </div>
 
-                  <div className="hidden lg:block pt-1 space-y-2">
-                    <ShinyBlackButton
-                      type="button"
-                      onClick={() => setStep("review")}
-                      className="w-full py-3.5 rounded-xl bg-[#111111] text-white text-sm font-bold"
-                    >
-                      Continue to Review <ChevronRight className="size-4" />
-                    </ShinyBlackButton>
-                    <button
-                      type="button"
-                      onClick={() => { setSelectedBeverages({}); setStep("review"); }}
-                      className="w-full py-2 text-xs font-semibold text-slate-500 hover:text-slate-800 cursor-pointer transition-colors"
-                    >
-                      Skip — no snacks
-                    </button>
+              {/* Order bar */}
+              {billOpen ? (
+                <div className="max-h-[40vh] overflow-y-auto border-t border-slate-200 bg-white px-4 py-4 lg:hidden">
+                  <div className="space-y-4 text-base">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Seats</p>
+                      <div className="mt-1.5 flex flex-wrap gap-1.5">
+                        {selectedSeats.map((seat) => (
+                          <span key={seat.seat_identifier} className="inline-flex items-center gap-1 rounded-lg border border-purple-200 bg-purple-50 px-2.5 py-1 text-sm font-semibold text-purple-900">
+                            <Armchair className="size-3.5 text-[#6900AA]" />
+                            {selectedSeatTiers.length > 1 ? formatSelectedSeatLabel(seat) : formatSelectedSeatCode(seat)}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="flex justify-between text-slate-600">
+                      <span>Tickets ({selectedSeats.length})</span>
+                      <span className="font-semibold text-slate-900">{formatMoney(ticketSubtotal)}</span>
+                    </div>
+                    <div className="border-t border-slate-100 pt-3">
+                      <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Snacks &amp; drinks</p>
+                      {Object.values(selectedBeverages).length === 0 ? (
+                        <p className="mt-1.5 text-xs text-slate-500">Nothing added yet. Tap Add on any item.</p>
+                      ) : (
+                        <ul className="mt-2 space-y-2">
+                          {Object.values(selectedBeverages).map((b) => (
+                            <li key={b.id} className="flex items-start gap-2">
+                              <span className="min-w-0 flex-1">
+                                <span className="block truncate text-base font-semibold text-slate-800">{b.name}</span>
+                                <span className="text-sm text-slate-500">{b.quantity} × {formatMoney(b.price)}</span>
+                              </span>
+                              <span className="shrink-0 text-base font-bold text-slate-900">{formatMoney(b.price * b.quantity)}</span>
+                              <button
+                                type="button"
+                                aria-label={`Remove ${b.name}`}
+                                onClick={() =>
+                                  setSelectedBeverages((prev) => {
+                                    const next = { ...prev };
+                                    delete next[b.id];
+                                    return next;
+                                  })
+                                }
+                                className="shrink-0 cursor-pointer rounded-full p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                              >
+                                <X className="size-3.5" />
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                    {beverageSubtotal > 0 && (
+                      <div className="flex justify-between text-slate-600">
+                        <span>Snacks subtotal</span>
+                        <span className="font-semibold text-slate-900">{formatMoney(beverageSubtotal)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between text-slate-600">
+                      <span>Convenience fees{convFeePct > 0 ? ` (${convFeePct}%)` : ""}</span>
+                      <span className="font-semibold text-slate-900">+{formatMoney(convenienceFee)}</span>
+                    </div>
+                    <div className="flex items-center justify-between border-t border-slate-200 pt-4 text-xl font-extrabold text-slate-900 sm:text-2xl">
+                      <span>Total</span>
+                      <span>{formatMoney(orderTotal)}</span>
+                    </div>
                   </div>
                 </div>
-              </aside>
+              ) : null}
+              <div className="border-t border-slate-200 bg-white px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_24px_rgba(15,23,42,0.06)] sm:px-6">
+                <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-600 sm:text-base">
+                  <span className="inline-flex flex-wrap items-center gap-1.5">
+                    <Armchair className="size-4 text-[#6900AA]" />
+                    {selectedSeats.map((s) => (selectedSeatTiers.length > 1 ? formatSelectedSeatLabel(s) : formatSelectedSeatCode(s))).join(", ")}
+                  </span>
+                  <span>Tickets {formatMoney(ticketSubtotal)}</span>
+                  <span className="font-semibold text-slate-900">
+                    {totalBeverageQty > 0 ? `${totalBeverageQty} snack${totalBeverageQty === 1 ? "" : "s"} · ${formatMoney(beverageSubtotal)}` : "No snacks added"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setBillOpen((v) => !v)}
+                    className="cursor-pointer text-xs font-bold text-[#6900AA] underline-offset-2 hover:underline lg:hidden"
+                  >
+                    {billOpen ? "Hide bill" : "View bill"}
+                  </button>
+                  <span className="ml-auto text-xl font-extrabold text-slate-900 sm:text-2xl">Total {formatMoney(orderTotal)}</span>
+                </div>
+                <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedBeverages({});
+                      setStep("review");
+                    }}
+                    className="cursor-pointer rounded-xl border border-slate-200 px-6 py-3.5 text-base font-semibold text-slate-600 transition-colors hover:bg-slate-50"
+                  >
+                    Skip, no snacks
+                  </button>
+                  <ShinyBlackButton
+                    type="button"
+                    onClick={() => setStep("review")}
+                    className="w-full rounded-xl bg-[#111111] px-9 py-3.5 text-base font-bold text-white sm:w-auto"
+                  >
+                    {totalBeverageQty > 0 ? "Continue with snacks" : "Continue to review"} <ChevronRight className="size-4" />
+                  </ShinyBlackButton>
+                </div>
+              </div>
             </div>
           </div>
         ) : (

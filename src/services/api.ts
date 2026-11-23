@@ -492,6 +492,7 @@ export interface MovieShowtime {
   screen_capacity?: number;
   layout_template_id?: string | null;
   layout_name?: string | null;
+  seats_sold?: number;
 }
 
 export type ShowSeatState = 'AVAILABLE' | 'BOOKED' | 'HELD' | 'BLOCKED' | 'OUT_OF_ORDER' | 'SCREEN_BLOCKED';
@@ -504,6 +505,7 @@ export interface ShowSeatMapSeat {
   section: string;
   x: number;
   y: number;
+  color?: string | null;
   state: ShowSeatState;
   price: number;
   base_price: number;
@@ -516,6 +518,7 @@ export interface ShowSeatMap {
   showtime: {
     id: string;
     movie_title: string;
+    movie_poster_url?: string | null;
     screen_name: string;
     screen_type?: string;
     starts_at: string;
@@ -536,13 +539,13 @@ export interface ShowSeatMap {
     screen_blocked: number;
   };
   revenue: number;
+  layout?: { seating_config?: unknown };
   seats: ShowSeatMapSeat[];
 }
 
 export interface ShowSeatOverrideInput {
   seat_key: string;
   status?: 'AVAILABLE' | 'BLOCKED' | 'OUT_OF_ORDER';
-  price?: number | null;
   note?: string | null;
 }
 
@@ -559,6 +562,27 @@ export interface ShowChannelSummaryRow {
   bookings: number;
   seats: number;
   amount: number;
+}
+
+/** One screen's numbers for the Shows & Seats audit: shows created, revenue and blocked seats. */
+export interface CinemaScreenAuditRow {
+  screen_id: string;
+  name: string;
+  shows: { total: number; past: number; current: number; upcoming: number; today: number; disabled: number; cancelled: number };
+  revenue: { total: number; today: number; advance: number; tickets: number };
+  seats: { total: number; blocked: number };
+  /** Sales by platform: ONLINE (website and app), COUNTER (offline, box office), PARTNER */
+  channels: Array<{ channel: string; bookings: number; tickets: number; amount: number }>;
+}
+
+export interface CinemaScreenSeatAuditEntry {
+  id: string;
+  action: "BLOCK" | "UNBLOCK";
+  seat_count: number;
+  seat_labels: string[];
+  note: string | null;
+  user_name: string | null;
+  created_at: string;
 }
 
 export type MovieShowBookingState = "UPCOMING" | "STARTED" | "ENDED";
@@ -668,6 +692,8 @@ export interface MovieShowtimeLayoutData {
   } | null;
   booked_seat_identifiers: string[];
   held_seat_identifiers?: string[];
+  blocked_seat_identifiers?: string[];
+  show_blocked_seat_identifiers?: string[];
   out_of_order_seat_identifiers?: string[];
   /** Per-seat price set by the cinema for this show, keyed by seat identifier */
   seat_price_overrides?: Record<string, number>;
@@ -1188,6 +1214,55 @@ export interface ContractPrefill {
     body_html: string;
     dynamic_data: Record<string, string | number>;
   };
+}
+
+export interface ScreenAuditChange {
+  value: number;
+  prev: number;
+  change: number | null;
+}
+export interface ScreenAuditData {
+  range: { from: string; to: string; prev_from: string; prev_to: string; days: number };
+  screens: Array<{ id: string; name: string }>;
+  scorecard: {
+    revenue: ScreenAuditChange;
+    tickets: ScreenAuditChange;
+    occupancy: ScreenAuditChange;
+    shows: ScreenAuditChange;
+    damaged: { value: number; total: number };
+  };
+  utilisation: {
+    per_show: Array<{ id: string; movie: string; screen: string; starts_at: string; language: string; format: string; capacity: number; sold: number; occupancy: number; revenue: number; completed: boolean }>;
+    shows_per_day: Array<{ date: string; shows: number }>;
+    hours_used: number;
+    hours_available: number;
+    usage_pct: number;
+    gaps: Array<{ screen: string; date: string; from: string; to: string; minutes: number }>;
+    low_shows: Array<{ id: string; movie: string; screen: string; starts_at: string; occupancy: number; sold: number; capacity: number }>;
+    sold_out: number;
+  };
+  revenue: {
+    avg_ticket: number;
+    tiers: Array<{ tier: string; tickets: number; revenue: number; avg_price: number }>;
+    channels: Array<{ channel: string; tickets: number; revenue: number }>;
+    slots: Array<{ dow: number; hour: number; shows: number; sold: number; capacity: number; revenue: number; occupancy: number }>;
+    advance: Array<{ id: string; movie: string; screen: string; starts_at: string; capacity: number; sold: number; occupancy: number; forecast_sold: number }>;
+    snacks: { revenue: number; items: number; top: Array<{ name: string; qty: number; revenue: number }> };
+  };
+  movies: Array<{ movie: string; language: string; format: string; shows: number; tickets: number; revenue: number; occupancy: number }>;
+  seats: {
+    damaged: number;
+    damaged_pct: number;
+    estimated_lost_revenue: number;
+    repeatedly_damaged: Array<{ seat: string; times: number }>;
+    avg_repair_days: number | null;
+    most_booked: Array<{ seat: string; bookings: number }>;
+    never_booked_pct: number | null;
+  };
+  quality: { cancellation_rate: number; cancelled: number; bookings: number; no_show_rate: number; no_shows: number; counter_share: number };
+  alerts: Array<{ level: 'high' | 'medium' | 'info'; text: string }>;
+  decisions: { best_slots: ScreenAuditData['revenue']['slots']; weak_slots: ScreenAuditData['revenue']['slots']; hints: string[] };
+  activity: Array<{ at: string; kind: string; text: string; by: string | null }>;
 }
 
 export interface MovieContract {
@@ -3529,9 +3604,47 @@ export const api = createApi({
       invalidatesTags: ['VenueLayouts'],
     }),
 
+    createAdminVenueLayoutRequest: builder.mutation<
+      VenueLayoutRequest,
+      {
+        business_id: string;
+        screen_id?: string;
+        hall_id?: string;
+        new_screen?: { name: string; screen_type?: string; capacity: number };
+        layout_name?: string;
+        layout_type?: string;
+        capacity?: number;
+        notes?: string;
+        visited_person?: string;
+        visit_notes?: string;
+        seat_types?: { regular: number; recliner: number; couple: number };
+        sections?: Array<{ seat_type: string; name: string; seats: number }>;
+      }
+    >({
+      query: (body) => ({ url: `/admin/venue-layout-requests`, method: 'POST', body }),
+      transformResponse: (res: { data: VenueLayoutRequest }) => res.data,
+    }),
+
+    updateAdminVenueLayoutRequest: builder.mutation<
+      VenueLayoutRequest,
+      { id: string; layout_name?: string; layout_type?: string; capacity?: number; notes?: string; visited_person?: string; visit_notes?: string; seat_types?: { regular: number; recliner: number; couple: number }; sections?: Array<{ seat_type: string; name: string; seats: number }> }
+    >({
+      query: ({ id, ...body }) => ({ url: `/admin/venue-layout-requests/${id}`, method: 'PATCH', body }),
+      transformResponse: (res: { data: VenueLayoutRequest }) => res.data,
+      invalidatesTags: (_r, _e, arg) => [{ type: 'VenueLayouts', id: arg.id }, 'VenueLayouts'],
+    }),
+
+    deleteAdminVenueLayoutRequest: builder.mutation<{ message?: string }, string>({
+      query: (id) => ({ url: `/admin/venue-layout-requests/${id}`, method: 'DELETE' }),
+    }),
+
+    unpublishAdminVenueLayout: builder.mutation<{ message?: string }, string>({
+      query: (id) => ({ url: `/admin/venue-layout-requests/${id}/unpublish`, method: 'POST' }),
+    }),
+
     markAdminVenueLayoutVisitComplete: builder.mutation<
       VenueLayoutRequest,
-      { id: string; visited_person: string; visit_notes: string }
+      { id: string; visited_person: string; visit_notes: string; sections?: Array<{ seat_type: string; name: string; seats: number }> }
     >({
       query: ({ id, ...body }) => ({
         url: `/admin/venue-layout-requests/${id}/visit-complete`,
@@ -7968,12 +8081,13 @@ export const api = createApi({
         bizId: string;
         screenId: string;
         seats: Array<{ seat_key: string; status: 'BLOCKED' | 'AVAILABLE' }>;
+        note?: string;
       }
     >({
-      query: ({ bizId, screenId, seats }) => ({
+      query: ({ bizId, screenId, seats, note }) => ({
         url: `/businesses/${bizId}/cinema-screens/${screenId}/seat-statuses`,
         method: 'PATCH',
-        body: { seats },
+        body: { seats, note },
       }),
       invalidatesTags: (_r, _e, arg) => [
         { type: 'CinemaScreens', id: arg.bizId },
@@ -8013,7 +8127,9 @@ export const api = createApi({
         seat_keys: string[];
         guest_name?: string;
         guest_phone?: string;
+        guest_email?: string;
         payment_method?: 'CASH' | 'CARD' | 'MOBILE_MONEY';
+        split_payment?: { cash_amount: number; other_method: 'CARD' | 'MOBILE_MONEY' };
       }
     >({
       query: ({ bizId, showtimeId, ...body }) => ({
@@ -8028,6 +8144,30 @@ export const api = createApi({
       ],
     }),
 
+    getScreenAudit: builder.query<
+      ScreenAuditData,
+      { bizId: string; screen_id?: string; period?: string; from?: string; to?: string }
+    >({
+      query: ({ bizId, ...params }) => ({ url: `/businesses/${bizId}/screen-audit`, params }),
+      transformResponse: (res: { data: ScreenAuditData }) => res.data,
+      providesTags: ['MovieShowtimes', 'CinemaScreens'],
+    }),
+
+    getCinemaScreenAuditSummary: builder.query<CinemaScreenAuditRow[], string>({
+      query: (bizId) => `/businesses/${bizId}/cinema-screens/audit-summary`,
+      transformResponse: (res: { data: CinemaScreenAuditRow[] }) => res.data,
+      providesTags: ['CinemaScreens', 'MovieShowtimes'],
+    }),
+
+    getCinemaScreenSeatAudit: builder.query<CinemaScreenSeatAuditEntry[], { bizId: string; screenId: string; limit?: number }>({
+      query: ({ bizId, screenId, limit }) => ({
+        url: `/businesses/${bizId}/cinema-screens/${screenId}/seat-audit`,
+        params: limit ? { limit } : undefined,
+      }),
+      transformResponse: (res: { data: CinemaScreenSeatAuditEntry[] }) => res.data,
+      providesTags: ['CinemaScreens'],
+    }),
+
     getShowChannelSummary: builder.query<ShowChannelSummaryRow[], { bizId: string; showtimeId: string }>({
       query: ({ bizId, showtimeId }) => `/businesses/${bizId}/movie-showtimes/${showtimeId}/channels`,
       transformResponse: (res: { data: { channels: ShowChannelSummaryRow[] } }) => res.data.channels,
@@ -8036,7 +8176,20 @@ export const api = createApi({
 
     getPartnerMovieShowtimes: builder.query<
       MovieShowtime[],
-      { bizId: string; date?: string; cinema_screen_id?: string; movie_id?: string }
+      {
+        bizId: string;
+        date?: string;
+        date_from?: string;
+        date_to?: string;
+        cinema_screen_id?: string;
+        movie_id?: string;
+        /** Searches movie, language, format, screen, date and time on the server */
+        q?: string;
+        time_of_day?: 'morning' | 'afternoon' | 'evening' | 'night';
+        language?: string;
+        format?: string;
+        status?: string;
+      }
     >({
       query: ({ bizId, ...params }) => ({
         url: `/businesses/${bizId}/movie-showtimes`,
@@ -8894,6 +9047,10 @@ export const {
   useGetVenueLayoutRequestsQuery,
   useCreateVenueLayoutRequestMutation,
   useGetAdminVenueLayoutRequestsQuery,
+  useUpdateAdminVenueLayoutRequestMutation,
+  useDeleteAdminVenueLayoutRequestMutation,
+  useUnpublishAdminVenueLayoutMutation,
+  useCreateAdminVenueLayoutRequestMutation,
   useGetAdminVenueLayoutRequestQuery,
   useReviewAdminVenueLayoutRequestMutation,
   useMarkAdminVenueLayoutVisitCompleteMutation,
@@ -9221,6 +9378,9 @@ export const {
   useUpdateShowSeatOverridesMutation,
   useCreateCounterBookingMutation,
   useGetShowChannelSummaryQuery,
+  useGetCinemaScreenAuditSummaryQuery,
+  useGetScreenAuditQuery,
+  useGetCinemaScreenSeatAuditQuery,
   useCreatePartnerMovieShowtimeMutation,
   useUpdatePartnerMovieShowtimeMutation,
   useDeletePartnerMovieShowtimeMutation,

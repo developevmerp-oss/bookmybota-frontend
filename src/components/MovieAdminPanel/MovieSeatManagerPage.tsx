@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import ClassicSeatMap from "@/components/venue/ClassicSeatMap";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -36,6 +37,7 @@ import { extractApiError } from "@/lib/apiErrors";
 import { formatTime12h, venueDateStr } from "@/lib/dateFormat";
 import { getApiBaseUrl } from "@/lib/apiBaseUrl";
 import { AdminListShimmer } from "@/components/Shared/Shimmer";
+import LayoutSeatPreview from "@/components/venue/LayoutSeatPreview";
 
 const STATE_META: Record<ShowSeatState, { label: string; cls: string }> = {
   AVAILABLE: {
@@ -68,6 +70,21 @@ const CHANNEL_LABEL: Record<string, string> = {
   ONLINE: "Website & app",
   COUNTER: "Box office (counter)",
 };
+
+const BUSY_FILL: Partial<Record<ShowSeatState, string>> = {
+  BOOKED: "#94a3b8",
+  HELD: "#f59e0b",
+  BLOCKED: "#fb7185",
+  OUT_OF_ORDER: "#fb923c",
+  SCREEN_BLOCKED: "#475569",
+};
+
+function hasPlacedLayout(seats: ShowSeatMapSeat[]): boolean {
+  if (seats.length < 2) return false;
+  const xs = new Set(seats.map((s) => Math.round(s.x)));
+  const ys = new Set(seats.map((s) => Math.round(s.y)));
+  return xs.size > 1 || ys.size > 1;
+}
 
 function money(n: number) {
   return Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
@@ -183,6 +200,8 @@ export default function MovieSeatManagerPage() {
   const {
     data: map,
     isFetching: mapLoading,
+    isError: mapFailed,
+    error: mapError,
     refetch: refetchMap,
   } = useGetShowSeatMapQuery({ bizId, showtimeId: showId }, { skip: !bizId || !showId, pollingInterval: 15000 });
   const { data: channels = [] } = useGetShowChannelSummaryQuery(
@@ -194,6 +213,21 @@ export default function MovieSeatManagerPage() {
   const [counterBook, { isLoading: booking }] = useCreateCounterBookingMutation();
 
   const sections = useMemo(() => buildSections(map?.seats ?? []), [map?.seats]);
+  const placedLayout = hasPlacedLayout(map?.seats ?? []);
+  const previewSeats = useMemo(
+    () =>
+      (map?.seats ?? []).map((s) => ({
+        key: s.key,
+        coordinate_x: s.x,
+        coordinate_y: s.y,
+        color: s.color,
+        section_name: s.section,
+        row_label: s.row,
+        seat_label: s.number,
+        status: "AVAILABLE",
+      })),
+    [map?.seats]
+  );
   const seatByKey = useMemo(() => new Map((map?.seats ?? []).map((s) => [s.key, s])), [map?.seats]);
   const selectedSeats = useMemo(
     () => Array.from(selected).map((k) => seatByKey.get(k)).filter(Boolean) as ShowSeatMapSeat[],
@@ -358,6 +392,15 @@ export default function MovieSeatManagerPage() {
         )}
       </div>
 
+      {showId && !map && mapLoading && (
+        <p className="text-sm text-slate-500 dark:text-zinc-400">Loading the seat layout…</p>
+      )}
+      {showId && !map && mapFailed && (
+        <p className="text-sm text-rose-600">
+          {extractApiError(mapError, "The seat layout could not be loaded. Refresh and try again.")}
+        </p>
+      )}
+
       {map && (
         <>
           {/* Stats */}
@@ -397,15 +440,59 @@ export default function MovieSeatManagerPage() {
                 </div>
               </div>
 
-              <div className="mb-5">
-                <div className="mx-auto h-2 w-3/5 rounded-b-full bg-gradient-to-b from-slate-400 to-slate-200 dark:from-zinc-500 dark:to-zinc-800" />
-                <div className="text-center text-[11px] tracking-[0.3em] text-slate-400 mt-1">SCREEN THIS WAY</div>
-              </div>
+              {!placedLayout && (
+                <div className="mb-5">
+                  <div className="mx-auto h-2 w-3/5 rounded-b-full bg-gradient-to-b from-slate-400 to-slate-200 dark:from-zinc-500 dark:to-zinc-800" />
+                  <div className="text-center text-[11px] tracking-[0.3em] text-slate-400 mt-1">SCREEN THIS WAY</div>
+                </div>
+              )}
 
               {map.seats.length === 0 ? (
                 <p className="text-sm text-slate-500 py-10 text-center">
                   This screen has no approved seat layout yet. Open <b>Screens &amp; Layouts</b> to submit and approve one.
                 </p>
+              ) : placedLayout ? (
+                <div>
+                  <div className="mb-3 flex flex-wrap gap-2">
+                    {sections.map((sec) => {
+                      const secSeats = sec.rows.flatMap((r) => r.seats);
+                      const price = secSeats[0]?.base_price ?? 0;
+                      return (
+                        <button
+                          key={sec.name}
+                          type="button"
+                          onClick={() => selectGroup(secSeats)}
+                          className="rounded-full border border-slate-200 dark:border-white/10 px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-slate-600 dark:text-zinc-300 hover:border-rose-400 hover:text-rose-600"
+                          title="Select / unselect this section"
+                        >
+                          {sec.name} · {money(price)} ETB
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <ClassicSeatMap
+                    seats={previewSeats}
+                    heightClass="h-[min(68vh,560px)]"
+                    seatMarker={(raw) => {
+                      const key = String((raw as { key?: string }).key || "");
+                      const live = seatByKey.get(key);
+                      if (!live) return null;
+                      const isSel = selected.has(live.key);
+                      const busy = BUSY_FILL[live.state];
+                      return {
+                        fill: isSel ? "#e11d48" : busy || "",
+                        stroke: isSel ? "#9f1239" : "#ffffff",
+                        strokeWidth: isSel ? 3 : undefined,
+                        cursor: live.state === "SCREEN_BLOCKED" ? "not-allowed" : "pointer",
+                        title: `${live.row}${live.number || ""} · ${STATE_META[live.state].label} · ${money(live.price)} ETB`,
+                        onClick: live.state === "SCREEN_BLOCKED" ? undefined : () => toggleSeat(live),
+                      };
+                    }}
+                  />
+                  <p className="mt-2 text-[11px] text-slate-500 dark:text-zinc-400">
+                    Tap a seat to select it, or tap a section to select every free seat in it.
+                  </p>
+                </div>
               ) : (
                 <div className="overflow-x-auto">
                   <div className="min-w-max mx-auto space-y-6">
@@ -717,7 +804,7 @@ function PriceModal({
       <label className="text-xs font-semibold text-slate-600 dark:text-zinc-300">New price per seat (ETB)</label>
       <input autoFocus type="number" min={1} step="0.01" value={value} onChange={(e) => setValue(e.target.value)} className={`${inputCls} mt-1`} placeholder="e.g. 450" />
       <p className="text-[11px] text-slate-500 mt-2">
-        Applies to this show only and takes effect immediately for new bookings on every channel. Tickets already sold keep the price they were sold at.
+        Sets the price for this seat type on this show. Every seat of that type uses the new price, on the website, the app and at the counter. Tickets already sold keep the price they were sold at.
         {sold > 0 ? ` ${sold} sold seat(s) will be skipped.` : ""}
       </p>
       <div className="mt-5 flex justify-between gap-2">

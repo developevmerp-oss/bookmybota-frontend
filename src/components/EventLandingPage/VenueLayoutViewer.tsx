@@ -975,6 +975,33 @@ export default function VenueLayoutViewer({
                 );
               })}
 
+              {/* Row letters on both sides of each row (cinema halls) */}
+              {cinemaMode
+                ? (() => {
+                    const rows = new Map<string, { label: string; minX: number; maxX: number; sumY: number; n: number }>();
+                    seats.forEach((s) => {
+                      const label = String(s.row_label || "").trim();
+                      if (!label || label.toUpperCase() === "VIP") return;
+                      const y = Number(s.coordinate_y) || 0;
+                      const x = Number(s.coordinate_x) || 0;
+                      const key = `${label}|${Math.round(y / 8)}`;
+                      const cur = rows.get(key) || { label, minX: x, maxX: x, sumY: 0, n: 0 };
+                      cur.minX = Math.min(cur.minX, x);
+                      cur.maxX = Math.max(cur.maxX, x);
+                      cur.sumY += y;
+                      cur.n += 1;
+                      rows.set(key, cur);
+                    });
+                    return Array.from(rows.entries()).flatMap(([key, r]) => {
+                      const y = r.sumY / r.n - 6;
+                      return [
+                        <Text key={`rl-${key}`} text={r.label} x={r.minX - 62} y={y - 3} width={34} align="center" fontSize={18} fontStyle="bold" fill="#475569" listening={false} />,
+                        <Text key={`rr-${key}`} text={r.label} x={r.maxX + 28} y={y - 3} width={34} align="center" fontSize={18} fontStyle="bold" fill="#475569" listening={false} />,
+                      ];
+                    });
+                  })()
+                : null}
+
               {/* Text Labels */}
               {labels.map((label, lIdx) => (
                 <Text

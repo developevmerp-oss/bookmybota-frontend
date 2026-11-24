@@ -31,6 +31,9 @@ import {
   Users,
   X,
   Building2,
+  Tag,
+  Percent,
+  Search,
 } from "lucide-react";
 import { toast } from "sonner";
 import images from "@/Images";
@@ -50,7 +53,11 @@ import {
   useGetEventLayoutQuery,
   useGetPublicEventLayoutQuery,
   useGetPublicStadiumBlocksQuery,
+  useGetPublicEventOffersQuery,
+  useGetActivePlatformOffersQuery,
   type OrganizerEvent,
+  type EventOffer,
+  type PlatformOffer,
 } from "@/services/api";
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
@@ -110,6 +117,11 @@ function readHoldSessionToken(): string | undefined {
 function writeHoldSessionToken(token: string) {
   if (typeof window === "undefined") return;
   sessionStorage.setItem(HOLD_SESSION_KEY, token);
+}
+
+function clearHoldSessionToken() {
+  if (typeof window === "undefined") return;
+  sessionStorage.removeItem(HOLD_SESSION_KEY);
 }
 
 const VenueLayoutViewer = dynamic(
@@ -297,6 +309,9 @@ export default function EventCheckout({
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [ticketModeDetailsOpen, setTicketModeDetailsOpen] = useState<TicketDeliveryMode | null>(null);
   const [contactModalOpen, setContactModalOpen] = useState(false);
+  const [offersModalOpen, setOffersModalOpen] = useState(false);
+  const [offersModalTab, setOffersModalTab] = useState<"ALL" | "EVENT" | "PLATFORM">("ALL");
+  const [giftCardModalOpen, setGiftCardModalOpen] = useState(false);
   const [cancelTxnOpen, setCancelTxnOpen] = useState(false);
   const [cancelTxnAction, setCancelTxnAction] = useState<"back" | "exit">("back");
   const [ticketMode, setTicketMode] = useState<TicketDeliveryMode>("M_TICKET");
@@ -384,6 +399,12 @@ export default function EventCheckout({
   const { data: myGiftCards = [] } = useGetMyGiftCardsQuery(undefined, {
     skip: !customerId || isOrganizer,
   });
+  const { data: publicEventOffers = [] } = useGetPublicEventOffersQuery(event.id, {
+    skip: isOrganizer || !event.id,
+  });
+  const { data: activePlatformOffers = [] } = useGetActivePlatformOffersQuery(undefined, {
+    skip: isOrganizer,
+  });
   const layoutArg = useMemo(() => {
     return sessionToken ? { eventId: event.id, session_token: sessionToken } : event.id;
   }, [event.id, sessionToken]);
@@ -392,12 +413,22 @@ export default function EventCheckout({
     data: layoutData,
     isLoading: layoutLoading,
     isFetching: layoutFetching,
+    refetch: refetchEventLayout,
   } = useGetEventLayoutQuery(layoutArg, { skip: !isOrganizer });
   const {
     data: publicLayoutData,
     isLoading: publicLayoutLoading,
     isFetching: publicLayoutFetching,
+    refetch: refetchPublicLayout,
   } = useGetPublicEventLayoutQuery(layoutArg, { skip: isOrganizer });
+
+  const refetchLayout = () => {
+    if (isOrganizer) {
+      refetchEventLayout();
+    } else {
+      refetchPublicLayout();
+    }
+  };
 
   const activeLayoutData = isOrganizer ? layoutData : publicLayoutData;
   const isLayoutLoading = isOrganizer
@@ -433,9 +464,11 @@ export default function EventCheckout({
     };
   }, [isMapFullscreen]);
 
+  const userCancelledHoldRef = useRef(false);
+
   useEffect(() => {
     const ownHold = (activeLayoutData as any)?.data?.own_hold || (activeLayoutData as any)?.own_hold;
-    if (!ownHold || ownHold.status !== "ACTIVE") return;
+    if (!ownHold || ownHold.status !== "ACTIVE" || userCancelledHoldRef.current) return;
 
     // Restore seat selection anytime, but only attach the booking countdown
     // once the user reaches Review (after Continue to review).
@@ -778,10 +811,10 @@ export default function EventCheckout({
     const seededContact =
       !isOrganizer && authUser?.role === "customer"
         ? {
-            name: profile?.name || authUser.name || "",
-            phone: sanitizePhoneInput(profile?.phone || authUser.phone || ""),
-            email: profile?.email || authUser.email || "",
-          }
+          name: profile?.name || authUser.name || "",
+          phone: sanitizePhoneInput(profile?.phone || authUser.phone || ""),
+          email: profile?.email || authUser.email || "",
+        }
         : emptyEventCheckoutContactValues();
     resetContact(seededContact);
     resetContactModal(seededContact);
@@ -974,7 +1007,10 @@ export default function EventCheckout({
   };
 
   const resetToSeatsAfterTimeout = async () => {
+    userCancelledHoldRef.current = true;
     await releaseActiveHold();
+    clearHoldSessionToken();
+    setSessionToken(undefined);
     clearSeatHoldState();
     setSelectedSeats([]);
     setQtyByType({});
@@ -984,22 +1020,49 @@ export default function EventCheckout({
     setGiftCardInput("");
     setSelectedGiftCardId("");
     setIsMapFullscreen(false);
+    autoOpenedMapRef.current = false;
+    setTimeOutOpen(false);
+    try {
+      refetchLayout();
+    } catch {
+      // ignore
+    }
     setStep(2);
+    syncCheckoutUrl(2, showtimeId, "replace");
   };
 
   const confirmCancelTransaction = async () => {
+    userCancelledHoldRef.current = true;
     await releaseActiveHold();
+    clearHoldSessionToken();
+    setSessionToken(undefined);
     clearSeatHoldState();
+    setSelectedSeats([]);
+    setQtyByType({});
+    setAppliedPromo(null);
+    setPromoInput("");
+    setAppliedGiftCard(null);
+    setGiftCardInput("");
+    setSelectedGiftCardId("");
+    setIsMapFullscreen(false);
+    autoOpenedMapRef.current = false;
     setCancelTxnOpen(false);
+    try {
+      refetchLayout();
+    } catch {
+      // ignore
+    }
     if (cancelTxnAction === "exit") {
       onClose();
       return;
     }
-    setStep(3);
+    // Redirect to Tickets step (Step 2: layout if reserved seats, or ticket selection if non-layout)
+    setStep(2);
+    syncCheckoutUrl(2, showtimeId, "replace");
   };
 
-  const handleApplyPromo = async () => {
-    const code = promoInput.trim();
+  const handleApplyPromo = async (codeOverride?: string) => {
+    const code = (typeof codeOverride === "string" ? codeOverride : promoInput).trim();
     if (!code) {
       toast.error("Enter a promo code.");
       return;
@@ -1013,18 +1076,60 @@ export default function EventCheckout({
         ...(selectedCity ? { city: selectedCity } : {}),
       }).unwrap();
       setAppliedPromo(result);
-      setAppliedGiftCard(null);
+      setPromoInput(code);
+      setOffersModalOpen(false);
       toast.success(`Promo code "${result.promo_code}" applied!`);
+
+      // If a gift card is already applied, recalculate its preview against the new remaining balance
+      if (appliedGiftCard) {
+        const promoDiscountVal = Number(result.discount_amount) || 0;
+        const newNetTicket = Math.max(0, ticketAmount - promoDiscountVal);
+        const newOrderTotal = moneySum([newNetTicket, convenienceFee]);
+        if (newOrderTotal <= 0) {
+          setAppliedGiftCard(null);
+          toast.info("Gift card removed because promo covers the full order.");
+        } else {
+          try {
+            const gcPayload = appliedGiftCard.gift_card_id
+              ? { gift_card_id: appliedGiftCard.gift_card_id, amount: newOrderTotal, category: "EVENTS" as const }
+              : giftCardInput.trim()
+                ? { code: giftCardInput.trim(), amount: newOrderTotal, category: "EVENTS" as const }
+                : null;
+            if (gcPayload) {
+              const updatedGc = await previewGiftCard(gcPayload).unwrap();
+              setAppliedGiftCard(updatedGc);
+            }
+          } catch {
+            // Keep existing gift card if re-preview fails or clear if balance issue
+          }
+        }
+      }
     } catch (err) {
       setAppliedPromo(null);
       toast.error(extractApiError(err, "Invalid or expired promo code."));
     }
   };
 
-  const handleRemovePromo = () => {
+  const handleRemovePromo = async () => {
     setAppliedPromo(null);
     setPromoInput("");
-    setAppliedGiftCard(null);
+    // If a gift card was applied, re-preview it with the un-discounted order total so customer can use full eligible balance
+    if (appliedGiftCard) {
+      const fullOrderTotal = moneySum([ticketAmount, convenienceFee]);
+      try {
+        const gcPayload = appliedGiftCard.gift_card_id
+          ? { gift_card_id: appliedGiftCard.gift_card_id, amount: fullOrderTotal, category: "EVENTS" as const }
+          : giftCardInput.trim()
+            ? { code: giftCardInput.trim(), amount: fullOrderTotal, category: "EVENTS" as const }
+            : null;
+        if (gcPayload) {
+          const updatedGc = await previewGiftCard(gcPayload).unwrap();
+          setAppliedGiftCard(updatedGc);
+        }
+      } catch {
+        // Keep existing
+      }
+    }
   };
 
   const handleApplyGiftCard = async () => {
@@ -1101,8 +1206,8 @@ export default function EventCheckout({
         selectedSeats.forEach((s) => {
           if (isRealPhysicalSeat(s)) {
             const resolved = resolveSeatTicket(s);
-                        const effectiveTypeId = s.ticket_type_id || resolved?.id;
-                        items.push({ ticket_type_id: effectiveTypeId, qty: 1, event_seat_id: String(s.id) });
+            const effectiveTypeId = s.ticket_type_id || resolved?.id;
+            items.push({ ticket_type_id: effectiveTypeId, qty: 1, event_seat_id: String(s.id) });
           } else {
             items.push({ ticket_type_id: s.ticket_type_id, qty: 1 });
           }
@@ -1720,7 +1825,7 @@ export default function EventCheckout({
 
   const seatsReady = hasReservedSeats
     ? effectiveDesiredSeatQty != null &&
-      selectedSeats.length === effectiveDesiredSeatQty
+    selectedSeats.length === effectiveDesiredSeatQty
     : ticketQty >= 1;
 
   const proceedFromTickets = () => {
@@ -1798,6 +1903,7 @@ export default function EventCheckout({
       }
 
       setHolding(true);
+      userCancelledHoldRef.current = false;
       try {
         const existing = sessionToken || readHoldSessionToken();
         const res = await createEventSeatHold({
@@ -1862,9 +1968,8 @@ export default function EventCheckout({
     selectedShowtime && step >= 2 ? (
       <div className="shrink-0 z-20 bg-[#F5F5F5] border-b border-slate-200/70">
         <div
-          className={`${
-            isPage ? "max-w-[36rem] mx-auto" : ""
-          } px-3 sm:px-4 py-2.5`}
+          className={`${isPage ? "max-w-[36rem] mx-auto" : ""
+            } px-3 sm:px-4 py-2.5`}
         >
           <div className="rounded-xl bg-[#E8ECF0] px-3.5 py-2.5 sm:px-4 sm:py-3 text-center">
             <p className="text-[0.8125rem] sm:text-[0.875rem] font-semibold text-slate-800 leading-snug break-words [overflow-wrap:anywhere]">
@@ -1902,16 +2007,14 @@ export default function EventCheckout({
     step === 4 && holdId && secondsLeft !== null && secondsLeft > 0 && !timeOutOpen ? (
       <div className="shrink-0 sticky top-0 z-20 bg-white/95 backdrop-blur-sm border-b border-slate-200/80 shadow-[0_1px_0_rgba(15,23,42,0.04)]">
         <div
-          className={`${
-            isPage ? "max-w-6xl mx-auto" : ""
-          } px-3 sm:px-4 py-2 sm:py-2.5`}
+          className={`${isPage ? "max-w-6xl mx-auto" : ""
+            } px-3 sm:px-4 py-2 sm:py-2.5`}
         >
           <div
-            className={`rounded-xl px-3.5 py-2.5 text-center border ${
-              secondsLeft <= 60
+            className={`rounded-xl px-3.5 py-2.5 text-center border ${secondsLeft <= 60
                 ? "bg-rose-50 border-rose-200 text-rose-700"
                 : "bg-[#F3E8FF] border-[#E9D5FF] text-[#6B21A8]"
-            }`}
+              }`}
           >
             <span className="inline-flex items-center justify-center gap-2 text-[0.8125rem] sm:text-sm font-bold leading-none tabular-nums">
               <Timer className="size-3.5 sm:size-4 shrink-0" />
@@ -1939,18 +2042,18 @@ export default function EventCheckout({
                   aria-current={active ? "step" : undefined}
                   aria-label={`Go to ${s.label}`}
                   className={`flex items-center gap-1 sm:gap-1.5 rounded-md text-left transition-opacity ${clickable
-                      ? "cursor-pointer hover:opacity-75"
-                      : active
-                        ? "cursor-default"
-                        : "cursor-not-allowed"
+                    ? "cursor-pointer hover:opacity-75"
+                    : active
+                      ? "cursor-default"
+                      : "cursor-not-allowed"
                     }`}
                 >
                   <span
                     className={`h-6 w-6 sm:h-7 sm:w-7 rounded-full flex items-center justify-center text-[0.75rem] sm:text-[0.875rem] font-bold shrink-0 ${done
-                        ? "bg-[#6900AA] text-white"
-                        : active
-                          ? "bg-slate-900 text-white"
-                          : "bg-white border border-slate-300 text-slate-400"
+                      ? "bg-[#6900AA] text-white"
+                      : active
+                        ? "bg-slate-900 text-white"
+                        : "bg-white border border-slate-300 text-slate-400"
                       }`}
                   >
                     {done ? <Check size={12} strokeWidth={3} /> : s.displayN}
@@ -2104,19 +2207,17 @@ export default function EventCheckout({
               <div className="flex w-full items-center justify-center gap-3 sm:gap-3.5 py-2.5 sm:py-3 min-w-0">
                 {step !== 4 && headerPosterUrl ? (
                   <span
-                    className={`relative shrink-0 overflow-hidden rounded-lg border border-slate-200/90 bg-slate-100 shadow-sm ${
-                      headerUsesHorizontal
+                    className={`relative shrink-0 overflow-hidden rounded-lg border border-slate-200/90 bg-slate-100 shadow-sm ${headerUsesHorizontal
                         ? "aspect-[16/9] h-11 sm:h-12 w-auto"
                         : "aspect-[2/3] h-14 sm:h-16 w-auto"
-                    }`}
+                      }`}
                   >
                     <img
                       src={headerPosterUrl}
                       alt=""
                       aria-hidden
-                      className={`absolute inset-0 h-full w-full object-cover ${
-                        headerUsesHorizontal ? "object-center" : "object-top"
-                      }`}
+                      className={`absolute inset-0 h-full w-full object-cover ${headerUsesHorizontal ? "object-center" : "object-top"
+                        }`}
                     />
                   </span>
                 ) : null}
@@ -2169,19 +2270,17 @@ export default function EventCheckout({
           <div className="mt-3 flex items-center gap-2.5 pt-3 border-t border-slate-100">
             {step !== 4 && headerPosterUrl ? (
               <span
-                className={`relative shrink-0 overflow-hidden rounded-md border border-slate-200/90 bg-slate-100 shadow-sm ${
-                  headerUsesHorizontal
+                className={`relative shrink-0 overflow-hidden rounded-md border border-slate-200/90 bg-slate-100 shadow-sm ${headerUsesHorizontal
                     ? "aspect-[16/9] h-10 w-auto"
                     : "aspect-[2/3] h-10 w-auto"
-                }`}
+                  }`}
               >
                 <img
                   src={headerPosterUrl}
                   alt=""
                   aria-hidden
-                  className={`absolute inset-0 h-full w-full object-cover ${
-                    headerUsesHorizontal ? "object-center" : "object-top"
-                  }`}
+                  className={`absolute inset-0 h-full w-full object-cover ${headerUsesHorizontal ? "object-center" : "object-top"
+                    }`}
                 />
               </span>
             ) : null}
@@ -2216,16 +2315,16 @@ export default function EventCheckout({
                   aria-current={active ? "step" : undefined}
                   aria-label={`Go to ${s.short}`}
                   className={`flex flex-col items-center min-w-0 rounded-lg py-1 transition-opacity ${clickable
-                      ? "cursor-pointer hover:opacity-75"
-                      : active
-                        ? "cursor-default"
-                        : "cursor-not-allowed"
+                    ? "cursor-pointer hover:opacity-75"
+                    : active
+                      ? "cursor-default"
+                      : "cursor-not-allowed"
                     }`}
                 >
                   <span
                     className={`w-8 h-8 rounded-full flex items-center justify-center text-[0.9375rem] font-bold ${done || active
-                        ? "bg-[#6900AA] text-white"
-                        : "border-2 border-slate-200 text-slate-400 bg-white"
+                      ? "bg-[#6900AA] text-white"
+                      : "border-2 border-slate-200 text-slate-400 bg-white"
                       }`}
                   >
                     {done ? <Check size={14} strokeWidth={3} /> : s.displayN}
@@ -2500,10 +2599,10 @@ export default function EventCheckout({
                     <div
                       key={t.id}
                       className={`rounded-[0.75rem] px-4 py-3.5 flex items-center justify-between gap-3 bg-white shadow-[0_0.125rem_0.75rem_rgba(15,23,42,0.06)] border ${qty > 0
-                          ? "border-[#6900AA]"
-                          : soldOut
-                            ? "border-slate-100 opacity-60"
-                            : "border-transparent"
+                        ? "border-[#6900AA]"
+                        : soldOut
+                          ? "border-slate-100 opacity-60"
+                          : "border-transparent"
                         }`}
                     >
                       <div className="min-w-0">
@@ -2590,15 +2689,15 @@ export default function EventCheckout({
                       type="button"
                       onClick={() => setTicketMode(option.id)}
                       className={`w-full text-left rounded-xl border p-3.5 sm:p-4 transition-colors cursor-pointer ${selected
-                          ? "border-[#6900AA] bg-[#FBF6FF]"
-                          : "border-slate-200 bg-white hover:border-slate-300"
+                        ? "border-[#6900AA] bg-[#FBF6FF]"
+                        : "border-slate-200 bg-white hover:border-slate-300"
                         }`}
                     >
                       <div className="flex items-start gap-3">
                         <span
                           className={`mt-0.5 h-5 w-5 rounded-full border-2 flex items-center justify-center shrink-0 ${selected
-                              ? "border-[#6900AA] bg-[#6900AA]"
-                              : "border-slate-300 bg-white"
+                            ? "border-[#6900AA] bg-[#6900AA]"
+                            : "border-slate-300 bg-white"
                             }`}
                         >
                           {selected && <span className="h-2 w-2 rounded-full bg-white" />}
@@ -2849,118 +2948,138 @@ export default function EventCheckout({
               </div>
 
               {!isOrganizer && (
-                <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm space-y-4">
-                  <h2 className="text-base font-bold text-slate-900">Offers for you</h2>
-                  <div className="space-y-2">
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Promo code</p>
-                    {appliedPromo ? (
-                      <div className="flex items-center justify-between p-2.5 rounded-xl bg-purple-50 border border-purple-200 text-xs">
-                        <div className="min-w-0">
-                          <p className="font-bold text-slate-900 font-mono truncate">
-                            {appliedPromo.promo_code}
-                            {appliedPromo.source === "platform" ? " · BookMyBota" : ""}
-                          </p>
-                          <p className="text-emerald-600">You save {formatMoney(appliedPromo.discount_amount)}</p>
+                <div className="space-y-3">
+                  {/* Applied Promo Code Banner */}
+                  {appliedPromo && (
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-3.5 shadow-sm">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="h-8 w-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
+                            <Tag size={16} />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-bold text-slate-900 font-mono text-sm tracking-wide">
+                                {appliedPromo.promo_code}
+                              </span>
+                              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-full">
+                                <Check size={11} /> Applied
+                              </span>
+                            </div>
+                            <p className="text-xs text-emerald-700 mt-0.5">
+                              You saved {formatMoney(appliedPromo.discount_amount)}!
+                            </p>
+                          </div>
                         </div>
-                        <button
-                          type="button"
-                          onClick={handleRemovePromo}
-                          className="text-xs text-rose-600 hover:underline font-semibold cursor-pointer shrink-0"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          value={promoInput}
-                          onChange={(e) => setPromoInput(e.target.value.toUpperCase())}
-                          placeholder="Enter promo code"
-                          className={`flex-1 px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs text-slate-900 uppercase placeholder:text-slate-400 focus:outline-none ${accentFocus}`}
-                        />
-                        <button
-                          type="button"
-                          onClick={handleApplyPromo}
-                          disabled={validatingPromo || !promoInput.trim()}
-                          className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-800 border border-slate-200 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
-                        >
-                          {validatingPromo ? <Loader2 className="size-3.5 animate-spin" /> : null}
-                          Apply
-                        </button>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="space-y-2 pt-1">
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Gift card</p>
-                    {appliedGiftCard ? (
-                      <div className="flex items-center justify-between gap-2 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2">
-                        <div className="min-w-0">
-                          <p className="text-xs font-bold text-slate-900 truncate">
-                            {appliedGiftCard.product_name} · {appliedGiftCard.code_masked}
-                          </p>
-                          <p className="text-[11px] text-rose-700">
-                            Applying {formatMoney(appliedGiftCard.amount_applicable)}
-                            {appliedGiftCard.balance_after > 0
-                              ? ` · ${formatMoney(appliedGiftCard.balance_after)} left after`
-                              : " · balance will be zero"}
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={handleRemoveGiftCard}
-                          className="text-xs font-semibold text-rose-600 hover:underline shrink-0 cursor-pointer"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        {redeemableGiftCards.length > 0 && (
-                          <select
-                            value={selectedGiftCardId}
-                            onChange={(e) => {
-                              setSelectedGiftCardId(e.target.value);
-                              if (e.target.value) setGiftCardInput("");
-                            }}
-                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900"
-                          >
-                            <option value="">Select from My Gift Cards</option>
-                            {redeemableGiftCards.map((c) => (
-                              <option key={c.id} value={c.id}>
-                                {c.product_name || "Gift Card"} · {c.code_masked} · {formatMoney(Number(c.current_balance))}
-                              </option>
-                            ))}
-                          </select>
-                        )}
-                        <div className="flex gap-2">
-                          <input
-                            type="text"
-                            value={giftCardInput}
-                            onChange={(e) => {
-                              setGiftCardInput(e.target.value.toUpperCase());
-                              if (e.target.value) setSelectedGiftCardId("");
-                            }}
-                            placeholder="Or enter gift card code"
-                            className={`flex-1 px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs text-slate-900 font-mono uppercase placeholder:text-slate-400 focus:outline-none ${accentFocus}`}
-                          />
+                        <div className="flex items-center gap-2 shrink-0">
                           <button
                             type="button"
-                            onClick={handleApplyGiftCard}
-                            disabled={
-                              validatingGiftCard ||
-                              (!selectedGiftCardId && !giftCardInput.trim()) ||
-                              orderTotal <= 0
-                            }
-                            className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-800 border border-slate-200 disabled:opacity-50 cursor-pointer"
+                            onClick={() => setOffersModalOpen(true)}
+                            className="text-xs font-semibold text-[#6900AA] hover:underline cursor-pointer"
                           >
-                            {validatingGiftCard ? <Loader2 className="size-3.5 animate-spin" /> : "Apply"}
+                            Change
+                          </button>
+                          <span className="text-slate-300">|</span>
+                          <button
+                            type="button"
+                            onClick={handleRemovePromo}
+                            className="text-xs font-semibold text-rose-600 hover:underline cursor-pointer"
+                          >
+                            Remove
                           </button>
                         </div>
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
+
+                  {/* Apply Offers Card (when no promo applied) */}
+                  {!appliedPromo && (
+                    <button
+                      type="button"
+                      onClick={() => setOffersModalOpen(true)}
+                      className="w-full rounded-2xl border border-slate-200 bg-white p-4 shadow-sm flex items-center justify-between text-left hover:border-[#6900AA]/40 hover:bg-purple-50/20 transition-colors cursor-pointer group"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="h-9 w-9 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600 shrink-0">
+                          <Percent size={18} className="stroke-[2.5]" />
+                        </div>
+                        <div className="min-w-0">
+                          <span className="text-[15px] font-bold text-slate-900 block group-hover:text-[#6900AA] transition-colors">
+                            Apply Offers
+                          </span>
+                          <p className="text-xs text-slate-500 truncate">
+                            Promo codes & event discounts
+                          </p>
+                        </div>
+                      </div>
+                      <ChevronRight size={18} className="text-slate-400 group-hover:text-[#6900AA] group-hover:translate-x-0.5 transition-all shrink-0" />
+                    </button>
+                  )}
+
+                  {/* Applied Gift Card Banner */}
+                  {appliedGiftCard && (
+                    <div className="rounded-xl border border-rose-200 bg-rose-50/70 p-3.5 shadow-sm">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="h-8 w-8 rounded-full bg-rose-100 flex items-center justify-center text-rose-600 shrink-0">
+                            <Gift size={16} />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-bold text-slate-900 text-sm truncate">
+                              {appliedGiftCard.product_name || "Gift Card"} · {appliedGiftCard.code_masked}
+                            </p>
+                            <p className="text-xs text-rose-700 mt-0.5">
+                              Applying {formatMoney(appliedGiftCard.amount_applicable)}
+                              {appliedGiftCard.balance_after > 0
+                                ? ` · ${formatMoney(appliedGiftCard.balance_after)} left`
+                                : " · balance 0"}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => setGiftCardModalOpen(true)}
+                            className="text-xs font-semibold text-[#6900AA] hover:underline cursor-pointer"
+                          >
+                            Change
+                          </button>
+                          <span className="text-slate-300">|</span>
+                          <button
+                            type="button"
+                            onClick={handleRemoveGiftCard}
+                            className="text-xs font-semibold text-rose-600 hover:underline cursor-pointer"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Apply Gift Cards Card (when no gift card applied) */}
+                  {!appliedGiftCard && (
+                    <button
+                      type="button"
+                      onClick={() => setGiftCardModalOpen(true)}
+                      className="w-full rounded-2xl border border-slate-200 bg-white p-4 shadow-sm flex items-center justify-between text-left hover:border-[#6900AA]/40 hover:bg-purple-50/20 transition-colors cursor-pointer group"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="h-9 w-9 rounded-full bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-600 shrink-0">
+                          <Gift size={18} />
+                        </div>
+                        <div className="min-w-0">
+                          <span className="text-[15px] font-bold text-slate-900 block group-hover:text-[#6900AA] transition-colors">
+                            Apply Gift Cards
+                          </span>
+                          <p className="text-xs text-slate-500 truncate">
+                            Redeem saved gift cards or voucher codes
+                          </p>
+                        </div>
+                      </div>
+                      <ChevronRight size={18} className="text-slate-400 group-hover:text-[#6900AA] group-hover:translate-x-0.5 transition-all shrink-0" />
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -3191,8 +3310,8 @@ export default function EventCheckout({
                   type="button"
                   onClick={() => setStep(2)}
                   className={`px-4 py-3 border text-slate-700 font-semibold text-[1rem] inline-flex items-center gap-1 cursor-pointer ${isPage
-                      ? "rounded-[0.5rem] border-slate-300 bg-white"
-                      : "rounded-xl border-slate-200"
+                    ? "rounded-[0.5rem] border-slate-300 bg-white"
+                    : "rounded-xl border-slate-200"
                     }`}
                 >
                   <ArrowLeft size={14} /> Back
@@ -3202,9 +3321,8 @@ export default function EventCheckout({
                     type="button"
                     onClick={() => setAuthModalOpen(true)}
                     disabled={!ticketMode || !deliveryDetailsReady}
-                    className={`flex-1 py-3 ${accentBtn} disabled:bg-slate-300 disabled:!opacity-100 text-white font-semibold text-[1.0625rem] ${
-                      isPage ? "rounded-[0.5rem]" : "rounded-xl"
-                    }`}
+                    className={`flex-1 py-3 ${accentBtn} disabled:bg-slate-300 disabled:!opacity-100 text-white font-semibold text-[1.0625rem] ${isPage ? "rounded-[0.5rem]" : "rounded-xl"
+                      }`}
                   >
                     Sign in
                   </ShinyBlackButton>
@@ -3213,9 +3331,8 @@ export default function EventCheckout({
                     type="button"
                     onClick={() => void proceedToReview()}
                     disabled={!canProceedFromTicketMode || holding}
-                    className={`flex-1 py-3 ${accentBtn} disabled:bg-slate-300 disabled:!opacity-100 text-white font-semibold text-[1.0625rem] ${
-                      isPage ? "rounded-[0.5rem]" : "rounded-xl"
-                    }`}
+                    className={`flex-1 py-3 ${accentBtn} disabled:bg-slate-300 disabled:!opacity-100 text-white font-semibold text-[1.0625rem] ${isPage ? "rounded-[0.5rem]" : "rounded-xl"
+                      }`}
                   >
                     {holding ? (
                       <>
@@ -3235,8 +3352,8 @@ export default function EventCheckout({
                   disabled={submitting}
                   onClick={() => requestLeaveConfirmStep("back")}
                   className={`shrink-0 px-4 py-3.5 border text-slate-700 font-semibold text-[1rem] inline-flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${isPage
-                      ? "rounded-xl border-slate-300 bg-white"
-                      : "rounded-xl border-slate-200"
+                    ? "rounded-xl border-slate-300 bg-white"
+                    : "rounded-xl border-slate-200"
                     }`}
                 >
                   <ArrowLeft size={16} /> Back
@@ -3341,8 +3458,8 @@ export default function EventCheckout({
                       type="button"
                       onClick={() => setSeatViewMode("canvas")}
                       className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] md:max-lg:text-[12px] lg:text-[10px] font-bold transition-all cursor-pointer ${seatViewMode === "canvas"
-                          ? "bg-[#6900AA] text-white shadow-sm"
-                          : "text-slate-500 hover:text-slate-900"
+                        ? "bg-[#6900AA] text-white shadow-sm"
+                        : "text-slate-500 hover:text-slate-900"
                         }`}
                     >
                       <MapIcon className="size-3" />
@@ -3352,8 +3469,8 @@ export default function EventCheckout({
                       type="button"
                       onClick={() => setSeatViewMode("grid")}
                       className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] md:max-lg:text-[12px] lg:text-[10px] font-bold transition-all cursor-pointer ${seatViewMode === "grid"
-                          ? "bg-[#6900AA] text-white shadow-sm"
-                          : "text-slate-500 hover:text-slate-900"
+                        ? "bg-[#6900AA] text-white shadow-sm"
+                        : "text-slate-500 hover:text-slate-900"
                         }`}
                     >
                       <LayoutGrid className="size-3" />
@@ -3512,10 +3629,10 @@ export default function EventCheckout({
                       <div
                         key={`band-${bandIdx}`}
                         className={`grid gap-4 ${band.sections.length === 1
-                            ? "grid-cols-1"
-                            : band.sections.length === 2
-                              ? "grid-cols-1 md:grid-cols-2"
-                              : "grid-cols-1 md:grid-cols-2 xl:grid-cols-3"
+                          ? "grid-cols-1"
+                          : band.sections.length === 2
+                            ? "grid-cols-1 md:grid-cols-2"
+                            : "grid-cols-1 md:grid-cols-2 xl:grid-cols-3"
                           }`}
                       >
                         {band.sections.map((section) => (
@@ -3563,10 +3680,10 @@ export default function EventCheckout({
                                             disabled={seat.isBooked}
                                             onClick={() => toggleGridSeat(seat)}
                                             className={`size-7 sm:size-8 rounded-md text-[10px] sm:text-[11px] font-bold transition-all duration-150 flex items-center justify-center select-none ${seat.isBooked
-                                                ? "bg-slate-200 border border-slate-300 text-slate-400 cursor-not-allowed"
-                                                : isSelected
-                                                  ? "bg-[#6900AA] text-white border border-[#6900AA]/40 shadow-md scale-105 z-10"
-                                                  : "bg-white border border-slate-300 text-slate-700 hover:bg-[#F7E9FF] hover:border-[#6900AA]/40 cursor-pointer"
+                                              ? "bg-slate-200 border border-slate-300 text-slate-400 cursor-not-allowed"
+                                              : isSelected
+                                                ? "bg-[#6900AA] text-white border border-[#6900AA]/40 shadow-md scale-105 z-10"
+                                                : "bg-white border border-slate-300 text-slate-700 hover:bg-[#F7E9FF] hover:border-[#6900AA]/40 cursor-pointer"
                                               }`}
                                             title={`${section.sectionName} · ${seat.row}${seat.number}`}
                                           >
@@ -3673,7 +3790,7 @@ export default function EventCheckout({
                 className={`shrink-0 min-w-[7.5rem] sm:min-w-[12rem] px-4 sm:px-5 py-3 sm:py-3.5 ${accentBtn} text-white font-bold text-[0.9375rem] sm:text-[1.0625rem] md:max-lg:text-[1.125rem] lg:text-[1.0625rem] rounded-xl disabled:bg-slate-300 disabled:!opacity-100`}
               >
                 {effectiveDesiredSeatQty &&
-                selectedSeats.length === effectiveDesiredSeatQty
+                  selectedSeats.length === effectiveDesiredSeatQty
                   ? "Continue"
                   : "Select seats"}
               </ShinyBlackButton>
@@ -3717,11 +3834,10 @@ export default function EventCheckout({
                           }
                           setSeatQtyModalOpen(false);
                         }}
-                        className={`h-12 rounded-xl text-base font-semibold cursor-pointer transition-all flex items-center justify-center ${
-                          isSelected
+                        className={`h-12 rounded-xl text-base font-semibold cursor-pointer transition-all flex items-center justify-center ${isSelected
                             ? "bg-[#EDE4F7] text-[#6900AA] ring-2 ring-[#6900AA]/20 shadow-sm font-bold"
                             : "bg-[#F5F5F5] text-[#333] hover:bg-[#EDE4F7] hover:text-[#6900AA]"
-                        }`}
+                          }`}
                       >
                         {n}
                       </button>
@@ -3769,6 +3885,397 @@ export default function EventCheckout({
                 <li key={line}>{line}</li>
               ))}
             </ul>
+          </div>
+        </div>
+      )}
+
+      {/* BookMyShow-style Apply Offers Modal (Responsive: Fullscreen Sheet on mobile, Centered Modal on desktop) */}
+      {offersModalOpen && (
+        <div
+          className="fixed inset-0 z-[115] flex items-end lg:items-center justify-center bg-black/50 backdrop-blur-[2px] transition-opacity"
+          onClick={() => setOffersModalOpen(false)}
+          role="presentation"
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="offers-modal-title"
+            className="w-full lg:max-w-2xl h-[92vh] lg:h-auto lg:max-h-[85vh] bg-slate-50 rounded-t-2xl lg:rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header: matches Image 4 (< Apply offers) */}
+            <div className="bg-white border-b border-slate-200 px-4 py-3.5 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <button
+                  type="button"
+                  onClick={() => setOffersModalOpen(false)}
+                  className="p-1 -ml-1 text-slate-700 hover:text-slate-900 rounded-full hover:bg-slate-100 cursor-pointer"
+                  aria-label="Back"
+                >
+                  <ArrowLeft size={20} />
+                </button>
+                <div className="min-w-0">
+                  <h3 id="offers-modal-title" className="text-base font-bold text-slate-900 leading-tight truncate">
+                    Apply offers
+                  </h3>
+                  <p className="text-xs text-slate-500 truncate mt-0.5">
+                    {event.name}
+                    {selectedShowtime?.starts_at ? ` | ${formatDateCustomer(selectedShowtime.starts_at)}` : ""}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setOffersModalOpen(false)}
+                className="hidden lg:flex h-8 w-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 items-center justify-center cursor-pointer shrink-0"
+                aria-label="Close"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              {/* Promo Code Input Card */}
+              <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+                <p className="text-xs font-semibold text-slate-500 mb-2">Got a promo code?</p>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <input
+                      type="text"
+                      value={promoInput}
+                      onChange={(e) => setPromoInput(e.target.value.toUpperCase())}
+                      placeholder="Type your coupon code here"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 uppercase font-medium placeholder:text-slate-400 focus:outline-none focus:border-[#6900AA] focus:bg-white"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleApplyPromo()}
+                    disabled={validatingPromo || !promoInput.trim()}
+                    className="px-5 py-2.5 rounded-lg bg-[#6900AA] hover:bg-[#57008E] disabled:bg-slate-200 disabled:text-slate-400 text-white text-xs font-bold transition-colors cursor-pointer disabled:cursor-not-allowed shrink-0 inline-flex items-center gap-1.5"
+                  >
+                    {validatingPromo ? <Loader2 size={14} className="animate-spin" /> : null}
+                    Apply
+                  </button>
+                </div>
+              </div>
+
+              {/* Offers Tabs (All Offers / Event Offers / Platform Offers) */}
+              <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
+                <button
+                  type="button"
+                  onClick={() => setOffersModalTab("ALL")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${offersModalTab === "ALL"
+                      ? "bg-[#6900AA] text-white shadow-xs"
+                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                    }`}
+                >
+                  All Offers
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOffersModalTab("EVENT")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${offersModalTab === "EVENT"
+                      ? "bg-[#6900AA] text-white shadow-xs"
+                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                    }`}
+                >
+                  Event Offers ({publicEventOffers.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOffersModalTab("PLATFORM")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${offersModalTab === "PLATFORM"
+                      ? "bg-[#6900AA] text-white shadow-xs"
+                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                    }`}
+                >
+                  Platform Offers (
+                  {
+                    (activePlatformOffers || []).filter((p: any) => {
+                      const cat = String(p.category || "").toUpperCase();
+                      return cat === "ALL" || cat === "EVENTS";
+                    }).length
+                  }
+                  )
+                </button>
+              </div>
+
+              {/* Offers List (Event & Platform Offers) */}
+              <div className="space-y-3">
+                {(() => {
+                  const eventOffersFormatted = (publicEventOffers || []).map((o: any) => {
+                    const discountType = String(o.discount_type || "").toUpperCase();
+                    const val = Number(o.discount_value) || 0;
+                    return {
+                      id: o.id,
+                      type: "EVENT" as const,
+                      title: o.title || `Special Event Offer`,
+                      code: o.promo_code || "EVENTOFFER",
+                      description: o.description || `Get ${discountType === "PERCENT" ? `${val}% off` : formatMoney(val)} on this event.`,
+                      discountText: discountType === "PERCENT" ? `${val}% OFF` : `FLAT ${formatMoney(val)} OFF`,
+                      savingsText: discountType === "PERCENT" ? `Save ${val}%` : `Save ${formatMoney(val)}`,
+                      badge: "Event Special",
+                    };
+                  });
+
+                  const platformOffersFormatted = (activePlatformOffers || [])
+                    .filter((p: any) => {
+                      const cat = String(p.category || "").toUpperCase();
+                      return cat === "ALL" || cat === "EVENTS";
+                    })
+                    .map((p: any) => {
+                      const discountType = String(p.discount_type || "").toUpperCase();
+                      const val = Number(p.discount_value) || 0;
+                      const maxDisc = p.max_discount != null ? Number(p.max_discount) : null;
+                      return {
+                        id: p.id,
+                        type: "PLATFORM" as const,
+                        title: p.name || `Platform Discount`,
+                        code: p.code || "BOTAPLATFORM",
+                        description: p.description || `Book tickets and save with this official platform offer.`,
+                        discountText: discountType === "PERCENT" ? `${val}% OFF` : `FLAT ${formatMoney(val)} OFF`,
+                        savingsText:
+                          discountType === "PERCENT"
+                            ? maxDisc
+                              ? `Save up to ${formatMoney(maxDisc)}`
+                              : `Save ${val}%`
+                            : `Save ${formatMoney(val)}`,
+                        badge: "BookMyBota",
+                      };
+                    });
+
+                  let displayedOffers = [...eventOffersFormatted, ...platformOffersFormatted];
+                  if (offersModalTab === "EVENT") {
+                    displayedOffers = eventOffersFormatted;
+                  } else if (offersModalTab === "PLATFORM") {
+                    displayedOffers = platformOffersFormatted;
+                  }
+
+                  if (displayedOffers.length === 0) {
+                    return (
+                      <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-slate-500">
+                        <p className="text-sm font-semibold">
+                          {offersModalTab === "EVENT"
+                            ? "No event-specific offers available."
+                            : offersModalTab === "PLATFORM"
+                              ? "No platform offers currently available."
+                              : "No offers currently available for this event."}
+                        </p>
+                        <p className="text-xs text-slate-400 mt-1">If you have a promo code, type it above to apply.</p>
+                      </div>
+                    );
+                  }
+
+                  return displayedOffers.map((offer) => {
+                    const isCurrentlyApplied = appliedPromo?.promo_code?.toUpperCase() === offer.code.toUpperCase();
+                    return (
+                      /* BookMyShow Offer Card */
+                      <div
+                        key={offer.id}
+                        className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-start gap-3 min-w-0">
+                            <div className="h-10 w-10 rounded-lg bg-purple-50 border border-purple-100 flex items-center justify-center text-[#6900AA] font-bold shrink-0">
+                              <Percent size={18} />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <h4 className="text-sm font-bold text-slate-900 leading-snug">
+                                  {offer.title}
+                                </h4>
+                                {offer.badge && (
+                                  <span className="text-[10px] font-semibold bg-purple-100 text-[#6900AA] px-1.5 py-0.5 rounded">
+                                    {offer.badge}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs text-slate-600 mt-1 line-clamp-2 leading-relaxed">
+                                {offer.description}
+                              </p>
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (isCurrentlyApplied) {
+                                handleRemovePromo();
+                              } else {
+                                handleApplyPromo(offer.code);
+                              }
+                            }}
+                            disabled={validatingPromo}
+                            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all shrink-0 cursor-pointer ${isCurrentlyApplied
+                                ? "bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100"
+                                : "text-rose-600 hover:bg-rose-50 border border-rose-200 hover:border-rose-300 font-semibold"
+                              }`}
+                          >
+                            {isCurrentlyApplied ? "Applied ✓" : "Apply"}
+                          </button>
+                        </div>
+
+                        <div className="mt-3 pt-2.5 border-t border-dashed border-slate-200 flex items-center justify-between text-[11px] text-slate-500">
+                          <span className="font-mono font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
+                            {offer.code}
+                          </span>
+                          <span className="font-semibold text-emerald-600">
+                            {offer.savingsText}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Standalone Redeem Gift Cards Modal */}
+      {giftCardModalOpen && (
+        <div
+          className="fixed inset-0 z-[115] flex items-end lg:items-center justify-center bg-black/50 backdrop-blur-[2px] transition-opacity"
+          onClick={() => setGiftCardModalOpen(false)}
+          role="presentation"
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="gift-cards-modal-title"
+            className="w-full lg:max-w-xl h-[80vh] lg:h-auto lg:max-h-[85vh] bg-slate-50 rounded-t-2xl lg:rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="bg-white border-b border-slate-200 px-4 py-3.5 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <button
+                  type="button"
+                  onClick={() => setGiftCardModalOpen(false)}
+                  className="p-1 -ml-1 text-slate-700 hover:text-slate-900 rounded-full hover:bg-slate-100 cursor-pointer"
+                  aria-label="Back"
+                >
+                  <ArrowLeft size={20} />
+                </button>
+                <div className="min-w-0">
+                  <h3 id="gift-cards-modal-title" className="text-base font-bold text-slate-900 leading-tight truncate">
+                    Apply Gift Card
+                  </h3>
+                  <p className="text-xs text-slate-500 truncate mt-0.5">
+                    Order total: {formatMoney(orderTotal)}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setGiftCardModalOpen(false)}
+                className="hidden lg:flex h-8 w-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 items-center justify-center cursor-pointer shrink-0"
+                aria-label="Close"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm space-y-4">
+                <div className="flex items-center gap-2 text-slate-900 font-bold text-sm">
+                  <Gift size={16} className="text-[#6900AA]" />
+                  <span>Redeem Gift Card</span>
+                </div>
+
+                {redeemableGiftCards.length > 0 && (
+                  <div className="space-y-2">
+                    <label className="block text-[11px] font-semibold text-slate-500">
+                      My Available Gift Cards
+                    </label>
+                    <div className="space-y-2">
+                      {redeemableGiftCards.map((c) => {
+                        const isSelected = selectedGiftCardId === c.id;
+                        const bal = Number(c.current_balance) || 0;
+                        return (
+                          <div
+                            key={c.id}
+                            className={`p-3 rounded-xl border transition-all flex items-center justify-between gap-3 ${isSelected
+                                ? "border-[#6900AA] bg-purple-50/50"
+                                : "border-slate-200 bg-slate-50/50 hover:bg-slate-50"
+                              }`}
+                          >
+                            <div className="min-w-0">
+                              <p className="text-xs font-bold text-slate-900 truncate">
+                                {c.product_name || "Gift Card"} · <span className="font-mono text-slate-600">{c.code_masked}</span>
+                              </p>
+                              <p className="text-[11px] text-emerald-600 font-semibold mt-0.5">
+                                Balance: {formatMoney(bal)}
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                setSelectedGiftCardId(c.id);
+                                setGiftCardInput("");
+                                try {
+                                  const res = await previewGiftCard({
+                                    gift_card_id: c.id,
+                                    amount: orderTotal,
+                                    category: "EVENTS",
+                                  }).unwrap();
+                                  setAppliedGiftCard(res);
+                                  setGiftCardModalOpen(false);
+                                  toast.success("Gift card applied!");
+                                } catch (err) {
+                                  toast.error(extractApiError(err, "Failed to apply gift card."));
+                                }
+                              }}
+                              disabled={validatingGiftCard || orderTotal <= 0}
+                              className="px-3.5 py-1.5 rounded-lg bg-[#6900AA] hover:bg-[#57008E] disabled:bg-slate-200 disabled:text-slate-400 text-white text-xs font-bold transition-colors cursor-pointer shrink-0"
+                            >
+                              {validatingGiftCard && isSelected ? <Loader2 size={13} className="animate-spin" /> : "Apply"}
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                <div className="pt-2 border-t border-slate-100">
+                  <label className="block text-[11px] font-semibold text-slate-500 mb-1.5">
+                    Or enter gift card code
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={giftCardInput}
+                      onChange={(e) => {
+                        setGiftCardInput(e.target.value.toUpperCase());
+                        if (e.target.value) setSelectedGiftCardId("");
+                      }}
+                      placeholder="ENTER 16-DIGIT CODE"
+                      className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono uppercase text-slate-900 focus:outline-none focus:border-[#6900AA] focus:bg-white"
+                    />
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        await handleApplyGiftCard();
+                        setGiftCardModalOpen(false);
+                      }}
+                      disabled={
+                        validatingGiftCard ||
+                        (!selectedGiftCardId && !giftCardInput.trim()) ||
+                        orderTotal <= 0
+                      }
+                      className="px-4 py-2 rounded-lg bg-[#6900AA] hover:bg-[#57008E] disabled:bg-slate-200 disabled:text-slate-400 text-white text-xs font-bold transition-colors cursor-pointer disabled:cursor-not-allowed shrink-0"
+                    >
+                      {validatingGiftCard ? <Loader2 size={13} className="animate-spin" /> : "Apply"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}

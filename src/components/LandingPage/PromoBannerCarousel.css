@@ -66,17 +66,27 @@
   box-sizing: border-box;
 }
 
+/* One banner: fill the padded row evenly (no left-leaning gap on the right) */
+.promo-banner-swiper.is-single .swiper-wrapper {
+  justify-content: center;
+}
+
+.promo-banner-swiper.is-single .promo-banner-slide.swiper-slide {
+  margin-left: auto;
+  margin-right: auto;
+}
+
 @media (max-width: 767px) {
   .promo-banner-swiper.is-single {
-    --promo-slide-w: calc(100% - 1.5rem);
-    --promo-h: calc((100vw - 3.5rem) / var(--promo-aspect));
+    --promo-slide-w: 100%;
+    --promo-h: calc((100vw - 2rem) / var(--promo-aspect));
   }
 }
 
 @media (min-width: 768px) and (max-width: 1023px) {
   .promo-banner-swiper.is-single {
-    --promo-slide-w: calc(100% - 2rem);
-    --promo-h: calc((100vw - 4.5rem) / var(--promo-aspect));
+    --promo-slide-w: 100%;
+    --promo-h: calc((100vw - 2.5rem) / var(--promo-aspect));
     padding-left: 1.25rem; /* md:px-5 */
     padding-right: 1.25rem;
   }

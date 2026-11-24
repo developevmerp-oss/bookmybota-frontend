@@ -6,6 +6,9 @@ import { StoreProvider } from "@/providers/StoreProvider";
 import { Toaster } from "sonner";
 import HomeHeader from "@/components/LandingPage/HomeHeader";
 import Footer from "@/components/LandingPage/Footer";
+import MobileBottomNav, {
+  MobileBottomNavSpacer,
+} from "@/components/LandingPage/MobileBottomNav";
 import PartnerAuthHeader from "@/components/Shared/PartnerAuthHeader";
 import NetworkStatusOverlay from "@/components/Shared/NetworkStatusOverlay";
 import { isArtistAdminPath, isMovieAdminPath, isVenueAdminPath } from "@/lib/authStorage";
@@ -129,6 +132,9 @@ export default function RootLayoutClient({
     !isListYourShowSubpage &&
     !isPartnerMinimalHeaderPage;
   const showPartnerAuthHeader = isPartnerMinimalHeaderPage;
+  /** Movies category pages use BMS chrome (no site footer / bottom tabs on mobile+tablet) */
+  const isMovieListingChrome =
+    pathname === "/movies" || pathname === "/movies/cinemas";
   const showLayoutFooter =
     showPublicHeader &&
     !isLandingPage &&
@@ -137,6 +143,9 @@ export default function RootLayoutClient({
     !isOrganizerMarketingPage &&
     !isListYourShowPage &&
     !hidePublicChromeForMovieBooking;
+  /** BMS-style sticky bottom tabs — only on public home landing page, hidden on all listing and details pages */
+  const showMobileBottomNav =
+    showPublicHeader && !isAuthPage && isLandingPage;
 
   useEffect(() => {
     const root = document.documentElement;
@@ -171,12 +180,26 @@ export default function RootLayoutClient({
       ) : showPublicHeader ? (
         <HomeHeader />
       ) : null}
-      <main className={isImmersiveBookingFlow ? "h-[100dvh] max-h-[100dvh] overflow-hidden" : undefined}>
+      <main
+        className={
+          isImmersiveBookingFlow
+            ? "flex h-[100dvh] max-h-[100dvh] min-h-0 flex-col overflow-hidden"
+            : undefined
+        }
+      >
         {children}
         {showLayoutFooter ? (
-          <Footer className={isPublicDetailPage ? "hidden md:block" : undefined} />
+          <Footer
+            className={
+              isPublicDetailPage || isMovieListingChrome
+                ? "hidden lg:block"
+                : undefined
+            }
+          />
         ) : null}
+        {showMobileBottomNav ? <MobileBottomNavSpacer /> : null}
       </main>
+      {showMobileBottomNav ? <MobileBottomNav /> : null}
       <Toaster position="top-center" richColors />
       <NetworkStatusOverlay />
     </StoreProvider>

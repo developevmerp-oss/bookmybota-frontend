@@ -8,7 +8,6 @@ import {
   ArrowLeft,
   Car,
   ChevronDown,
-  ChevronRight,
   CloudMoon,
   Clock,
   Film,
@@ -189,10 +188,6 @@ function formatTime(iso: string) {
   return parseIsoDateAndHours(iso).displayTime;
 }
 
-function showHour(iso: string) {
-  return parseIsoDateAndHours(iso).hour;
-}
-
 function generateDateOptions(count = 7) {
   const options: Array<{
     dateStr: string;
@@ -281,27 +276,6 @@ function tierStatusClass(status: string): string {
   if (status === "FILLING_FAST") return "text-[#EAB308]";
   if (status === "SOLD_OUT") return "text-[#B0B0B0]";
   return "text-[#4CAD4C]";
-}
-
-function priceInBands(price: number, bands: string[]) {
-  if (bands.length === 0) return true;
-  return bands.some((band) => {
-    if (band === "801+") return price >= 801;
-    const [minStr, maxStr] = band.split("-");
-    return price >= Number(minStr) && price <= Number(maxStr);
-  });
-}
-
-function matchesPreferredTime(iso: string, bands: string[]) {
-  if (bands.length === 0) return true;
-  const h = showHour(iso);
-  return bands.some((band) => {
-    if (band === "morning") return h >= 0 && h < 12;
-    if (band === "afternoon") return h >= 12 && h < 16;
-    if (band === "evening") return h >= 16 && h < 19;
-    if (band === "night") return h >= 19 && h <= 23;
-    return true;
-  });
 }
 
 function BmsFilterDropdown({
@@ -1030,7 +1004,7 @@ function ShowtimeChip({
   })();
 
   return (
-    <span className="group/chip relative inline-flex flex-col items-center overflow-visible pt-2.5 pr-2">
+    <span className="group/chip relative inline-flex flex-col items-center overflow-visible pt-1.5 pr-1.5">
       {tiers.length > 0 ? (
         <div
           className="pointer-events-none absolute bottom-[calc(100%+8px)] left-1/2 z-40 hidden w-max max-w-[min(92vw,36rem)] -translate-x-1/2 rounded-lg border border-[#E5E7EB] bg-white px-3 py-2.5 shadow-[0_8px_24px_rgba(15,23,42,0.12)] group-hover/chip:block"
@@ -1105,13 +1079,13 @@ function ShowtimeChip({
 
         {underLabel ? (
           <span
-            className="mt-1 max-w-[6.5rem] truncate text-center text-[10px] font-semibold uppercase tracking-wide leading-none"
+            className="mt-1.5 max-w-[6.5rem] truncate text-center text-[10px] font-semibold uppercase tracking-wide leading-none"
             style={{ color: underLabel.color }}
           >
             {underLabel.text}
           </span>
         ) : (
-          <span className="mt-1 block h-[10px]" aria-hidden />
+          <span className="mt-1.5 block h-[10px]" aria-hidden />
         )}
       </span>
     </span>
@@ -1153,7 +1127,7 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
     return s === "popularity" || s === "distance" || s === "relevance" ? s : "relevance";
   });
   const [openFilter, setOpenFilter] = useState<"language" | "price" | "time" | "sort" | null>(null);
-  const [mobileSheet, setMobileSheet] = useState<"filters" | "langFormat" | "sort" | null>(null);
+  const [mobileSheet, setMobileSheet] = useState<"filters" | "sort" | null>(null);
   const [draftPriceFilters, setDraftPriceFilters] = useState<string[]>([]);
   const [draftTimeFilters, setDraftTimeFilters] = useState<string[]>([]);
   const [draftFormatFilters, setDraftFormatFilters] = useState<string[]>([]);
@@ -1282,13 +1256,34 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
     setCinemaSearch("");
   };
 
-  const { data, isLoading, isFetching, isSuccess } = useGetPublicMovieShowtimesQuery({
-    idOrSlug: movieIdOrSlug,
-    date: selectedDate,
-    city_slug: selectedCity || undefined,
-  });
+  const showtimesQueryArgs = useMemo(
+    () => ({
+      idOrSlug: movieIdOrSlug,
+      date: selectedDate,
+      city_slug: selectedCity || undefined,
+      language: languageFilters.length ? languageFilters.join(",") : undefined,
+      format: formatFilters.length ? formatFilters.join(",") : undefined,
+      price: priceFilters.length ? priceFilters.join(",") : undefined,
+      time: timeFilters.length ? timeFilters.join(",") : undefined,
+      q: cinemaSearch.trim() || undefined,
+    }),
+    [
+      movieIdOrSlug,
+      selectedDate,
+      selectedCity,
+      languageFilters,
+      formatFilters,
+      priceFilters,
+      timeFilters,
+      cinemaSearch,
+    ]
+  );
+
+  const { data, isLoading, isFetching, isSuccess } =
+    useGetPublicMovieShowtimesQuery(showtimesQueryArgs);
 
   // Hide finished slots client-side (API may lag / stale process).
+  // Language / format / price / time / cinema search are applied server-side.
   const cinemas = useMemo(() => {
     const rows = data?.cinemas ?? [];
     return rows
@@ -1315,11 +1310,13 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
   const languageOptions = useMemo(() => {
     const set = new Set<string>();
     movie.languages.forEach((l) => l && set.add(l));
+    // Keep chips stable while a language filter is active (server omits other langs)
     cinemas.forEach((c) => c.showtimes.forEach((st) => st.language && set.add(st.language)));
+    languageFilters.forEach((l) => l && set.add(l));
     return Array.from(set)
       .sort()
       .map((v) => ({ value: v, label: v }));
-  }, [cinemas, movie.languages]);
+  }, [cinemas, movie.languages, languageFilters]);
 
   const formatOptions = useMemo(() => {
     const set = new Set<string>();
@@ -1330,59 +1327,54 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
         if (f) set.add(f);
       })
     );
+    formatFilters.forEach((f) => f && set.add(f));
     return Array.from(set)
       .sort()
       .map((v) => ({ value: v, label: v }));
-  }, [cinemas, movie.formats]);
+  }, [cinemas, movie.formats, formatFilters]);
 
   const filteredCinemas = useMemo(() => {
-    const q = cinemaSearch.trim().toLowerCase();
-    let rows = cinemas
-      .map((cinema) => {
-        let showtimes = cinema.showtimes;
-        if (languageFilters.length) {
-          showtimes = showtimes.filter((st) => languageFilters.includes(st.language));
-        }
-        if (formatFilters.length) {
-          showtimes = showtimes.filter((st) => {
-            const f = (st.format || st.screen_type || "").trim();
-            return f && formatFilters.includes(f);
-          });
-        }
-        if (priceFilters.length) {
-          showtimes = showtimes.filter((st) => {
-            const price = showtimePrice(st);
-            return price != null && priceInBands(price, priceFilters);
-          });
-        }
-        if (timeFilters.length) {
-          showtimes = showtimes.filter((st) => matchesPreferredTime(st.starts_at, timeFilters));
-        }
-        return { ...cinema, showtimes };
-      })
-      .filter((cinema) => cinema.showtimes.length > 0);
-
-    if (q) {
-      rows = rows.filter(
-        (c) =>
-          c.name.toLowerCase().includes(q) ||
-          (c.address || "").toLowerCase().includes(q)
-      );
-    }
-
+    let rows = cinemas;
     if (sortBy === "popularity") {
       rows = [...rows].sort((a, b) => b.showtimes.length - a.showtimes.length);
     } else if (sortBy === "distance") {
       rows = [...rows].sort((a, b) => a.name.localeCompare(b.name));
     }
-
     return rows;
-  }, [cinemas, languageFilters, formatFilters, priceFilters, timeFilters, cinemaSearch, sortBy]);
+  }, [cinemas, sortBy]);
 
   const [lateEntryModal, setLateEntryModal] = useState<{
     showtime: PublicMovieShowtimeItem;
     cinema: PublicMovieCinemaGroup;
   } | null>(null);
+  /** Safari / Chrome mobile toolbars overlay the viewport — lift bottom sheet above them. */
+  const [lateEntryVvPad, setLateEntryVvPad] = useState(0);
+
+  useEffect(() => {
+    if (!lateEntryModal) {
+      setLateEntryVvPad(0);
+      return;
+    }
+    const sync = () => {
+      const vv = window.visualViewport;
+      if (!vv) {
+        setLateEntryVvPad(0);
+        return;
+      }
+      const obscured = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
+      setLateEntryVvPad(obscured);
+    };
+    sync();
+    const vv = window.visualViewport;
+    vv?.addEventListener("resize", sync);
+    vv?.addEventListener("scroll", sync);
+    window.addEventListener("resize", sync);
+    return () => {
+      vv?.removeEventListener("resize", sync);
+      vv?.removeEventListener("scroll", sync);
+      window.removeEventListener("resize", sync);
+    };
+  }, [lateEntryModal]);
 
   /** BMS flow: open seat map first — “How many seats?” modal shows on that page. */
   const goToSeatMap = (showtime: PublicMovieShowtimeItem) => {
@@ -1410,15 +1402,7 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
 
   const backHref = `/movies/${movie.slug || movie.id}`;
   const languageLabel = languageFilters.length === 1 ? languageFilters[0] : null;
-  const displayLanguage =
-    languageFilters.length > 0
-      ? languageFilters.join(", ")
-      : movie.languages[0] || "Language";
-  const displayFormat =
-    formatFilters.length > 0
-      ? formatFilters.join(", ")
-      : formatOptions[0]?.label || "2D";
-  // Header title follows Select language and format (URL filters), not catalog[0]
+  // Header title follows URL language/format filters when set
   const titleLanguage =
     languageFilters.length > 0 ? languageFilters.join(", ") : null;
   const titleFormat = formatFilters.length > 0 ? formatFilters.join(", ") : null;
@@ -1439,12 +1423,6 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
     setMobileSheet("filters");
   };
 
-  const openLangFormatSheet = () => {
-    setDraftLanguageFilters([...languageFilters]);
-    setDraftFormatFilters([...formatFilters]);
-    setMobileSheet("langFormat");
-  };
-
   const toggleDraftValue = (
     values: string[],
     setValues: (next: string[]) => void,
@@ -1453,26 +1431,43 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
     setValues(values.includes(value) ? values.filter((v) => v !== value) : [...values, value]);
   };
 
-  const mobilePillClass = (active: boolean) =>
-    `shrink-0 h-9 px-3.5 inline-flex items-center gap-1.5 rounded-full border text-[13px] whitespace-nowrap cursor-pointer transition-colors ${
-      active
-        ? "border-slate-400 bg-slate-100 text-slate-900 font-semibold"
-        : "border-slate-200 text-slate-700 bg-white hover:border-slate-300 font-medium"
+  /** Quick chips — selected = brand purple (Browse-by-Cinemas style) */
+  const mobilePillClass = (active: boolean, disabled = false) =>
+    `shrink-0 h-8 px-3 inline-flex items-center gap-1.5 rounded-full border text-[12px] whitespace-nowrap transition-colors ${
+      disabled
+        ? "border-[#E5E7EB] bg-[#F3F4F6] text-[#9CA3AF] cursor-not-allowed line-through decoration-[#D1D5DB]"
+        : active
+          ? "border-[#6900AA] bg-[#F3E8FF] text-[#6900AA] font-semibold cursor-pointer"
+          : "border-[#D0D0D0] text-[#4B5563] bg-white hover:border-[#C4B5FD] font-medium cursor-pointer"
     }`;
 
   const filterChipClass = (active: boolean, disabled = false) =>
     `inline-flex items-center justify-center rounded-full border px-4 py-2 text-[13px] font-semibold transition-all select-none ${
       disabled
-        ? "border-slate-200 text-slate-300 bg-slate-50 cursor-not-allowed opacity-60"
+        ? "border-[#E5E7EB] bg-[#F3F4F6] text-[#9CA3AF] cursor-not-allowed line-through decoration-[#D1D5DB]"
         : active
-          ? "border-slate-900 bg-slate-900 text-white shadow-sm cursor-pointer"
+          ? "border-[#6900AA] bg-[#F3E8FF] text-[#6900AA] shadow-sm cursor-pointer"
           : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50 active:scale-[0.98] cursor-pointer"
     }`;
+
+  const toggleQuickFilter = (
+    values: string[],
+    setValues: (next: string[]) => void,
+    value: string
+  ) => {
+    setValues(values.includes(value) ? values.filter((v) => v !== value) : [...values, value]);
+  };
+
+  const activeFilterCount =
+    languageFilters.length + formatFilters.length + priceFilters.length + timeFilters.length;
 
   return (
     <div className="w-full space-y-4">
       {/* ── Mobile / tablet chrome (BookMyShow-style) ── */}
-      <div className="lg:hidden sticky top-0 z-30 -mx-3 sm:-mx-6 bg-white border-b border-[#E8E8E8] shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+      <div
+        className="lg:hidden sticky z-30 -mx-3 sm:-mx-6 bg-white border-b border-[#E8E8E8] shadow-[0_2px_8px_rgba(0,0,0,0.04)]"
+        style={{ top: headerOffset || 0 }}
+      >
         <div className="flex items-center gap-2 px-3 sm:px-4 py-2.5">
           <button
             type="button"
@@ -1509,14 +1504,6 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
           >
             <Search size={20} />
           </button>
-          <button
-            type="button"
-            aria-label="Open filters"
-            onClick={openAllFiltersSheet}
-            className="shrink-0 p-2 text-[#333333] hover:text-[#6900AA] cursor-pointer"
-          >
-            <SlidersHorizontal size={20} />
-          </button>
         </div>
 
         {showSearch ? (
@@ -1547,7 +1534,9 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
           </div>
         ) : null}
 
-        <div className="flex items-end gap-2.5 overflow-x-auto px-3 sm:px-4 pt-2 pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="relative px-3 sm:px-4 pt-2 pb-3">
+          <div className="pointer-events-none absolute inset-y-2 right-3 z-10 w-8 bg-gradient-to-l from-white to-transparent sm:right-4" aria-hidden />
+          <div className="flex items-end gap-1.5 overflow-x-auto pr-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {dateOptions.map((opt) => {
             const active = opt.dateStr === selectedDate;
             const hasShows = availableDates.includes(opt.dateStr);
@@ -1565,7 +1554,7 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
                 aria-disabled={disabled}
                 className={`relative shrink-0 text-center ${
                   disabled ? "cursor-not-allowed pointer-events-none" : "cursor-pointer"
-                } ${active && !disabled ? "w-[3.35rem] pt-2.5" : "w-[3.15rem] py-1.5"}`}
+                } ${active && !disabled ? "w-[3.05rem] pt-2" : "w-[2.85rem] py-1"}`}
               >
                 {active && !disabled ? (
                   <span className="relative block w-full">
@@ -1597,12 +1586,6 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
                   </span>
                 ) : (
                   <>
-                    {hasShows && !disabled ? (
-                      <span
-                        className="absolute top-0.5 right-1 h-1.5 w-1.5 rounded-full"
-                        style={{ backgroundColor: BRAND }}
-                      />
-                    ) : null}
                     <span
                       className="block text-[9px] font-bold tracking-wide"
                       style={{ color: disabled ? DISABLED_MUTED : "#333333" }}
@@ -1611,7 +1594,7 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
                     </span>
                     <span
                       className="mt-0.5 block text-base font-extrabold leading-none"
-                      style={{ color: disabled ? DISABLED_MUTED : "#222222" }}
+                      style={{ color: disabled ? DISABLED_MUTED : "#9CA3AF" }}
                     >
                       {opt.dayNumber}
                     </span>
@@ -1626,67 +1609,76 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
               </button>
             );
           })}
+          </div>
         </div>
 
-        <div className="flex items-center justify-between gap-3 px-3 sm:px-4 py-2.5 border-t border-[#F0F0F0]">
-          <p className="min-w-0 text-[13px] font-bold text-[#111111] truncate">
-            {displayLanguage}
-            <span className="mx-1.5 text-[#9CA3AF] font-semibold">•</span>
-            {displayFormat}
-          </p>
-          <button
-            type="button"
-            onClick={openLangFormatSheet}
-            className="shrink-0 inline-flex items-center gap-0.5 text-[13px] font-bold text-[#6900AA] cursor-pointer"
-          >
-            Change
-            <ChevronRight size={16} strokeWidth={2.5} />
-          </button>
-        </div>
+        {/* Sticky Filters button + horizontally scrollable format/time chips */}
+        <div className="px-3 sm:px-4 py-2.5 border-t border-[#F0F0F0] bg-[#FAFAFA]">
+          <div className="flex items-center gap-2 min-w-0">
+            <button
+              type="button"
+              onClick={openAllFiltersSheet}
+              className={`shrink-0 h-8 pl-2.5 pr-3 inline-flex items-center gap-1.5 rounded-full border text-[12px] font-semibold whitespace-nowrap cursor-pointer transition-colors ${
+                activeFilterCount > 0
+                  ? "border-[#E9D5FF] bg-[#F5F3FF] text-[#374151]"
+                  : "border-[#D0D0D0] bg-white text-[#374151]"
+              }`}
+              aria-label="Open filters"
+            >
+              {activeFilterCount > 0 ? (
+                <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#6900AA] px-1 text-[10px] font-bold text-white">
+                  {activeFilterCount}
+                </span>
+              ) : (
+                <SlidersHorizontal size={13} strokeWidth={2.25} className="text-[#6900AA]" />
+              )}
+              Filters
+              <ChevronDown size={13} className="opacity-60" />
+            </button>
 
-        <div className="flex items-center gap-2 px-3 sm:px-4 py-2.5 border-t border-[#F0F0F0]">
-          <button
-            type="button"
-            onClick={() => setMobileSheet("sort")}
-            className={mobilePillClass(sortBy !== "relevance" || mobileSheet === "sort")}
-          >
-            <ListFilter size={14} />
-            Sort by
-            <ChevronDown size={14} className="opacity-70" />
-          </button>
-          <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <button
-              type="button"
-              onClick={openLangFormatSheet}
-              className={mobilePillClass(formatFilters.length > 0)}
-            >
-              Special Formats
-              <ChevronDown size={14} className="opacity-70" />
-            </button>
-            <button
-              type="button"
-              onClick={openAllFiltersSheet}
-              className={mobilePillClass(priceFilters.length > 0)}
-            >
-              Price Range
-              <ChevronDown size={14} className="opacity-70" />
-            </button>
-            <button
-              type="button"
-              onClick={openAllFiltersSheet}
-              className={mobilePillClass(timeFilters.length > 0)}
-            >
-              Preferred Time
-              <ChevronDown size={14} className="opacity-70" />
-            </button>
-            <button
-              type="button"
-              onClick={openAllFiltersSheet}
-              className={mobilePillClass(languageFilters.length > 0)}
-            >
-              Language
-              <ChevronDown size={14} className="opacity-70" />
-            </button>
+            <span className="h-5 w-px shrink-0 bg-[#E0E0E0]" aria-hidden />
+
+            <div className="min-w-0 flex-1 flex items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {formatOptions.map((opt) => (
+                <button
+                  key={`fmt-${opt.value}`}
+                  type="button"
+                  onClick={() => toggleQuickFilter(formatFilters, setFormatFilters, opt.value)}
+                  className={mobilePillClass(formatFilters.includes(opt.value))}
+                >
+                  {opt.label}
+                </button>
+              ))}
+
+              {preferredTimeOptions.map((opt) => {
+                const disabled = Boolean(opt.disabled);
+                return (
+                  <button
+                    key={`time-${opt.value}`}
+                    type="button"
+                    disabled={disabled}
+                    aria-disabled={disabled}
+                    title={disabled ? "This time period has passed" : undefined}
+                    onClick={() => {
+                      if (disabled) return;
+                      toggleQuickFilter(timeFilters, setTimeFilters, opt.value);
+                    }}
+                    className={mobilePillClass(timeFilters.includes(opt.value), disabled)}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+
+              <button
+                type="button"
+                onClick={() => setMobileSheet("sort")}
+                className={mobilePillClass(sortBy !== "relevance")}
+              >
+                Sort
+                <ChevronDown size={13} className="opacity-70" />
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -1765,7 +1757,9 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
         <div className="px-3 sm:px-4 py-3 sm:py-3.5">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-4">
             {/* Dates — calendar-shaped active chip (squircle + binder tabs) */}
-            <div className="flex items-end gap-2.5 sm:gap-3 overflow-x-auto pt-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden min-w-0 lg:flex-1">
+            <div className="relative min-w-0 lg:flex-1">
+              <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-8 bg-gradient-to-l from-white to-transparent" aria-hidden />
+              <div className="flex items-end gap-1.5 sm:gap-2 overflow-x-auto pt-3 pr-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden min-w-0">
               {dateOptions.map((opt) => {
                 const active = opt.dateStr === selectedDate;
                 const hasShows = availableDates.includes(opt.dateStr);
@@ -1783,10 +1777,10 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
                     aria-disabled={disabled}
                     className={`relative shrink-0 text-center transition-transform ${
                       disabled
-                        ? "w-[3.15rem] sm:w-[3.5rem] py-1.5 cursor-not-allowed pointer-events-none"
+                        ? "w-[2.85rem] sm:w-[3.25rem] py-1 cursor-not-allowed pointer-events-none"
                         : active
-                          ? "w-[3.35rem] sm:w-[3.75rem] pt-2.5 cursor-pointer"
-                          : "w-[3.15rem] sm:w-[3.5rem] py-1.5 cursor-pointer hover:opacity-80"
+                          ? "w-[3.05rem] sm:w-[3.45rem] pt-2 cursor-pointer"
+                          : "w-[2.85rem] sm:w-[3.25rem] py-1 cursor-pointer hover:opacity-80"
                     }`}
                   >
                     {active && !disabled ? (
@@ -1821,12 +1815,6 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
                       </span>
                     ) : (
                       <>
-                        {hasShows && !disabled ? (
-                          <span
-                            className="absolute top-0.5 right-1 h-1.5 w-1.5 rounded-full"
-                            style={{ backgroundColor: BRAND }}
-                          />
-                        ) : null}
                         <span
                           className="block text-[9px] sm:text-[10px] font-bold tracking-wide"
                           style={{ color: disabled ? DISABLED_MUTED : "#333333" }}
@@ -1835,7 +1823,7 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
                         </span>
                         <span
                           className="mt-0.5 block text-base sm:text-lg font-extrabold leading-none"
-                          style={{ color: disabled ? DISABLED_MUTED : "#222222" }}
+                          style={{ color: disabled ? DISABLED_MUTED : "#9CA3AF" }}
                         >
                           {opt.dayNumber}
                         </span>
@@ -1850,6 +1838,7 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
                   </button>
                 );
               })}
+              </div>
             </div>
 
             {/* Filters + search */}
@@ -1971,29 +1960,11 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
               </button>
             ) : null}
           </div>
-          <div className="inline-flex flex-wrap items-center gap-4 text-[11px] font-semibold tracking-wide">
-            <span className="inline-flex items-center gap-1.5 text-[#111111]">
-              <span className="h-2 w-2 rounded-full bg-[#4CAD4C]" />
-              AVAILABLE
-            </span>
-            <span className="inline-flex items-center gap-1.5 text-[#EAB308]">
-              <span className="h-2 w-2 rounded-full bg-[#EAB308]" />
-              FILLING FAST
-            </span>
-            <span className="inline-flex items-center gap-1.5 text-[#B0B0B0]">
-              <span className="h-2 w-2 rounded-full bg-[#DC2626]" />
-              SOLD OUT
-            </span>
-            <span className="inline-flex items-center gap-1.5 text-[#F97122]">
-              <span className="h-2 w-2 rounded-full bg-[#F97122]" />
-              STARTED
-            </span>
-          </div>
         </div>
       </div>
 
       <div className="space-y-3">
-        {isLoading ? (
+        {isLoading || isFetching ? (
           <ShowtimeListShimmer />
         ) : filteredCinemas.length === 0 ? (
           <div className="rounded-xl border border-[#E8E8E8] bg-white p-10 text-center space-y-3">
@@ -2048,10 +2019,6 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
           </div>
         ) : (
           <>
-            {isFetching ? (
-              <div className="text-xs text-[#F84464] animate-pulse px-0.5">Updating shows…</div>
-            ) : null}
-
             <div className="space-y-3">
               {filteredCinemas.map((cinema) => {
                 const logoSrc = resolveMediaUrl(cinema.logo || cinema.image || "");
@@ -2128,7 +2095,7 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
                             <p className="mb-2 text-[11px] sm:text-xs font-semibold uppercase tracking-[0.08em] text-[#6B7280]">
                               {group.label}
                             </p>
-                            <div className="flex flex-wrap items-stretch gap-2 sm:gap-2.5 overflow-visible pt-0.5">
+                            <div className="flex flex-wrap items-start gap-x-2 gap-y-1.5 sm:gap-x-2.5 sm:gap-y-2 overflow-visible pt-0.5">
                               {group.showtimes.map((st) => (
                                 <ShowtimeChip
                                   key={st.id}
@@ -2161,22 +2128,41 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
               : null}
 
             {lateEntryModal ? (
-              <div className="fixed inset-0 z-[85] flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4">
-                <div className="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl bg-white shadow-xl overflow-hidden">
-                  <div className="flex items-center justify-between px-5 py-4 border-b border-[#E8E8E8]">
-                    <h3 className="text-base font-bold text-[#222]">
+              <div
+                className="fixed inset-0 z-[85] flex items-end justify-center bg-black/50 sm:items-center sm:p-4"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="late-entry-title"
+              >
+                <button
+                  type="button"
+                  className="absolute inset-0 cursor-default"
+                  aria-label="Dismiss"
+                  onClick={() => setLateEntryModal(null)}
+                />
+                {/* Mobile bottom sheet (not centered); lifts above Safari/Chrome toolbars via visualViewport */}
+                <div
+                  className="relative z-[1] w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl bg-white shadow-xl overflow-hidden sm:!mb-0 sm:!pb-0"
+                  style={{
+                    marginBottom: lateEntryVvPad,
+                    paddingBottom: "max(1.25rem, calc(env(safe-area-inset-bottom, 0px) + 0.5rem))",
+                  }}
+                >
+                  <div className="mx-auto mt-2.5 h-1 w-10 shrink-0 rounded-full bg-slate-300 sm:hidden" aria-hidden />
+                  <div className="flex items-start justify-between gap-3 px-5 pt-3 sm:pt-5 pb-3">
+                    <h3 id="late-entry-title" className="text-[17px] font-bold text-[#111111] leading-snug pr-2">
                       Heads-up! This show has already started
                     </h3>
                     <button
                       type="button"
                       onClick={() => setLateEntryModal(null)}
-                      className="p-1.5 rounded-lg text-[#6B7280] hover:bg-[#F5F5F5] cursor-pointer"
+                      className="shrink-0 -mt-0.5 p-1.5 rounded-lg text-[#6B7280] hover:bg-[#F5F5F5] cursor-pointer"
                       aria-label="Close"
                     >
                       <X size={18} />
                     </button>
                   </div>
-                  <div className="px-5 py-5 space-y-4">
+                  <div className="px-5 pb-4 space-y-4">
                     <p className="text-sm text-[#6B7280] leading-relaxed">
                       You can still book tickets for{" "}
                       <span className="font-semibold text-[#374151]">
@@ -2188,27 +2174,26 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
                       </span>
                       . You may miss the beginning of the movie.
                     </p>
-                    <div className="flex flex-col-reverse sm:flex-row gap-2.5">
-                      <button
-                        type="button"
-                        onClick={() => setLateEntryModal(null)}
-                        className="flex-1 h-11 rounded-xl border border-[#E5E7EB] bg-white text-sm font-bold text-[#374151] cursor-pointer hover:bg-[#F9FAFB] transition-colors"
-                      >
-                        Go back
-                      </button>
+                    <div className="flex flex-col gap-2.5">
                       <ShinyBlackButton
                         type="button"
                         onClick={confirmLateEntryContinue}
-                        className="flex-1 h-11 rounded-xl bg-[#111111] text-white text-sm font-bold"
+                        className="w-full h-12 rounded-xl bg-[#111111] text-white text-sm font-bold"
                       >
                         Continue booking
                       </ShinyBlackButton>
+                      <button
+                        type="button"
+                        onClick={() => setLateEntryModal(null)}
+                        className="w-full h-12 rounded-xl border-2 border-[#CBD5E1] bg-white text-sm font-bold text-[#1F2937] cursor-pointer hover:bg-[#F8FAFC] active:bg-[#F1F5F9] transition-colors"
+                      >
+                        Go back
+                      </button>
                     </div>
                   </div>
                 </div>
               </div>
             ) : null}
-
           </>
         )}
       </div>
@@ -2304,24 +2289,35 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
             {preferredTimeOptions.map((opt) => {
               const disabled = Boolean(opt.disabled);
               return (
-                <button
-                  key={opt.value}
-                  type="button"
-                  disabled={disabled}
-                  onClick={() => {
-                    if (disabled) return;
-                    toggleDraftValue(draftTimeFilters, setDraftTimeFilters, opt.value);
-                  }}
-                  className={filterChipClass(draftTimeFilters.includes(opt.value), disabled)}
-                  title={disabled ? "This time period has passed" : undefined}
-                >
-                  {opt.label}
-                </button>
+                <div key={opt.value} className="inline-flex flex-col items-center gap-1">
+                  <button
+                    type="button"
+                    disabled={disabled}
+                    aria-disabled={disabled}
+                    onClick={() => {
+                      if (disabled) return;
+                      toggleDraftValue(draftTimeFilters, setDraftTimeFilters, opt.value);
+                    }}
+                    className={filterChipClass(draftTimeFilters.includes(opt.value), disabled)}
+                    title={disabled ? "This time period has passed" : opt.hint}
+                  >
+                    {opt.label}
+                  </button>
+                  {disabled ? (
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-[#9CA3AF]">
+                      Passed
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-medium text-[#9CA3AF] leading-none">
+                      {opt.hint}
+                    </span>
+                  )}
+                </div>
               );
             })}
           </div>
         </div>
-        <div className="sticky bottom-0 inset-x-0 flex items-center gap-3 border-t border-slate-200 bg-white px-5 py-3 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-[0_-4px_16px_rgba(0,0,0,0.06)] shrink-0">
+        <div className="shrink-0 flex items-center gap-3 border-t border-slate-200 bg-white px-5 py-3 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-[0_-4px_16px_rgba(0,0,0,0.06)]">
           <button
             type="button"
             onClick={() => {
@@ -2345,85 +2341,6 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
             className="flex-[1.4] h-11 !rounded-full bg-[#111111] text-white text-sm font-bold shadow-md shadow-black/20"
           >
             Apply Filters
-          </ShinyBlackButton>
-        </div>
-      </MobileBottomSheet>
-
-      {/* Mobile: language + format sheet */}
-      <MobileBottomSheet open={mobileSheet === "langFormat"} onClose={() => setMobileSheet(null)}>
-        <div className="w-10 h-1 bg-slate-300 rounded-full mx-auto mt-2.5 shrink-0" />
-        <div className="flex items-center justify-between gap-3 px-5 py-3.5 border-b border-slate-200 shrink-0 bg-white">
-          <div className="min-w-0 flex-1">
-            <p className="text-[11px] font-semibold text-slate-400 truncate">{movie.title}</p>
-            <h2 className="mt-0.5 text-lg font-bold text-slate-900 tracking-tight">Select language and format</h2>
-          </div>
-          <button
-            type="button"
-            onClick={() => setMobileSheet(null)}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-full text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors cursor-pointer shrink-0"
-            aria-label="Close"
-          >
-            <X size={18} strokeWidth={2.25} />
-          </button>
-        </div>
-        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain pb-6">
-          {languageOptions.map((lang) => (
-            <div key={lang.value}>
-              <div className="bg-[#F8FAFC] px-5 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-500 border-y border-slate-100">
-                {lang.label}
-              </div>
-              <div className="flex flex-wrap gap-2.5 px-5 py-3.5">
-                <button
-                  type="button"
-                  onClick={() =>
-                    toggleDraftValue(draftLanguageFilters, setDraftLanguageFilters, lang.value)
-                  }
-                  className={filterChipClass(draftLanguageFilters.includes(lang.value))}
-                >
-                  {lang.label}
-                </button>
-                {formatOptions.map((fmt) => (
-                  <button
-                    key={`${lang.value}-${fmt.value}`}
-                    type="button"
-                    onClick={() => {
-                      if (!draftLanguageFilters.includes(lang.value)) {
-                        setDraftLanguageFilters([...draftLanguageFilters, lang.value]);
-                      }
-                      toggleDraftValue(draftFormatFilters, setDraftFormatFilters, fmt.value);
-                    }}
-                    className={filterChipClass(draftFormatFilters.includes(fmt.value))}
-                  >
-                    {fmt.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ))}
-          {languageOptions.length === 0 ? (
-            <p className="px-5 py-6 text-sm text-slate-400">No languages available for this date.</p>
-          ) : null}
-        </div>
-        <div className="sticky bottom-0 inset-x-0 flex items-center gap-3 border-t border-slate-200 bg-white px-5 py-3 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-[0_-4px_16px_rgba(0,0,0,0.06)] shrink-0">
-          <button
-            type="button"
-            onClick={() => {
-              setDraftLanguageFilters([]);
-              setDraftFormatFilters([]);
-            }}
-            className="flex-1 h-11 inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-5 text-sm font-bold text-slate-800 hover:bg-slate-50 active:scale-[0.98] transition-all cursor-pointer"
-          >
-            Reset
-          </button>
-          <ShinyBlackButton
-            onClick={() => {
-              setLanguageFilters(draftLanguageFilters);
-              setFormatFilters(draftFormatFilters);
-              setMobileSheet(null);
-            }}
-            className="flex-[1.4] h-11 !rounded-full bg-[#111111] text-white text-sm font-bold shadow-md shadow-black/20"
-          >
-            Apply
           </ShinyBlackButton>
         </div>
       </MobileBottomSheet>

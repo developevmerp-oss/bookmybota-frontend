@@ -468,8 +468,8 @@ export default function PromoBannerCarousel({ city }: PromoBannerCarouselProps) 
           loop={false}
           initialSlide={startIndex}
           speed={600}
-          centeredSlides={multi}
-          centeredSlidesBounds={edgeBounds}
+          centeredSlides
+          centeredSlidesBounds={multi ? edgeBounds : true}
           grabCursor={multi}
           // Swipes are handled by usePromoSwipeNav → same infinite next/prev as arrows.
           allowTouchMove={false}

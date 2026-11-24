@@ -804,8 +804,9 @@ async function getLocationByIP(): Promise<{ city: string; lat?: number; lng?: nu
 
 async function searchLocations(query: string): Promise<NominatimResult[]> {
   if (!query.trim()) return [];
+  // Restrict to Ethiopia so India/world results never appear in dining city search
   const res = await fetch(
-    `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=5&addressdetails=1`,
+    `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=5&addressdetails=1&countrycodes=et`,
     { headers: NOMINATIM_HEADERS }
   );
   if (!res.ok) return [];
@@ -943,7 +944,14 @@ function LocationDropdown({ onSelect, onDetect, detecting, onClose }: LocationDr
         ) : !query ? (
           <div className="px-5 py-4">
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Popular Cities</p>
-            {["Mumbai", "Delhi", "Bengaluru", "Ahmedabad", "Pune", "Hyderabad"].map((city) => (
+            {[
+              "Addis Ababa",
+              "Dire Dawa",
+              "Mekelle",
+              "Adama",
+              "Hawassa",
+              "Bahir Dar",
+            ].map((city) => (
               <button
                 key={city}
                 onClick={() => { onSelect(city); onClose(); }}

@@ -400,14 +400,6 @@ function OfferFormPanel({
         </p>
       )}
 
-      {earliestEventStart && (
-        <p className="text-xs portal-muted">
-          Offers must end before the earliest event date{" "}
-          <strong>{earliestEventStart}</strong>
-          {lastOfferDate ? ` (latest end date: ${lastOfferDate})` : ""}.
-        </p>
-      )}
-
       <div className="grid sm:grid-cols-2 gap-4">
         <div>
           <label className="portal-label text-xs font-bold uppercase mb-1.5 block">
@@ -447,7 +439,6 @@ function OfferFormPanel({
           <input
             type="date"
             className="input-field"
-            max={lastOfferDate || endDate || undefined}
             {...register("start_date")}
           />
           {errors.start_date && <p className={fieldErrorClass}>{errors.start_date.message}</p>}
@@ -464,7 +455,6 @@ function OfferFormPanel({
             type="date"
             className="input-field"
             min={startDate || undefined}
-            max={lastOfferDate || undefined}
             {...register("end_date")}
           />
           {errors.end_date && <p className={fieldErrorClass}>{errors.end_date.message}</p>}

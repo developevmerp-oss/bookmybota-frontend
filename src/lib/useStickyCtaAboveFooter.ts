@@ -41,14 +41,30 @@ export function useStickyCtaAboveFooter(enabled = true): {
     let pollId = 0;
     let cancelled = false;
 
+    const mobileNavHeight = () => {
+      if (typeof window === "undefined") return 0;
+      if (!window.matchMedia("(max-width: 1023px)").matches) return 0;
+      const nav = document.querySelector("[data-mobile-bottom-nav]");
+      if (!(nav instanceof HTMLElement)) return 0;
+      const style = getComputedStyle(nav);
+      if (style.display === "none" || style.visibility === "hidden") return 0;
+      return Math.ceil(nav.getBoundingClientRect().height);
+    };
+
     const clearCtaOffset = () => {
-      setStickyCtaBottom((prev) => (prev === 0 ? prev : 0));
+      const navH = mobileNavHeight();
+      setStickyCtaBottom((prev) => (prev === navH ? prev : navH));
       setStickyCtaHidden((prev) => (prev === false ? prev : false));
     };
 
     const update = () => {
-      if (!footer) return;
-      // Mobile-hidden footer (detail pages) — keep CTA pinned to viewport bottom
+      const navH = mobileNavHeight();
+      if (!footer) {
+        setStickyCtaBottom((prev) => (prev === navH ? prev : navH));
+        setStickyCtaHidden((prev) => (prev === false ? prev : false));
+        return;
+      }
+      // Mobile-hidden footer (detail pages) — keep CTA above bottom tab bar
       if (!isFooterVisuallyPresent(footer)) {
         clearCtaOffset();
         return;
@@ -56,8 +72,9 @@ export function useStickyCtaAboveFooter(enabled = true): {
       const rect = footer.getBoundingClientRect();
       const vh = window.innerHeight;
       const overlap = Math.max(0, Math.ceil(vh - rect.top));
+      const nextBottom = Math.max(overlap, navH);
       const hide = rect.top < vh * 0.4 && rect.bottom > 0;
-      setStickyCtaBottom((prev) => (prev === overlap ? prev : overlap));
+      setStickyCtaBottom((prev) => (prev === nextBottom ? prev : nextBottom));
       setStickyCtaHidden((prev) => (prev === hide ? prev : hide));
     };
 

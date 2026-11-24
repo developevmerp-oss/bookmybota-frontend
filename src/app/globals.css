@@ -285,6 +285,75 @@
     @apply mx-auto w-full max-w-[1380px] px-4 md:px-5 lg:px-10 xl:px-12;
   }
 
+  /**
+   * BookMyShow-style mobile frosted header:
+   * milky translucent white + backdrop blur so posters/content
+   * show through softly while scrolling underneath.
+   */
+  .bmb-mobile-frost-header {
+    background-color: rgba(255, 255, 255, 0.72);
+    -webkit-backdrop-filter: saturate(180%) blur(14px);
+    backdrop-filter: saturate(180%) blur(14px);
+  }
+
+  .bmb-mobile-frost-header::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 100%;
+    height: 18px;
+    pointer-events: none;
+    background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.45) 0%,
+      rgba(255, 255, 255, 0.12) 40%,
+      rgba(255, 255, 255, 0) 100%
+    );
+  }
+
+  /**
+   * Movies “Now Showing” chrome — BookMyShow frosted glass.
+   * Parent stays transparent; ONLY `__glass` paints fill + blur
+   * (stacked white layers were making it look solid).
+   */
+  .bmb-movies-frost-chrome {
+    background: transparent !important;
+    border-bottom: none;
+  }
+
+  .bmb-movies-frost-chrome__glass {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    /* ~55% white — translucent enough to see posters blur through */
+    background: rgba(255, 255, 255, 0.55);
+    -webkit-backdrop-filter: blur(18px) saturate(180%);
+    backdrop-filter: blur(18px) saturate(180%);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  }
+
+  .bmb-movies-frost-chrome__fade {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 100%;
+    height: 18px;
+    pointer-events: none;
+    z-index: 0;
+    background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.4) 0%,
+      rgba(255, 255, 255, 0) 100%
+    );
+  }
+
+  .bmb-movies-frost-chrome__content {
+    position: relative;
+    z-index: 1;
+  }
+
   .glass-panel {
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);

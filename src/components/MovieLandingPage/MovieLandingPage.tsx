@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -13,11 +14,13 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
+  ArrowLeft,
   Check,
   ChevronLeft,
   ChevronRight,
   ChevronUp,
   Clapperboard,
+  MapPin,
   Search,
   SlidersHorizontal,
   Ticket,
@@ -67,9 +70,9 @@ import "./MovieLandingPage.css";
 import "@/components/DinningLandingPage/DiningHomePage.css";
 import "@/components/DinningLandingPage/DiningSearchPopup.css";
 
-/** See All / expanded grid — 1-up mobile, 2-up tablet, 5-up desktop. */
+/** See All / expanded grid — 2-up mobile/tablet (BMS), 5-up desktop. */
 const MOVIE_GRID_COLS =
-  "grid-cols-1 gap-y-5 sm:grid-cols-2 sm:gap-x-[1.15rem] sm:gap-y-5 lg:grid-cols-5 lg:gap-x-5 lg:gap-y-6";
+  "grid-cols-2 gap-x-3 gap-y-5 sm:gap-x-[1.15rem] sm:gap-y-5 lg:grid-cols-5 lg:gap-x-5 lg:gap-y-6";
 const DISPLAY_ONE_ROW_COUNT = 5;
 
 const FORMATS = ["2D", "3D", "4DX", "IMAX 2D"] as const;
@@ -130,10 +133,10 @@ function ChipButton({
     <button
       type="button"
       onClick={onClick}
-      className={`shrink-0 inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-[13px] sm:text-sm font-medium whitespace-nowrap transition-colors cursor-pointer ${
+      className={`shrink-0 inline-flex h-8 items-center gap-1 rounded-full border px-3 sm:px-3.5 text-[12px] sm:text-[13px] font-semibold whitespace-nowrap transition-colors cursor-pointer backdrop-blur-sm ${
         active
-          ? "bg-slate-100 border-slate-400 text-slate-800"
-          : "bg-white border-slate-200 text-slate-700 hover:border-slate-300"
+          ? "bg-[#F7E9FF] border-[#6900AA] text-[#6900AA]"
+          : "bg-white/85 border-[#6900AA]/55 text-[#6900AA] hover:bg-white"
       }`}
     >
       {icon}
@@ -252,7 +255,7 @@ function primaryMovieTrailerUrl(movie: Movie): string {
 function mapCatalogMovieToCard(movie: Movie): MovieCardData {
   const ratingNum = Number(movie.rating);
   const reviewsCount = Number(movie.reviews_count) || 0;
-  const hasRating = Number.isFinite(ratingNum) && ratingNum > 0 && reviewsCount > 0;
+  const hasRating = Number.isFinite(ratingNum) && ratingNum > 0;
   return {
     id: movie.id,
     title: formatMovieCardTitle(movie.title, movie.release_date),
@@ -265,9 +268,8 @@ function mapCatalogMovieToCard(movie: Movie): MovieCardData {
     promoted: isMoviePromoted(movie.is_promoted),
     href: `/movies/${movie.slug || movie.id}`,
     rating: hasRating ? ratingNum.toFixed(1) : undefined,
-    votes: hasRating
-      ? `${reviewsCount} review${reviewsCount === 1 ? "" : "s"}`
-      : undefined,
+    // Keep raw count in string so cards can parse & show BMS-style vote labels
+    votes: reviewsCount > 0 ? String(reviewsCount) : undefined,
   };
 }
 
@@ -455,9 +457,9 @@ function toLandingMovieCard(movie: MovieCardData): MustWatchMovieCard {
   };
 }
 
-/** Same card UI as home landing Notify Movies section (5-up dense type). */
+/** Now Showing grid — BMS-scale type on 2-up mobile; denser on desktop rails. */
 function MovieCard({ movie }: { movie: MovieCardData }) {
-  return <MovieNotifyCard movie={toLandingMovieCard(movie)} dense />;
+  return <MovieNotifyCard movie={toLandingMovieCard(movie)} listing />;
 }
 
 /** Same See All / Show Less expand pattern as EventsListPage (rail → grid). */
@@ -693,6 +695,8 @@ export default function MovieLandingPage() {
   const [draftGenres, setDraftGenres] = useState<string[]>([]);
   const [draftFormats, setDraftFormats] = useState<string[]>([]);
   const headerOffset = useStickyHeaderOffset();
+  const bmsHeaderRef = useRef<HTMLDivElement>(null);
+  const [bmsHeaderHeight, setBmsHeaderHeight] = useState(56);
   const [isFiltersStuck, setIsFiltersStuck] = useState(false);
   const [isMoviesExpanded, setIsMoviesExpanded] = useState(false);
   const [isTopRatedExpanded, setIsTopRatedExpanded] = useState(false);
@@ -709,6 +713,26 @@ export default function MovieLandingPage() {
       moviesListingRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 50);
   }, []);
+
+  // BMS Now Showing header height → sticky filters sit flush underneath (mobile/tablet).
+  useLayoutEffect(() => {
+    const el = bmsHeaderRef.current;
+    if (!el) return;
+    const measure = () => {
+      const h = Math.round(el.getBoundingClientRect().height);
+      if (h > 0) setBmsHeaderHeight((prev) => (prev === h ? prev : h));
+    };
+    measure();
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(measure) : null;
+    ro?.observe(el);
+    window.addEventListener("resize", measure, { passive: true });
+    return () => {
+      ro?.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, []);
+
+  const filtersStickyTop = headerOffset > 0 ? headerOffset : bmsHeaderHeight;
 
   const openFiltersModal = useCallback((tab: MovieFilterModalTab = "language") => {
     setDraftLanguages([...selectedLanguages]);
@@ -746,12 +770,12 @@ export default function MovieLandingPage() {
       {
         root: null,
         threshold: 0,
-        rootMargin: `-${Math.max(headerOffset, 1)}px 0px 0px 0px`,
+        rootMargin: `-${Math.max(filtersStickyTop, 1)}px 0px 0px 0px`,
       }
     );
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [headerOffset]);
+  }, [filtersStickyTop]);
 
   useEffect(() => {
     const applyCity = () => {
@@ -1114,7 +1138,7 @@ export default function MovieLandingPage() {
       .sort((a, b) => ratingValue(b.rating) - ratingValue(a.rating));
   }, [movies]);
 
-  const headingCity = city || "Ethiopia";
+  const headingCity = (city || "").trim() ? city : "Select City";
   const cinemasHref = city
     ? `/movies/cinemas?city=${encodeURIComponent(city)}`
     : "/movies/cinemas";
@@ -1370,10 +1394,163 @@ export default function MovieLandingPage() {
     </div>
   );
 
+  const movieCountLabel = `${movies.length} Movie${movies.length === 1 ? "" : "s"}`;
+
+  const filterChipsRow = (
+    <div className="flex items-center gap-2 -mx-0.5 px-0.5">
+      <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto scrollbar-hide py-0.5">
+        <button
+          type="button"
+          onClick={() => openFiltersModal("language")}
+          aria-label={
+            selectedMovieFilterChips.length > 0
+              ? `Filter, ${selectedMovieFilterChips.length} active`
+              : "Filter"
+          }
+          className={`relative shrink-0 inline-flex h-8 min-w-8 sm:min-w-0 sm:px-3 items-center justify-center gap-1 rounded-full border text-[12px] sm:text-[13px] font-semibold whitespace-nowrap transition-colors cursor-pointer backdrop-blur-sm ${
+            selectedMovieFilterChips.length > 0 || filtersOpen
+              ? "bg-[#F7E9FF] border-[#6900AA] text-[#6900AA]"
+              : "bg-white/85 border-[#6900AA]/55 text-[#6900AA] hover:bg-white"
+          }`}
+        >
+          {selectedMovieFilterChips.length > 0 ? (
+            <span
+              className="absolute top-0 right-0 size-2 rounded-full bg-[#6900AA] ring-2 ring-white"
+              aria-hidden
+            />
+          ) : null}
+          <SlidersHorizontal size={14} strokeWidth={2.25} className="text-[#6900AA]" />
+          <span className="hidden sm:inline">Filter</span>
+        </button>
+
+        {selectedMovieFilterChips.map((chip) => (
+          <span
+            key={chip.key}
+            className="shrink-0 inline-flex h-8 items-center gap-1 bg-[#F7E9FF] border border-[#6900AA]/45 text-[#6900AA] rounded-full px-3 sm:px-3.5 text-[12px] sm:text-[13px] font-semibold whitespace-nowrap"
+          >
+            {chip.label}
+            <button
+              type="button"
+              onClick={chip.onClear}
+              className="hover:bg-[#efd7ff] rounded-full p-0.5 transition-colors cursor-pointer"
+              aria-label={`Remove ${chip.label}`}
+            >
+              <X size={13} strokeWidth={2.25} />
+            </button>
+          </span>
+        ))}
+
+        {quickOutsideChips
+          .filter((chip) => {
+            if (chip.type === "language") return !selectedLanguages.includes(chip.value);
+            if (chip.type === "genre") return !selectedGenres.includes(chip.value);
+            return !selectedFormats.includes(chip.value);
+          })
+          .map((chip) => (
+            <ChipButton
+              key={`${chip.type}-chip-${chip.value}`}
+              label={chip.value}
+              active={false}
+              onClick={() => {
+                if (chip.type === "language") toggleLanguage(chip.value);
+                else if (chip.type === "genre") toggleGenre(chip.value);
+                else toggleFormat(chip.value);
+                scrollToMoviesListing();
+              }}
+            />
+          ))}
+
+        {hasActiveFilters ? (
+          <button
+            type="button"
+            onClick={() => {
+              clearAll();
+              scrollToMoviesListing();
+            }}
+            className="shrink-0 text-[12px] sm:text-[13px] font-bold px-1.5 py-1 text-[#6900AA] transition-colors cursor-pointer hover:underline whitespace-nowrap"
+          >
+            Clear All
+          </button>
+        ) : null}
+      </div>
+
+      <button
+        type="button"
+        onClick={openMovieSearchPopup}
+        className="dining-search-trigger hidden lg:inline-flex shrink-0 h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-full bg-white text-slate-700 cursor-pointer"
+        aria-label="Search movies"
+      >
+        <Search size={18} strokeWidth={1.75} />
+      </button>
+    </div>
+  );
+
   return (
-    <div className="min-h-screen bg-white">
-      {/* Top promo — same marketing + city logic / banner UI as dining & landing */}
-      <ListingPromoSlider category="MOVIES" city={city} moviesById={moviesById} />
+    <div className="min-h-screen bg-[#F5F5F5] lg:bg-white pb-[max(5rem,env(safe-area-inset-bottom,0px))] lg:pb-0">
+      {/* ── Mobile / tablet: BMS frosted chrome (one glass layer only) ── */}
+      <div
+        ref={bmsHeaderRef}
+        className="bmb-movies-frost-chrome lg:hidden fixed top-0 inset-x-0 z-40"
+        style={{ paddingTop: "max(0px, env(safe-area-inset-top, 0px))" }}
+      >
+        {/* Single frosted plate — do not stack extra white fills on the parent */}
+        <div
+          className="bmb-movies-frost-chrome__glass"
+          aria-hidden
+          style={{
+            background: "rgba(255,255,255,0.55)",
+            WebkitBackdropFilter: "blur(18px) saturate(180%)",
+            backdropFilter: "blur(18px) saturate(180%)",
+          }}
+        />
+        <div className="bmb-movies-frost-chrome__fade" aria-hidden />
+        <div className="bmb-movies-frost-chrome__content">
+          <div className="flex items-center gap-1 px-2 sm:px-3 pt-2 pb-1.5 min-w-0">
+            <button
+              type="button"
+              onClick={() => router.push("/")}
+              aria-label="Back to home"
+              className="flex size-10 shrink-0 items-center justify-center text-[#111111] cursor-pointer"
+            >
+              <ArrowLeft size={22} strokeWidth={2.25} />
+            </button>
+            <div className="min-w-0 flex-1">
+              <h1 className="text-[16px] sm:text-[17px] font-bold text-[#111111] leading-tight truncate drop-shadow-[0_0_6px_rgba(255,255,255,0.9)]">
+                Now Showing
+              </h1>
+              <button
+                type="button"
+                onClick={() => window.dispatchEvent(new Event("open_city_select"))}
+                className="mt-0.5 inline-flex max-w-full items-center gap-1 text-[12px] sm:text-[13px] font-medium text-[#6B7280] hover:text-[#6900AA] cursor-pointer"
+              >
+                <span className="truncate">
+                  {headingCity} | {isLoading ? "…" : movieCountLabel}
+                </span>
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={openMovieSearchPopup}
+              aria-label="Search movies"
+              className="flex size-10 shrink-0 items-center justify-center text-[#111111] cursor-pointer"
+            >
+              <Search size={20} strokeWidth={2} />
+            </button>
+          </div>
+          <div className="px-3 sm:px-4 pb-2.5 pt-0.5">{filterChipsRow}</div>
+        </div>
+      </div>
+      {/* Spacer slightly shorter than chrome so first posters tuck under glass (BMS feel) */}
+      <div
+        className="lg:hidden shrink-0 pointer-events-none"
+        style={{ height: Math.max(bmsHeaderHeight - 12, 48) }}
+        aria-hidden
+      />
+
+      {/* Top promo — desktop; mobile uses BMS listing chrome instead */}
+      <div className="hidden lg:block">
+        <ListingPromoSlider category="MOVIES" city={city} moviesById={moviesById} />
+      </div>
 
       {/* District / native spotlight hero — disabled (Dining parity). Restore: remove `false &&`. */}
       {false && (
@@ -1557,15 +1734,17 @@ export default function MovieLandingPage() {
       ) : null
       )}
 
-      <MovieReleasesGrid title="Coming to the Screen" movies={comingSoonMovies} />
+      <div className="hidden lg:block">
+        <MovieReleasesGrid title="Coming to the Screen" movies={comingSoonMovies} />
+      </div>
 
       <section
         ref={moviesListingRef}
         id="movies-listing"
-        className="bg-white pt-6 sm:pt-7 lg:pt-8 pb-6 sm:pb-7 lg:pb-8"
-        style={{ scrollMarginTop: headerOffset + 8 }}
+        className="bg-[#F5F5F5] lg:bg-white pt-3 sm:pt-4 lg:pt-8 pb-6 sm:pb-7 lg:pb-8"
+        style={{ scrollMarginTop: filtersStickyTop + 8 }}
       >
-        <div className={CONTAINER}>
+        <div className={`${CONTAINER} hidden lg:block`}>
           <div className="mb-2 flex items-center justify-between gap-3 sm:mb-2.5">
             <div className="min-w-0">
               <h2 className="text-lg sm:text-xl md:text-2xl font-semibold text-slate-900 tracking-tight">
@@ -1599,99 +1778,35 @@ export default function MovieLandingPage() {
           </div>
         </div>
 
-        <div ref={filtersStickySentinelRef} className="h-px w-full" aria-hidden />
-        <section className="sticky z-30 w-full bg-transparent" style={{ top: headerOffset }}>
-          <div className={`dining-filters-sticky w-full ${isFiltersStuck ? "is-stuck" : ""}`}>
-            <div className={`${CONTAINER} pt-1 pb-1`}>
-              <div className="mb-0.5">
-                <div className="flex items-center gap-2 sm:gap-3 pb-1 -mx-1 px-1">
-                  <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto scrollbar-hide">
-                    <button
-                      type="button"
-                      onClick={() => openFiltersModal("language")}
-                      className={`shrink-0 inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-[13px] sm:text-sm font-medium whitespace-nowrap transition-colors cursor-pointer ${
-                        selectedMovieFilterChips.length > 0 || filtersOpen
-                          ? "bg-slate-100 border-slate-400 text-slate-800"
-                          : "bg-white border-slate-200 text-slate-700 hover:border-slate-300"
-                      }`}
-                    >
-                      {selectedMovieFilterChips.length > 0 ? (
-                        <span className="w-4 h-4 rounded-full text-[0.7rem] font-bold text-white flex items-center justify-center bg-[#6900AA]">
-                          {selectedMovieFilterChips.length}
-                        </span>
-                      ) : null}
-                      Filter
-                      <SlidersHorizontal size={14} className="text-slate-500" />
-                    </button>
-
-                    {selectedMovieFilterChips.map((chip) => (
-                      <span
-                        key={chip.key}
-                        className="shrink-0 inline-flex items-center gap-1.5 bg-[#f7e9ff] border border-[#e3bcff] text-[#6900AA] rounded-full px-3 py-1.5 text-xs font-semibold whitespace-nowrap"
-                      >
-                        {chip.label}
-                        <button
-                          type="button"
-                          onClick={chip.onClear}
-                          className="hover:bg-[#efd7ff] rounded-full p-0.5 transition-colors cursor-pointer"
-                          aria-label={`Remove ${chip.label}`}
-                        >
-                          <X size={12} />
-                        </button>
-                      </span>
-                    ))}
-
-                    {quickOutsideChips
-                      .filter((chip) => {
-                        if (chip.type === "language") {
-                          return !selectedLanguages.includes(chip.value);
-                        }
-                        if (chip.type === "genre") {
-                          return !selectedGenres.includes(chip.value);
-                        }
-                        return !selectedFormats.includes(chip.value);
-                      })
-                      .map((chip) => (
-                        <ChipButton
-                          key={`${chip.type}-chip-${chip.value}`}
-                          label={chip.value}
-                          active={false}
-                          onClick={() => {
-                            if (chip.type === "language") toggleLanguage(chip.value);
-                            else if (chip.type === "genre") toggleGenre(chip.value);
-                            else toggleFormat(chip.value);
-                            scrollToMoviesListing();
-                          }}
-                        />
-                      ))}
-
-                    {hasActiveFilters ? (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          clearAll();
-                          scrollToMoviesListing();
-                        }}
-                        className="shrink-0 text-xs font-bold px-2 py-1.5 text-[#6900AA] transition-colors cursor-pointer hover:underline whitespace-nowrap"
-                      >
-                        Clear All
-                      </button>
-                    ) : null}
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={openMovieSearchPopup}
-                    className="dining-search-trigger shrink-0 inline-flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-full bg-white text-slate-700 cursor-pointer"
-                    aria-label="Search movies"
-                  >
-                    <Search size={18} strokeWidth={1.75} />
-                  </button>
-                </div>
+        {/* Desktop sticky filters (site header offset). Mobile filters live in frost chrome above. */}
+        <div className="hidden lg:block">
+          <div ref={filtersStickySentinelRef} className="h-px w-full" aria-hidden />
+          <section className="sticky z-30 w-full bg-transparent" style={{ top: filtersStickyTop }}>
+            <div className={`dining-filters-sticky w-full ${isFiltersStuck ? "is-stuck" : ""}`}>
+              <div className={`${CONTAINER} pt-1 pb-1`}>
+                <div className="mb-0.5 pb-1">{filterChipsRow}</div>
               </div>
             </div>
+          </section>
+        </div>
+
+        {/* BMS Coming Soon banner — mobile / tablet */}
+        {comingSoonMovies.length > 0 ? (
+          <div className={`${CONTAINER} lg:hidden pt-3 pb-1`}>
+            <a
+              href="#coming-soon"
+              className="flex items-center justify-between gap-3 rounded-xl bg-[#6900AA] px-4 py-3.5 text-white shadow-[0_6px_18px_rgba(105,0,170,0.28)] active:scale-[0.99] transition-transform"
+            >
+              <div className="min-w-0">
+                <p className="text-[15px] font-bold leading-tight">Coming Soon</p>
+                <p className="mt-0.5 text-[12px] font-medium text-white/85">
+                  Explore Upcoming Movies
+                </p>
+              </div>
+              <ChevronRight size={20} strokeWidth={2.25} className="shrink-0 opacity-90" />
+            </a>
           </div>
-        </section>
+        ) : null}
 
         {showMovieSearchPopup &&
           typeof document !== "undefined" &&
@@ -1871,15 +1986,24 @@ export default function MovieLandingPage() {
 
         <div className={`${CONTAINER} pt-3 sm:pt-3.5`}>
           <div className="space-y-8 sm:space-y-10">
-            {isLoading ? (
-              isMoviesExpanded ? (
-                <MovieGridShimmer count={8} />
-              ) : (
-                <CustomerRailShimmer count={4} variant="movie" />
-              )
+            {isLoading || (isFetching && hasActiveFilters) ? (
+              <>
+                <div className="lg:hidden">
+                  <MovieGridShimmer count={6} />
+                </div>
+                <div className="hidden lg:block">
+                  {isMoviesExpanded || hasActiveFilters ? (
+                    <MovieGridShimmer count={8} />
+                  ) : (
+                    <CustomerRailShimmer count={4} variant="movie" />
+                  )}
+                </div>
+              </>
             ) : noCinemasInCity && !useStaticMovies ? (
               <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-10 text-center">
-                <p className="text-sm font-semibold text-slate-800">No cinemas in {headingCity} yet</p>
+                <p className="text-sm font-semibold text-slate-800">
+                  No cinemas in {(city || "").trim() || "your city"} yet
+                </p>
                 <p className="mt-1 text-sm text-slate-500">
                   Try another city or browse cinemas near you.
                 </p>
@@ -1903,64 +2027,93 @@ export default function MovieLandingPage() {
                 onAction={hasActiveFilters ? clearAll : undefined}
                 dimmed={isFetching}
               />
-            ) : !isMoviesExpanded ? (
-              <div className={isFetching ? "opacity-70 transition-opacity" : ""}>
-                <AdaptiveCardRow
-                  minVisible={5}
-                  scrollerRef={moviesRailRef}
-                  className="adaptive-card-row--four"
-                >
-                  {movies.map((movie) => (
-                    <MovieCard key={movie.id} movie={movie} />
-                  ))}
-                </AdaptiveCardRow>
-                <div className="hidden lg:block">
-                  <RailPagerNav
-                    canPrev={moviesScrollEdges.left}
-                    canNext={moviesScrollEdges.right}
-                    pageCount={moviesScrollEdges.pageCount}
-                    activePage={moviesScrollEdges.activePage}
-                    onPrev={() => {
-                      const el = moviesRailRef.current;
-                      if (el) scrollRailBy(el, -1);
-                    }}
-                    onNext={() => {
-                      const el = moviesRailRef.current;
-                      if (el) scrollRailBy(el, 1);
-                    }}
-                    label="movies"
-                  />
-                </div>
-              </div>
             ) : (
-              <div className={isFetching ? "opacity-70 transition-opacity" : ""}>
-                <MovieCardsGrid movies={movies} />
-                {canToggleSeeAllMovies ? (
-                  <div className="mt-8 sm:mt-10 flex justify-center">
-                    <button
-                      type="button"
-                      onClick={toggleSeeAllMovies}
-                      className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full border border-slate-200 bg-white text-sm font-semibold text-[#6900AA] hover:bg-[#FAF5FF] hover:border-[#6900AA]/30 shadow-sm transition-all cursor-pointer"
-                    >
-                      <span>Show Less</span>
-                      <ChevronUp className="size-4" />
-                    </button>
-                  </div>
-                ) : null}
-              </div>
+              <>
+                {/* Mobile / tablet: always BMS 2-column grid */}
+                <div className={`lg:hidden ${isFetching ? "opacity-70 transition-opacity" : ""}`}>
+                  <MovieCardsGrid movies={movies} />
+                </div>
+                {/* Desktop: rail or expanded grid */}
+                <div className="hidden lg:block">
+                  {!isMoviesExpanded ? (
+                    <div className={isFetching ? "opacity-70 transition-opacity" : ""}>
+                      <AdaptiveCardRow
+                        minVisible={5}
+                        scrollerRef={moviesRailRef}
+                        className="adaptive-card-row--four"
+                      >
+                        {movies.map((movie) => (
+                          <MovieCard key={movie.id} movie={movie} />
+                        ))}
+                      </AdaptiveCardRow>
+                      <RailPagerNav
+                        canPrev={moviesScrollEdges.left}
+                        canNext={moviesScrollEdges.right}
+                        pageCount={moviesScrollEdges.pageCount}
+                        activePage={moviesScrollEdges.activePage}
+                        onPrev={() => {
+                          const el = moviesRailRef.current;
+                          if (el) scrollRailBy(el, -1);
+                        }}
+                        onNext={() => {
+                          const el = moviesRailRef.current;
+                          if (el) scrollRailBy(el, 1);
+                        }}
+                        label="movies"
+                      />
+                    </div>
+                  ) : (
+                    <div className={isFetching ? "opacity-70 transition-opacity" : ""}>
+                      <MovieCardsGrid movies={movies} />
+                      {canToggleSeeAllMovies ? (
+                        <div className="mt-8 sm:mt-10 flex justify-center">
+                          <button
+                            type="button"
+                            onClick={toggleSeeAllMovies}
+                            className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full border border-slate-200 bg-white text-sm font-semibold text-[#6900AA] hover:bg-[#FAF5FF] hover:border-[#6900AA]/30 shadow-sm transition-all cursor-pointer"
+                          >
+                            <span>Show Less</span>
+                            <ChevronUp className="size-4" />
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
+                  )}
+                </div>
+              </>
             )}
 
             <div id="coming-soon" className="scroll-mt-28" />
 
-            <MovieRail
-              title="Top Rated Movies"
-              movies={topRatedMovies}
-              expanded={isTopRatedExpanded}
-              onToggle={toggleTopRatedExpanded}
-            />
+            <div className="lg:hidden">
+              <MovieReleasesGrid title="Coming Soon" movies={comingSoonMovies} />
+            </div>
+
+            <div className="hidden lg:block">
+              <MovieRail
+                title="Top Rated Movies"
+                movies={topRatedMovies}
+                expanded={isTopRatedExpanded}
+                onToggle={toggleTopRatedExpanded}
+              />
+            </div>
           </div>
         </div>
       </section>
+
+      {/* BMS Browse by Cinemas FAB — bottom-left (not centered) */}
+      <Link
+        href={cinemasHref}
+        className="lg:hidden fixed z-40 inline-flex items-center gap-2 rounded-full bg-[#6900AA]/90 backdrop-blur-md px-5 py-3 text-[14px] font-bold text-white shadow-[0_8px_24px_rgba(105,0,170,0.35)] border border-white/25"
+        style={{
+          left: "1rem",
+          right: "auto",
+          bottom: "max(1.25rem, calc(1rem + env(safe-area-inset-bottom, 0px)))",
+        }}
+      >
+        <MapPin size={18} strokeWidth={2.25} className="shrink-0" />
+        Browse by Cinemas
+      </Link>
 
       {filtersOpen ? (
         <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-0 sm:p-4">

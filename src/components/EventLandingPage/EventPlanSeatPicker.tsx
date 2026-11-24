@@ -12,6 +12,8 @@ import { formatMoney } from "@/lib/currencyFormat";
 export type SeatPlan = {
   width: number;
   height: number;
+  /** Turn the plan upside down (top becomes bottom) so the stage is drawn at the top; numbering still runs left to right */
+  flip?: boolean;
   stage?: { x: number; y: number; w: number; h: number; label?: string };
   bars?: Array<{ label: string; x: number; y: number; w: number; h: number }>;
   tiers?: Array<{ name: string; x: number; y: number }>;
@@ -85,6 +87,7 @@ export default function EventPlanSeatPicker({
 
   const boxRef = useRef<HTMLDivElement>(null);
   const [zoom, setZoom] = useState(1);
+  const fy = (y: number) => (plan.flip ? plan.height - y : y);
   const W = plan.width * S;
   const H = plan.height * S;
   useEffect(() => {
@@ -115,12 +118,12 @@ export default function EventPlanSeatPicker({
           <div style={{ width: W, height: H, transform: `scale(${zoom})`, transformOrigin: "0 0" }} className="relative">
             <svg className="pointer-events-none absolute inset-0" width={W} height={H}>
               {(plan.lines || []).map((l, i) => (
-                <line key={i} x1={l.x1 * S} y1={l.y1 * S} x2={l.x2 * S} y2={l.y2 * S} stroke="#94a3b8" strokeWidth={3} strokeLinecap="round" />
+                <line key={i} x1={l.x1 * S} y1={fy(l.y1) * S} x2={l.x2 * S} y2={fy(l.y2) * S} stroke="#94a3b8" strokeWidth={3} strokeLinecap="round" />
               ))}
             </svg>
 
             {(plan.bars || []).map((b) => (
-              <div key={b.label} className="absolute flex items-center justify-center rounded bg-slate-300 text-[11px] font-bold tracking-wider text-slate-600" style={{ left: b.x * S, top: b.y * S, width: b.w * S, height: b.h * S }}>
+              <div key={b.label} className="absolute flex items-center justify-center rounded bg-slate-300 text-[11px] font-bold tracking-wider text-slate-600" style={{ left: b.x * S, top: (plan.flip ? fy(b.y + b.h) : b.y) * S, width: b.w * S, height: b.h * S }}>
                 {b.label}
               </div>
             ))}
@@ -128,7 +131,7 @@ export default function EventPlanSeatPicker({
             {(plan.tiers || []).map((t) => {
               const price = tierPrice.get(t.name.toLowerCase());
               return (
-                <div key={t.name} className="absolute -translate-x-1/2 -translate-y-1/2 whitespace-nowrap text-sm font-extrabold uppercase tracking-wide text-slate-700" style={{ left: t.x * S, top: t.y * S }}>
+                <div key={t.name} className="absolute -translate-x-1/2 -translate-y-1/2 whitespace-nowrap text-sm font-extrabold uppercase tracking-wide text-slate-700" style={{ left: t.x * S, top: fy(t.y) * S }}>
                   {t.name}
                   {price != null ? <span className="ml-2 text-[#6900AA]">{formatMoney(price, { compact: true })}</span> : null}
                 </div>
@@ -136,7 +139,7 @@ export default function EventPlanSeatPicker({
             })}
 
             {rowTags.map((r, i) => (
-              <span key={i} className="pointer-events-none absolute flex -translate-x-1/2 -translate-y-1/2 items-center justify-center text-sm font-extrabold text-slate-600" style={{ left: r.x * S, top: r.y * S }}>
+              <span key={i} className="pointer-events-none absolute flex -translate-x-1/2 -translate-y-1/2 items-center justify-center text-sm font-extrabold text-slate-600" style={{ left: r.x * S, top: fy(r.y) * S }}>
                 {r.t}
               </span>
             ))}
@@ -154,7 +157,7 @@ export default function EventPlanSeatPicker({
                   className="absolute flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-md text-[11px] font-semibold"
                   style={{
                     left: Number(s.coordinate_x) * S,
-                    top: Number(s.coordinate_y) * S,
+                    top: fy(Number(s.coordinate_y)) * S,
                     width: SEAT,
                     height: SEAT,
                     background: picked ? "#6900AA" : free ? "#ffffff" : "#e5e7eb",
@@ -169,7 +172,7 @@ export default function EventPlanSeatPicker({
             })}
 
             {plan.stage && (
-              <div className="absolute flex items-center justify-center rounded-md bg-slate-700 text-lg font-extrabold tracking-[0.4em] text-white shadow-md" style={{ left: plan.stage.x * S, top: plan.stage.y * S, width: plan.stage.w * S, height: plan.stage.h * S }}>
+              <div className="absolute flex items-center justify-center rounded-md bg-slate-700 text-lg font-extrabold tracking-[0.4em] text-white shadow-md" style={{ left: plan.stage.x * S, top: (plan.flip ? fy(plan.stage.y + plan.stage.h) : plan.stage.y) * S, width: plan.stage.w * S, height: plan.stage.h * S }}>
                 {plan.stage.label || "STAGE"}
               </div>
             )}

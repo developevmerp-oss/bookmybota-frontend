@@ -487,13 +487,13 @@ function TicketShowtimeButton({
         type="button"
         onClick={onClick}
         data-status={status}
-        className={`bmb-showtime-chip inline-flex h-9 sm:h-10 min-w-[5.75rem] sm:min-w-[6.25rem] items-center justify-center rounded-full border border-solid px-3.5 sm:px-4 text-center cursor-pointer transition-colors active:scale-[0.98] ${
+        className={`bmb-showtime-chip inline-flex min-h-[2.75rem] sm:min-h-[3rem] min-w-[5.5rem] sm:min-w-[6rem] flex-col items-center justify-center gap-0.5 rounded-md border border-solid px-3 py-1.5 text-center cursor-pointer transition-colors active:scale-[0.98] ${
           selected ? "" : "bg-white hover:bg-[#FAFAFA]"
         }`}
         style={
           selected
-            ? { border: `1.5px solid #111111`, backgroundColor: "#111111" }
-            : { border: `1.5px solid ${border}`, backgroundColor: "#FFFFFF" }
+            ? { border: `1px solid #111111`, backgroundColor: "#111111" }
+            : { border: `1px solid ${border}`, backgroundColor: "#FFFFFF" }
         }
       >
         <span
@@ -503,18 +503,17 @@ function TicketShowtimeButton({
         >
           {formatTime(st.starts_at)}
         </span>
+        {under ? (
+          <span
+            className={`max-w-[5.75rem] truncate text-[9px] font-semibold uppercase tracking-wide leading-none ${
+              selected ? "text-white/70" : "text-[#9CA3AF]"
+            }`}
+          >
+            {under}
+          </span>
+        ) : null}
       </button>
-      {under ? (
-        <span
-          className={`mt-1 max-w-[6.5rem] truncate text-center text-[10px] font-semibold uppercase tracking-wide leading-none ${
-            selected ? "text-[#6B7280]" : "text-[#9CA3AF]"
-          }`}
-        >
-          {under}
-        </span>
-      ) : (
-        <span className="mt-1 block h-[10px]" aria-hidden />
-      )}
+      <span className="mt-1.5 block h-[10px]" aria-hidden />
     </span>
   );
 }
@@ -900,10 +899,12 @@ export default function CinemaDetailPage({ cinemaId }: { cinemaId: string }) {
   };
 
   const dateButtons = (stripRef: RefObject<HTMLDivElement | null>) => (
-    <div
-      ref={stripRef}
-      className="flex items-end gap-2 sm:gap-2.5 overflow-x-auto scroll-smooth pt-3 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden min-w-0 w-full"
-    >
+    <div className="relative min-w-0 w-full">
+      <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-8 bg-gradient-to-l from-white to-transparent" aria-hidden />
+      <div
+        ref={stripRef}
+        className="flex items-end gap-1.5 sm:gap-2 overflow-x-auto scroll-smooth pt-3 pb-0.5 pr-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden min-w-0 w-full"
+      >
       {dateOptions.map((opt) => {
         const active = opt.dateStr === selectedDate;
         return (
@@ -913,7 +914,7 @@ export default function CinemaDetailPage({ cinemaId }: { cinemaId: string }) {
             data-date={opt.dateStr}
             onClick={() => setSelectedDate(opt.dateStr)}
             className={`relative shrink-0 text-center cursor-pointer transition-transform ${
-              active ? "w-[3.35rem] sm:w-[3.75rem] pt-2.5" : "w-[3.15rem] sm:w-[3.5rem]"
+              active ? "w-[3.05rem] sm:w-[3.45rem] pt-2" : "w-[2.85rem] sm:w-[3.25rem]"
             }`}
           >
             {active ? (
@@ -949,7 +950,7 @@ export default function CinemaDetailPage({ cinemaId }: { cinemaId: string }) {
                 <span className="block text-[9px] sm:text-[10px] font-bold tracking-wide text-[#6B7280] leading-none">
                   {opt.weekdayShort}
                 </span>
-                <span className="block text-[1.15rem] sm:text-[1.3rem] font-extrabold leading-none text-[#222222]">
+                <span className="block text-[1.15rem] sm:text-[1.3rem] font-extrabold leading-none text-[#9CA3AF]">
                   {opt.dayNumber}
                 </span>
                 <span className="block text-[9px] sm:text-[10px] font-semibold tracking-wide text-[#9CA3AF] leading-none">
@@ -960,6 +961,7 @@ export default function CinemaDetailPage({ cinemaId }: { cinemaId: string }) {
           </button>
         );
       })}
+      </div>
     </div>
   );
 
@@ -1454,7 +1456,7 @@ export default function CinemaDetailPage({ cinemaId }: { cinemaId: string }) {
                       </div>
                     </div>
 
-                    <div className="flex flex-wrap gap-2.5 min-w-0 flex-1 content-start pt-0.5">
+                    <div className="flex flex-wrap gap-x-2 gap-y-1.5 sm:gap-x-2.5 sm:gap-y-2 min-w-0 flex-1 content-start pt-0.5">
                       {row.showtimes.map((st) => (
                         <TicketShowtimeButton
                           key={st.id}

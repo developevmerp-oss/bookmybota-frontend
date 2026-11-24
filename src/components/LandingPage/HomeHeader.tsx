@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { ChevronDown, MapPin, Search, User } from "lucide-react";
+import { ChevronDown, ChevronRight, MapPin, Search, User } from "lucide-react";
 // Gift — re-add when restoring Gift Cards in main header
 import { toast } from "sonner";
 import images from "@/Images";
@@ -370,6 +370,7 @@ const NAV_CONTAINER = "mx-auto w-full px-5 sm:px-10 lg:px-8";
 
 export default function HomeHeader() {
   const pathname = usePathname();
+  const router = useRouter();
   const dispatch = useAppDispatch();
   const [city, setCity] = useState("");
   const [cityOpen, setCityOpen] = useState(false);
@@ -379,9 +380,13 @@ export default function HomeHeader() {
   const [authReady, setAuthReady] = useState(false);
   /** After scroll: sticky subheader shows logo + categories + profile. */
   const [compactHeader, setCompactHeader] = useState(false);
+  const [mobileFrostHeight, setMobileFrostHeight] = useState(64);
+  const mobileFrostRef = useRef<HTMLDivElement>(null);
   const isAuthPage = pathname === "/login" || pathname === "/register";
-  /** Detail pages — hide site header + subnav on mobile/tablet only */
+  /** Category + detail pages — hide site chrome on mobile/tablet (page owns BMS header) */
   const hideChromeOnMobileTablet = Boolean(
+    pathname === "/movies" ||
+    pathname === "/movies/cinemas" ||
     (pathname?.match(/^\/movies\/[^/]+\/?$/) && pathname !== "/movies/cinemas") ||
     pathname?.match(/^\/movies\/[^/]+\/showtimes\/?$/) ||
     pathname?.match(/^\/movies\/cinemas\/[^/]+\/?$/) ||
@@ -397,6 +402,15 @@ export default function HomeHeader() {
     syncAuth();
     setAuthReady(true);
     const openLogin = () => setLoginOpen(true);
+    // AuthGate / Profile tab can set this before bouncing guests back to `/`
+    try {
+      if (sessionStorage.getItem("pending_customer_login") === "1") {
+        sessionStorage.removeItem("pending_customer_login");
+        setLoginOpen(true);
+      }
+    } catch {
+      /* ignore */
+    }
     window.addEventListener("selected_city_changed", syncCity);
     window.addEventListener("auth_changed", syncAuth);
     window.addEventListener("storage", syncAuth);
@@ -411,6 +425,24 @@ export default function HomeHeader() {
       window.removeEventListener("open_city_select", openCity);
     };
   }, [pathname]);
+
+  // Keep spacer in sync with fixed frosted header (safe-area + content height).
+  useLayoutEffect(() => {
+    const el = mobileFrostRef.current;
+    if (!el || hideChromeOnMobileTablet) return;
+    const measure = () => {
+      const h = Math.round(el.getBoundingClientRect().height);
+      if (h > 0) setMobileFrostHeight((prev) => (prev === h ? prev : h));
+    };
+    measure();
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(measure) : null;
+    ro?.observe(el);
+    window.addEventListener("resize", measure, { passive: true });
+    return () => {
+      ro?.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [hideChromeOnMobileTablet, pathname]);
 
   useLayoutEffect(() => {
     const mainHeader = document.querySelector<HTMLElement>("[data-site-main-header]");
@@ -511,69 +543,83 @@ export default function HomeHeader() {
     </Suspense>
   );
 
+  const hideMobileChrome =
+    diningBookImmersive || diningDetailNavHidden || hideChromeOnMobileTablet;
+
   return (
     <>
-      {/* Main header — scrolls away (not sticky). Logo/profile live here only until compact. */}
-      <header
-        data-site-main-header
-        className={`relative z-[60] w-full overflow-visible bg-white text-[#111111] border-b border-[#E8E8E8] transition-transform duration-300 ease-out ${diningBookImmersive
-          ? "hidden"
-          : diningDetailNavHidden
-            ? "-translate-y-full pointer-events-none max-md:hidden"
-            : hideChromeOnMobileTablet
-              ? "max-lg:hidden"
-              : "translate-y-0"
-          }`}
-        aria-hidden={diningDetailNavHidden || undefined}
-        data-header-compact={compactHeader ? "1" : "0"}
+      {/* ── Mobile + tablet: BMS frosted fixed header (content scrolls under & blurs through) ── */}
+      <div
+        ref={mobileFrostRef}
+        data-site-mobile-sticky-header
+        className={`bmb-mobile-frost-header lg:hidden fixed top-0 inset-x-0 z-[60] w-full text-[#111111] ${
+          hideMobileChrome ? "hidden" : ""
+        }`}
+        style={{ paddingTop: "max(0px, env(safe-area-inset-top, 0px))" }}
       >
-        <div className={`${NAV_CONTAINER} py-1.5 lg:py-1 min-w-0`}>
-          {/* Mobile + tablet: city | search icon + profile */}
-          <div className="flex flex-nowrap items-center justify-between gap-2 min-w-0 lg:hidden">
+        <div className="relative flex items-start justify-between gap-3 px-4 sm:px-5 pt-2.5 pb-2.5 min-w-0">
+          <div className="min-w-0 flex-1">
+            <p className="text-[16px] sm:text-[17px] font-extrabold leading-tight tracking-tight text-[#1A1A1A] truncate">
+              It All Starts Here!
+            </p>
             <button
               type="button"
               onClick={() => setCityOpen(true)}
-              className="inline-flex h-9 items-center gap-1 min-w-0 max-w-[calc(100%-5.5rem)] text-[#111111] type-nav font-semibold hover:text-[#6900AA] transition-colors cursor-pointer"
+              className="mt-0.5 inline-flex max-w-full items-center gap-0.5 text-[13px] sm:text-[14px] font-semibold text-[#6900AA] hover:opacity-80 cursor-pointer"
+              aria-label={city ? `Change city, ${city}` : "Select city"}
             >
-              <MapPin size={16} className="shrink-0 text-[#6900AA]" />
               <span className="truncate">{cityLabel}</span>
-              <ChevronDown size={14} className="shrink-0 opacity-80" />
+              <ChevronRight size={14} strokeWidth={2.5} className="shrink-0 opacity-90" />
             </button>
-
-            <div
-              className={`flex items-center gap-1.5 sm:gap-2 shrink-0 transition-opacity duration-200 ${compactHeader ? "opacity-0 pointer-events-none" : "opacity-100"
-                }`}
-              aria-hidden={compactHeader || undefined}
-            >
-              <button
-                type="button"
-                onClick={() => setSearchOpen(true)}
-                aria-label="Search"
-                tabIndex={compactHeader ? -1 : undefined}
-                className="w-9 h-9 rounded-full hover:bg-[#F7E9FF] text-[#111111] flex items-center justify-center shrink-0 cursor-pointer"
-              >
-                <Search size={18} strokeWidth={2} />
-              </button>
-
-              <AuthSection
-                authReady={authReady}
-                customer={customer}
-                displayName={displayName}
-                initial={initial}
-                isAuthPage={isAuthPage}
-                onLogin={() => setLoginOpen(true)}
-                onLogout={handleLogout}
-                avatarOnly
-              />
-            </div>
           </div>
 
-          {/* Desktop: logo left | search dead-center | city | Login right */}
-          <div className="relative hidden lg:flex items-center justify-between min-w-0 py-0 min-h-[3.25rem]">
+          <div className="flex items-center gap-1.5 shrink-0 pt-0.5">
+            <button
+              type="button"
+              onClick={() => setSearchOpen(true)}
+              aria-label="Search"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full text-[#1A1A1A] hover:bg-black/[0.06] cursor-pointer"
+            >
+              <Search size={20} strokeWidth={2} />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Reserves space under fixed frosted header so first paint isn't covered */}
+      <div
+        className={`lg:hidden shrink-0 pointer-events-none ${hideMobileChrome ? "hidden" : ""}`}
+        style={{ height: mobileFrostHeight }}
+        aria-hidden
+      />
+
+      {/* Categories scroll with the page (not sticky) */}
+      <div
+        data-site-mobile-category-nav
+        className={`lg:hidden relative z-0 w-full min-w-0 overflow-x-clip bg-transparent px-3 sm:px-4 pb-1 ${
+          hideMobileChrome ? "hidden" : ""
+        }`}
+      >
+        <Suspense fallback={null}>
+          <SubNavBar isStickyChrome={false} />
+        </Suspense>
+      </div>
+
+      {/* ── Desktop: main header scrolls away; logo/profile until compact ── */}
+      <header
+        data-site-main-header
+        className={`relative z-[60] w-full overflow-visible bg-white text-[#111111] border-b border-[#E8E8E8] transition-transform duration-300 ease-out hidden lg:block ${
+          diningBookImmersive ? "!hidden" : "translate-y-0"
+        }`}
+        data-header-compact={compactHeader ? "1" : "0"}
+      >
+        <div className={`${NAV_CONTAINER} py-1.5 lg:py-1 min-w-0`}>
+          <div className="relative flex items-center justify-between min-w-0 py-0 min-h-[3.25rem]">
             <Link
               href="/"
-              className={`relative z-10 shrink-0 flex items-center transition-opacity duration-200 pl-4 sm:pl-6 lg:pl-8 xl:pl-10 ${compactHeader ? "opacity-0 pointer-events-none" : "opacity-100"
-                }`}
+              className={`relative z-10 shrink-0 flex items-center transition-opacity duration-200 pl-4 sm:pl-6 lg:pl-8 xl:pl-10 ${
+                compactHeader ? "opacity-0 pointer-events-none" : "opacity-100"
+              }`}
               aria-hidden={compactHeader || undefined}
               tabIndex={compactHeader ? -1 : undefined}
             >
@@ -584,7 +630,6 @@ export default function HomeHeader() {
               />
             </Link>
 
-            {/* True horizontal center of the header */}
             <div className="pointer-events-none absolute inset-y-0 left-1/2 z-[1] flex w-[min(52%,42rem)] xl:w-[min(50%,46rem)] 2xl:w-[min(48%,48rem)] -translate-x-1/2 items-center">
               <NavSearchBar
                 variant="desktop"
@@ -607,8 +652,9 @@ export default function HomeHeader() {
               <span className="w-px h-5 bg-[#D0D0D0] shrink-0" aria-hidden />
 
               <div
-                className={`transition-opacity duration-200 ${compactHeader ? "opacity-0 pointer-events-none" : "opacity-100"
-                  }`}
+                className={`transition-opacity duration-200 ${
+                  compactHeader ? "opacity-0 pointer-events-none" : "opacity-100"
+                }`}
                 aria-hidden={compactHeader || undefined}
               >
                 <AuthSection
@@ -626,48 +672,29 @@ export default function HomeHeader() {
         </div>
       </header>
 
-      {/* Subheader — sticky */}
+      {/* ── Desktop sticky subheader (logo + categories + actions when scrolled) ── */}
       <div
         data-site-sticky-subheader="1"
-        className={`sticky top-0 z-50 w-full overflow-x-clip border-b border-[#E8E8E8] bg-white transition-shadow duration-300 ${diningBookImmersive
-          ? "hidden"
-          : diningDetailNavHidden
-            ? "-translate-y-full pointer-events-none max-md:hidden"
-            : hideChromeOnMobileTablet
-              ? "max-lg:hidden"
-              : ""
-          } ${compactHeader
-            ? "shadow-[0_2px_10px_rgba(0,0,0,0.08)] max-lg:border-t max-lg:border-[#E8E8E8]"
-            : "shadow-none lg:shadow-none max-lg:shadow-[0_2px_8px_rgba(0,0,0,0.06)]"
-          }`}
-        aria-hidden={diningDetailNavHidden || undefined}
+        className={`sticky top-0 z-50 w-full overflow-x-clip border-b border-[#E8E8E8] bg-white transition-shadow duration-300 hidden lg:block ${
+          diningBookImmersive ? "!hidden" : ""
+        } ${
+          compactHeader
+            ? "shadow-[0_2px_10px_rgba(0,0,0,0.08)]"
+            : "shadow-none"
+        }`}
       >
-        {/* Mobile/tablet sticky only: search pill above categories */}
-        {compactHeader ? (
-          <div className="lg:hidden mx-auto w-full px-3 sm:px-4 md:px-5 pt-2.5 pb-0 min-w-0">
-            <NavSearchBar
-              variant="mobile"
-              onClick={() => setSearchOpen(true)}
-              className="w-full"
-            />
-          </div>
-        ) : null}
-
         <div
-          className={`min-w-0 w-full items-center ${compactHeader
-            ? // Desktop sticky: mx-auto w-full … lg:px-8 flex items-center lg:gap-5
-            "mx-auto w-full px-3 sm:px-4 md:px-5 max-lg:pt-1 max-lg:flex max-lg:flex-nowrap max-lg:gap-2 lg:px-8 lg:flex lg:items-center lg:gap-5"
-            : // Desktop non-sticky: padding comes from SubNavBar bmb-section-container
-            "mx-auto flex flex-nowrap gap-2 sm:gap-3 px-3 sm:px-4 md:px-5 lg:block lg:px-0"
-            }`}
+          className={`min-w-0 w-full items-center ${
+            compactHeader
+              ? "mx-auto w-full px-8 flex items-center gap-5"
+              : "mx-auto block px-0"
+          }`}
         >
-          {/* Desktop sticky only — logo left (same size as main header logo) */}
           <Link
             href="/"
-            className={`shrink-0 items-center pl-4 sm:pl-6 lg:pl-8 xl:pl-10 ${compactHeader
-              ? "hidden lg:flex animate-bmb-sticky-chrome"
-              : "hidden"
-              }`}
+            className={`shrink-0 items-center pl-8 xl:pl-10 ${
+              compactHeader ? "flex animate-bmb-sticky-chrome" : "hidden"
+            }`}
             aria-hidden={!compactHeader}
             tabIndex={compactHeader ? undefined : -1}
           >
@@ -678,22 +705,20 @@ export default function HomeHeader() {
             />
           </Link>
 
-          {/* Categories — full width when not sticky; flex-1 middle when sticky */}
           <div
-            className={`min-w-0 max-w-full overflow-hidden ${compactHeader
-              ? "flex-1 lg:min-w-0"
-              : "flex-1 lg:w-full"
-              }`}
+            className={`min-w-0 max-w-full overflow-hidden ${
+              compactHeader ? "flex-1 min-w-0" : "w-full"
+            }`}
           >
             {subNav}
           </div>
 
-          {/* Desktop sticky only — search + location + List Your Show + profile */}
           <div
-            className={`relative z-10 shrink-0 items-center ${compactHeader
-              ? "hidden lg:flex gap-2.5 xl:gap-3.5 animate-bmb-sticky-chrome-delay"
-              : "hidden"
-              }`}
+            className={`relative z-10 shrink-0 items-center ${
+              compactHeader
+                ? "flex gap-2.5 xl:gap-3.5 animate-bmb-sticky-chrome-delay"
+                : "hidden"
+            }`}
             aria-hidden={!compactHeader}
           >
             <button
@@ -752,7 +777,18 @@ export default function HomeHeader() {
       <CustomerAuthModal
         open={loginOpen}
         onClose={() => setLoginOpen(false)}
-        onSuccess={() => setCustomer(readCustomer())}
+        onSuccess={() => {
+          setCustomer(readCustomer());
+          try {
+            const next = sessionStorage.getItem("customer_login_next");
+            if (next) {
+              sessionStorage.removeItem("customer_login_next");
+              router.push(next);
+            }
+          } catch {
+            /* ignore */
+          }
+        }}
       />
     </>
   );

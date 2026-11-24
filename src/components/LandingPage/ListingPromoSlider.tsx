@@ -563,8 +563,8 @@ export default function ListingPromoSlider({
           loop={false}
           initialSlide={startIndex}
           speed={600}
-          centeredSlides={multi}
-          centeredSlidesBounds={edgeBounds}
+          centeredSlides
+          centeredSlidesBounds={multi ? edgeBounds : true}
           grabCursor={multi}
           allowTouchMove={false}
           simulateTouch={false}

@@ -113,10 +113,15 @@ export default function CitySelectModal({
     };
   }, [open, onClose]);
 
-  const sortedCities = useMemo(
-    () => cities.slice().sort((a, b) => a.name.localeCompare(b.name)),
-    [cities]
-  );
+  /** Ethiopia-only — India cities were seeded historically and must not appear in search */
+  const sortedCities = useMemo(() => {
+    const ethiopiaOnly = cities.filter((c) => {
+      const country = (c.country || "").trim().toLowerCase();
+      if (!country) return true; // API already Ethiopia-scoped; keep rows without country label
+      return country === "ethiopia";
+    });
+    return ethiopiaOnly.slice().sort((a, b) => a.name.localeCompare(b.name));
+  }, [cities]);
 
   const popularCities = useMemo(
     () =>

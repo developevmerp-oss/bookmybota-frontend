@@ -95,18 +95,7 @@ export function buildEventOfferFormSchema(earliestEventStart: string) {
         const n = Number(value);
         return Number.isFinite(n) && n >= 1;
       }),
-    start_date: yup
-      .string()
-      .required('Start date is required.')
-      .test('before-event-from', function (value) {
-        if (!value || !earliestEventStart) return true;
-        if (value >= earliestEventStart) {
-          return this.createError({
-            message: `Start date must be before the event date (${earliestEventStart}).`,
-          });
-        }
-        return true;
-      }),
+    start_date: yup.string().required('Start date is required.'),
     start_time: yup.string().default(''),
     end_date: yup
       .string()
@@ -119,15 +108,6 @@ export function buildEventOfferFormSchema(earliestEventStart: string) {
         const startTime = String(this.parent.start_time || '00:00');
         const endTime = String(this.parent.end_time || '23:59');
         return endTime >= startTime;
-      })
-      .test('before-event-until', function (value) {
-        if (!value || !earliestEventStart) return true;
-        if (value >= earliestEventStart) {
-          return this.createError({
-            message: `End date must be before the event date (${earliestEventStart}).`,
-          });
-        }
-        return true;
       }),
     end_time: yup.string().default(''),
     status: yup.mixed<EventOfferStatus>().oneOf(['DRAFT', 'ACTIVE']).required(),

@@ -85,6 +85,7 @@ import {
   type TicketDeliveryMode,
 } from "@/lib/eventTicketMode";
 import dynamic from "next/dynamic";
+import { isStraightRowLayout } from "@/components/venue/ClassicSeatMap";
 import CustomerAuthModal from "@/components/Shared/CustomerAuthModal";
 const fieldErrorClass = "mt-1.5 text-[0.8125rem] font-medium text-rose-500";
 /** Required-field marker — placed after the label (e.g. "Your name *"). */
@@ -116,6 +117,8 @@ const VenueLayoutViewer = dynamic(
   { ssr: false }
 );
 
+const EventClassicSeatPicker = dynamic(() => import("@/components/EventLandingPage/EventClassicSeatPicker"), { ssr: false });
+const EventTieredSeatPicker = dynamic(() => import("@/components/EventLandingPage/EventTieredSeatPicker"), { ssr: false });
 const StadiumLayoutViewer = dynamic(
   () => import("@/components/EventLandingPage/StadiumLayoutViewer"),
   { ssr: false }
@@ -1634,6 +1637,8 @@ export default function EventCheckout({
       );
     }
   };
+
+  const classicSeats: any[] = ((activeLayoutData as any)?.data?.seats || (activeLayoutData as any)?.seats || []) as any[];
 
   const handleMapSeatsSelected = (seats: any[]) => {
     if (!desiredSeatQty) {
@@ -3414,6 +3419,26 @@ export default function EventCheckout({
                     initialSelectedSeats={selectedSeats}
                     maxSelectable={desiredSeatQty ?? undefined}
                     hideBookingBar
+                  />
+                ) : classicSeats.length > 0 && isStraightRowLayout(classicSeats) ? (
+                  <EventClassicSeatPicker
+                    seats={classicSeats}
+                    selected={selectedSeats}
+                    maxSelectable={desiredSeatQty ?? undefined}
+                    onSeatsSelected={handleMapSeatsSelected}
+                  />
+                ) : classicSeats.length > 0 ? (
+                  <EventTieredSeatPicker
+                    seats={classicSeats}
+                    selected={selectedSeats}
+                    maxSelectable={desiredSeatQty ?? undefined}
+                    onSeatsSelected={handleMapSeatsSelected}
+                    ticketTypes={[...ticketTypes, ...allTicketTypes]}
+                    stageCenter={(() => {
+                      const shapes: any[] = ((activeLayoutData as any)?.data?.seating_config ?? (activeLayoutData as any)?.seating_config)?.shapes || [];
+                      const st = shapes.find((h) => /stage/i.test(String(h?.text || "")));
+                      return st ? { x: Number(st.x) + (Number(st.width) || 0) / 2, y: Number(st.y) + (Number(st.height) || 0) / 2 } : null;
+                    })()}
                   />
                 ) : (
                   <VenueLayoutViewer

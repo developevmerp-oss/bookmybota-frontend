@@ -89,6 +89,20 @@ export default function AuthGate({
         setReady(false);
         dispatch(clearCredentials());
         const loginRole = allowed[0] || "customer";
+        // Customer auth is modal-based on the public site — bounce home and open login
+        // so Profile /account deep links don't look like a no-op redirect.
+        if (loginRole === "customer") {
+          try {
+            const intended =
+              typeof window !== "undefined" ? window.location.pathname : "/customer/profile";
+            if (intended.startsWith("/customer")) {
+              sessionStorage.setItem("customer_login_next", intended);
+            }
+            sessionStorage.setItem("pending_customer_login", "1");
+          } catch {
+            /* ignore */
+          }
+        }
         router.replace(loginPathForRole(loginRole));
         return;
       }
@@ -97,6 +111,18 @@ export default function AuthGate({
         setReady(false);
         clearSessionForRole(matched.user.role);
         dispatch(clearCredentials());
+        if (matched.user.role === "customer") {
+          try {
+            const intended =
+              typeof window !== "undefined" ? window.location.pathname : "/customer/profile";
+            if (intended.startsWith("/customer")) {
+              sessionStorage.setItem("customer_login_next", intended);
+            }
+            sessionStorage.setItem("pending_customer_login", "1");
+          } catch {
+            /* ignore */
+          }
+        }
         router.replace(loginPathForRole(matched.user.role));
         return;
       }

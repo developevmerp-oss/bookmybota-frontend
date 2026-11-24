@@ -6948,12 +6948,13 @@ export const api = createApi({
 
     getPublicRegisteredCinemas: builder.query<
       PublicRegisteredPartner[],
-      { q?: string; city?: string } | void
+      { q?: string; city?: string; sort?: 'asc' | 'desc' } | void
     >({
       query: (params) => {
         const sp = new URLSearchParams();
         if (params?.q) sp.append('q', params.q);
         if (params?.city) sp.append('city', params.city);
+        if (params?.sort) sp.append('sort', params.sort);
         const qs = sp.toString();
         return `/movies/public/cinemas${qs ? `?${qs}` : ''}`;
       },
@@ -8307,7 +8308,22 @@ export const api = createApi({
 
     getPublicMovieShowtimes: builder.query<
       PublicMovieShowtimesResponse,
-      { idOrSlug: string; date?: string; city_id?: string; city_slug?: string }
+      {
+        idOrSlug: string;
+        date?: string;
+        city_id?: string;
+        city_slug?: string;
+        /** CSV — server-side language filter */
+        language?: string;
+        /** CSV — server-side format / screen_type filter */
+        format?: string;
+        /** CSV — price bands e.g. 0-200,801+ */
+        price?: string;
+        /** CSV — preferred time bands: morning|afternoon|evening|night */
+        time?: string;
+        /** Cinema name / address search */
+        q?: string;
+      }
     >({
       query: ({ idOrSlug, ...params }) => ({
         url: `/movies/${idOrSlug}/showtimes`,

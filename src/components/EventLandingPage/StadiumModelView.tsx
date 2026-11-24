@@ -25,17 +25,19 @@ type ModelSeat = {
   slot?: number;
 };
 
+/** bump when the stadium model files in public/models are rebuilt, so browsers do not keep an old copy */
+const MODEL_VERSION = "20261124b";
 const seatFiles: Record<string, Promise<ModelSeat[]>> = {};
 function loadSeats(model: string): Promise<ModelSeat[]> {
   const file = model === "narendra-modi" ? "narendra-modi-seats" : "stadium-seats";
-  if (!seatFiles[file]) seatFiles[file] = fetch(`/models/${file}.json`).then((r) => (r.ok ? r.json() : Promise.reject(new Error("no seat file")))).then((j) => j.seats as ModelSeat[]);
+  if (!seatFiles[file]) seatFiles[file] = fetch(`/models/${file}.json?v=${MODEL_VERSION}`, { cache: "no-cache" }).then((r) => (r.ok ? r.json() : Promise.reject(new Error("no seat file")))).then((j) => j.seats as ModelSeat[]);
   return seatFiles[file];
 }
 
 const COLORS = ["#ef4444", "#facc15", "#22c55e", "#f8fafc", "#2563eb", "#f97316"];
 
 function Model({ model }: { model: string }) {
-  const gltf = useGLTF(model === "narendra-modi" ? "/models/narendra-modi.glb" : "/models/stadium.glb");
+  const gltf = useGLTF(`${model === "narendra-modi" ? "/models/narendra-modi.glb" : "/models/stadium.glb"}?v=${MODEL_VERSION}`);
   return <primitive object={gltf.scene} />;
 }
 
@@ -77,7 +79,7 @@ function Crowd({ seats, skipId }: { seats: ModelSeat[]; skipId: string | null })
 }
 
 /** Chair-shaped markers (cushion + backrest) in one colour, laid over the model's chairs, facing the pitch */
-function ColoredChairs({ seats, color, scale = 1.25 }: { seats: ModelSeat[]; color: string; scale?: number }) {
+function ColoredChairs({ seats, color, scale = 1.25, lit = false, glow = false, wide = 1 }: { seats: ModelSeat[]; color: string; scale?: number; lit?: boolean; glow?: boolean; wide?: number }) {
   const cushion = useRef<THREE.InstancedMesh>(null);
   const back = useRef<THREE.InstancedMesh>(null);
   // a seat that covers several model chairs (rows with fewer seat numbers than chairs) becomes that many real chair shapes
@@ -101,7 +103,7 @@ function ColoredChairs({ seats, color, scale = 1.25 }: { seats: ModelSeat[]; col
     items.forEach((s, i) => {
       const base = s.y - 0.23;
       m.rotation.set(0, s.rot, 0);
-      m.scale.set(scale, scale, scale);
+      m.scale.set(scale * wide, scale, scale);
       m.position.set(s.x, base + 0.42 * scale, s.z);
       m.updateMatrix();
       cushion.current?.setMatrixAt(i, m.matrix);
@@ -119,35 +121,27 @@ function ColoredChairs({ seats, color, scale = 1.25 }: { seats: ModelSeat[]; col
     <group>
       <instancedMesh key={items.length} ref={cushion} args={[undefined, undefined, items.length]}>
         <boxGeometry args={[0.46, 0.13, 0.46]} />
-        <meshBasicMaterial color={color} polygonOffset polygonOffsetFactor={-4} polygonOffsetUnits={-4} />
+        {lit ? <meshStandardMaterial color={color} roughness={0.5} emissive={glow ? color : "#000000"} emissiveIntensity={glow ? 0.55 : 0} /> : <meshBasicMaterial color={color} polygonOffset polygonOffsetFactor={-4} polygonOffsetUnits={-4} />}
       </instancedMesh>
       <instancedMesh key={`b${items.length}`} ref={back} args={[undefined, undefined, items.length]}>
         <boxGeometry args={[0.46, 0.5, 0.12]} />
-        <meshBasicMaterial color={color} polygonOffset polygonOffsetFactor={-4} polygonOffsetUnits={-4} />
+        {lit ? <meshStandardMaterial color={color} roughness={0.5} emissive={glow ? color : "#000000"} emissiveIntensity={glow ? 0.55 : 0} /> : <meshBasicMaterial color={color} polygonOffset polygonOffsetFactor={-4} polygonOffsetUnits={-4} />}
       </instancedMesh>
     </group>
   );
 }
 
 /** Seats already booked by other people: red chairs */
-function Taken({ seats }: { seats: ModelSeat[] }) {
-  return <ColoredChairs seats={seats} color="#e11d48" />;
+function Taken({ seats, wide }: { seats: ModelSeat[]; wide: number }) {
+  return <ColoredChairs seats={seats} color="#e11d48" scale={1.05} lit glow wide={wide / 1.05} />;
 }
 
 /** The seats the customer picked: orange chairs (larger, with a tall beam, in the whole-stadium view) */
-function Picked({ seats, tall, skipId }: { seats: ModelSeat[]; tall: boolean; skipId: string | null }) {
+function Picked({ seats, tall, skipId, wide }: { seats: ModelSeat[]; tall: boolean; skipId: string | null; wide: number }) {
   const list = seats.filter((s) => tall || s.id !== skipId);
   return (
     <group>
-      <ColoredChairs seats={list} color="#f97316" scale={tall ? 3 : 1.1} />
-      {false
-        ? list.map((s) => (
-            <mesh key={s.id} position={[s.position[0], s.position[1] + 17, s.position[2]]}>
-              <boxGeometry args={[0.8, 34, 0.8]} />
-              <meshBasicMaterial color="#f97316" />
-            </mesh>
-          ))
-        : null}
+      <ColoredChairs seats={list} color="#ff8a00" scale={tall ? 4 : 1.25} lit glow wide={tall ? 1 : wide / 1.25} />
     </group>
   );
 }
@@ -194,9 +188,9 @@ function groupPose(group: ModelSeat[]): Pose {
   const first = group[0];
   const out = first.outward ?? Math.atan2(c.x, c.z);
   const outV = new THREE.Vector3(Math.sin(out), 0, Math.cos(out));
-  const dist = Math.max(6, span * 1.15 + 3);
+  const dist = Math.max(15, span * 1.5 + 8);
   const pos = c.clone().sub(outV.clone().multiplyScalar(dist));
-  pos.y = c.y + 1.6 + Math.min(2.5, span * 0.12);
+  pos.y = c.y + 6.5 + Math.min(3, span * 0.15);
   return { pos: [pos.x, pos.y, pos.z], look: [c.x, c.y + 0.5, c.z] };
 }
 
@@ -209,6 +203,18 @@ export default function StadiumModelView({ seats, seat, className = "", model: m
   }, [modelKey]);
 
   // Event seat -> stadium-model seat: same section, same order (row letter, then seat number)
+  // gap between neighbouring chairs of the stadium model: wide stands get wider chairs so rows read as rows
+  const pitch = useMemo(() => {
+    if (!model) return 0.62;
+    const d: number[] = [];
+    for (let i = 1; i < model.length && d.length < 400; i += 7) {
+      const a = model[i - 1], b = model[i];
+      if (a.block === b.block && a.row === b.row) d.push(Math.hypot(a.position[0] - b.position[0], a.position[2] - b.position[2]));
+    }
+    d.sort((x, y) => x - y);
+    return Math.min(3, Math.max(0.62, d.length ? d[Math.floor(d.length / 2)] : 0.62));
+  }, [model]);
+  const wide = Math.min(3.2, pitch / 0.62);
   const mapping = useMemo(() => {
     const map = new Map<string, ModelSeat>();
     if (!model) return map;
@@ -219,7 +225,7 @@ export default function StadiumModelView({ seats, seat, className = "", model: m
     const byRow = <T,>(list: T[], key: (t: T) => string) => {
       const m = new Map<string, T[]>();
       list.forEach((t) => m.set(key(t), [...(m.get(key(t)) || []), t]));
-      return [...m.entries()].sort((p, q) => p[0].localeCompare(q[0], undefined, { numeric: true })).map((e) => e[1]);
+      return [...m.entries()].sort((p, q) => p[0].length - q[0].length || p[0].localeCompare(q[0], undefined, { numeric: true })).map((e) => e[1]);
     };
     const eventByBlock = new Map<string, Seat3D[]>();
     seats.forEach((s) => eventByBlock.set(String(s.section_name), [...(eventByBlock.get(String(s.section_name)) || []), s]));
@@ -229,6 +235,11 @@ export default function StadiumModelView({ seats, seat, className = "", model: m
       const mRows = byRow(target, (t) => t.row).map((r) => r.sort((p, q) => p.seat - q.seat));
       const eRows = byRow(list, (t) => String(t.row_label)).map((r) => r.sort((p, q) => Number(p.seat_label) - Number(q.seat_label)));
       eRows.forEach((er, ri) => {
+        // same rows and same seats per row as the 3D model: seat n of row r is exactly chair n of row r
+        if (eRows.length === mRows.length && er.length === mRows[ri].length) {
+          er.forEach((es, si) => map.set(es.id, { ...mRows[ri][si], id: es.id }));
+          return;
+        }
         const mr = mRows[eRows.length > 1 ? Math.round((ri * (mRows.length - 1)) / (eRows.length - 1)) : 0];
         if (!mr) return;
         er.forEach((es, si) => {
@@ -237,18 +248,40 @@ export default function StadiumModelView({ seats, seat, className = "", model: m
           const i0 = Math.floor(fc), i1 = Math.min(mr.length - 1, i0 + 1), t = fc - i0;
           const A = mr[i0], B = mr[i1];
           const rot = A.outward ?? Math.atan2(A.position[0], A.position[2]);
-          const o = (si - (er.length - 1) / 2) * 0.62;
+          const o = (si - (er.length - 1) / 2) * pitch;
           const p = lerp(A.position, B.position, t) as [number, number, number];
           map.set(es.id, { ...A, id: es.id, position: [p[0] + Math.cos(rot) * o, p[1], p[2] - Math.sin(rot) * o], camera: lerp(A.camera, B.camera, t), lookAt: lerp(A.lookAt, B.lookAt, t) });
         });
       });
     });
     return map;
-  }, [model, seats]);
+  }, [model, seats, pitch]);
 
   const [chosen, setChosen] = useState<"seat" | "group" | "stadium" | null>(null);
   const gone = useMemo(() => booked.map((x) => mapping.get(x.id)).filter(Boolean) as ModelSeat[], [booked, mapping]);
   const mine = useMemo(() => selected.map((x) => mapping.get(x.id)).filter(Boolean) as ModelSeat[], [selected, mapping]);
+  // chairs nobody has picked or bought; picked and sold ones are drawn on their own in orange / red
+  const freeChairs = useMemo(() => {
+    if (!model) return [] as ModelSeat[];
+    const marked = [...mine, ...gone];
+    if (marked.length === 0) return model;
+    // a picked seat is drawn at its own spot, which can sit between two model chairs: hide every blue chair close to one
+    const cell = 1.2;
+    const grid = new Map<string, ModelSeat[]>();
+    marked.forEach((m) => {
+      const k = `${Math.floor(m.position[0] / cell)}|${Math.floor(m.position[2] / cell)}`;
+      grid.set(k, [...(grid.get(k) || []), m]);
+    });
+    return model.filter((x) => {
+      const gx = Math.floor(x.position[0] / cell), gz = Math.floor(x.position[2] / cell);
+      for (let dx = -1; dx <= 1; dx++)
+        for (let dz = -1; dz <= 1; dz++)
+          for (const m of grid.get(`${gx + dx}|${gz + dz}`) || []) {
+            if (Math.abs(m.position[1] - x.position[1]) < 0.5 && Math.hypot(m.position[0] - x.position[0], m.position[2] - x.position[2]) < 0.45) return false;
+          }
+      return true;
+    });
+  }, [model, mine, gone]);
   const mode: "seat" | "group" | "stadium" = chosen ?? (mine.length > 1 ? "group" : "seat");
   const overview = mode === "stadium";
   const cam = mode === "seat" && seat ? mapping.get(seat.id) || null : null;
@@ -266,8 +299,9 @@ export default function StadiumModelView({ seats, seat, className = "", model: m
         <directionalLight position={[80, 140, 60]} intensity={2.2} />
         <Suspense fallback={null}>
           <Model model={modelKey} />
-          <Taken seats={gone} />
-          <Picked seats={mine} tall={overview} skipId={mode === "seat" ? cam?.id || null : null} />
+          <ColoredChairs seats={freeChairs} color="#1d4ed8" scale={1} lit wide={wide} />
+          <Taken seats={gone} wide={wide} />
+          <Picked seats={mine} wide={wide} tall={overview} skipId={mode === "seat" ? cam?.id || null : null} />
         </Suspense>
         <Rig pose={pose} />
       </Canvas>

@@ -61,12 +61,15 @@ export default function BlockSeatPicker({
   onSeatsSelected,
   initialSelectedSeats = [],
   maxSelectable = 10,
+  onContinue,
 }: {
   layoutData: any;
   ticketTypes: any[];
   onSeatsSelected: (seats: any[]) => void;
   initialSelectedSeats?: any[];
   maxSelectable?: number;
+  /** Called by the Book button in the live stadium view; leave out to hide the button */
+  onContinue?: () => void;
 }) {
   const data = layoutData?.data ?? layoutData ?? {};
   const cfg = data.seating_config || {};
@@ -98,6 +101,7 @@ export default function BlockSeatPicker({
   const [blockId, setBlockId] = useState<string | null>(null);
   const [category, setCategory] = useState<string | null>(null);
   const [showView, setShowView] = useState(true);
+  const [liveOpen, setLiveOpen] = useState(false);
 
   useEffect(() => {
     const ids = new Set(initialSelectedSeats.map((i: any) => String(i.id || i.seat_identifier)));
@@ -171,7 +175,7 @@ export default function BlockSeatPicker({
     const m = new Map<string, EventSeat[]>();
     (seatsByBlock.get(block.id) || []).forEach((s) => m.set(String(s.row_label), [...(m.get(String(s.row_label)) || []), s]));
     return Array.from(m.entries())
-      .sort((a, b) => a[0].localeCompare(b[0]))
+      .sort((a, b) => a[0].length - b[0].length || a[0].localeCompare(b[0]))
       .map(([label, list]) => ({ label, seats: list.sort((a, b) => num(a.seat_label) - num(b.seat_label)) }));
   }, [block, seatsByBlock]);
 
@@ -271,7 +275,7 @@ export default function BlockSeatPicker({
               </button>
               <p className="text-2xl font-extrabold text-white">{block.name}</p>
               <p className="text-sm text-slate-500">
-                {info?.type} · <b className="text-white">{money(info?.price || 0)}</b> per seat · {info?.free} of {info?.total} free
+                {info?.type} · <b className="text-white">{money(info?.price || 0)}</b> per seat · {info?.free} of {info?.total} available
               </p>
             </div>
             <button type="button" onClick={() => setBlockId(null)} aria-label="Close" className="cursor-pointer rounded-full p-1.5 text-slate-400 hover:bg-slate-100 lg:hidden">
@@ -283,7 +287,7 @@ export default function BlockSeatPicker({
             <div className="mb-3 grid grid-cols-3 gap-2 text-center text-xs">
               <div className="rounded-lg bg-white/5 px-2 py-1.5">
                 <p className="text-base font-extrabold text-white">{info?.free ?? 0}</p>
-                <p className="text-slate-400">free</p>
+                <p className="text-slate-400">available</p>
               </div>
               <div className="rounded-lg bg-rose-950/60 px-2 py-1.5">
                 <p className="text-base font-extrabold text-rose-300">{(info?.total ?? 0) - (info?.free ?? 0)}</p>
@@ -299,13 +303,14 @@ export default function BlockSeatPicker({
                 Your seats here: {selected.filter((x) => String(x.block_id) === block.id).map((x) => `${x.row_label}${x.seat_label}`).join(", ")}
               </p>
             ) : null}
-            <div className="space-y-1.5" data-seat-grid>
+            <div className={rows.some((r) => r.seats.length > 20) ? "space-y-[3px]" : "space-y-1.5"} data-seat-grid>
               {(() => {
                 const maxCols = Math.max(1, ...rows.map((r) => r.seats.length));
-                return rows.map((r) => (
+                // highest row on top, row A (nearest the pitch) at the bottom - works for any number of rows
+                return [...rows].reverse().map((r) => (
                   <div key={r.label} className="flex items-center gap-1.5">
                     <span className="w-5 shrink-0 text-center text-xs font-bold text-slate-400">{r.label}</span>
-                    <div className="grid min-w-0 flex-1 gap-1" style={{ gridTemplateColumns: `repeat(${maxCols}, minmax(0, 1fr))` }}>
+                    <div className={`grid min-w-0 flex-1 ${maxCols > 20 ? "gap-[2px]" : "gap-1"}`} style={{ gridTemplateColumns: `repeat(${maxCols}, minmax(0, 1fr))` }}>
                       {r.seats.map((s) => {
                         const free = String(s.status || "AVAILABLE").toUpperCase() === "AVAILABLE";
                         const isSel = selected.some((x) => x.id === s.id);
@@ -317,7 +322,7 @@ export default function BlockSeatPicker({
                             disabled={!free && !isSel}
                             onClick={() => toggle(s)}
                             title={`${block.name} · row ${r.label} · seat ${s.seat_label}`}
-                            className={`flex aspect-square min-w-0 items-center justify-center rounded-md border text-[11px] font-semibold transition-colors ${
+                            className={`flex min-w-0 items-center justify-center ${maxCols > 20 ? "h-[22px] rounded-[3px] text-[9px] leading-none" : "aspect-square rounded-md text-[11px]"} border font-semibold transition-colors ${
                               isSel
                                 ? "cursor-pointer border-orange-400 bg-orange-500 text-white"
                                 : free
@@ -336,7 +341,7 @@ export default function BlockSeatPicker({
               })()}
             </div>
             <div className="mt-4 flex flex-wrap items-center justify-center gap-4 text-xs text-slate-500">
-              <span className="inline-flex items-center gap-1.5"><span className="size-3.5 rounded border border-white/30 bg-white/10" /> Free</span>
+              <span className="inline-flex items-center gap-1.5"><span className="size-3.5 rounded border border-white/30 bg-white/10" /> Available</span>
               <span className="inline-flex items-center gap-1.5"><span className="size-3.5 rounded bg-orange-500" /> Your seats</span>
               <span className="inline-flex items-center gap-1.5"><span className="size-3.5 rounded bg-rose-950 border border-rose-500/60" /> Booked</span>
             </div>
@@ -354,13 +359,10 @@ export default function BlockSeatPicker({
               </p>
               <p className="text-xs text-slate-500">{seatView.tier}</p>
             </div>
-            <button type="button" onClick={() => setShowView((v) => !v)} className="shrink-0 cursor-pointer rounded-lg border border-[#6900AA]/40 bg-white px-3 py-1.5 text-xs font-bold text-[#6900AA] hover:bg-purple-50">
-              {showView ? "Hide view" : "View from seat"}
+            <button type="button" onClick={() => setLiveOpen(true)} className="shrink-0 cursor-pointer rounded-lg bg-[#6900AA] px-4 py-2 text-xs font-bold text-white hover:bg-[#55008a]">
+              Live stadium view
             </button>
           </div>
-          {showView ? (
-            <Stadium3DView booked={seats.filter((x) => String(x.status || "AVAILABLE").toUpperCase() !== "AVAILABLE") as any} selected={selected as any} model={String(cfg.stadium_model || "football")} seats={seats as any} seat={lastSeat as any} className="mt-2 h-56 rounded-xl sm:h-64 lg:h-72" />
-          ) : null}
           <div className="mt-2 grid grid-cols-3 gap-2 text-center">
             <div className="rounded-lg bg-white/5 px-2 py-2">
               <p className="text-lg font-extrabold text-white">{seatView.toCentre} m</p>
@@ -452,7 +454,7 @@ export default function BlockSeatPicker({
       </div>
 
       {/* Side panel on large screens */}
-      <aside className="hidden h-full w-[30rem] shrink-0 flex-col overflow-hidden border-l border-white/10 bg-[#111826] lg:flex" aria-label="Section and seats">
+      <aside className="hidden h-full w-[38rem] shrink-0 flex-col overflow-hidden border-l border-white/10 bg-[#111826] lg:flex" aria-label="Section and seats">
         {sheet}
       </aside>
 
@@ -464,6 +466,59 @@ export default function BlockSeatPicker({
       >
         {sheet}
       </div>
+
+      {liveOpen && lastSeat ? (
+        <div className="fixed inset-0 z-[200] flex flex-col bg-black">
+          <div className="flex items-center justify-between gap-3 border-b border-white/10 bg-[#0b0f17] px-4 py-3 text-white">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-extrabold sm:text-base">Live stadium view</p>
+              <p className="text-[11px] text-slate-400">Drag to look around · switch between your seat, your group and the whole stadium with the buttons</p>
+            </div>
+            <button type="button" onClick={() => setLiveOpen(false)} className="shrink-0 cursor-pointer rounded-lg border border-white/30 px-4 py-1.5 text-sm font-bold hover:bg-white/10">Close</button>
+          </div>
+          <div className="relative min-h-0 flex-1">
+            <Stadium3DView booked={seats.filter((x) => String(x.status || "AVAILABLE").toUpperCase() !== "AVAILABLE") as any} selected={selected as any} model={String(cfg.stadium_model || "football")} seats={seats as any} seat={lastSeat as any} className="h-full w-full" />
+            <div className="pointer-events-none absolute left-3 top-3 max-w-[min(22rem,calc(100%-1.5rem))] rounded-xl bg-black/70 p-3 text-white backdrop-blur">
+              {(() => {
+                const groups = new Map<string, any[]>();
+                selected.forEach((x) => {
+                  const k = `${x.section_name} · Row ${x.row_label}`;
+                  groups.set(k, [...(groups.get(k) || []), x]);
+                });
+                return (
+                  <>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-orange-300">Your seats</p>
+                    {[...groups.entries()].map(([k, list]) => (
+                      <p key={k} className="mt-1 text-sm">
+                        <b>{k}</b> · seat {list.map((x) => x.seat_label).sort((a, b) => num(a) - num(b)).join(", ")}
+                      </p>
+                    ))}
+                  </>
+                );
+              })()}
+            </div>
+          </div>
+          <div className="flex items-center justify-between gap-3 border-t border-white/10 bg-[#0b0f17] px-4 py-3 text-white">
+            <div className="min-w-0">
+              <p className="text-xs text-slate-400">{selected.length} of {maxSelectable} seats selected</p>
+              <p className="text-xl font-extrabold">{money(total)}</p>
+            </div>
+            {onContinue ? (
+              <button
+                type="button"
+                disabled={selected.length === 0}
+                onClick={() => {
+                  setLiveOpen(false);
+                  onContinue();
+                }}
+                className="shrink-0 cursor-pointer rounded-xl bg-white px-6 py-3 text-base font-extrabold text-black hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {selected.length >= maxSelectable ? "Book these seats" : `Select ${maxSelectable - selected.length} more`}
+              </button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

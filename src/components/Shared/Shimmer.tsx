@@ -1035,12 +1035,12 @@ export function MovieDetailShimmer() {
   );
 }
 
-/** Movies listing grid — matches MOVIE_GRID_COLS (lg: 5 cols, 3/4 posters) */
+/** Movies listing grid — matches Now Showing MOVIE_GRID_COLS (2-up mobile, 5-up desktop) */
 export function MovieGridShimmer({ count = 10 }: { count?: number }) {
   return (
     <Wrap>
       <div
-        className="grid grid-cols-1 gap-y-5 sm:grid-cols-2 sm:gap-x-[1.15rem] sm:gap-y-5 lg:grid-cols-5 lg:gap-x-5 lg:gap-y-6"
+        className="grid grid-cols-2 gap-x-3 gap-y-5 sm:gap-x-[1.15rem] sm:gap-y-5 lg:grid-cols-5 lg:gap-x-5 lg:gap-y-6"
         aria-busy="true"
         aria-label="Loading movies"
       >
@@ -1052,9 +1052,13 @@ export function MovieGridShimmer({ count = 10 }: { count?: number }) {
             <div className="aspect-[3/4] overflow-hidden bg-slate-100">
               <Skeleton className="!block !h-full !w-full !rounded-none" height="100%" />
             </div>
-            <div className="space-y-1.5 px-2.5 py-2.5 sm:px-3 sm:py-3">
-              <Skeleton width="85%" height={14} />
-              <Skeleton width="55%" height={12} />
+            <div className="space-y-1 px-1.5 sm:px-2 pt-1.5 pb-2">
+              <div className="flex items-start justify-between gap-1">
+                <Skeleton width="72%" height={12} />
+                <Skeleton width="18%" height={11} />
+              </div>
+              <Skeleton width="48%" height={10} />
+              <Skeleton width="60%" height={10} />
             </div>
           </div>
         ))}

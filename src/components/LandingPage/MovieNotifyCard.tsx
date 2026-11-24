@@ -18,38 +18,32 @@ import {
 const cardShell =
   "bg-white border border-[#EAEAEA] rounded-2xl overflow-hidden shadow-[0_1px_3px_rgba(17,17,17,0.06)] hover:shadow-[0_8px_24px_rgba(17,17,17,0.1)] hover:-translate-y-0.5 transition-[box-shadow,transform] duration-300";
 
-function formatReviewsCount(count: number) {
-  if (count >= 1000) {
-    const k = count / 1000;
-    const label = Number.isInteger(k) ? `${k}k` : `${k.toFixed(1)}k`;
-    return `(${label})`;
-  }
-  return `(${count})`;
-}
-
 /**
  * Must-Watch movie card — status on poster; rating on title row (right);
  * genre meta, release date, CTA below.
  * Typography densifies inside 5-up AdaptiveCardRow slots.
+ * `listing` = 2-up Now Showing grid (BookMyShow-scale type on mobile).
  */
 export function MovieNotifyCard({
   movie,
   dense: denseProp,
+  listing = false,
 }: {
   movie: MustWatchMovieCard;
   /** Force compact type for 5-up grids outside AdaptiveCardRow. */
   dense?: boolean;
+  /** Now Showing / movies catalog 2-column grid. */
+  listing?: boolean;
 }) {
   const [imgFailed, setImgFailed] = useState(false);
   const adaptive = useAdaptiveCard();
-  const dense = denseProp ?? (adaptive?.minVisible ?? 0) >= 5;
+  const dense = listing ? true : denseProp ?? (adaptive?.minVisible ?? 0) >= 5;
   const showPoster = Boolean(movie.poster) && !imgFailed;
   const meta = movieDetailMeta(movie);
   // const releaseLabel = formatMovieReleaseLabel(movie.releaseDate);
   const comingSoon = Boolean(movie.comingSoon);
   const promoted = Boolean(movie.promoted);
   const rating = meta.rating;
-  const reviewsCount = Math.max(0, Number(movie.reviewsCount) || 0);
   const showRating = rating != null && !comingSoon;
   // const ctaClass =
   //   "shrink-0 inline-flex items-center gap-1.5 rounded-full border bg-white px-3 py-1.5 text-[12px] font-semibold tracking-wide text-[#1C1C1C] shadow-sm transition-colors border-[#D4C4A8] group-hover:border-[#B08D57]";
@@ -112,60 +106,64 @@ export function MovieNotifyCard({
 
         <div
           className={`flex flex-col min-w-0 ${
-            dense
-              ? "gap-0.5 px-2.5 pt-2 pb-2.5"
-              : "gap-0.5 sm:gap-1 px-2.5 sm:px-3.5 pt-2.5 sm:pt-3 pb-3 sm:pb-3.5"
+            listing
+              ? "gap-0.5 px-1.5 sm:px-2 pt-1.5 pb-2"
+              : dense
+                ? "gap-0.5 px-2.5 pt-2 pb-2.5"
+                : "gap-0.5 sm:gap-1 px-2.5 sm:px-3.5 pt-2.5 sm:pt-3 pb-3 sm:pb-3.5"
           }`}
         >
-          <div className={`flex items-start justify-between min-w-0 ${dense ? "gap-1" : "gap-1.5 sm:gap-2"}`}>
+          <div
+            className={`flex items-start justify-between min-w-0 ${
+              listing || dense ? "gap-1" : "gap-1.5 sm:gap-2"
+            }`}
+          >
             <h3
-              className={`min-w-0 flex-1 font-bold text-[#1C1C1C] break-words leading-snug line-clamp-2 tracking-wide ${
-                dense
-                  ? "text-[0.8125rem] sm:text-[0.875rem] lg:text-[0.9375rem]"
-                  : "text-[0.875rem] sm:text-base md:text-lg"
+              className={`min-w-0 flex-1 font-bold text-[#1C1C1C] break-words leading-snug line-clamp-2 ${
+                listing
+                  ? "text-[12px] sm:text-[13px] tracking-normal"
+                  : dense
+                    ? "text-[0.8125rem] sm:text-[0.875rem] lg:text-[0.9375rem] tracking-wide"
+                    : "text-[0.875rem] sm:text-base md:text-lg tracking-wide"
               }`}
             >
               {movie.title}
             </h3>
             {showRating ? (
               <span
-                className={`shrink-0 inline-flex items-center pt-0.5 ${dense ? "gap-0.5" : "gap-1"}`}
-                aria-label={`Rated ${rating.toFixed(1)}${reviewsCount > 0 ? ` from ${reviewsCount} reviews` : ""}`}
+                className={`shrink-0 inline-flex items-center pt-0.5 ${
+                  listing || dense ? "gap-0.5" : "gap-1"
+                }`}
+                aria-label={`Rated ${rating.toFixed(1)}`}
               >
                 <Star
-                  size={dense ? 11 : 13}
+                  size={listing ? 10 : dense ? 11 : 13}
                   className="fill-[#F5C518] text-[#F5C518]"
                   strokeWidth={0}
                 />
                 <span
                   className={`font-bold tabular-nums text-[#1C1C1C] leading-none ${
-                    dense ? "text-[11px] sm:text-xs" : "text-xs sm:text-sm"
+                    listing
+                      ? "text-[10px] sm:text-[11px]"
+                      : dense
+                        ? "text-[11px] sm:text-xs"
+                        : "text-xs sm:text-sm"
                   }`}
                 >
                   {rating.toFixed(1)}
                 </span>
-                {reviewsCount > 0 ? (
-                  <>
-                    <span className="hidden sm:inline text-gray-300 leading-none" aria-hidden>
-                      |
-                    </span>
-                    <span
-                      className={`hidden sm:inline font-medium tabular-nums text-gray-500 leading-none ${
-                        dense ? "text-[11px]" : "text-sm"
-                      }`}
-                    >
-                      {formatReviewsCount(reviewsCount)}
-                    </span>
-                  </>
-                ) : null}
               </span>
             ) : null}
           </div>
 
           {metaLine ? (
             <p
-              className={`min-w-0 tracking-wide text-gray-600 truncate leading-snug ${
-                dense ? "text-[11px] sm:text-xs" : "text-xs sm:text-sm"
+              className={`min-w-0 text-gray-600 truncate leading-snug ${
+                listing
+                  ? "text-[10px] sm:text-[11px] tracking-normal"
+                  : dense
+                    ? "text-[11px] sm:text-xs tracking-wide"
+                    : "text-xs sm:text-sm tracking-wide"
               }`}
             >
               {metaLine}

@@ -311,10 +311,111 @@ function ovalTrackBlocks(): UniversalVenueObject[] {
   return out;
 }
 
+/**
+ * Make every block hold exactly `target` seats: tighten the seat and row gaps until at least `target` fit,
+ * then take out the surplus seats from the back of the last rows.
+ */
+function exactSeatsPerBlock(blocks: UniversalVenueObject[], target: number): UniversalVenueObject[] {
+  return blocks.map((b) => {
+    const baseGap = b.seatSpacing || 16;
+    const baseRow = b.rowSpacing || 18;
+    let chosen: UniversalVenueObject = b;
+    let count = 0;
+    for (let k = 1.6; k >= 0.25; k -= 0.02) {
+      const probe = { ...b, seatSpacing: Math.round(baseGap * k * 100) / 100, rowSpacing: Math.round(baseRow * k * 100) / 100 } as UniversalVenueObject;
+      const n = generateSeatsForObject(probe, []).length;
+      if (n >= target) {
+        chosen = probe;
+        count = n;
+        break;
+      }
+    }
+    if (count > target) {
+      const all = generateSeatsForObject(chosen, []);
+      const surplus = all.slice(target);
+      const overrides: Record<string, { removed: boolean }> = {};
+      surplus.forEach((seat) => {
+        if (seat.slotKey) overrides[seat.slotKey] = { removed: true };
+      });
+      chosen = { ...chosen, seatOverrides: overrides } as UniversalVenueObject;
+    }
+    return chosen;
+  });
+}
+
+/** Narendra Modi Stadium (Ahmedabad): a round cricket ground, an inner bowl of 12 blocks and an outer bowl of 9 blocks, 100 seats each */
+export const NARENDRA_MODI_BLOCKS: Array<{ name: string; ring: "inner" | "outer"; centre: number; half: number; color: string; level: string; price: number }> = [
+  { name: "North Corporate Box", ring: "inner", centre: 0, half: 13.5, color: "#f4a6b8", level: "Inner bowl", price: 4500 },
+  { name: "Block E", ring: "inner", centre: 30, half: 13.5, color: "#f5a24b", level: "Inner bowl", price: 3000 },
+  { name: "Block F", ring: "inner", centre: 60, half: 13.5, color: "#f5a24b", level: "Inner bowl", price: 3000 },
+  { name: "Block G", ring: "inner", centre: 90, half: 13.5, color: "#f5a24b", level: "Inner bowl", price: 3000 },
+  { name: "Block H", ring: "inner", centre: 120, half: 13.5, color: "#f5a24b", level: "Inner bowl", price: 3000 },
+  { name: "South Premium East", ring: "inner", centre: 150, half: 13.5, color: "#f7b567", level: "Inner bowl", price: 4500 },
+  { name: "South Premium Centre", ring: "inner", centre: 180, half: 13.5, color: "#f7b567", level: "Inner bowl", price: 4500 },
+  { name: "South Premium West", ring: "inner", centre: 210, half: 13.5, color: "#f7b567", level: "Inner bowl", price: 4500 },
+  { name: "Block A", ring: "inner", centre: 240, half: 13.5, color: "#f5a24b", level: "Inner bowl", price: 3000 },
+  { name: "Block B", ring: "inner", centre: 270, half: 13.5, color: "#f5a24b", level: "Inner bowl", price: 3000 },
+  { name: "Block C", ring: "inner", centre: 300, half: 13.5, color: "#f5a24b", level: "Inner bowl", price: 3000 },
+  { name: "Block D", ring: "inner", centre: 330, half: 13.5, color: "#f5a24b", level: "Inner bowl", price: 3000 },
+  { name: "Block N", ring: "outer", centre: 0, half: 18, color: "#2f6fd6", level: "Outer bowl", price: 1500 },
+  { name: "Block P", ring: "outer", centre: 40, half: 18, color: "#9b6fd0", level: "Outer bowl", price: 1500 },
+  { name: "Block Q", ring: "outer", centre: 80, half: 18, color: "#4cc15a", level: "Outer bowl", price: 1200 },
+  { name: "Block R", ring: "outer", centre: 120, half: 18, color: "#ef5da8", level: "Outer bowl", price: 1200 },
+  { name: "Bay Gallery", ring: "outer", centre: 160, half: 18, color: "#9aa3b2", level: "Outer bowl", price: 2500 },
+  { name: "Block J", ring: "outer", centre: 200, half: 18, color: "#ef5da8", level: "Outer bowl", price: 1200 },
+  { name: "Block K", ring: "outer", centre: 240, half: 18, color: "#4cc15a", level: "Outer bowl", price: 1200 },
+  { name: "Block L", ring: "outer", centre: 280, half: 18, color: "#b08be0", level: "Outer bowl", price: 1500 },
+  { name: "Block M", ring: "outer", centre: 320, half: 18, color: "#52cfe0", level: "Outer bowl", price: 1500 },
+];
+
+function narendraModiObjects(): UniversalVenueObject[] {
+  const ring = { inner: [300, 395], outer: [418, 520] } as const;
+  const circle = (r: number) => Array.from({ length: 48 }, (_, i) => [Math.round(r * Math.cos((i / 48) * Math.PI * 2)), Math.round(r * Math.sin((i / 48) * Math.PI * 2))]).flat();
+  const base: UniversalVenueObject[] = [
+    { id: "shp_ground", name: "Ground", type: "shape", shapeKind: "polygon", points: circle(285), x: CX, y: CY, width: 200, height: 120, rotation: 0, color: "#2f8f3f", label: "", opacity: 0.95 } as UniversalVenueObject,
+    { id: "shp_pitch", name: "Pitch", type: "shape", shapeKind: "polygon", points: [-9, -48, 9, -48, 9, 48, -9, 48], x: CX, y: CY, width: 200, height: 120, rotation: 0, color: "#d8c08a", label: "", opacity: 1 } as UniversalVenueObject,
+  ];
+  const blocks = NARENDRA_MODI_BLOCKS.map((b) => {
+    const [ri, ro] = ring[b.ring];
+    const raw = arcSectorPoints(0, 0, ri, ro, b.centre - 90 - b.half, b.centre - 90 + b.half, 8);
+    const r = recentre(raw);
+    return {
+      id: `blk_${b.name.toLowerCase().replace(/[^a-z0-9]+/g, "_")}`,
+      name: b.name,
+      type: "block",
+      x: Math.round(CX + r.cx),
+      y: Math.round(CY + r.cy),
+      width: 200,
+      height: 120,
+      rotation: 0,
+      color: b.color,
+      price: b.price,
+      level: b.level,
+      points: r.points.map((v) => Math.round(v)),
+      blockRowMode: "arc",
+      blockArcCenter: [Math.round(-r.cx), Math.round(-r.cy)],
+      seatSpacing: 16,
+      rowSpacing: 18,
+      blockInset: 8,
+      showSeatNumbers: true,
+    } as UniversalVenueObject;
+  });
+  return [...base, ...exactSeatsPerBlock(blocks, 100)];
+}
+
 const GROUND = GROUND_PRESETS.find((g) => g.id === "oval-ground")!;
 const T_STAGE = GROUND_PRESETS.find((g) => g.id === "t-stage")!;
 
 export const UNIVERSAL_TEMPLATES: UniversalTemplateDef[] = [
+  // Narendra Modi Stadium, Ahmedabad
+  {
+    id: "stadium_narendra_modi",
+    name: "Narendra Modi Stadium (Cricket, 21 blocks of 100 seats)",
+    venueType: "stadium_cricket",
+    badge: "Blocks",
+    description: "Round cricket ground with an inner bowl of 12 blocks (A to H, corporate and south premium) and an outer bowl of 9 blocks (J to R and the bay gallery). Every block has 100 seats.",
+    objects: narendraModiObjects(),
+  },
   // 0d. Oval stadium: ground, running track, lower and upper rings of 40 × 30 blocks
   {
     id: "stadium_oval_track_40x30",
@@ -489,6 +590,51 @@ export const UNIVERSAL_TEMPLATES: UniversalTemplateDef[] = [
         opacity: 0.95,
       },
       ...trackStadiumBlocks(),
+    ],
+  },
+
+  // 0b. Oval (racetrack) stadium with exactly 100 seats in every block
+  {
+    id: "stadium_oval_rings_100",
+    name: "Oval Stadium (Lower & Upper Rings, 100 seats per block)",
+    venueType: "stadium_football",
+    badge: "Blocks",
+    description: "Pill-shaped ground with a pitch, a lower ring of 14 blocks and an upper ring of 18 blocks. Every block has exactly 100 seats. Tap a block to see its seats.",
+    objects: [
+      {
+        id: "shp_pill_ground",
+        name: "Ground",
+        type: "shape",
+        shapeKind: "polygon",
+        points: roundedRectPoints(980, 380, 190, 10).map((v) => Math.round(v)),
+        x: CX,
+        y: CY,
+        width: 200,
+        height: 120,
+        rotation: 0,
+        color: "#4d8f3a",
+        label: "",
+        opacity: 0.95,
+      },
+      {
+        id: "shp_pitch",
+        name: "Pitch",
+        type: "shape",
+        shapeKind: "polygon",
+        points: [-250, -110, 250, -110, 250, 110, -250, 110],
+        x: CX,
+        y: CY,
+        width: 200,
+        height: 120,
+        rotation: 0,
+        color: "#6aa84f",
+        label: "PITCH",
+        textColor: "#ffffff",
+        fontSize: 16,
+        opacity: 0.95,
+      },
+      ...exactSeatsPerBlock(pillRing({ prefix: "Lower", level: "Lower stand", a: 205, b: 300, half: 300, straight: 4, caps: 3, color: "#7c3aed", price: 2500 }), 100),
+      ...exactSeatsPerBlock(pillRing({ prefix: "Upper", level: "Upper stand", a: 315, b: 410, half: 300, straight: 5, caps: 4, color: "#2563eb", price: 1200 }), 100),
     ],
   },
 

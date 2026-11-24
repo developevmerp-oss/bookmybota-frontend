@@ -116,6 +116,11 @@ const VenueLayoutViewer = dynamic(
   { ssr: false }
 );
 
+const BlockSeatPicker = dynamic(
+  () => import("@/components/EventLandingPage/BlockSeatPicker"),
+  { ssr: false }
+);
+
 const StadiumLayoutViewer = dynamic(
   () => import("@/components/EventLandingPage/StadiumLayoutViewer"),
   { ssr: false }
@@ -408,6 +413,9 @@ export default function EventCheckout({
   const isStadiumLayout =
     seatingConfig?.layout_mode === "stadium" ||
     (Array.isArray(seatingConfig?.blocks) && seatingConfig.blocks.length > 0);
+
+  // Stadiums and halls drawn as blocks get the section picker (map, then seats, then a view from the seat)
+  const isBlockLayout = seatingConfig?.layout_mode === "universal_blocks";
 
   const [createEventBooking] = useCreateEventBookingMutation();
   const [createEventSeatHold] = useCreateEventSeatHoldMutation();
@@ -3386,7 +3394,15 @@ export default function EventCheckout({
           <div className="flex-1 min-h-0 overflow-hidden flex flex-col bg-white">
             {seatViewMode === "canvas" || isStadiumLayout ? (
               <div className="flex-1 min-h-0 h-full w-full">
-                {isStadiumLayout ? (
+                {isBlockLayout ? (
+                  <BlockSeatPicker
+                    layoutData={activeLayoutData}
+                    ticketTypes={ticketTypes}
+                    onSeatsSelected={handleMapSeatsSelected}
+                    initialSelectedSeats={selectedSeats}
+                    maxSelectable={desiredSeatQty ?? undefined}
+                  />
+                ) : isStadiumLayout ? (
                   <StadiumLayoutViewer
                     eventId={event.id}
                     ticketTypes={Array.from(

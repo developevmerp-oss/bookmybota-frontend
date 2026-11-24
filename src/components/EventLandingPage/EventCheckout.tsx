@@ -118,7 +118,8 @@ const VenueLayoutViewer = dynamic(
 );
 
 const EventClassicSeatPicker = dynamic(() => import("@/components/EventLandingPage/EventClassicSeatPicker"), { ssr: false });
-const EventTieredSeatPicker = dynamic(() => import("@/components/EventLandingPage/EventTieredSeatPicker"), { ssr: false });
+const EventPlanSeatPicker = dynamic(() => import("@/components/EventLandingPage/EventPlanSeatPicker"), { ssr: false });
+const EventGeoSeatPicker = dynamic(() => import("@/components/EventLandingPage/EventGeoSeatPicker"), { ssr: false });
 const StadiumLayoutViewer = dynamic(
   () => import("@/components/EventLandingPage/StadiumLayoutViewer"),
   { ssr: false }
@@ -3420,7 +3421,16 @@ export default function EventCheckout({
                     maxSelectable={desiredSeatQty ?? undefined}
                     hideBookingBar
                   />
-                ) : classicSeats.length > 0 && isStraightRowLayout(classicSeats) ? (
+                ) : classicSeats.length > 0 && (((activeLayoutData as any)?.data?.seating_config ?? (activeLayoutData as any)?.seating_config)?.layout_style === "plan") ? (
+                  <EventPlanSeatPicker
+                    plan={((activeLayoutData as any)?.data?.seating_config ?? (activeLayoutData as any)?.seating_config).plan}
+                    seats={classicSeats}
+                    selected={selectedSeats}
+                    maxSelectable={desiredSeatQty ?? undefined}
+                    onSeatsSelected={handleMapSeatsSelected}
+                    ticketTypes={[...ticketTypes, ...allTicketTypes]}
+                  />
+                ) : classicSeats.length > 0 && isStraightRowLayout(classicSeats) && !(((activeLayoutData as any)?.data?.seating_config ?? (activeLayoutData as any)?.seating_config)?.decks?.length) ? (
                   <EventClassicSeatPicker
                     seats={classicSeats}
                     selected={selectedSeats}
@@ -3428,16 +3438,17 @@ export default function EventCheckout({
                     onSeatsSelected={handleMapSeatsSelected}
                   />
                 ) : classicSeats.length > 0 ? (
-                  <EventTieredSeatPicker
+                  <EventGeoSeatPicker
                     seats={classicSeats}
                     selected={selectedSeats}
                     maxSelectable={desiredSeatQty ?? undefined}
                     onSeatsSelected={handleMapSeatsSelected}
                     ticketTypes={[...ticketTypes, ...allTicketTypes]}
-                    stageCenter={(() => {
+                    decksConfig={((activeLayoutData as any)?.data?.seating_config ?? (activeLayoutData as any)?.seating_config)?.decks}
+                    stage={(() => {
                       const shapes: any[] = ((activeLayoutData as any)?.data?.seating_config ?? (activeLayoutData as any)?.seating_config)?.shapes || [];
                       const st = shapes.find((h) => /stage/i.test(String(h?.text || "")));
-                      return st ? { x: Number(st.x) + (Number(st.width) || 0) / 2, y: Number(st.y) + (Number(st.height) || 0) / 2 } : null;
+                      return st ? { x: Number(st.x), y: Number(st.y), width: Number(st.width) || 0, height: Number(st.height) || 0 } : null;
                     })()}
                   />
                 ) : (

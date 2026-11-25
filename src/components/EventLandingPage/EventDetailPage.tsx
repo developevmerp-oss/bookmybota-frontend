@@ -121,7 +121,7 @@ function MetaRow({ icon, children }: { icon: ReactNode; children: ReactNode }) {
   return (
     <div className="flex items-start gap-2.5 sm:gap-3 py-2 sm:py-2.2">
       <span className="mt-0.5 w-5 shrink-0 text-gray-800 flex justify-center">{icon}</span>
-      <div className="min-w-0 text-[1rem] sm:text-[1.0625rem] lg:text-[1rem]  text-gray-600 leading-snug break-words">
+      <div className="min-w-0 text-[0.8125rem] sm:text-sm lg:text-[1rem] text-gray-600 leading-snug break-words">
         {children}
       </div>
     </div>
@@ -148,7 +148,7 @@ function AboutBody({
       {paragraphs.map((para, index) => (
         <p
           key={index}
-          className="text-[1rem] sm:text-[1.0625rem] lg:text-[1rem] leading-6 sm:leading-[1.55] text-[#5A5A5A]"
+          className="text-[0.8125rem] sm:text-sm lg:text-[1rem] leading-5 sm:leading-6 lg:leading-[1.55] text-[#5A5A5A]"
         >
           {para}
           {index === paragraphs.length - 1 ? trailing : null}
@@ -628,7 +628,7 @@ export default function PublicEventDetailPage({
               <button
                 type="button"
                 onClick={() => setVenuesOpen(true)}
-                className="block mt-1.5 text-[1rem] sm:text-[1.0625rem] font-semibold cursor-pointer"
+                className="block mt-1.5 text-[0.8125rem] sm:text-sm lg:text-[1rem] font-semibold cursor-pointer"
                 style={{ color: BRAND }}
               >
                 View {otherVenues.length} Other Venue{otherVenues.length === 1 ? "" : "s"}
@@ -639,7 +639,7 @@ export default function PublicEventDetailPage({
       </div>
 
       {fillingFast && (
-        <div className="mx-3 sm:mx-4 mb-3 flex items-start sm:items-center gap-2 rounded-md bg-[#FFF6E5] px-3 py-2 text-[0.875rem] sm:text-[0.9375rem] text-[#6B4E16]">
+        <div className="mx-3 sm:mx-4 mb-3 flex items-start sm:items-center gap-2 rounded-md bg-[#FFF6E5] px-3 py-2 text-xs sm:text-[0.8125rem] lg:text-[0.9375rem] text-[#6B4E16]">
           <Info size={14} className="shrink-0 mt-0.5 sm:mt-0" />
           <span>
             Bookings are filling fast
@@ -742,7 +742,7 @@ export default function PublicEventDetailPage({
                 {categoryBadges.map((badge) => (
                   <span
                     key={badge}
-                    className="inline-flex shrink-0 items-center rounded-2xl border border-gray-300 bg-white text-gray-800 text-[0.875rem] sm:text-[0.9375rem] font-semibold px-3 sm:px-3.5 py-1.5"
+                    className="inline-flex shrink-0 items-center rounded-2xl border border-gray-300 bg-white text-gray-800 text-xs sm:text-[0.8125rem] lg:text-[0.9375rem] font-semibold px-2.5 sm:px-3 lg:px-3.5 py-1 sm:py-1.5"
                   >
                     {badge}
                   </span>
@@ -805,8 +805,8 @@ export default function PublicEventDetailPage({
             <div className="lg:hidden mt-3.5 sm:mt-4 rounded-2xl border border-[#E8E8E8] bg-white px-4 py-3 shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
               {saved ? (
                 <div className="flex items-center justify-between gap-3 min-w-0">
-                  <span className="inline-flex items-center gap-2 text-[0.9375rem] sm:text-[1rem] font-medium text-[#333333] min-w-0">
-                    <ThumbsUp size={17} className="text-[#2E7D32] shrink-0" fill="#2E7D32" />
+                  <span className="inline-flex items-center gap-2 text-[0.8125rem] sm:text-sm font-medium text-[#333333] min-w-0">
+                    <ThumbsUp size={16} className="text-[#2E7D32] shrink-0" fill="#2E7D32" />
                     <span className="truncate">
                       {interestCount <= 1
                         ? "You are interested"
@@ -817,7 +817,7 @@ export default function PublicEventDetailPage({
                     type="button"
                     onClick={undoInterest}
                     disabled={isTogglingInterest}
-                    className="shrink-0 rounded-lg border px-3.5 py-1.5 text-[0.875rem] sm:text-[0.9375rem] font-semibold cursor-pointer disabled:opacity-60 hover:bg-[#FBF6E8] transition-colors"
+                    className="shrink-0 rounded-lg border px-3 sm:px-3.5 py-1.5 text-xs sm:text-[0.8125rem] font-semibold cursor-pointer disabled:opacity-60 hover:bg-[#FBF6E8] transition-colors"
                     style={{
                       color: "#B59B2A",
                       borderColor: "#B59B2A",
@@ -830,8 +830,8 @@ export default function PublicEventDetailPage({
               ) : (
                 <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0 flex items-center gap-2">
-                    <ThumbsUp size={16} className="text-[#2E7D32] shrink-0" fill="#2E7D32" />
-                    <span className="text-[0.9375rem] sm:text-[1rem] font-medium text-[#333333] truncate">
+                    <ThumbsUp size={15} className="text-[#2E7D32] shrink-0" fill="#2E7D32" />
+                    <span className="text-[0.8125rem] sm:text-sm font-medium text-[#333333] truncate">
                       {interestCount > 0
                         ? `${interestCountLabel} interested`
                         : "Mark yourself interested"}
@@ -841,7 +841,7 @@ export default function PublicEventDetailPage({
                     type="button"
                     onClick={toggleSave}
                     disabled={isTogglingInterest}
-                    className="shrink-0 rounded-lg border px-3.5 sm:px-4 py-1.5 sm:py-2 text-[0.875rem] sm:text-[0.9375rem] font-semibold cursor-pointer disabled:opacity-60 hover:bg-[#FBF6E8] transition-colors"
+                    className="shrink-0 rounded-lg border px-3 sm:px-3.5 py-1.5 text-xs sm:text-[0.8125rem] font-semibold cursor-pointer disabled:opacity-60 hover:bg-[#FBF6E8] transition-colors"
                     style={{
                       color: "#B59B2A",
                       borderColor: "#B59B2A",
@@ -856,7 +856,7 @@ export default function PublicEventDetailPage({
 
             {aboutText && (
               <section className="mt-6 sm:mt-8 lg:mt-9">
-                <h2 className="text-[1.25rem] sm:text-[1.375rem] lg:text-[1.4rem] font-semibold text-[#1A1A1A] mb-2 sm:mb-2.5">
+                <h2 className="text-[1.0625rem] sm:text-lg lg:text-[1.4rem] font-semibold text-[#1A1A1A] mb-2 sm:mb-2.5">
                   About The Event
                 </h2>
                 <AboutBody
@@ -882,7 +882,7 @@ export default function PublicEventDetailPage({
 
             {!hasLayout && ticketTypesDisplay.length > 0 && (
               <section className="mt-6 sm:mt-8 lg:mt-9">
-                <h2 className="text-[1.25rem] sm:text-[1.375rem] lg:text-[1.4rem] font-semibold text-[#1A1A1A] mb-2.5 sm:mb-2">
+                <h2 className="text-[1.0625rem] sm:text-lg lg:text-[1.4rem] font-semibold text-[#1A1A1A] mb-2.5 sm:mb-2">
                   Tickets
                 </h2>
                 <ul className="divide-y divide-[#EEE] rounded-xl border border-[#E8E8E8] overflow-hidden">
@@ -892,14 +892,14 @@ export default function PublicEventDetailPage({
                       className="flex items-start justify-between gap-3 px-3.5 sm:px-4 py-3 sm:py-3.5 bg-white"
                     >
                       <div className="min-w-0">
-                        <p className="font-semibold text-[#1A1A1A] text-[1rem] sm:text-[1.0625rem]">
+                        <p className="font-semibold text-[#1A1A1A] text-sm sm:text-[0.9375rem] lg:text-[1.0625rem]">
                           {t.ticket_type}
                         </p>
-                        <p className="mt-0.5 text-[0.875rem] sm:text-[0.9375rem] text-[#6B6B6B]">
+                        <p className="mt-0.5 text-xs sm:text-[0.8125rem] lg:text-[0.9375rem] text-[#6B6B6B]">
                           Max {t.max_per_order} per order
                         </p>
                       </div>
-                      <p className="shrink-0 font-semibold text-[#1A1A1A] text-[1rem] sm:text-[1.0625rem]">
+                      <p className="shrink-0 font-semibold text-[#1A1A1A] text-sm sm:text-[0.9375rem] lg:text-[1.0625rem]">
                         {formatMoney(t.price, { compact: true })}
                       </p>
                     </li>
@@ -910,7 +910,7 @@ export default function PublicEventDetailPage({
 
             {artistGroups.map((group) => (
             <section key={group.title} className="mt-6 sm:mt-8 lg:mt-9">
-              <h2 className="text-[1.25rem] sm:text-[1.375rem] lg:text-[1.4rem] font-semibold text-[#1A1A1A] mb-2.5 sm:mb-2">
+              <h2 className="text-[1.0625rem] sm:text-lg lg:text-[1.4rem] font-semibold text-[#1A1A1A] mb-2.5 sm:mb-2">
                 {group.title}
               </h2>
               <div className="flex gap-3 sm:gap-4 lg:gap-5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -938,11 +938,11 @@ export default function PublicEventDetailPage({
                         fallback={<ArtistImageFallback size={36} />}
                       />
                     </div>
-                    <p className="mt-1.5 sm:mt-2 font-bold text-[#1A1A1A] text-[1rem] sm:text-[1.0625rem] leading-snug">
+                    <p className="mt-1.5 sm:mt-2 font-bold text-[#1A1A1A] text-sm sm:text-[0.9375rem] lg:text-[1.0625rem] leading-snug">
                       {artist.name}
                     </p>
                     {artist.role && (
-                      <p className="mt-0.5 text-[0.875rem] sm:text-[1rem] text-[#8A8A8A]">{artist.role}</p>
+                      <p className="mt-0.5 text-xs sm:text-[0.8125rem] lg:text-[0.9375rem] text-[#8A8A8A]">{artist.role}</p>
                     )}
                     {artist.unauthorized && (
                       <p className="mt-0.5 text-[0.6875rem] sm:text-xs text-[#9AA0A6] leading-snug">
@@ -957,7 +957,7 @@ export default function PublicEventDetailPage({
 
           {offers.length > 0 && (
               <section className="mt-6 sm:mt-8 lg:mt-9">
-                <h2 className="text-[1.25rem] sm:text-[1.375rem] lg:text-[1.5rem] font-bold text-[#1A1A1A] mb-2.5 sm:mb-3">
+                <h2 className="text-[1.0625rem] sm:text-lg lg:text-[1.5rem] font-bold text-[#1A1A1A] mb-2.5 sm:mb-3">
                   Offers
               </h2>
                 <ul className="space-y-2.5 sm:space-y-3">
@@ -966,13 +966,13 @@ export default function PublicEventDetailPage({
                     key={o.id}
                       className="rounded-xl border border-dashed border-[#E3BCFF] bg-[#FBF6FF] p-3.5 sm:p-4"
                   >
-                      <p className="font-bold text-[#1A1A1A] text-[1rem] sm:text-[1.0625rem] lg:text-[1.125rem]">{o.title}</p>
+                      <p className="font-bold text-[#1A1A1A] text-sm sm:text-[0.9375rem] lg:text-[1.125rem]">{o.title}</p>
                     {o.description && (
-                        <p className="text-[1rem] sm:text-[1.0625rem] text-slate-600 mt-1">{o.description}</p>
+                        <p className="text-xs sm:text-[0.875rem] lg:text-[1rem] text-slate-600 mt-1">{o.description}</p>
                     )}
-                      <p className="text-[1rem] sm:text-[1.0625rem] font-bold mt-2" style={{ color: BRAND }}>
+                      <p className="text-xs sm:text-[0.875rem] lg:text-[1rem] font-bold mt-2" style={{ color: BRAND }}>
                       {o.discount_type === "PERCENT"
-                        ? `${o.discount_value}% off`
+                        ? `${Number.isFinite(Number(o.discount_value)) ? Number(o.discount_value) : o.discount_value}% off`
                         : formatOfferDiscount(o.discount_type, o.discount_value)}
                       {o.promo_code ? ` · Use code ${o.promo_code}` : ""}
                     </p>
@@ -990,17 +990,17 @@ export default function PublicEventDetailPage({
                 onClick={() => setTermsOpen(true)}
                 className="mt-3 sm:mt-4 flex w-full items-center justify-between py-3.5 sm:py-4 border-t border-slate-200 cursor-pointer"
               >
-                <span className="text-[1.125rem] sm:text-[1.25rem] font-bold text-[#1A1A1A]">Terms &amp; Conditions</span>
+                <span className="text-[0.9375rem] sm:text-base lg:text-[1.25rem] font-bold text-[#1A1A1A]">Terms &amp; Conditions</span>
                 <ChevronRight size={18} className="text-slate-400 shrink-0" />
               </button>
             )}
 
             {related.length > 0 && (
               <section className="mt-8 sm:mt-10 pt-6 sm:pt-7 border-t border-slate-200 min-w-0">
-                <h2 className="text-[1.25rem] sm:text-[1.375rem] lg:text-[1.4rem] font-semibold text-[#1A1A1A]">
+                <h2 className="text-[1.0625rem] sm:text-lg lg:text-[1.4rem] font-semibold text-[#1A1A1A]">
                   You May Also Like
                 </h2>
-                <p className="text-[0.9375rem] sm:text-[1rem] text-[#6B6B6B] mt-1 mb-3.5 sm:mb-4">
+                <p className="text-xs sm:text-sm lg:text-[1rem] text-[#6B6B6B] mt-1 mb-3.5 sm:mb-4">
                   Events around you, book now.
                 </p>
                 <div className="relative min-w-0">
@@ -1065,7 +1065,7 @@ export default function PublicEventDetailPage({
         >
           <div className="min-w-0 flex-1 overflow-hidden">
             {minPrice != null && Number.isFinite(minPrice) && (
-              <p className="text-[0.9375rem] sm:text-[1rem] leading-tight whitespace-nowrap">
+              <p className="text-sm sm:text-[0.9375rem] leading-tight whitespace-nowrap">
                 <span className="font-bold text-[#1A1A1A]">
                   {formatMoney(minPrice, { compact: true })}
                 </span>{" "}
@@ -1073,7 +1073,7 @@ export default function PublicEventDetailPage({
               </p>
             )}
             {fillingFast && (
-              <p className="mt-0.5 text-[0.8125rem] sm:text-[0.875rem] font-semibold text-[#C47A2C]">
+              <p className="mt-0.5 text-xs sm:text-[0.8125rem] font-semibold text-[#C47A2C]">
                 Filling Fast
               </p>
             )}
@@ -1082,7 +1082,7 @@ export default function PublicEventDetailPage({
             type="button"
             disabled={!canBook}
             onClick={() => openCheckout()}
-            className={`shrink-0 min-w-[7.5rem] px-5 sm:px-6 py-2.5 rounded-[0.5rem] text-[0.9375rem] sm:text-[1rem] ${
+            className={`shrink-0 min-w-[7.5rem] px-5 sm:px-6 py-2.5 rounded-[0.5rem] text-sm sm:text-[0.9375rem] ${
               canBook ? "bg-[#111111] text-white" : "bg-slate-200 text-slate-500 !opacity-100"
             }`}
           >
@@ -1098,7 +1098,7 @@ export default function PublicEventDetailPage({
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-bold text-[#1A1A1A] text-[1.125rem] sm:text-[1.25rem]">Share this event</h3>
+              <h3 className="font-bold text-[#1A1A1A] text-base sm:text-lg lg:text-[1.25rem]">Share this event</h3>
               <button type="button" onClick={() => setShareOpen(false)} className="cursor-pointer text-slate-500">
                 <FaTimes />
               </button>
@@ -1233,7 +1233,7 @@ export default function PublicEventDetailPage({
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-4 px-5 sm:px-8 pt-5 sm:pt-7 pb-2">
-              <h2 id="event-terms-title" className="text-[1.375rem] sm:text-[1.625rem] lg:text-[1.875rem] font-extrabold text-[#333] leading-tight pr-8">
+              <h2 id="event-terms-title" className="text-lg sm:text-xl lg:text-[1.875rem] font-extrabold text-[#333] leading-tight pr-8">
                 Terms &amp; Conditions
               </h2>
               <button
@@ -1247,7 +1247,7 @@ export default function PublicEventDetailPage({
             </div>
             <div className="overflow-y-auto px-5 sm:px-8 pb-6 sm:pb-8 pt-3 max-h-[calc(90vh-5rem)] sm:max-h-[calc(85vh-5.5rem)] space-y-1.5">
               {termLines.map((line, i) => (
-                <p key={`${i}-${line.slice(0, 24)}`} className="text-[1rem] sm:text-[1.0625rem] lg:text-[1.125rem] leading-7 sm:leading-[1.7] text-[#4A4A4A]">
+                <p key={`${i}-${line.slice(0, 24)}`} className="text-sm sm:text-[0.9375rem] lg:text-[1.125rem] leading-6 sm:leading-7 lg:leading-[1.7] text-[#4A4A4A]">
                   {line}
                 </p>
               ))}

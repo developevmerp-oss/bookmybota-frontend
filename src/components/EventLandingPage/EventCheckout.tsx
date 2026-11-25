@@ -406,9 +406,10 @@ export default function EventCheckout({
   const { data: publicEventOffers = [] } = useGetPublicEventOffersQuery(event.id, {
     skip: isOrganizer || !event.id,
   });
-  const { data: activePlatformOffers = [] } = useGetActivePlatformOffersQuery(undefined, {
-    skip: isOrganizer,
-  });
+  const { data: activePlatformOffers = [] } = useGetActivePlatformOffersQuery(
+    { customer_id: customerId || null },
+    { skip: isOrganizer }
+  );
   const layoutArg = useMemo(() => {
     return sessionToken ? { eventId: event.id, session_token: sessionToken } : event.id;
   }, [event.id, sessionToken]);
@@ -4075,7 +4076,8 @@ export default function EventCheckout({
                   {
                     (activePlatformOffers || []).filter((p: any) => {
                       const cat = String(p.category || "").toUpperCase();
-                      return cat === "ALL" || cat === "EVENTS";
+                      const statusOk = !p.effective_status || p.effective_status === "ACTIVE";
+                      return statusOk && (cat === "ALL" || cat === "EVENTS");
                     }).length
                   }
                   )
@@ -4103,7 +4105,8 @@ export default function EventCheckout({
                   const platformOffersFormatted = (activePlatformOffers || [])
                     .filter((p: any) => {
                       const cat = String(p.category || "").toUpperCase();
-                      return cat === "ALL" || cat === "EVENTS";
+                      const statusOk = !p.effective_status || p.effective_status === "ACTIVE";
+                      return statusOk && (cat === "ALL" || cat === "EVENTS");
                     })
                     .map((p: any) => {
                       const discountType = String(p.discount_type || "").toUpperCase();

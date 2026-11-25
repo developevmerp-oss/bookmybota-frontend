@@ -10,10 +10,10 @@ import {
   Laugh,
   Mic2,
   Music,
+  Sparkles,
   Ticket,
   Trophy,
   UtensilsCrossed,
-  WandSparkles,
   type LucideIcon,
 } from "lucide-react";
 import { HiArrowRight } from "react-icons/hi";
@@ -33,24 +33,18 @@ type SubNavTab = {
   match?: string;
   key?: string;
   variant?: "link" | "cta";
-};
-
-/** Mobile/tablet only — first tab, links to landing page (desktop unchanged). */
-const FOR_YOU_TAB: SubNavTab = {
-  label: "For you",
-  href: "/",
-  match: "home",
-  Icon: WandSparkles,
+  mobileOnly?: boolean;
 };
 
 const TABS: SubNavTab[] = [
+  { label: "For you", href: "/", match: "home", Icon: Sparkles, mobileOnly: true },
   { label: "Dining", href: "/dining", match: "dining", Icon: UtensilsCrossed },
+  { label: "Movie", href: "/movies", match: "movie", Icon: Clapperboard },
   { label: "Events", href: "/events", match: "events", Icon: CalendarDays },
+  { label: "Sports", key: "sports", Icon: Trophy },
   { label: "Concert", key: "concert", Icon: Mic2 },
   { label: "Comedy", key: "comedy", Icon: Laugh },
   { label: "Music", key: "music", Icon: Music },
-  { label: "Movie", href: "/movies", match: "movie", Icon: Clapperboard },
-  { label: "Sports", key: "sports", Icon: Trophy },
   { label: "Venues", href: "/venues", match: "venues", Icon: Building2 },
   { label: "Artists", href: "/artists", match: "artists", Icon: Mic2 },
   { label: "List Your Show", href: "/list-your-show", match: "list-your-show", Icon: Ticket, variant: "cta" },
@@ -144,28 +138,24 @@ export default function SubNavBar({ isStickyChrome = false }: SubNavBarProps) {
   const isLandingPage = pathname === "/";
   const [city, setCity] = useState("");
   const [detailEventCategory, setDetailEventCategory] = useState("");
-  const [lastEventCategory, setLastEventCategory] = useState("");
+  const [lastEventSource, setLastEventSource] = useState("");
 
   useEffect(() => {
     try {
       if (pathname === "/events") {
-        if (activeSlug) {
-          sessionStorage.setItem("bmb_last_event_category", activeSlug);
-          setLastEventCategory(activeSlug);
-        } else {
-          sessionStorage.removeItem("bmb_last_event_category");
-          setLastEventCategory("");
-        }
+        const source = activeSlug || (q ? q : "events");
+        sessionStorage.setItem("bmb_last_event_source", source);
+        setLastEventSource(source);
       } else if (pathname.startsWith("/events/")) {
-        setLastEventCategory(sessionStorage.getItem("bmb_last_event_category") || "");
+        setLastEventSource(sessionStorage.getItem("bmb_last_event_source") || "");
       } else {
-        sessionStorage.removeItem("bmb_last_event_category");
-        setLastEventCategory("");
+        sessionStorage.removeItem("bmb_last_event_source");
+        setLastEventSource("");
       }
     } catch {
       /* ignore */
     }
-  }, [pathname, activeSlug]);
+  }, [pathname, activeSlug, q]);
 
   useEffect(() => {
     const syncCategory = () => {
@@ -184,7 +174,13 @@ export default function SubNavBar({ isStickyChrome = false }: SubNavBarProps) {
 
   const effectiveEventSlug =
     activeSlug ||
-    (pathname.startsWith("/events/") ? detailEventCategory || lastEventCategory : "");
+    (pathname.startsWith("/events/")
+      ? lastEventSource === "events"
+        ? ""
+        : lastEventSource || detailEventCategory
+      : "");
+  const forceEventsTabOnDetail =
+    pathname.startsWith("/events/") && lastEventSource === "events";
 
   useEffect(() => {
     const sync = () => {
@@ -210,6 +206,7 @@ export default function SubNavBar({ isStickyChrome = false }: SubNavBarProps) {
     if (item.match === "artists") return onArtists;
     if (item.match === "events") {
       if (!onEvents) return false;
+      if (forceEventsTabOnDetail) return true;
       if (!effectiveEventSlug && !q) return true;
       // Highlight Events when category isn't one of the dedicated Concert/Comedy/Music/Sports tabs
       const known = ["concert", "comedy", "music", "sports"] as const;
@@ -288,7 +285,9 @@ export default function SubNavBar({ isStickyChrome = false }: SubNavBarProps) {
         href={href}
         aria-current={active ? "page" : undefined}
         data-subnav-active={active ? "1" : undefined}
-        className={`subnav-tab shrink-0 transition-colors whitespace-nowrap flex flex-col items-center justify-center gap-0.5 min-w-[4.5rem] sm:min-w-[5.25rem] md:min-w-[5.75rem] h-full px-3 sm:px-3.5 rounded-xl text-[12px] sm:text-[13px] md:text-[14px] font-semibold tracking-wide lg:inline-flex lg:flex-row lg:items-center lg:gap-1.5 lg:h-auto lg:min-w-0 lg:text-[11px] xl:text-[12px] lg:uppercase lg:tracking-[0.04em] lg:font-semibold ${
+        className={`subnav-tab shrink-0 transition-colors whitespace-nowrap flex flex-col items-center justify-center gap-0.5 min-w-[4.5rem] sm:min-w-[5.25rem] md:min-w-[5.75rem] h-full px-3 sm:px-3.5 rounded-xl text-[12px] sm:text-[13px] md:text-[14px] font-semibold tracking-wide ${
+          item.mobileOnly ? "lg:hidden" : "lg:inline-flex"
+        } lg:flex-row lg:items-center lg:gap-1.5 lg:h-auto lg:min-w-0 lg:text-[11px] xl:text-[12px] lg:uppercase lg:tracking-[0.04em] lg:font-semibold ${
           active
             ? "is-active bg-gradient-to-r from-[#A78BFA] to-[#6D28D9] text-white shadow-sm lg:rounded-full lg:px-3.5 xl:px-4 lg:py-1.5 xl:py-2"
             : "text-[#111111] hover:text-[#111111] lg:hover:text-[#6900AA] lg:rounded-none lg:px-0.5 lg:py-0"
@@ -323,8 +322,6 @@ export default function SubNavBar({ isStickyChrome = false }: SubNavBarProps) {
 
   const categoryTabs = (
     <>
-      {/* Mobile/tablet only — wrapper wins over lg:inline-flex on the link */}
-      <span className="contents lg:hidden">{renderTabLink(FOR_YOU_TAB)}</span>
       {linkTabs.map((item) => renderTabLink(item))}
     </>
   );

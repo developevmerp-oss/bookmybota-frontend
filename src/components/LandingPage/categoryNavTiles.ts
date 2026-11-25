@@ -15,6 +15,22 @@ export const CATEGORY_NAV_TILES = [
     image: imageSrc(images.diningCard),
   },
   {
+    key: "movie",
+    title: "Movie",
+    keywords: ["movie", "movies", "film"],
+    fallbackSlug: "movie",
+    countLabel: "Movies to watch",
+    image: imageSrc(images.movieCard),
+  },
+  {
+    key: "sports",
+    title: "Sports",
+    keywords: ["sports", "sport"],
+    fallbackSlug: "sports",
+    countLabel: "Sports events",
+    image: imageSrc(images.sportsCard),
+  },
+  {
     key: "concert",
     title: "Concert",
     keywords: ["concert"],
@@ -37,22 +53,6 @@ export const CATEGORY_NAV_TILES = [
     fallbackSlug: "music",
     countLabel: "Music events",
     image: imageSrc(images.musicCard),
-  },
-  {
-    key: "movie",
-    title: "Movie",
-    keywords: ["movie", "movies", "film"],
-    fallbackSlug: "movie",
-    countLabel: "Movies to watch",
-    image: imageSrc(images.movieCard),
-  },
-  {
-    key: "sports",
-    title: "Sports",
-    keywords: ["sports", "sport"],
-    fallbackSlug: "sports",
-    countLabel: "Sports events",
-    image: imageSrc(images.sportsCard),
   },
 ] as const;
 

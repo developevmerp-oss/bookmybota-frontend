@@ -93,15 +93,40 @@ export default function EventPlanSeatPicker({
   const fy = (y: number) => (plan.flip ? plan.height - y : y);
   const W = plan.width * S;
   const H = plan.height * S;
+  const { actualW, actualH } = useMemo(() => {
+    let maxW = W;
+    let maxH = H;
+    for (const s of list) {
+      maxW = Math.max(maxW, Number(s.coordinate_x) * S + SEAT);
+      maxH = Math.max(maxH, fy(Number(s.coordinate_y)) * S + SEAT);
+    }
+    for (const r of rowTags) {
+      maxW = Math.max(maxW, r.x * S + 20);
+      maxH = Math.max(maxH, fy(r.y) * S + 20);
+    }
+    return { actualW: maxW, actualH: maxH };
+  }, [W, H, list, rowTags, plan.flip, plan.height]);
+
   useEffect(() => {
     const el = boxRef.current;
     if (!el) return;
-    const doFit = () => setFit(Math.min(1, Math.max(0.5, (el.clientWidth - 8) / W)));
+    const doFit = () => {
+      const vw = el.clientWidth;
+      const vh = el.clientHeight;
+      if (vw < 40 || vh < 40) return;
+      const pad = vw >= 640 ? 48 : 32;
+      const nextFit = Math.min(1, (vw - pad) / actualW, (vh - pad) / actualH);
+      setFit(Math.max(0.15, Math.round(nextFit * 1000) / 1000));
+      requestAnimationFrame(() => {
+        el.scrollLeft = Math.max(0, (el.scrollWidth - el.clientWidth) / 2);
+        el.scrollTop = Math.max(0, (el.scrollHeight - el.clientHeight) / 2);
+      });
+    };
     doFit();
     const ro = new ResizeObserver(doFit);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [W]);
+  }, [actualW, actualH]);
 
   const toggle = (seat: Seat) => {
     const id = String(seat.id);
@@ -117,8 +142,9 @@ export default function EventPlanSeatPicker({
   return (
     <div className="flex h-full min-h-0 flex-col bg-white">
       <div className="relative min-h-0 flex-1"><div ref={boxRef} className="h-full overflow-auto bg-slate-50">
-        <div style={{ width: W * zoom, height: H * zoom }} className="mx-auto">
-          <div style={{ width: W, height: H, transform: `scale(${zoom})`, transformOrigin: "0 0" }} className="relative">
+        <div className="min-h-full min-w-full w-max flex items-center justify-center p-2 sm:p-4">
+          <div style={{ width: actualW * zoom, height: actualH * zoom }} className="shrink-0">
+            <div style={{ width: actualW, height: actualH, transform: `scale(${zoom})`, transformOrigin: "0 0" }} className="relative">
             <svg className="pointer-events-none absolute inset-0" width={W} height={H}>
               {(plan.lines || []).map((l, i) => (
                 <line key={i} x1={l.x1 * S} y1={fy(l.y1) * S} x2={l.x2 * S} y2={fy(l.y2) * S} stroke="#94a3b8" strokeWidth={3} strokeLinecap="round" />
@@ -181,6 +207,7 @@ export default function EventPlanSeatPicker({
                 {plan.stage.label || "STAGE"}
               </div>
             )}
+          </div>
           </div>
         </div>
       </div>

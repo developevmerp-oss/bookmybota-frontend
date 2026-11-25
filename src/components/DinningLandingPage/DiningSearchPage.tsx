@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, Suspense, useMemo, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { Loader2, X } from "lucide-react";
+import { ArrowLeft, Loader2, Search, X } from "lucide-react";
 import { useGetBusinessesPagedQuery, useGetCollectionsQuery, useGetMoodsQuery, Business } from "@/services/api";
 import DiningFiltersBar from "@/components/DinningLandingPage/DiningFiltersBar";
 import DiningRestaurantCardOption2 from "@/components/DinningLandingPage/DiningRestaurantCardOption2";
@@ -212,9 +212,79 @@ function SearchContent() {
 
   const hasQuickFilters = Boolean(collectionParam || moodParam || queryParam || cityParam);
 
+  const totalPlacesCount = businessesData?.meta?.total ?? displayRestaurants.length;
+
   return (
-    <div className="min-h-screen bg-slate-50 pt-4 pb-16">
-      <div className="bmb-section-container">
+    <div className="min-h-screen bg-white lg:pt-4 pb-16">
+      {/* ── Mobile / tablet: BMS frosted chrome ── */}
+      <div
+        className="bmb-movies-frost-chrome lg:hidden fixed top-0 inset-x-0 z-40"
+        style={{ paddingTop: "max(0px, env(safe-area-inset-top, 0px))" }}
+      >
+        <div
+          className="bmb-movies-frost-chrome__glass"
+          aria-hidden
+          style={{
+            background: "rgba(255,255,255,0.55)",
+            WebkitBackdropFilter: "blur(18px) saturate(180%)",
+            backdropFilter: "blur(18px) saturate(180%)",
+          }}
+        />
+        <div className="bmb-movies-frost-chrome__fade" aria-hidden />
+        <div className="bmb-movies-frost-chrome__content">
+          <div className="flex items-center gap-1 px-2 sm:px-3 pt-2 pb-2 min-w-0">
+            <button
+              type="button"
+              onClick={() => {
+                if (window.history.length > 1) router.back();
+                else router.push("/dining");
+              }}
+              aria-label="Back"
+              className="flex size-10 shrink-0 items-center justify-center text-[#111111] cursor-pointer"
+            >
+              <ArrowLeft size={22} strokeWidth={2.25} />
+            </button>
+            <div className="min-w-0 flex-1">
+              <h1 className="text-[16px] sm:text-[17px] font-bold text-[#111111] leading-tight truncate drop-shadow-[0_0_6px_rgba(255,255,255,0.9)]">
+                {banner.title}
+              </h1>
+              <button
+                type="button"
+                onClick={() => window.dispatchEvent(new Event("open_city_select"))}
+                className="mt-0.5 inline-flex max-w-full items-center gap-1 text-[12px] sm:text-[13px] font-medium text-[#6B7280] hover:text-[#6900AA] cursor-pointer"
+              >
+                <span className="truncate">
+                  {cityParam && cityParam !== "All Cities" ? cityParam : "Select City"} |{" "}
+                  {loadingBusinesses
+                    ? "…"
+                    : `${totalPlacesCount} Place${totalPlacesCount === 1 ? "" : "s"}`}
+                </span>
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                const input = document.querySelector<HTMLInputElement>(
+                  'input[placeholder*="Search"], input[type="search"]'
+                );
+                if (input) {
+                  input.scrollIntoView({ behavior: "smooth", block: "center" });
+                  input.focus();
+                } else {
+                  window.dispatchEvent(new Event("open_search_overlay"));
+                }
+              }}
+              aria-label="Search"
+              className="flex size-10 shrink-0 items-center justify-center text-[#111111] cursor-pointer"
+            >
+              <Search size={20} strokeWidth={2} />
+            </button>
+          </div>
+        </div>
+      </div>
+      <div className="lg:hidden h-14 shrink-0 pointer-events-none" aria-hidden />
+
+      <div className="bmb-section-container pt-2 lg:pt-0">
         {/* ── 1. Hero Dynamic Banner (Zomato-Style) ───────────────────────── */}
         <div className="relative overflow-hidden rounded-2xl bg-slate-900 text-white h-72 md:h-80 shadow-md flex items-center border border-slate-100/50 mb-4">
           {/* Background image */}

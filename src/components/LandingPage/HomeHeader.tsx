@@ -389,6 +389,10 @@ export default function HomeHeader() {
     pathname === "/movies/cinemas" ||
     pathname === "/events" ||
     pathname === "/dining" ||
+    pathname === "/venues" ||
+    pathname === "/artists" ||
+    pathname === "/collections" ||
+    pathname === "/search" ||
     pathname === "/list-your-show" ||
     Boolean(pathname?.startsWith("/customer")) ||
     (pathname?.match(/^\/movies\/[^/]+\/?$/) && pathname !== "/movies/cinemas") ||

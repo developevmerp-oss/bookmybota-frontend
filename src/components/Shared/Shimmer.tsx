@@ -1979,14 +1979,90 @@ export function ShowtimeListShimmer({ count = 3 }: { count?: number }) {
 export function SeatMapShimmer({
   className = "",
   fill = false,
+  variant = "cinema",
 }: {
   className?: string;
   fill?: boolean;
+  variant?: "cinema" | "stadium";
 }) {
+  if (variant === "stadium") {
+    return (
+      <Wrap>
+        <div
+          className={`flex flex-col ${fill ? "h-full min-h-0" : "h-[550px] min-h-[320px] rounded-2xl border border-slate-200"} bg-[#F8FAFC] overflow-hidden ${className}`}
+          aria-busy="true"
+          aria-label="Loading stadium layout"
+        >
+          {/* Top compact chrome matching StadiumLayoutViewer */}
+          <div className="shrink-0 border-b border-slate-200 bg-white px-2.5 sm:px-3 py-2 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Skeleton width={56} height={20} borderRadius={6} />
+              <Skeleton width={96} height={14} borderRadius={6} className="hidden sm:block" />
+            </div>
+            <div className="flex items-center gap-2">
+              <Skeleton width={68} height={22} borderRadius={999} />
+              <Skeleton width={48} height={22} borderRadius={999} />
+            </div>
+          </div>
+
+          {/* Center stadium bowl: stands around central pitch/stage */}
+          <div className="relative flex-1 min-h-0 flex items-center justify-center p-4 sm:p-6">
+            <div className="relative w-[min(82vw,310px)] sm:w-[min(64vw,420px)] aspect-square max-h-[min(56dvh,400px)] flex items-center justify-center">
+              {/* Top stand */}
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[54%] h-[18%]">
+                <Skeleton width="100%" height="100%" borderRadius={14} />
+              </div>
+              {/* Bottom stand */}
+              <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[54%] h-[18%]">
+                <Skeleton width="100%" height="100%" borderRadius={14} />
+              </div>
+              {/* Left stand */}
+              <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[18%] h-[50%]">
+                <Skeleton width="100%" height="100%" borderRadius={14} />
+              </div>
+              {/* Right stand */}
+              <div className="absolute right-0 top-1/2 -translate-y-1/2 w-[18%] h-[50%]">
+                <Skeleton width="100%" height="100%" borderRadius={14} />
+              </div>
+              {/* Corner stands */}
+              <div className="absolute top-[9%] left-[9%] w-[16%] h-[16%]">
+                <Skeleton width="100%" height="100%" borderRadius={10} />
+              </div>
+              <div className="absolute top-[9%] right-[9%] w-[16%] h-[16%]">
+                <Skeleton width="100%" height="100%" borderRadius={10} />
+              </div>
+              <div className="absolute bottom-[9%] left-[9%] w-[16%] h-[16%]">
+                <Skeleton width="100%" height="100%" borderRadius={10} />
+              </div>
+              <div className="absolute bottom-[9%] right-[9%] w-[16%] h-[16%]">
+                <Skeleton width="100%" height="100%" borderRadius={10} />
+              </div>
+              {/* Center pitch / stage oval */}
+              <div className="w-[46%] h-[42%]">
+                <Skeleton width="100%" height="100%" borderRadius={999} />
+              </div>
+            </div>
+
+            {/* Bottom-center hint pill */}
+            <div className="absolute bottom-14 lg:bottom-4 left-1/2 -translate-x-1/2">
+              <Skeleton width={210} height={28} borderRadius={999} />
+            </div>
+
+            {/* Bottom-right zoom controls */}
+            <div className="hidden sm:flex flex-col gap-1.5 absolute bottom-4 right-4">
+              <Skeleton width={32} height={32} borderRadius={8} />
+              <Skeleton width={32} height={32} borderRadius={8} />
+            </div>
+          </div>
+        </div>
+      </Wrap>
+    );
+  }
+
   return (
     <Wrap>
       <div
-        className={`flex ${fill ? "h-full min-h-0" : "h-[550px] min-h-[320px]"} flex-col items-center justify-center gap-4 rounded-2xl border border-slate-200 bg-slate-100 px-6 ${className}`}
+        className={`flex ${fill ? "h-full min-h-0" : "h-[550px] min-h-[320px] rounded-2xl border border-slate-200"} flex-col items-center justify-center gap-4 bg-slate-100 px-6 ${className}`}
         aria-busy="true"
         aria-label="Loading seating map"
       >

@@ -60,7 +60,7 @@ import {
   useGetShowtimeBeveragesQuery,
   useValidatePlatformPromoCodeMutation,
   useGetPublicMovieShowtimesQuery,
-  useGetActivePlatformOffersQuery,
+  useGetMovieEligiblePlatformOffersQuery,
   useGetPublicCinemaOffersForMovieQuery,
   type MovieBookingSeatPayload,
   type GiftCardRedeemPreview,
@@ -502,9 +502,15 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
     skip: !customerId,
   });
 
-  const { data: activePlatformOffers = [] } = useGetActivePlatformOffersQuery(undefined, {
-    skip: false,
-  });
+  const movieIdForOffers = String(layoutData?.movie?.id || "");
+  const { data: activePlatformOffers = [] } = useGetMovieEligiblePlatformOffersQuery(
+    {
+      movie_id: movieIdForOffers,
+      customer_id: customerId || null,
+      ...(selectedCity && selectedCity !== "All Cities" ? { city: selectedCity } : {}),
+    },
+    { skip: !movieIdForOffers }
+  );
 
   const { data: publicCinemaOffers = [] } = useGetPublicCinemaOffersForMovieQuery(
     String(layoutData?.movie?.id || layoutData?.movie?.slug || ""),
@@ -4446,7 +4452,8 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                   {
                     (activePlatformOffers || []).filter((p: any) => {
                       const cat = String(p.category || "").toUpperCase();
-                      return cat === "ALL" || cat === "MOVIES";
+                      const statusOk = !p.effective_status || p.effective_status === "ACTIVE";
+                      return statusOk && (cat === "ALL" || cat === "MOVIES");
                     }).length
                   }
                   )
@@ -4476,7 +4483,8 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                   const platformOffersFormatted = (activePlatformOffers || [])
                     .filter((p: any) => {
                       const cat = String(p.category || "").toUpperCase();
-                      return cat === "ALL" || cat === "MOVIES";
+                      const statusOk = !p.effective_status || p.effective_status === "ACTIVE";
+                      return statusOk && (cat === "ALL" || cat === "MOVIES");
                     })
                     .map((p: any) => {
                       const discountType = String(p.discount_type || "").toUpperCase();

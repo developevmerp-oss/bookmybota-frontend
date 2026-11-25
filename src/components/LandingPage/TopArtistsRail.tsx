@@ -84,7 +84,14 @@ export default function TopArtistsRail() {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const { artists, isLoading } = usePublicArtistsCatalog();
   const items = useMemo(() => {
-    const mapped = artists.map(mapApiArtist);
+    const mapped = artists
+      .filter(
+        (a) =>
+          !/^(chief\s*guest|guest)$/i.test(
+            String(a.role_title || a.type_name || "").trim()
+          )
+      )
+      .map(mapApiArtist);
     return prioritizeArtists(mapped).slice(0, 12);
   }, [artists]);
   const edges = useHorizontalScrollEdges(scrollerRef, [items.length, isLoading]);

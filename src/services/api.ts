@@ -4517,7 +4517,7 @@ export const api = createApi({
 
     getMovieEligiblePlatformOffers: builder.query<
       MovieEligiblePlatformOffer[],
-      { movie_id: string; guest_phone?: string; city?: string }
+      { movie_id: string; guest_phone?: string; city?: string; customer_id?: string | null }
     >({
       query: ({ movie_id, guest_phone, city }) => {
         const sp = new URLSearchParams({ movie_id });
@@ -7343,7 +7343,7 @@ export const api = createApi({
         method: 'POST',
         body,
       }),
-      invalidatesTags: ['EventBookings', 'PublicEvents', 'OrganizerTicketStats', 'OrganizerBookings', 'OrganizerEvents', 'MyGiftCards'],
+      invalidatesTags: ['EventBookings', 'PublicEvents', 'OrganizerTicketStats', 'OrganizerBookings', 'OrganizerEvents', 'MyGiftCards', 'PublicPlatformOffers'],
     }),
 
     getCustomerEventBookings: builder.query<
@@ -8395,6 +8395,7 @@ export const api = createApi({
       invalidatesTags: (_r, _e, arg) => [
         { type: 'MovieShowtimes', id: `layout-${arg.showtime_id}` },
         'MovieShowtimes',
+        'PublicPlatformOffers',
       ],
     }),
 

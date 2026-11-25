@@ -28,7 +28,7 @@ export default function ListYourShowHostTypesSection({
   containerClassName = DEFAULT_CONTAINER,
 }: ListYourShowHostTypesSectionProps) {
   return (
-    <section className="bg-white py-12 md:py-16">
+    <section className="bg-white pt-5 pb-10 md:py-12">
       <div className={containerClassName}>
         <div className="text-center max-w-[820px] mx-auto">
           <h2 className="text-[1.65rem] sm:text-[2rem] md:text-[2.25rem] font-bold tracking-tight text-[#1A2B48] leading-tight">

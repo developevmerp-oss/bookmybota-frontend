@@ -2,12 +2,14 @@
 
 import {
   BarChart3,
+  ChevronLeft,
   LayoutDashboard,
   Megaphone,
   ShieldCheck,
   Tag,
   UserPlus,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import PartnerListYourShowLanding from "@/components/Shared/PartnerListYourShowLanding";
 import ListYourShowHostTypesSection from "@/components/Shared/ListYourShowHostTypesSection";
 import ListYourShowServicesSection from "@/components/Shared/ListYourShowServicesSection";
@@ -212,8 +214,23 @@ const FEATURES_FOOTNOTE =
   "Category-specific tools such as table management, ticket scanning, cinema showtimes, venue layouts, and artist booking are available after you register under the partner type that fits your business.";
 
 export default function ListYourShowLandingPage() {
+  const router = useRouter();
   return (
-    <PartnerListYourShowLanding
+    <>
+      {/* Mobile / tablet BookMyShow-style header */}
+      <header className="lg:hidden sticky top-0 z-40 h-12 w-full bg-white/95 backdrop-blur-md border-b border-slate-200/80 flex items-center justify-between px-2">
+        <button
+          type="button"
+          onClick={() => router.back()}
+          aria-label="Go back"
+          className="flex size-10 shrink-0 items-center justify-center rounded-full text-[#111111] hover:bg-slate-100 cursor-pointer transition-colors"
+        >
+          <ChevronLeft size={22} strokeWidth={2.25} />
+        </button>
+        <h1 className="text-[16px] font-bold text-[#111111] truncate">List Your Show</h1>
+        <div className="size-10 shrink-0" aria-hidden />
+      </header>
+      <PartnerListYourShowLanding
       hostOnly
       layout="bms"
       hideBuiltInHeader
@@ -255,5 +272,6 @@ export default function ListYourShowLandingPage() {
       securityTitle="Sit back and watch your event come to life"
       securitySubtitle="Events may be all fun and games, but we take it seriously. We ensure our customer's security so that you don't have to."
     />
+    </>
   );
 }

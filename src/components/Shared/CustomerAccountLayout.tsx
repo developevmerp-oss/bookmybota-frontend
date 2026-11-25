@@ -76,7 +76,7 @@ export default function CustomerAccountLayout({
   const mobileTitle = customTitle || currentNav?.label || "Back";
 
   return (
-    <div className="bg-[#f4f5f7] pt-2 pb-4 sm:pt-3 sm:pb-6 lg:pt-4 lg:pb-8">
+    <div className="min-h-[100dvh] lg:min-h-0 bg-[#f4f5f7] pt-0 pb-6 sm:pb-8 lg:pt-4 lg:pb-8">
       <div className="max-w-[1440px] mx-auto px-2 sm:px-6 lg:px-8">
         <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 items-start">
           <aside
@@ -150,18 +150,19 @@ export default function CustomerAccountLayout({
 
           <div className="flex-1 min-w-0 w-full">
             {!isProfileOverview && !hideMobileHeader && (
-              <div className="lg:hidden flex items-center gap-3 px-1 mb-3.5">
+              <div className="lg:hidden sticky top-0 z-40 h-12 -mx-2 sm:-mx-6 px-3 sm:px-6 mb-3.5 bg-white/95 backdrop-blur-md border-b border-slate-200/80 flex items-center gap-3">
                 <button
                   type="button"
                   onClick={handleBack}
-                  className="p-1 -ml-1 text-black cursor-pointer hover:opacity-75 transition-opacity"
+                  className="p-1.5 -ml-1.5 rounded-full text-[#111111] hover:bg-slate-100 cursor-pointer transition-colors"
                   aria-label="Go back"
                 >
-                  <ArrowLeft size={22} />
+                  <ArrowLeft size={20} strokeWidth={2.25} />
                 </button>
-                <h1 className="text-xl font-bold text-black">{mobileTitle}</h1>
+                <h1 className="text-[17px] font-bold text-[#111111] truncate">{mobileTitle}</h1>
               </div>
             )}
+            {isProfileOverview && <div className="lg:hidden h-2.5" aria-hidden />}
             {children}
           </div>
         </div>

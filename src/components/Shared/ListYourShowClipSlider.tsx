@@ -161,7 +161,7 @@ export default function ListYourShowClipSlider({
 
   return (
     <section
-      className="bg-white pt-6 sm:pt-8 pb-4 sm:pb-6 w-full"
+      className="bg-white pt-4 sm:pt-6 pb-2 sm:pb-4 w-full"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
@@ -228,7 +228,8 @@ export default function ListYourShowClipSlider({
         }
       `}</style>
       <div className={containerClassName}>
-        <div className="flex flex-col lg:flex-row gap-3 sm:gap-4 items-stretch border-0 outline-none shadow-none">
+        <div className="relative">
+          <div className="flex flex-col lg:flex-row gap-3 sm:gap-4 items-stretch border-0 outline-none shadow-none">
           {/* Active — exact hero clip-path on image + readable cream content */}
           <article className="relative flex-1 min-w-0 overflow-hidden rounded-2xl sm:rounded-[1.25rem] bg-[#FDFAF7] shadow-[0_1px_3px_rgba(0,0,0,0.06)] min-h-[300px] sm:min-h-[340px] md:min-h-[380px]">
             {/* Mobile: stacked image + cream */}
@@ -430,26 +431,27 @@ export default function ListYourShowClipSlider({
           ))}
         </div>
 
-        {/* Arrow controls — no divider line above */}
-        <div className="mt-4 sm:mt-5 flex items-center gap-2 border-0 outline-none">
-          <button
-            type="button"
-            onClick={goPrev}
-            aria-label="Previous slide"
-            disabled={n <= 1}
-            className="inline-flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-full bg-[#EDEDED] text-[#333] hover:bg-[#E0E0E0] transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-default"
-          >
-            <ChevronLeft size={20} strokeWidth={2.25} />
-          </button>
-          <button
-            type="button"
-            onClick={goNext}
-            aria-label="Next slide"
-            disabled={n <= 1}
-            className="inline-flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-full bg-[#EDEDED] text-[#333] hover:bg-[#E0E0E0] transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-default"
-          >
-            <ChevronRight size={20} strokeWidth={2.25} />
-          </button>
+          {/* Left / Right BMS-style rectangular arrow controls (matches promotion banner) */}
+          {n > 1 && (
+            <>
+              <button
+                type="button"
+                onClick={goPrev}
+                aria-label="Previous slide"
+                className="absolute left-0 top-1/2 -translate-y-1/2 z-20 flex items-center justify-center w-7 h-12 sm:w-8 sm:h-14 lg:w-9 lg:h-16 rounded-r-[0.3rem] bg-black/45 hover:bg-black/60 text-white transition-colors cursor-pointer"
+              >
+                <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" strokeWidth={2} />
+              </button>
+              <button
+                type="button"
+                onClick={goNext}
+                aria-label="Next slide"
+                className="absolute right-0 top-1/2 -translate-y-1/2 z-20 flex items-center justify-center w-7 h-12 sm:w-8 sm:h-14 lg:w-9 lg:h-16 rounded-l-[0.3rem] bg-black/45 hover:bg-black/60 text-white transition-colors cursor-pointer"
+              >
+                <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" strokeWidth={2} />
+              </button>
+            </>
+          )}
         </div>
       </div>
     </section>

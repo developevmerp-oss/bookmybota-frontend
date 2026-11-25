@@ -481,6 +481,22 @@ export default function PublicEventDetailPage({
     router.push(categoryBrowseHref);
   };
 
+  const eventSubnavCategory = String(
+    (event as { category_slug?: string; category_name?: string } | undefined)?.category_slug ||
+      event?.category_name ||
+      ""
+  )
+    .trim()
+    .toLowerCase();
+
+  useEffect(() => {
+    if (!eventSubnavCategory) return;
+    document.body.dataset.eventSubnavCategory = eventSubnavCategory;
+    return () => {
+      delete document.body.dataset.eventSubnavCategory;
+    };
+  }, [eventSubnavCategory]);
+
   if (isLoading) {
     return <EventDetailShimmer />;
   }
@@ -732,7 +748,7 @@ export default function PublicEventDetailPage({
                   </span>
                 ))}
               </div>
-              <div className="flex items-center gap-3 sm:gap-4 shrink-0 min-w-0 lg:ml-auto">
+              <div className="hidden lg:flex items-center gap-3 sm:gap-4 shrink-0 min-w-0 lg:ml-auto">
                 {saved ? (
                   <div className="flex items-center gap-3 sm:gap-5 min-w-0">
                     <span className="inline-flex items-center gap-2 text-[1rem] sm:text-[1.0625rem] font-medium text-[#333333] min-w-0">
@@ -784,6 +800,59 @@ export default function PublicEventDetailPage({
             </div>
 
             <div className="lg:hidden mt-4 sm:mt-5">{bookingCard}</div>
+
+            {/* Mobile + tablet: Interested bar cleanly placed below the details card */}
+            <div className="lg:hidden mt-3.5 sm:mt-4 rounded-2xl border border-[#E8E8E8] bg-white px-4 py-3 shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
+              {saved ? (
+                <div className="flex items-center justify-between gap-3 min-w-0">
+                  <span className="inline-flex items-center gap-2 text-[0.9375rem] sm:text-[1rem] font-medium text-[#333333] min-w-0">
+                    <ThumbsUp size={17} className="text-[#2E7D32] shrink-0" fill="#2E7D32" />
+                    <span className="truncate">
+                      {interestCount <= 1
+                        ? "You are interested"
+                        : `You & ${interestCountLabel} are interested`}
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={undoInterest}
+                    disabled={isTogglingInterest}
+                    className="shrink-0 rounded-lg border px-3.5 py-1.5 text-[0.875rem] sm:text-[0.9375rem] font-semibold cursor-pointer disabled:opacity-60 hover:bg-[#FBF6E8] transition-colors"
+                    style={{
+                      color: "#B59B2A",
+                      borderColor: "#B59B2A",
+                      backgroundColor: "transparent",
+                    }}
+                  >
+                    Undo
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0 flex items-center gap-2">
+                    <ThumbsUp size={16} className="text-[#2E7D32] shrink-0" fill="#2E7D32" />
+                    <span className="text-[0.9375rem] sm:text-[1rem] font-medium text-[#333333] truncate">
+                      {interestCount > 0
+                        ? `${interestCountLabel} interested`
+                        : "Mark yourself interested"}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={toggleSave}
+                    disabled={isTogglingInterest}
+                    className="shrink-0 rounded-lg border px-3.5 sm:px-4 py-1.5 sm:py-2 text-[0.875rem] sm:text-[0.9375rem] font-semibold cursor-pointer disabled:opacity-60 hover:bg-[#FBF6E8] transition-colors"
+                    style={{
+                      color: "#B59B2A",
+                      borderColor: "#B59B2A",
+                      backgroundColor: "transparent",
+                    }}
+                  >
+                    I&apos;m Interested
+                  </button>
+                </div>
+              )}
+            </div>
 
             {aboutText && (
               <section className="mt-6 sm:mt-8 lg:mt-9">

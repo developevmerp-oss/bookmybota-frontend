@@ -10,11 +10,13 @@ import {
   Building2,
   ChevronRight,
   Loader2,
+  LogOut,
   Map,
   MapPin,
   Pencil,
   Plus,
   Save,
+  Ticket,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -441,104 +443,85 @@ export default function CustomerProfilePage() {
         </form>
       </div>
 
-      {/* ── Mobile / tablet ── */}
-      <div className="lg:hidden space-y-4">
+      {/* ── Mobile / tablet (BookMyShow profile style) ── */}
+      <div className="lg:hidden space-y-3.5 pt-1">
         {mobileScreen === "overview" && (
           <>
-            {/* Header */}
-            <div className="flex items-center gap-3 px-1">
-              <button
-                type="button"
-                onClick={() => router.back()}
-                className="p-1 -ml-1 text-black cursor-pointer"
-                aria-label="Go back"
-              >
-                <ArrowLeft size={22} />
-              </button>
-              <h1 className="text-xl font-bold text-black">Profile</h1>
-            </div>
-
-            {/* Summary card — whole box opens personal details */}
+            {/* Top user card — clean BMS style with Edit Profile */}
             <button
               type="button"
               onClick={() => setMobileScreen("details")}
-              className="w-full rounded-2xl border border-slate-200 bg-white overflow-hidden text-left cursor-pointer hover:border-slate-300 transition-colors"
+              className="w-full rounded-2xl bg-white p-4 shadow-[0_1px_6px_rgba(15,23,42,0.06)] text-left cursor-pointer active:scale-[0.995] transition-transform"
             >
-              <div className="flex items-center gap-4 p-4">
-                <div className="relative shrink-0 w-[72px] h-[72px]">
-                  <svg className="absolute inset-0 w-[72px] h-[72px] -rotate-90" viewBox="0 0 72 72" aria-hidden>
-                    <circle cx="36" cy="36" r="32" fill="none" stroke="#E5E7EB" strokeWidth="3" />
-                    <circle
-                      cx="36"
-                      cy="36"
-                      r="32"
-                      fill="none"
-                      stroke="#6900AA"
-                      strokeWidth="3"
-                      strokeLinecap="round"
-                      strokeDasharray={`${(progressPct / 100) * 201} 201`}
-                    />
-                  </svg>
-                  <div className="absolute inset-[6px] rounded-full bg-[#F7E9FF] text-[#6900AA] flex items-center justify-center text-2xl font-bold">
-                    {displayName.charAt(0).toUpperCase()}
-                  </div>
+              <div className="flex items-center gap-3.5">
+                <div className="w-14 h-14 rounded-full bg-[#F7E9FF] text-[#6900AA] flex items-center justify-center text-2xl font-bold shrink-0">
+                  {displayName.charAt(0).toUpperCase()}
                 </div>
-                <div className="min-w-0">
-                  <p className="text-lg font-bold text-black truncate">{displayName}</p>
-                  {phone.trim() ? (
-                    <p className={`text-sm ${VALUE_COLOR} mt-0.5`}>
-                      {phone.trim().startsWith("+") ? phone.trim() : `+91 ${phone.trim()}`}
-                    </p>
-                  ) : (
-                    <p className="text-sm text-slate-400 mt-0.5 truncate">{displayEmail}</p>
-                  )}
-                  <p className="text-sm font-medium text-[#6900AA] mt-1">
-                    {stepsDone} / {TOTAL_STEPS} steps done
+                <div className="min-w-0 flex-1">
+                  <p className="text-[18px] font-bold text-[#111111] truncate leading-tight">
+                    Hey, {displayName}!
                   </p>
+                  <span className="mt-1 inline-flex items-center gap-1.5 text-[13px] font-medium text-[#6900AA]">
+                    Edit Profile
+                    <Pencil size={12} strokeWidth={2.25} />
+                  </span>
                 </div>
+                <ChevronRight size={18} className="text-slate-400 shrink-0" />
               </div>
             </button>
 
-            {/* Account menu */}
-            <div>
-              <h2 className="text-base font-bold text-black px-1 mb-2">My Account</h2>
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                {mobileNavItems.map((item, idx) => {
-                  const Icon = item.icon;
-                  return (
-                    <Link
-                      key={item.label}
-                      href={item.soon ? "#" : item.href}
-                      onClick={(e) => {
-                        if (!item.soon) return;
-                        e.preventDefault();
-                        toast.message("Coming soon");
-                      }}
-                      className={`flex items-center gap-3 px-4 py-3.5 ${
-                        idx < mobileNavItems.length - 1 ? "border-b border-slate-100" : ""
-                      }`}
-                    >
-                      <Icon size={20} className="text-slate-500 shrink-0" />
-                      <span className="flex-1 text-[15px] font-medium text-black">{item.label}</span>
-                      {item.soon ? (
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-[#F7E9FF] text-[#6900AA]">
-                          Soon
-                        </span>
-                      ) : (
-                        <ChevronRight size={18} className="text-slate-400" />
-                      )}
-                    </Link>
-                  );
-                })}
-                <button
-                  type="button"
-                  onClick={handleLogout}
-                  className="w-full flex items-center gap-3 px-4 py-3.5 border-t border-slate-100 text-red-600 cursor-pointer"
-                >
-                  <span className="flex-1 text-[15px] font-medium text-left">Log out</span>
-                  <ChevronRight size={18} className="text-red-400" />
-                </button>
-              </div>
+            {/* Primary account menu card */}
+            <div className="bg-white rounded-2xl shadow-[0_1px_6px_rgba(15,23,42,0.06)] overflow-hidden divide-y divide-slate-100">
+              {mobileNavItems.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <Link
+                    key={item.label}
+                    href={item.soon ? "#" : item.href}
+                    onClick={(e) => {
+                      if (!item.soon) return;
+                      e.preventDefault();
+                      toast.message("Coming soon");
+                    }}
+                    className="flex items-center gap-3.5 px-4 py-3.5 active:bg-slate-50 transition-colors"
+                  >
+                    <Icon size={20} strokeWidth={1.85} className="text-slate-600 shrink-0" />
+                    <span className="flex-1 text-[15px] font-medium text-[#111111]">
+                      {item.label}
+                    </span>
+                    {item.soon ? (
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-[#F7E9FF] text-[#6900AA]">
+                        Soon
+                      </span>
+                    ) : (
+                      <ChevronRight size={18} className="text-slate-400 shrink-0" />
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
+
+            {/* Secondary card — List your Show + Log out */}
+            <div className="bg-white rounded-2xl shadow-[0_1px_6px_rgba(15,23,42,0.06)] overflow-hidden divide-y divide-slate-100">
+              <Link
+                href="/list-your-show"
+                className="flex items-center gap-3.5 px-4 py-3.5 active:bg-slate-50 transition-colors"
+              >
+                <Ticket size={20} strokeWidth={1.85} className="text-slate-600 shrink-0" />
+                <span className="flex-1 text-[15px] font-medium text-[#111111]">
+                  List your Show
+                </span>
+                <ChevronRight size={18} className="text-slate-400 shrink-0" />
+              </Link>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="w-full flex items-center gap-3.5 px-4 py-3.5 text-rose-600 active:bg-rose-50/50 transition-colors cursor-pointer"
+              >
+                <LogOut size={20} strokeWidth={1.85} className="text-rose-500 shrink-0" />
+                <span className="flex-1 text-[15px] font-medium text-left">Log out</span>
+                <ChevronRight size={18} className="text-rose-400 shrink-0" />
+              </button>
             </div>
           </>
         )}

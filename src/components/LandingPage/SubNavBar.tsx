@@ -143,6 +143,48 @@ export default function SubNavBar({ isStickyChrome = false }: SubNavBarProps) {
   const onArtists = pathname === "/artists" || pathname.startsWith("/artists/");
   const isLandingPage = pathname === "/";
   const [city, setCity] = useState("");
+  const [detailEventCategory, setDetailEventCategory] = useState("");
+  const [lastEventCategory, setLastEventCategory] = useState("");
+
+  useEffect(() => {
+    try {
+      if (pathname === "/events") {
+        if (activeSlug) {
+          sessionStorage.setItem("bmb_last_event_category", activeSlug);
+          setLastEventCategory(activeSlug);
+        } else {
+          sessionStorage.removeItem("bmb_last_event_category");
+          setLastEventCategory("");
+        }
+      } else if (pathname.startsWith("/events/")) {
+        setLastEventCategory(sessionStorage.getItem("bmb_last_event_category") || "");
+      } else {
+        sessionStorage.removeItem("bmb_last_event_category");
+        setLastEventCategory("");
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [pathname, activeSlug]);
+
+  useEffect(() => {
+    const syncCategory = () => {
+      setDetailEventCategory(
+        (document.body.dataset.eventSubnavCategory || "").trim().toLowerCase()
+      );
+    };
+    syncCategory();
+    const observer = new MutationObserver(syncCategory);
+    observer.observe(document.body, {
+      attributes: true,
+      attributeFilter: ["data-event-subnav-category"],
+    });
+    return () => observer.disconnect();
+  }, [pathname]);
+
+  const effectiveEventSlug =
+    activeSlug ||
+    (pathname.startsWith("/events/") ? detailEventCategory || lastEventCategory : "");
 
   useEffect(() => {
     const sync = () => {
@@ -168,11 +210,11 @@ export default function SubNavBar({ isStickyChrome = false }: SubNavBarProps) {
     if (item.match === "artists") return onArtists;
     if (item.match === "events") {
       if (!onEvents) return false;
-      if (!activeSlug && !q) return true;
+      if (!effectiveEventSlug && !q) return true;
       // Highlight Events when category isn't one of the dedicated Concert/Comedy/Music/Sports tabs
       const known = ["concert", "comedy", "music", "sports"] as const;
       const matchesKnown = known.some((key) =>
-        categorySlugsMatch(activeSlug, resolveCategorySlug(key, categories), categories)
+        categorySlugsMatch(effectiveEventSlug, resolveCategorySlug(key, categories), categories)
       );
       return !matchesKnown;
     }
@@ -185,8 +227,8 @@ export default function SubNavBar({ isStickyChrome = false }: SubNavBarProps) {
     if (item.key) {
       if (!onEvents) return false;
       const itemSlug = resolveCategorySlug(item.key, categories);
-      if (activeSlug) {
-        return categorySlugsMatch(activeSlug, itemSlug, categories);
+      if (effectiveEventSlug) {
+        return categorySlugsMatch(effectiveEventSlug, itemSlug, categories);
       }
       return q === item.key;
     }

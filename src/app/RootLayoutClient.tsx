@@ -132,9 +132,14 @@ export default function RootLayoutClient({
     !isListYourShowSubpage &&
     !isPartnerMinimalHeaderPage;
   const showPartnerAuthHeader = isPartnerMinimalHeaderPage;
-  /** Movies category pages use BMS chrome (no site footer / bottom tabs on mobile+tablet) */
+  /** Category + customer account pages use BMS chrome (no site footer on mobile+tablet) */
+  const isProfilePage = pathname === "/customer/profile";
+  const isCustomerAccountPage = Boolean(pathname?.startsWith("/customer"));
   const isMovieListingChrome =
-    pathname === "/movies" || pathname === "/movies/cinemas";
+    pathname === "/movies" ||
+    pathname === "/movies/cinemas" ||
+    pathname === "/dining" ||
+    isCustomerAccountPage;
   const showLayoutFooter =
     showPublicHeader &&
     !isLandingPage &&
@@ -143,9 +148,9 @@ export default function RootLayoutClient({
     !isOrganizerMarketingPage &&
     !isListYourShowPage &&
     !hidePublicChromeForMovieBooking;
-  /** BMS-style sticky bottom tabs — only on public home landing page, hidden on all listing and details pages */
+  /** BMS-style sticky bottom tabs — home landing page & customer profile */
   const showMobileBottomNav =
-    showPublicHeader && !isAuthPage && isLandingPage;
+    showPublicHeader && !isAuthPage && (isLandingPage || isProfilePage);
 
   useEffect(() => {
     const root = document.documentElement;

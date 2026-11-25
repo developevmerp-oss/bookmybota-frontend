@@ -431,6 +431,45 @@ function getBlockAccessDescription(block: StadiumBlock): string {
 
 // ─── Main Stadium Layout Viewer (BookMyShow Flow) ────────────────────────────
 
+/**
+ * Colour palette of the clean festival layout (muted, calm). Sections are matched by name; anything else
+ * falls back to a pastel of the section's own colour.
+ */
+const FESTIVAL_PALETTE = {
+  stage: "#C9C3D3", // muted lavender
+  stageEdge: "#B8B1C8",
+  fanPit: "#E5BFC8", // dusty rose
+  platinum: "#A9C5D4", // steel blue
+  gold: "#E9D0AE", // warm beige
+  silver: "#C4D2C6", // soft sage
+  text: "#263238", // dark charcoal
+  background: "#FAFAF8", // off-white
+};
+
+function festivalFill(name: string | undefined, hex: string | undefined, hovered = false): string {
+  const n = String(name || "");
+  let base: string | null = null;
+  if (/fan\s*pit/i.test(n)) base = FESTIVAL_PALETTE.fanPit;
+  else if (/platinum/i.test(n)) base = FESTIVAL_PALETTE.platinum;
+  else if (/gold/i.test(n)) base = FESTIVAL_PALETTE.gold;
+  else if (/silver/i.test(n)) base = FESTIVAL_PALETTE.silver;
+  if (!base) return pastel(hex, hovered ? 0.68 : 0.8);
+  if (!hovered) return base;
+  // slightly deeper on hover
+  const v = parseInt(base.slice(1), 16);
+  const d = (c: number) => Math.round(c * 0.93);
+  return `rgb(${d((v >> 16) & 255)}, ${d((v >> 8) & 255)}, ${d(v & 255)})`;
+}
+
+/** Soft pastel version of a colour (mixed with white), used by the clean festival layout */
+function pastel(hex: string | undefined, mix = 0.8): string {
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || ""));
+  if (!m) return "#EDE9FE";
+  const n = parseInt(m[1], 16);
+  const c = (v: number) => Math.round(v + (255 - v) * mix);
+  return `rgb(${c((n >> 16) & 255)}, ${c((n >> 8) & 255)}, ${c(n & 255)})`;
+}
+
 export default function StadiumLayoutViewer({
   eventId,
   ticketTypes,
@@ -523,6 +562,8 @@ export default function StadiumLayoutViewer({
   const pitchW = (data as any)?.ground?.width ?? canvasWidth * 0.56;
   const pitchH = (data as any)?.ground?.height ?? canvasHeight * 0.56;
   const pitchRot = (data as any)?.ground?.rotation ?? 0;
+  // Festival / T-stage layouts get a clean look: light card outline (no black frame), soft pastel sections, plain stage
+  const cleanFestival = (data as any)?.ground?.sport_type === "festival_t_stage";
 
   // Fit stadium content (stands + pitch) into the right map pane — not empty canvas margins
   const overviewBounds = useMemo(() => {
@@ -577,7 +618,7 @@ export default function StadiumLayoutViewer({
     }
 
     // Tighter content margin on small panes so the full stadium reads larger
-    const margin = 20;
+    const margin = cleanFestival ? 56 : 20; // the card outline sits 50 units outside the arena
     minX -= margin;
     minY -= margin;
     maxX += margin;
@@ -588,7 +629,7 @@ export default function StadiumLayoutViewer({
       width: Math.max(80, maxX - minX),
       height: Math.max(80, maxY - minY),
     };
-  }, [data?.blocks, canvasWidth, canvasHeight, pitchX, pitchY, pitchW, pitchH]);
+  }, [data?.blocks, canvasWidth, canvasHeight, pitchX, pitchY, pitchW, pitchH, cleanFestival]);
 
   const baseScale = useMemo(() => {
     // Compact screens: tiny edge pad so stadium fills the map pane without clipping
@@ -865,6 +906,42 @@ export default function StadiumLayoutViewer({
         toast.info(`${block.name} is completely sold out.`);
         return;
       }
+      // The customer already chose how many people are coming ("How many seats?"). Tapping a standing stand adds exactly
+      // that many passes straight away, with no extra drawer or "Add" step. Tapping another stand replaces the selection.
+      if (block.stand_type === "standing" && maxSelectable < Number.MAX_SAFE_INTEGER) {
+        const matchedTicketId = block.ticket_type_id || block.tiers?.[0]?.ticket_type_id || "";
+        const tt = ticketTypes.find((t) => t.id === matchedTicketId);
+        const unitPrice = tt ? Number(tt.price) : 0;
+        const left = Math.max(0, Number(block.available) || 0);
+        const qty = Math.max(1, Math.min(maxSelectable, left || maxSelectable));
+        const alreadyHere = selectedSeats.filter(
+          (s) => s.section_name === block.name || s.id.startsWith(`standing-${block.block_id}-`)
+        ).length;
+        setSelectedBlockId(null);
+        setActiveTierId(null);
+        setShowTierPicker(false);
+        setSelectedRow(null);
+        setHoveredSeat(null);
+        if (alreadyHere === qty && selectedSeats.length === qty) return; // this stand already holds the passes
+        const virtualSeats: TierSeat[] = Array.from({ length: qty }, (_, idx) => ({
+          id: `standing-${block.block_id}-${Date.now()}-${idx + 1}`,
+          row_label: "Standing",
+          seat_label: `Pass #${idx + 1}`,
+          coordinate_x: block.x + block.width / 2,
+          coordinate_y: block.y + block.height / 2,
+          status: "AVAILABLE",
+          ticket_type_id: matchedTicketId,
+          section_name: block.name,
+          price: unitPrice,
+        }));
+        setStandingQty(qty);
+        setSelectedSeats(virtualSeats);
+        onSeatsSelected(virtualSeats);
+        if (qty < maxSelectable) toast.info(`Only ${qty} pass${qty === 1 ? "" : "es"} left in ${block.name}`);
+        else toast.success(`${qty} pass${qty === 1 ? "" : "es"} selected for ${block.name}`);
+        return;
+      }
+
       setSelectedBlockId(block.block_id);
       setSelectedRow(null);
       setHoveredSeat(null);
@@ -1033,7 +1110,7 @@ export default function StadiumLayoutViewer({
         easing: Konva.Easings.EaseInOut,
       });
     },
-    [containerSize, canvasWidth, canvasHeight, selectedCategoryFilter, selectedSeats, maxSelectable]
+    [containerSize, canvasWidth, canvasHeight, selectedCategoryFilter, selectedSeats, maxSelectable, ticketTypes, onSeatsSelected]
   );
 
   // Select a tier from the picker → zoom straight into that tier's seats
@@ -2178,7 +2255,8 @@ export default function StadiumLayoutViewer({
                         </div>
                       </div>
 
-                      {/* Bottom Row: Bullet and Access Description */}
+                      {/* Bottom Row: Bullet and Access Description (not shown on the clean festival layout: name and price only) */}
+                      {!cleanFestival && (
                       <div className="flex items-start gap-1.5 mt-1 text-[13px] sm:text-[13.5px] leading-snug text-slate-500">
                         <span
                           className={`shrink-0 select-none text-[13px] leading-none mt-0.5 ${
@@ -2196,6 +2274,7 @@ export default function StadiumLayoutViewer({
                           {accessText}
                         </span>
                       </div>
+                      )}
                     </div>
                   </button>
                 );
@@ -2207,7 +2286,7 @@ export default function StadiumLayoutViewer({
         {/* ── Interactive Konva Canvas (Zoomable Pitch + Stands + Seats) ── */}
         <div
           ref={containerRef}
-          className="flex-1 min-h-0 h-full w-full min-w-0 bg-white relative overflow-hidden flex items-center justify-center cursor-grab active:cursor-grabbing select-none"
+          className={`flex-1 min-h-0 h-full w-full min-w-0 relative overflow-hidden flex items-center justify-center cursor-grab active:cursor-grabbing select-none ${cleanFestival ? "bg-[#FAFAF8]" : "bg-white"}`}
           style={{ touchAction: "none", WebkitUserSelect: "none" }}
         >
         <Stage
@@ -2234,7 +2313,7 @@ export default function StadiumLayoutViewer({
               y={0}
               width={canvasWidth}
               height={canvasHeight}
-              fill="#FFFFFF"
+              fill={cleanFestival ? FESTIVAL_PALETTE.background : "#FFFFFF"}
               perfectDrawEnabled={false}
             />
 
@@ -2256,7 +2335,7 @@ export default function StadiumLayoutViewer({
                   width={pitchW + 100}
                   height={pitchH + 100}
                   fill={
-                    (data as any)?.ground?.track_color ||
+                    cleanFestival ? FESTIVAL_PALETTE.background : (data as any)?.ground?.track_color ||
                     ((data as any)?.ground?.sport_type === "cricket"
                       ? "#052e16"
                       : (data as any)?.ground?.sport_type === "basketball"
@@ -2271,9 +2350,9 @@ export default function StadiumLayoutViewer({
                               ? "#020617"
                               : "#7f1d1d")
                   }
-                  stroke={((data as any)?.ground?.sport_type === "festival_t_stage" && ((data as any)?.ground?.turf_color === "#ffffff" || !(data as any)?.ground?.turf_color || (data as any)?.ground?.turf_color === "#090d16")) ? "#e2e8f0" : "rgba(255,255,255,0.15)"}
-                  strokeWidth={1.5}
-                  cornerRadius={(data as any)?.ground?.sport_type === "cricket" ? (pitchW + 100) / 2 : 40}
+                  stroke={cleanFestival ? "#D6D3D1" : ((data as any)?.ground?.sport_type === "festival_t_stage" && ((data as any)?.ground?.turf_color === "#ffffff" || !(data as any)?.ground?.turf_color || (data as any)?.ground?.turf_color === "#090d16")) ? "#e2e8f0" : "rgba(255,255,255,0.15)"}
+                  strokeWidth={cleanFestival ? 2.5 : 1.5}
+                  cornerRadius={cleanFestival ? 36 : (data as any)?.ground?.sport_type === "cricket" ? (pitchW + 100) / 2 : 40}
                   perfectDrawEnabled={false}
                 />
 
@@ -2507,9 +2586,9 @@ export default function StadiumLayoutViewer({
                     y={0}
                     width={pitchW}
                     height={pitchH}
-                    fill={((data as any)?.ground?.turf_color && (data as any)?.ground?.turf_color !== "#090d16") ? (data as any)?.ground?.turf_color : "#ffffff"}
+                    fill={cleanFestival ? FESTIVAL_PALETTE.background : ((data as any)?.ground?.turf_color && (data as any)?.ground?.turf_color !== "#090d16") ? (data as any)?.ground?.turf_color : "#ffffff"}
                     stroke={((data as any)?.ground?.turf_color && (data as any)?.ground?.turf_color !== "#090d16" && (data as any)?.ground?.turf_color !== "#ffffff") ? "#6366f1" : "#e2e8f0"}
-                    strokeWidth={2}
+                    strokeWidth={cleanFestival ? 0 : 2}
                     cornerRadius={16}
                   />
 
@@ -2521,6 +2600,7 @@ export default function StadiumLayoutViewer({
                     height={pitchH * 0.18}
                     fill={(data as any)?.ground?.stage_color || "#4c1d95"}
                     opacity={((data as any)?.ground?.turf_color && (data as any)?.ground?.turf_color !== "#090d16" && (data as any)?.ground?.turf_color !== "#ffffff") ? 0.35 : 0.12}
+                    visible={!cleanFestival}
                     cornerRadius={12}
                     shadowColor="#a855f7"
                     shadowBlur={20}
@@ -2562,31 +2642,31 @@ export default function StadiumLayoutViewer({
                         <Line
                           points={tStagePoints}
                           closed={true}
-                          fill={stageColor}
-                          stroke="#c084fc"
-                          strokeWidth={3}
+                          fill={cleanFestival ? FESTIVAL_PALETTE.stage : stageColor}
+                          stroke={cleanFestival ? FESTIVAL_PALETTE.stageEdge : "#c084fc"}
+                          strokeWidth={cleanFestival ? 1.5 : 3}
                           lineJoin="round"
                           shadowColor="#a855f7"
-                          shadowBlur={16}
+                          shadowBlur={cleanFestival ? 0 : 16}
                         />
 
                         {/* Stage Rig / Spotlight Accents on Main Deck */}
-                        <Circle x={sX + sW * 0.04} y={sY + sH * 0.22} radius={6} fill="#fbbf24" opacity={0.85} />
-                        <Circle x={sX + sW * 0.10} y={sY + sH * 0.22} radius={6} fill="#ec4899" opacity={0.85} />
-                        <Circle x={sX + sW * 0.90} y={sY + sH * 0.22} radius={6} fill="#ec4899" opacity={0.85} />
-                        <Circle x={sX + sW * 0.96} y={sY + sH * 0.22} radius={6} fill="#fbbf24" opacity={0.85} />
+                        <Circle x={sX + sW * 0.04} y={sY + sH * 0.22} radius={6} fill="#fbbf24" opacity={0.85} visible={!cleanFestival} />
+                        <Circle x={sX + sW * 0.10} y={sY + sH * 0.22} radius={6} fill="#ec4899" opacity={0.85} visible={!cleanFestival} />
+                        <Circle x={sX + sW * 0.90} y={sY + sH * 0.22} radius={6} fill="#ec4899" opacity={0.85} visible={!cleanFestival} />
+                        <Circle x={sX + sW * 0.96} y={sY + sH * 0.22} radius={6} fill="#fbbf24" opacity={0.85} visible={!cleanFestival} />
 
                         {/* Main Stage Label */}
                         {(((ground.stage_label ?? ground.pitch_label) || "MAIN STAGE").trim().length > 0) && (
                           <Text
-                            text={`🎤 ${((ground.stage_label ?? ground.pitch_label) || "MAIN STAGE").trim().toUpperCase()}`}
+                            text={`${cleanFestival ? "" : "🎤 "}${((ground.stage_label ?? ground.pitch_label) || "MAIN STAGE").trim().toUpperCase()}`}
                             x={sX}
                             y={sY + sH * 0.30}
                             width={sW}
                             align="center"
                             fontSize={Math.max(14, pitchH * 0.04)}
                             fontStyle="bold"
-                            fill="#ffffff"
+                            fill={cleanFestival ? FESTIVAL_PALETTE.text : "#ffffff"}
                           />
                         )}
 
@@ -2597,6 +2677,7 @@ export default function StadiumLayoutViewer({
                             cX + cW * 0.10, cBottom - 6
                           ]}
                           stroke="#e9d5ff"
+                          visible={!cleanFestival}
                           strokeWidth={2}
                           dash={[4, 6]}
                           opacity={0.8}
@@ -2607,6 +2688,7 @@ export default function StadiumLayoutViewer({
                             cX + cW * 0.90, cBottom - 6
                           ]}
                           stroke="#e9d5ff"
+                          visible={!cleanFestival}
                           strokeWidth={2}
                           dash={[4, 6]}
                           opacity={0.8}
@@ -2626,74 +2708,12 @@ export default function StadiumLayoutViewer({
                           />
                         )}
 
-                        {/* Crowd Control Barricades around the Stage & Runway */}
-                        <Line
-                          points={[
-                            pitchW * 0.08, sBottom + 2,
-                            cX - 12, sBottom + 2
-                          ]}
-                          stroke="#94a3b8"
-                          strokeWidth={1.5}
-                          dash={[5, 5]}
-                          opacity={0.7}
-                        />
-                        <Line
-                          points={[
-                            cX + cW + 12, sBottom + 2,
-                            pitchW * 0.92, sBottom + 2
-                          ]}
-                          stroke="#94a3b8"
-                          strokeWidth={1.5}
-                          dash={[5, 5]}
-                          opacity={0.7}
-                        />
-                        <Line
-                          points={[
-                            cX - 12, sBottom + 2,
-                            cX - 12, cBottom + 12
-                          ]}
-                          stroke="#94a3b8"
-                          strokeWidth={1.5}
-                          dash={[5, 5]}
-                          opacity={0.7}
-                        />
-                        <Line
-                          points={[
-                            cX + cW + 12, sBottom + 2,
-                            cX + cW + 12, cBottom + 12
-                          ]}
-                          stroke="#94a3b8"
-                          strokeWidth={1.5}
-                          dash={[5, 5]}
-                          opacity={0.7}
-                        />
+                        {/* (the dotted crowd-barricade lines were removed: clean layout) */}
                       </>
                     );
                   })()}
 
-                  {/* FOH Audio Console / Sound Booth */}
-                  <Rect
-                    x={pitchW * 0.44}
-                    y={pitchH * 0.92}
-                    width={pitchW * 0.12}
-                    height={pitchH * 0.06}
-                    fill="#1e1b4b"
-                    stroke="#4338ca"
-                    strokeWidth={1.5}
-                    cornerRadius={4}
-                    opacity={0.65}
-                  />
-                  <Text
-                    text="🎛️ FOH / AUDIO"
-                    x={pitchW * 0.44}
-                    y={pitchH * 0.92 + pitchH * 0.015}
-                    width={pitchW * 0.12}
-                    align="center"
-                    fontSize={9}
-                    fontStyle="bold"
-                    fill="#818cf8"
-                    opacity={0.75}
-                  />
+                  {/* (the FOH / AUDIO booth was removed: clean layout) */}
                 </>
               ) : ((data as any)?.ground?.sport_type === "custom") ? (
                 // 🔲 5. CUSTOM / MULTI-PURPOSE PITCH
@@ -3481,25 +3501,35 @@ export default function StadiumLayoutViewer({
                         width={block.width}
                         height={block.height}
                         fill={
-                          isSelected
+                          cleanFestival
                             ? isSoldOut
                               ? "#E2E8F0"
-                              : "#F3E8FF"
-                            : isSoldOut
-                              ? "#94A3B8"
-                              : block.color || "#2563eb"
-                        }
-                        opacity={isSelected ? 0.92 : 0.95}
-                        stroke={
-                          isSelected
-                            ? "#6900AA"
-                            : isHovered
-                              ? "#6900AA"
+                              : festivalFill(block.name, block.color, isHovered && !(isSelected || hasPicks))
+                            : isSelected
+                              ? isSoldOut
+                                ? "#E2E8F0"
+                                : "#F3E8FF"
                               : isSoldOut
                                 ? "#94A3B8"
-                                : "rgba(15,23,42,0.18)"
+                                : block.color || "#2563eb"
                         }
-                        strokeWidth={isSelected ? 4 : isHovered ? 3 : 1.5}
+                        opacity={cleanFestival ? 1 : isSelected ? 0.92 : 0.95}
+                        stroke={
+                          cleanFestival
+                            ? isSelected || hasPicks
+                              ? "#6900AA"
+                              : isHovered
+                                ? "#A78BFA"
+                                : "rgba(0,0,0,0)"
+                            : isSelected
+                              ? "#6900AA"
+                              : isHovered
+                                ? "#6900AA"
+                                : isSoldOut
+                                  ? "#94A3B8"
+                                  : "rgba(15,23,42,0.18)"
+                        }
+                        strokeWidth={cleanFestival ? (isSelected || hasPicks ? 3 : isHovered ? 2 : 0) : isSelected ? 4 : isHovered ? 3 : 1.5}
                         cornerRadius={
                           (block as any).shape === "pill"
                             ? Math.min(block.width, block.height) / 2
@@ -3513,8 +3543,8 @@ export default function StadiumLayoutViewer({
                               : 12
                         }
                         shadowColor="#0f172a"
-                        shadowBlur={isHovered || isSelected ? 10 : 4}
-                        shadowOpacity={0.12}
+                        shadowBlur={cleanFestival ? 0 : isHovered || isSelected ? 10 : 4}
+                        shadowOpacity={cleanFestival ? 0 : 0.12}
                         perfectDrawEnabled={false}
                       />
 
@@ -3522,24 +3552,66 @@ export default function StadiumLayoutViewer({
                       {!isSelected && (
                         <>
                           <Text
-                            text={isStanding ? `🧍 ${block.name.toUpperCase()}` : block.name.toUpperCase()}
+                            text={cleanFestival ? block.name.toUpperCase() : isStanding ? `🧍 ${block.name.toUpperCase()}` : block.name.toUpperCase()}
                             x={0}
-                            y={Math.max(6, block.height * 0.12)}
+                            y={
+                              cleanFestival
+                                ? hasPicks || isSoldOut
+                                  ? block.height * 0.28
+                                  : (block.height - Math.max(15, Math.min(block.width, block.height) * 0.19) * mapLabelScale) / 2
+                                : Math.max(6, block.height * 0.12)
+                            }
                             width={block.width}
                             align="center"
-                            fontSize={Math.max(13, Math.min(block.width, block.height) * 0.15) * mapLabelScale}
+                            fontSize={cleanFestival ? Math.max(15, Math.min(block.width, block.height) * 0.19) * mapLabelScale : Math.max(13, Math.min(block.width, block.height) * 0.15) * mapLabelScale}
                             fontStyle="bold"
-                            fill={isSoldOut ? "#94a3b8" : "#ffffff"}
+                            fill={cleanFestival ? (isSoldOut ? "#94a3b8" : FESTIVAL_PALETTE.text) : isSoldOut ? "#94a3b8" : "#ffffff"}
                             shadowColor="#000000"
-                            shadowBlur={6}
-                            shadowOpacity={0.65}
+                            shadowBlur={cleanFestival ? 0 : 6}
+                            shadowOpacity={cleanFestival ? 0 : 0.65}
                             listening={false}
                             wrap="none"
                             ellipsis={true}
                             perfectDrawEnabled={false}
                           />
 
-                          {block.total > 0 && (
+                          {cleanFestival && block.total > 0 && (
+                            <>
+                              {/* only the name is shown on the map; the price is in the list. Status text only when it matters */}
+                              {isSoldOut && (
+                                <Text
+                                  text="SOLD OUT"
+                                  x={0}
+                                  y={block.height * 0.6}
+                                  width={block.width}
+                                  align="center"
+                                  fontSize={Math.max(11, Math.min(block.width, block.height) * 0.12) * mapLabelScale}
+                                  fontStyle="bold"
+                                  fill="#DC2626"
+                                  listening={false}
+                                  wrap="none"
+                                  perfectDrawEnabled={false}
+                                />
+                              )}
+                              {hasPicks && (
+                                <Text
+                                  text={`✓ ${blockSelectedSeats.length} selected`}
+                                  x={0}
+                                  y={block.height * 0.6}
+                                  width={block.width}
+                                  align="center"
+                                  fontSize={Math.max(11, Math.min(block.width, block.height) * 0.12) * mapLabelScale}
+                                  fontStyle="bold"
+                                  fill="#6900AA"
+                                  listening={false}
+                                  wrap="none"
+                                  perfectDrawEnabled={false}
+                                />
+                              )}
+                            </>
+                          )}
+
+                          {!cleanFestival && block.total > 0 && (
                             <Group x={block.width / 2} y={Math.max(28, block.height * 0.54)}>
                               {(() => {
                                 const pillText = minPrice != null && minPrice > 0 
@@ -3595,7 +3667,7 @@ export default function StadiumLayoutViewer({
                   )}
 
                   {/* Click to Zoom In / Pick Passes Hint on Hover */}
-                  {isHovered && !selectedBlockId && !isSoldOut && (
+                  {isHovered && !selectedBlockId && !isSoldOut && !cleanFestival && (
                     <Text
                       text={isStanding ? "🧍 Click to Pick Passes" : "🔍 Click to Zoom In"}
                       x={0}
@@ -3604,7 +3676,7 @@ export default function StadiumLayoutViewer({
                       align="center"
                       fontSize={11}
                       fontStyle="bold"
-                      fill="#ffffff"
+                      fill={cleanFestival ? "#6900AA" : "#ffffff"}
                       listening={false}
                       perfectDrawEnabled={false}
                     />

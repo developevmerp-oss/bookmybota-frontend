@@ -52,7 +52,7 @@ export default function EventClassicSeatPicker({
           seatMarker={(seat: any) => {
             const picked = selectedIds.has(String(seat.id));
             const free = String(seat.status || "").toUpperCase() === "AVAILABLE";
-            if (picked) return { fill: "#6900AA", stroke: "#4c0080", strokeWidth: 2, cursor: "pointer", onClick: () => toggle(seat), title: `${seat.row_label}${seat.seat_label} — selected` };
+            if (picked) return { fill: "#7B61FF", stroke: "#7B61FF", strokeWidth: 1, cursor: "pointer", onClick: () => toggle(seat), title: `${seat.row_label}${seat.seat_label} — selected` };
             if (!free) return { fill: "#e5e7eb", stroke: "#e5e7eb", cursor: "not-allowed", title: "Not available" };
             return { stroke: "#22c55e", cursor: "pointer", onClick: () => toggle(seat), title: `${seat.row_label}${seat.seat_label}` };
           }}
@@ -60,7 +60,7 @@ export default function EventClassicSeatPicker({
       </div>
       <div className="flex flex-wrap items-center justify-center gap-4 border-t border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
         <span className="flex items-center gap-1.5"><i className="size-3.5 rounded border-2 border-green-500 bg-white" /> Available</span>
-        <span className="flex items-center gap-1.5"><i className="size-3.5 rounded bg-[#6900AA]" /> Selected</span>
+        <span className="flex items-center gap-1.5"><i className="size-3.5 rounded bg-[#7B61FF] shadow-[0_0_0_2px_rgba(123,97,255,0.22)]" /> Selected</span>
         <span className="flex items-center gap-1.5"><i className="size-3.5 rounded bg-slate-200" /> Sold / held</span>
       </div>
     </div>

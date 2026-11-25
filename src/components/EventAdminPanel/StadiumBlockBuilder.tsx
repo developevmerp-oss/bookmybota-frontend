@@ -3183,6 +3183,45 @@ function CustomerStadiumPreviewModal({
 
 // ─── Main StadiumBlockBuilder Component ──────────────────────────────────────
 
+/**
+ * Colour palette of the clean festival layout (muted, calm). Sections are matched by name; anything else
+ * falls back to a pastel of the section's own colour.
+ */
+const FESTIVAL_PALETTE = {
+  stage: "#C9C3D3", // muted lavender
+  stageEdge: "#B8B1C8",
+  fanPit: "#E5BFC8", // dusty rose
+  platinum: "#A9C5D4", // steel blue
+  gold: "#E9D0AE", // warm beige
+  silver: "#C4D2C6", // soft sage
+  text: "#263238", // dark charcoal
+  background: "#FAFAF8", // off-white
+};
+
+function festivalFill(name: string | undefined, hex: string | undefined, hovered = false): string {
+  const n = String(name || "");
+  let base: string | null = null;
+  if (/fan\s*pit/i.test(n)) base = FESTIVAL_PALETTE.fanPit;
+  else if (/platinum/i.test(n)) base = FESTIVAL_PALETTE.platinum;
+  else if (/gold/i.test(n)) base = FESTIVAL_PALETTE.gold;
+  else if (/silver/i.test(n)) base = FESTIVAL_PALETTE.silver;
+  if (!base) return pastel(hex, hovered ? 0.68 : 0.8);
+  if (!hovered) return base;
+  // slightly deeper on hover
+  const v = parseInt(base.slice(1), 16);
+  const d = (c: number) => Math.round(c * 0.93);
+  return `rgb(${d((v >> 16) & 255)}, ${d((v >> 8) & 255)}, ${d(v & 255)})`;
+}
+
+/** Soft pastel version of a colour (mixed with white), used by the clean festival layout (same as the customer page) */
+function pastel(hex: string | undefined, mix = 0.8): string {
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || ""));
+  if (!m) return "#EDE9FE";
+  const n = parseInt(m[1], 16);
+  const c = (v: number) => Math.round(v + (255 - v) * mix);
+  return `rgb(${c((n >> 16) & 255)}, ${c((n >> 8) & 255)}, ${c(n & 255)})`;
+}
+
 export default function StadiumBlockBuilder({
   ticketTypes,
   initialConfig,
@@ -3284,6 +3323,8 @@ export default function StadiumBlockBuilder({
   const pitchH = groundConfig.height ?? PITCH_H;
   const pitchRot = groundConfig.rotation ?? 0;
   const isPitchSelected = selectedId === "ground-pitch";
+  // Festival / T-stage layouts use the same clean look as the customer page: light card, plain stage, pastel name-only sections
+  const cleanFestival = groundConfig.sport_type === "festival_t_stage";
 
   // Update container dimensions
   useEffect(() => {
@@ -4464,7 +4505,7 @@ export default function StadiumBlockBuilder({
                   width={pitchW + 100}
                   height={pitchH + 100}
                   fill={
-                    groundConfig.track_color ||
+                    cleanFestival ? FESTIVAL_PALETTE.background : groundConfig.track_color ||
                     (groundConfig.sport_type === "cricket"
                       ? "#052e16"
                       : groundConfig.sport_type === "basketball"
@@ -4477,9 +4518,9 @@ export default function StadiumBlockBuilder({
                               ? "#020617"
                               : "#7f1d1d")
                   }
-                  stroke={isPitchSelected ? "#38bdf8" : (groundConfig.sport_type === "festival_t_stage" && (groundConfig.turf_color === "#ffffff" || !groundConfig.turf_color)) ? "#e2e8f0" : "rgba(255,255,255,0.15)"}
-                  strokeWidth={isPitchSelected ? 3.5 : 1.5}
-                  cornerRadius={groundConfig.sport_type === "cricket" ? (pitchW + 100) / 2 : 40}
+                  stroke={isPitchSelected ? "#38bdf8" : cleanFestival ? "#D6D3D1" : (groundConfig.sport_type === "festival_t_stage" && (groundConfig.turf_color === "#ffffff" || !groundConfig.turf_color)) ? "#e2e8f0" : "rgba(255,255,255,0.15)"}
+                  strokeWidth={isPitchSelected ? 3.5 : cleanFestival ? 2.5 : 1.5}
+                  cornerRadius={cleanFestival ? 36 : groundConfig.sport_type === "cricket" ? (pitchW + 100) / 2 : 40}
                   perfectDrawEnabled={false}
                 />
 
@@ -4716,9 +4757,9 @@ export default function StadiumBlockBuilder({
                       y={0}
                       width={pitchW}
                       height={pitchH}
-                      fill={groundConfig.turf_color || "#ffffff"}
+                      fill={cleanFestival ? FESTIVAL_PALETTE.background : groundConfig.turf_color || "#ffffff"}
                       stroke={groundConfig.turf_color === "#ffffff" || !groundConfig.turf_color ? "#e2e8f0" : "#6366f1"}
-                      strokeWidth={2}
+                      strokeWidth={cleanFestival ? 0 : 2}
                       cornerRadius={16}
                     />
 
@@ -4730,6 +4771,7 @@ export default function StadiumBlockBuilder({
                       height={pitchH * 0.18}
                       fill={groundConfig.stage_color || "#4c1d95"}
                       opacity={groundConfig.turf_color === "#ffffff" || !groundConfig.turf_color ? 0.12 : 0.35}
+                      visible={!cleanFestival}
                       cornerRadius={12}
                       shadowColor="#a855f7"
                       shadowBlur={20}
@@ -4770,31 +4812,31 @@ export default function StadiumBlockBuilder({
                           <Line
                             points={tStagePoints}
                             closed={true}
-                            fill={stageColor}
-                            stroke="#c084fc"
-                            strokeWidth={3}
+                            fill={cleanFestival ? FESTIVAL_PALETTE.stage : stageColor}
+                            stroke={cleanFestival ? FESTIVAL_PALETTE.stageEdge : "#c084fc"}
+                            strokeWidth={cleanFestival ? 1.5 : 3}
                             lineJoin="round"
                             shadowColor="#a855f7"
-                            shadowBlur={16}
+                            shadowBlur={cleanFestival ? 0 : 16}
                           />
 
                           {/* Stage Rig / Spotlight Accents on Main Deck */}
-                          <Circle x={sX + sW * 0.04} y={sY + sH * 0.22} radius={6} fill="#fbbf24" opacity={0.85} />
-                          <Circle x={sX + sW * 0.10} y={sY + sH * 0.22} radius={6} fill="#ec4899" opacity={0.85} />
-                          <Circle x={sX + sW * 0.90} y={sY + sH * 0.22} radius={6} fill="#ec4899" opacity={0.85} />
-                          <Circle x={sX + sW * 0.96} y={sY + sH * 0.22} radius={6} fill="#fbbf24" opacity={0.85} />
+                          <Circle x={sX + sW * 0.04} y={sY + sH * 0.22} radius={6} fill="#fbbf24" opacity={0.85} visible={!cleanFestival} />
+                          <Circle x={sX + sW * 0.10} y={sY + sH * 0.22} radius={6} fill="#ec4899" opacity={0.85} visible={!cleanFestival} />
+                          <Circle x={sX + sW * 0.90} y={sY + sH * 0.22} radius={6} fill="#ec4899" opacity={0.85} visible={!cleanFestival} />
+                          <Circle x={sX + sW * 0.96} y={sY + sH * 0.22} radius={6} fill="#fbbf24" opacity={0.85} visible={!cleanFestival} />
 
                           {/* Main Stage Label */}
                           {((groundConfig.stage_label ?? groundConfig.pitch_label) || "MAIN STAGE").trim().length > 0 && (
                             <Text
-                              text={`🎤 ${((groundConfig.stage_label ?? groundConfig.pitch_label) || "MAIN STAGE").trim().toUpperCase()}`}
+                              text={`${cleanFestival ? "" : "🎤 "}${((groundConfig.stage_label ?? groundConfig.pitch_label) || "MAIN STAGE").trim().toUpperCase()}`}
                               x={sX}
                               y={sY + sH * 0.30}
                               width={sW}
                               align="center"
                               fontSize={Math.max(14, pitchH * 0.04)}
                               fontStyle="bold"
-                              fill="#ffffff"
+                              fill={cleanFestival ? FESTIVAL_PALETTE.text : "#ffffff"}
                             />
                           )}
 
@@ -4805,6 +4847,7 @@ export default function StadiumBlockBuilder({
                               cX + cW * 0.10, cBottom - 6
                             ]}
                             stroke="#e9d5ff"
+                            visible={!cleanFestival}
                             strokeWidth={2}
                             dash={[4, 6]}
                             opacity={0.8}
@@ -4815,6 +4858,7 @@ export default function StadiumBlockBuilder({
                               cX + cW * 0.90, cBottom - 6
                             ]}
                             stroke="#e9d5ff"
+                            visible={!cleanFestival}
                             strokeWidth={2}
                             dash={[4, 6]}
                             opacity={0.8}
@@ -4834,74 +4878,12 @@ export default function StadiumBlockBuilder({
                             />
                           )}
 
-                          {/* Crowd Control Barricades around the Stage & Runway */}
-                          <Line
-                            points={[
-                              pitchW * 0.08, sBottom + 2,
-                              cX - 12, sBottom + 2
-                            ]}
-                            stroke="#94a3b8"
-                            strokeWidth={1.5}
-                            dash={[5, 5]}
-                            opacity={0.7}
-                          />
-                          <Line
-                            points={[
-                              cX + cW + 12, sBottom + 2,
-                              pitchW * 0.92, sBottom + 2
-                            ]}
-                            stroke="#94a3b8"
-                            strokeWidth={1.5}
-                            dash={[5, 5]}
-                            opacity={0.7}
-                          />
-                          <Line
-                            points={[
-                              cX - 12, sBottom + 2,
-                              cX - 12, cBottom + 12
-                            ]}
-                            stroke="#94a3b8"
-                            strokeWidth={1.5}
-                            dash={[5, 5]}
-                            opacity={0.7}
-                          />
-                          <Line
-                            points={[
-                              cX + cW + 12, sBottom + 2,
-                              cX + cW + 12, cBottom + 12
-                            ]}
-                            stroke="#94a3b8"
-                            strokeWidth={1.5}
-                            dash={[5, 5]}
-                            opacity={0.7}
-                          />
+                        {/* (the dotted crowd-barricade lines were removed: clean layout) */}
                         </>
                       );
                     })()}
 
-                    {/* FOH Audio Console / Sound Booth */}
-                    <Rect
-                      x={pitchW * 0.44}
-                      y={pitchH * 0.92}
-                      width={pitchW * 0.12}
-                      height={pitchH * 0.06}
-                      fill="#1e1b4b"
-                      stroke="#4338ca"
-                      strokeWidth={1.5}
-                      cornerRadius={4}
-                      opacity={0.65}
-                    />
-                    <Text
-                      text="🎛️ FOH / AUDIO"
-                      x={pitchW * 0.44}
-                      y={pitchH * 0.92 + pitchH * 0.015}
-                      width={pitchW * 0.12}
-                      align="center"
-                      fontSize={9}
-                      fontStyle="bold"
-                      fill="#818cf8"
-                      opacity={0.75}
-                    />
+                  {/* (the FOH / AUDIO booth was removed: clean layout) */}
                   </>
                 ) : groundConfig.sport_type === "custom" ? (
                   // 🔲 5. CUSTOM / MULTI-PURPOSE PITCH
@@ -5569,10 +5551,10 @@ export default function StadiumBlockBuilder({
                           y={0}
                           width={block.width}
                           height={block.height}
-                          fill={block.tiers?.[0]?.color || block.color}
-                          opacity={0.92}
-                          stroke={isSelected ? "#ffffff" : "rgba(255,255,255,0.4)"}
-                          strokeWidth={isSelected ? 4.5 : 2}
+                          fill={cleanFestival ? festivalFill(block.name, block.tiers?.[0]?.color || block.color) : block.tiers?.[0]?.color || block.color}
+                          opacity={cleanFestival ? 1 : 0.92}
+                          stroke={cleanFestival ? (isSelected ? "#6900AA" : "rgba(0,0,0,0)") : isSelected ? "#ffffff" : "rgba(255,255,255,0.4)"}
+                          strokeWidth={cleanFestival ? (isSelected ? 3 : 0) : isSelected ? 4.5 : 2}
                           cornerRadius={
                             block.shape === "pill"
                               ? Math.min(block.width, block.height) / 2
@@ -5586,25 +5568,26 @@ export default function StadiumBlockBuilder({
                                 : 14
                           }
                           shadowColor={isSelected ? "#ffffff" : "#000000"}
-                          shadowBlur={isSelected ? 18 : 8}
-                          shadowOpacity={isSelected ? 0.9 : 0.4}
+                          shadowBlur={cleanFestival ? 0 : isSelected ? 18 : 8}
+                          shadowOpacity={cleanFestival ? 0 : isSelected ? 0.9 : 0.4}
                         />
                         <Text
                           text={block.name.toUpperCase()}
                           x={4}
-                          y={Math.max(6, block.height * 0.15)}
+                          y={cleanFestival ? (block.height - Math.max(15, Math.min(block.width, block.height) * 0.19)) / 2 : Math.max(6, block.height * 0.15)}
                           width={block.width - 8}
                           align="center"
-                          fontSize={Math.max(14, Math.min(block.width, block.height) * 0.16)}
+                          fontSize={cleanFestival ? Math.max(15, Math.min(block.width, block.height) * 0.19) : Math.max(14, Math.min(block.width, block.height) * 0.16)}
                           fontStyle="bold"
-                          fill="#ffffff"
+                          fill={cleanFestival ? FESTIVAL_PALETTE.text : "#ffffff"}
                           shadowColor="#000000"
-                          shadowBlur={4}
+                          shadowBlur={cleanFestival ? 0 : 4}
                           listening={false}
                           wrap="none"
                           ellipsis={true}
                         />
                         <Text
+                          visible={!cleanFestival}
                           text={
                             block.stand_type === "standing"
                               ? `🧍 STANDING · ${totalSeats.toLocaleString()} passes`

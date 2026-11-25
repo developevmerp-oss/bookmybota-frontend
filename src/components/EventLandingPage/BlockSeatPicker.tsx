@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { ArrowLeft, Armchair, X } from "lucide-react";
+import { useMapZoom } from "@/components/venue/useMapZoom";
 
 const Stadium3DView = dynamic(() => import("@/components/EventLandingPage/StadiumModelView"), {
   ssr: false,
@@ -102,6 +103,12 @@ export default function BlockSeatPicker({
   const [category, setCategory] = useState<string | null>(null);
   const [showView, setShowView] = useState(true);
   const [liveOpen, setLiveOpen] = useState(false);
+  // The "Your seats are ready" panel (Change seats / Book these seats). Its ✕ hides it so the customer is back on
+  // the map with no block selected and can tap a block again; it comes back when the seats change.
+  const [readyDismissed, setReadyDismissed] = useState(false);
+  // Zoom of the sections map: pinch / ctrl+wheel / the + - buttons zoom only the map, not the whole page
+  const mapBoxRef = useRef<HTMLDivElement>(null);
+  const { zoom: mapZoom, controls: mapZoomControls } = useMapZoom(mapBoxRef, { min: 1, max: 4 });
 
   useEffect(() => {
     const ids = new Set(initialSelectedSeats.map((i: any) => String(i.id || i.seat_identifier)));
@@ -180,6 +187,7 @@ export default function BlockSeatPicker({
   }, [block, seatsByBlock]);
 
   const toggle = (s: EventSeat) => {
+    setReadyDismissed(false);
     const isSel = selected.some((x) => x.id === s.id);
     let next: EventSeat[];
     if (isSel) next = selected.filter((x) => x.id !== s.id);
@@ -195,12 +203,28 @@ export default function BlockSeatPicker({
     const id = lastSeat?.block_id ? String(lastSeat.block_id) : String(selected.find((x) => x.block_id)?.block_id || "");
     if (id) {
       setCategory(null);
+      setReadyDismissed(false);
       setBlockId(id);
     }
   };
   useEffect(() => {
-    if (!lastSeat) setLiveOpen(false);
+    if (!lastSeat) {
+      setLiveOpen(false);
+      setReadyDismissed(false);
+    }
   }, [lastSeat]);
+  // true while the "Your seats are ready" panel should be on screen
+  const showReady = selected.length > 0 && !readyDismissed;
+  // As soon as a seat is picked, start loading the live stadium view (code, seat positions, 3D model) in the
+  // background, so the first time the customer opens it, it is ready and appears complete
+  const hasSeat = Boolean(lastSeat);
+  useEffect(() => {
+    if (!hasSeat) return;
+    import("@/components/EventLandingPage/StadiumModelView")
+      .then((m) => m.preloadStadium(String(cfg.stadium_model || "football")))
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasSeat]);
   useEffect(() => {
     if (!selected.length) return;
     const t = setTimeout(() => {
@@ -268,15 +292,15 @@ export default function BlockSeatPicker({
     <div className="flex h-full min-h-0 flex-col">
       {!block ? (
         <div className="relative p-5 text-center text-slate-500">
-          {selected.length > 0 ? (
-            <button type="button" aria-label="Cancel and pick seats in your block" onClick={openMyBlock} className="absolute right-3 top-3 cursor-pointer rounded-full p-1.5 text-slate-300 hover:bg-white/10 hover:text-white">
+          {showReady ? (
+            <button type="button" aria-label="Close and choose a block on the map" onClick={() => { setBlockId(null); setCategory(null); setReadyDismissed(true); }} className="absolute right-3 top-3 cursor-pointer rounded-full p-1.5 text-slate-300 hover:bg-white/10 hover:text-white">
               <X size={18} />
             </button>
           ) : null}
           <Armchair className="mx-auto mb-2 size-8 text-slate-300" />
-          <p className="text-base font-bold text-white">{selected.length > 0 ? "Your seats are ready" : "Choose a section"}</p>
-          <p className="mt-1 text-sm">{selected.length > 0 ? "Book them now, or tap a block on the map to change seats." : "Tap a block on the map. Colours show the price category."}</p>
-          {selected.length > 0 ? (
+          <p className="text-base font-bold text-white">{showReady ? "Your seats are ready" : "Choose a section"}</p>
+          <p className="mt-1 text-sm">{showReady ? "Book them now, or tap a block on the map to change seats." : "Tap a block on the map. Colours show the price category."}</p>
+          {showReady ? (
             <>
               <p className="mt-4 rounded-xl bg-purple-50 px-3 py-2 text-sm font-semibold text-purple-900">
                 {selected.length} seat{selected.length === 1 ? "" : "s"} selected · {money(total)}
@@ -445,8 +469,9 @@ export default function BlockSeatPicker({
           ))}
         </div>
 
-        <div className="min-h-0 flex-1 p-2 sm:p-4">
-          <svg viewBox={`${bounds.x} ${bounds.y} ${bounds.w} ${bounds.h}`} className="h-full w-full" style={{ background: "#0b0f17" }} role="group" aria-label="Stadium sections">
+        <div className="relative min-h-0 flex-1">
+         <div ref={mapBoxRef} className="h-full w-full overflow-auto p-2 sm:p-4">
+          <svg viewBox={`${bounds.x} ${bounds.y} ${bounds.w} ${bounds.h}`} style={{ background: "#0b0f17", width: `${mapZoom * 100}%`, height: `${mapZoom * 100}%`, minWidth: "100%", minHeight: "100%" }} role="group" aria-label="Stadium sections">
             {ground ? <polygon points={poly(ground)} fill="#14532d" /> : null}
             {pitch ? <polygon points={poly(pitch)} fill="#1f7a3a" stroke="#ffffff" strokeOpacity="0.7" strokeWidth="2" /> : null}
             {blocks.map((b) => {
@@ -461,7 +486,10 @@ export default function BlockSeatPicker({
                 <g
                   key={b.id}
                   onClick={() => {
-                    if (!dim) setBlockId(b.id);
+                    if (!dim) {
+                      setReadyDismissed(false);
+                      setBlockId(b.id);
+                    }
                   }}
                   className={dim ? "opacity-25" : "cursor-pointer"}
                 >
@@ -479,6 +507,8 @@ export default function BlockSeatPicker({
               );
             })}
           </svg>
+         </div>
+         {mapZoomControls}
         </div>
       </div>
 
@@ -490,7 +520,7 @@ export default function BlockSeatPicker({
       {/* Bottom sheet on phones and tablets */}
       <div
         className={`fixed inset-x-0 bottom-20 z-40 flex max-h-[70vh] flex-col overflow-hidden rounded-t-3xl border-t border-white/10 bg-[#111826] text-slate-100 shadow-[0_-12px_40px_rgba(0,0,0,0.6)] transition-transform duration-200 lg:hidden ${
-          block || selected.length > 0 ? "translate-y-0" : "translate-y-full"
+          block || showReady ? "translate-y-0" : "translate-y-full"
         }`}
       >
         {sheet}

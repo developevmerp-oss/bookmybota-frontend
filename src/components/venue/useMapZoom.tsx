@@ -8,11 +8,28 @@ import { Minus, Plus } from "lucide-react";
  * because pinch / ctrl+wheel on the box is handled here and kept away from the browser's own page zoom.
  * `zoom` is a multiplier (1 = fit to the box) that the map multiplies its own fit scale with.
  */
-export function useMapZoom(boxRef: RefObject<HTMLElement | null>, { min = 1, max = 3 } = {}) {
+export function useMapZoom(boxRef: RefObject<HTMLElement | null>, { min = 0.5, max = 3 } = {}) {
   const [zoom, setZoom] = useState(1);
   const zoomRef = useRef(1);
   zoomRef.current = zoom;
   const clamp = (v: number) => Math.min(max, Math.max(min, Math.round(v * 100) / 100));
+
+  const applyButtonZoom = (nextRaw: number) => {
+    const prev = zoomRef.current;
+    const next = clamp(nextRaw);
+    if (next === prev) return;
+    setZoom(next);
+    const el = boxRef.current;
+    if (el) {
+      const ratio = next / prev;
+      const cx = el.scrollLeft + el.clientWidth / 2;
+      const cy = el.scrollTop + el.clientHeight / 2;
+      requestAnimationFrame(() => {
+        el.scrollLeft = Math.max(0, cx * ratio - el.clientWidth / 2);
+        el.scrollTop = Math.max(0, cy * ratio - el.clientHeight / 2);
+      });
+    }
+  };
 
   useEffect(() => {
     const el = boxRef.current;
@@ -56,10 +73,22 @@ export function useMapZoom(boxRef: RefObject<HTMLElement | null>, { min = 1, max
 
   const controls = (
     <div className="pointer-events-auto absolute bottom-3 right-3 z-10 flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
-      <button type="button" aria-label="Zoom in" onClick={() => setZoom((z) => clamp(z + 0.25))} className="flex size-9 cursor-pointer items-center justify-center text-slate-700 hover:bg-slate-100">
+      <button
+        type="button"
+        aria-label="Zoom in"
+        disabled={zoom >= max}
+        onClick={() => applyButtonZoom(zoom + 0.25)}
+        className="flex size-9 cursor-pointer items-center justify-center text-slate-700 hover:bg-slate-100 disabled:opacity-35 disabled:cursor-not-allowed"
+      >
         <Plus className="size-4" />
       </button>
-      <button type="button" aria-label="Zoom out" onClick={() => setZoom((z) => clamp(z - 0.25))} className="flex size-9 cursor-pointer items-center justify-center border-t border-slate-200 text-slate-700 hover:bg-slate-100">
+      <button
+        type="button"
+        aria-label="Zoom out"
+        disabled={zoom <= min}
+        onClick={() => applyButtonZoom(zoom - 0.25)}
+        className="flex size-9 cursor-pointer items-center justify-center border-t border-slate-200 text-slate-700 hover:bg-slate-100 disabled:opacity-35 disabled:cursor-not-allowed"
+      >
         <Minus className="size-4" />
       </button>
     </div>

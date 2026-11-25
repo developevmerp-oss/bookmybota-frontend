@@ -159,15 +159,16 @@ export function bookingWidgetOfferLabel(raw: unknown): string | null {
 }
 
 export function formatDiningOfferDiscount(offer: DiningOffer): string {
+  const cleanNum = (v: unknown) => (Number.isFinite(Number(v)) ? Number(v) : v);
   if (offer.discount_type === "FLAT" && offer.discount_value != null) {
-    return `${offer.discount_value} ETB off`;
+    return `${cleanNum(offer.discount_value)} ETB off`;
   }
   if (offer.discount_type === "PERCENT" && offer.discount_value != null) {
     const max =
       offer.max_discount != null && offer.max_discount > 0
-        ? ` (max ${offer.max_discount} ETB)`
+        ? ` (max ${cleanNum(offer.max_discount)} ETB)`
         : "";
-    return `${offer.discount_value}% off${max}`;
+    return `${cleanNum(offer.discount_value)}% off${max}`;
   }
   return offer.title || "Offer";
 }

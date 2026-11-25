@@ -162,7 +162,7 @@ function HeaderScrollArrows({
 }) {
   if (!canScroll.overflow) return null;
   return (
-    <div className="flex items-center gap-2 shrink-0">
+    <div className="hidden lg:flex items-center gap-2 shrink-0">
       <button
         type="button"
         aria-label="Scroll left"
@@ -198,7 +198,7 @@ function HScroll({
   const { ref, canScroll, scrollBy } = useHorizontalScroll(childCount);
 
   const btnClass =
-    "absolute z-20 top-1/2 -translate-y-1/2 hidden md:flex size-9 items-center justify-center rounded-full bg-white text-slate-900 shadow-md hover:shadow-lg hover:bg-[#F7E9FF] transition-shadow cursor-pointer";
+    "absolute z-20 top-1/2 -translate-y-1/2 hidden lg:flex size-9 items-center justify-center rounded-full bg-white text-slate-900 shadow-md hover:shadow-lg hover:bg-[#F7E9FF] transition-shadow cursor-pointer";
 
   return (
     <div className="relative">

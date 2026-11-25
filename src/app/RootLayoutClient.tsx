@@ -139,6 +139,10 @@ export default function RootLayoutClient({
     pathname === "/movies" ||
     pathname === "/movies/cinemas" ||
     pathname === "/dining" ||
+    pathname === "/venues" ||
+    pathname === "/artists" ||
+    pathname === "/collections" ||
+    pathname === "/search" ||
     isCustomerAccountPage;
   const showLayoutFooter =
     showPublicHeader &&

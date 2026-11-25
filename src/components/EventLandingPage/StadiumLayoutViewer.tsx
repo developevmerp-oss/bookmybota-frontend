@@ -1969,7 +1969,7 @@ export default function StadiumLayoutViewer({
   );
 
   if (isLoading) {
-    return <SeatMapShimmer fill className="bg-[#F8FAFC]" />;
+    return <SeatMapShimmer fill variant="stadium" className="bg-[#F8FAFC]" />;
   }
 
   if (isError || !data) {

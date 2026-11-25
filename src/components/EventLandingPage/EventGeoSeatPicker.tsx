@@ -180,7 +180,17 @@ export default function EventGeoSeatPicker({
   useEffect(() => {
     const el = boxRef.current;
     if (!el || !model) return;
-    const doFit = () => setFit(Math.min(1, Math.max(0.55, (el.clientWidth - 8) / model.width)));
+    const doFit = () => {
+      const vw = el.clientWidth;
+      const vh = el.clientHeight;
+      if (vw < 40 || vh < 40) return;
+      const nextFit = Math.min(1, (vw - 24) / model.width, (vh - 24) / model.height);
+      setFit(Math.max(0.15, Math.round(nextFit * 1000) / 1000));
+      requestAnimationFrame(() => {
+        el.scrollLeft = Math.max(0, (el.scrollWidth - el.clientWidth) / 2);
+        el.scrollTop = Math.max(0, (el.scrollHeight - el.clientHeight) / 2);
+      });
+    };
     doFit();
     const ro = new ResizeObserver(doFit);
     ro.observe(el);
@@ -227,8 +237,9 @@ export default function EventGeoSeatPicker({
         </div>
       )}
       <div className="relative min-h-0 flex-1"><div ref={boxRef} className="h-full overflow-auto">
-        <div style={{ width: model.width * zoom, height: model.height * zoom }} className="mx-auto">
-          <div style={{ width: model.width, height: model.height, transform: `scale(${zoom})`, transformOrigin: "0 0" }} className="relative">
+        <div className="min-h-full min-w-full w-max flex items-center justify-center p-2 sm:p-4">
+          <div style={{ width: model.width * zoom, height: model.height * zoom }} className="shrink-0">
+            <div style={{ width: model.width, height: model.height, transform: `scale(${zoom})`, transformOrigin: "0 0" }} className="relative">
             <div
               className="absolute flex h-16 items-center justify-center rounded-lg bg-slate-700 text-sm font-bold tracking-[0.4em] text-white shadow-md"
               style={{ left: model.centerX - model.stageW / 2, top: model.stageTop, width: model.stageW }}
@@ -286,6 +297,7 @@ export default function EventGeoSeatPicker({
             >
               ENTRY / EXIT
             </div>
+          </div>
           </div>
         </div>
       </div>

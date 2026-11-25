@@ -1486,7 +1486,7 @@ export default function MovieLandingPage() {
   );
 
   return (
-    <div className="min-h-screen bg-[#F5F5F5] lg:bg-white pb-[max(5rem,env(safe-area-inset-bottom,0px))] lg:pb-0">
+    <div className="min-h-screen bg-white pb-[max(5rem,env(safe-area-inset-bottom,0px))] lg:pb-0">
       {/* ── Mobile / tablet: BMS frosted chrome (one glass layer only) ── */}
       <div
         ref={bmsHeaderRef}
@@ -1738,7 +1738,7 @@ export default function MovieLandingPage() {
       <section
         ref={moviesListingRef}
         id="movies-listing"
-        className="bg-[#F5F5F5] lg:bg-white pt-3 sm:pt-4 lg:pt-8 pb-6 sm:pb-7 lg:pb-8"
+        className="bg-white pt-3 sm:pt-4 lg:pt-8 pb-6 sm:pb-7 lg:pb-8"
         style={{ scrollMarginTop: filtersStickyTop + 8 }}
       >
         <div className={CONTAINER}>

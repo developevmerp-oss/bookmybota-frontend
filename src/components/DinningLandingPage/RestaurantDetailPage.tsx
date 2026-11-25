@@ -2319,7 +2319,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
             {/* Mobile District-style meta under gallery */}
             <div className="md:hidden mt-4 space-y-3 px-5">
               <div className="relative flex items-start justify-between gap-3">
-                <h1 className="text-[1.65rem] font-semibold text-slate-900 tracking-tight leading-tight min-w-0">
+                <h1 className="text-[1.375rem] sm:text-[1.625rem] font-bold text-slate-900 tracking-tight leading-tight min-w-0">
                   {profile.name}
                 </h1>
                 {ratingValue ? (
@@ -2340,12 +2340,12 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
               </div>
 
               {profile.address?.trim() ? (
-                <p className="text-sm text-slate-500 leading-snug">{profile.address.trim()}</p>
+                <p className="text-[13px] sm:text-sm text-slate-500 leading-snug">{profile.address.trim()}</p>
               ) : null}
 
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
               {infoCostText ? (
-                <p className="inline-flex items-center gap-1 text-sm font-medium text-slate-700">
+                <p className="inline-flex items-center gap-1 text-[13px] sm:text-sm font-medium text-slate-700">
                   <EqualApproximately size={14} strokeWidth={2} className="shrink-0 text-slate-600" aria-hidden />
                   <span>{infoCostText}</span>
                 </p>
@@ -2354,7 +2354,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
               <button
                 type="button"
                 onClick={() => setVenueInfoModal("hours")}
-                className="inline-flex items-center gap-1.5 cursor-pointer text-sm shrink-0"
+                className="inline-flex items-center gap-1.5 cursor-pointer text-[13px] sm:text-sm shrink-0"
                 aria-label="Show opening hours"
               >
                 <span className={`font-semibold ${isOpenNow ? "text-emerald-600" : "text-[#C2410C]"}`}>
@@ -2385,26 +2385,26 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                       });
                       if (!opened) toast.error("Location not available");
                     }}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-slate-300 px-3.5 py-2 text-sm font-semibold text-slate-800 cursor-pointer hover:bg-slate-50"
+                    className="inline-flex items-center gap-1.5 rounded-full border border-slate-300 px-3 sm:px-3.5 py-1.5 sm:py-2 text-[13px] sm:text-sm font-semibold text-slate-800 cursor-pointer hover:bg-slate-50"
                   >
-                    <Navigation size={15} strokeWidth={2.25} />
+                    <Navigation size={14} strokeWidth={2.25} />
                     Directions
                   </button>
                 ) : null}
                 <button
                   type="button"
                   onClick={() => setShareOpen(true)}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-slate-300 px-3.5 py-2 text-sm font-semibold text-slate-800 cursor-pointer hover:bg-slate-50"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-slate-300 px-3 sm:px-3.5 py-1.5 sm:py-2 text-[13px] sm:text-sm font-semibold text-slate-800 cursor-pointer hover:bg-slate-50"
                 >
-                  <Upload size={15} strokeWidth={2.25} />
+                  <Upload size={14} strokeWidth={2.25} />
                   Share
                 </button>
                 {phoneDisplay ? (
                   <a
                     href={`tel:${phoneDisplay}`}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-slate-300 px-3.5 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50"
+                    className="inline-flex items-center gap-1.5 rounded-full border border-slate-300 px-3 sm:px-3.5 py-1.5 sm:py-2 text-[13px] sm:text-sm font-semibold text-slate-800 hover:bg-slate-50"
                   >
-                    <Phone size={15} strokeWidth={2.25} />
+                    <Phone size={14} strokeWidth={2.25} />
                     Call
                   </a>
                 ) : null}
@@ -2669,13 +2669,13 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
 
                     {/* About Venue — Cost + Cuisines */}
                     <section className="bg-white p-0">
-                      <h3 className="text-2xl sm:text-3xl lg:text-xl font-bold text-zinc-800 mb-2">
+                      <h3 className="text-lg sm:text-xl font-bold text-zinc-800 mb-2">
                         About the restaurant
                       </h3>
                       <div className="min-w-0">
                         <p
                           ref={aboutDescRef}
-                          className="text-slate-500 text-base sm:text-lg lg:text-sm leading-relaxed whitespace-pre-wrap line-clamp-2"
+                          className="text-slate-500 text-sm sm:text-[15px] lg:text-sm leading-relaxed whitespace-pre-wrap line-clamp-2"
                         >
                           {aboutDescription}
                         </p>
@@ -2683,7 +2683,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                           <button
                             type="button"
                             onClick={() => setVenueInfoModal("about")}
-                            className="mt-1.5 inline-flex items-center text-sm font-bold text-[#111111] cursor-pointer hover:underline"
+                            className="mt-1.5 inline-flex items-center text-[13px] sm:text-sm font-bold text-[#111111] cursor-pointer hover:underline"
                           >
                             See more
                           </button>
@@ -2694,21 +2694,21 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
 
                       {cuisineDisplay ? (
                         <div className="mt-5">
-                          <h4 className="text-base sm:text-lg lg:text-base font-bold text-zinc-800">Cuisines</h4>
-                          <p className="mt-1 text-base sm:text-lg lg:text-sm text-slate-500">{cuisineDisplay}</p>
+                          <h4 className="text-sm sm:text-base font-bold text-zinc-800">Cuisines</h4>
+                          <p className="mt-1 text-sm sm:text-[15px] lg:text-sm text-slate-500">{cuisineDisplay}</p>
                         </div>
                       ) : null}
 
                       {profile.amenities && profile.amenities.length > 0 && (
                         <>
-                          <h4 className="text-lg sm:text-xl lg:text-base font-bold text-zinc-800 mt-5 mb-3">
+                          <h4 className="text-sm sm:text-base font-bold text-zinc-800 mt-5 mb-3">
                             Available Facilities
                           </h4>
                           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
                             {profile.amenities.map((info: string) => (
                               <div
                                 key={info}
-                                className="flex items-center gap-2 text-base sm:text-lg lg:text-sm text-slate-600"
+                                className="flex items-center gap-2 text-sm sm:text-[15px] lg:text-sm text-slate-600"
                               >
                                 <FacilityDiamondIcon className="text-[#292929] shrink-0" />
                                 <span>{info}</span>
@@ -2726,7 +2726,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                     className="bg-white p-0 scroll-mt-[7.5rem] md:scroll-mt-[8rem] lg:scroll-mt-[9rem] xl:scroll-mt-[9.25rem] pt-3 pb-1"
                   >
                     <div className="flex items-center justify-between gap-3 mb-3">
-                      <h3 className="text-2xl sm:text-3xl lg:text-xl font-bold text-zinc-800">Menu</h3>
+                      <h3 className="text-lg sm:text-xl font-bold text-zinc-800">Menu</h3>
                       {venueMenuImages.length > 0 && (
                         <button
                           type="button"
@@ -2756,7 +2756,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                     id="section-photos"
                     className="bg-white scroll-mt-[7.5rem] md:scroll-mt-[8rem] lg:scroll-mt-[9rem] xl:scroll-mt-[9.25rem] pt-3 pb-1"
                   >
-                    <h3 className="text-xl sm:text-2xl lg:text-lg font-bold text-slate-800 mb-3">Photos Gallery</h3>
+                    <h3 className="text-lg sm:text-xl lg:text-lg font-bold text-slate-800 mb-3">Photos Gallery</h3>
                     <VenuePhotosGallery
                       urls={venueGalleryPhotos}
                       onOpen={(index, items) => openLightbox(index, items)}
@@ -2800,13 +2800,13 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                         <form onSubmit={handleReviewSubmit(onAddReview)} className="space-y-4" noValidate>
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
-                              <label className="block text-base sm:text-lg lg:text-sm font-medium text-slate-400 mb-1">
+                              <label className="block text-xs sm:text-sm font-medium text-slate-500 mb-1">
                                 Your Name <span className="text-rose-500">*</span>
                               </label>
                               <input
                                 type="text"
                                 {...registerReview("user_name")}
-                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm sm:text-base lg:text-xs focus:outline-none focus:border-rose-500"
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-rose-500"
                                 placeholder="E.g., Priya R."
                               />
                               {reviewErrors.user_name && (
@@ -2814,7 +2814,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                               )}
                             </div>
                             <div>
-                              <label className="block text-base lg:text-xs font-medium text-slate-400 mb-2">
+                              <label className="block text-xs sm:text-sm font-medium text-slate-500 mb-2">
                                 Rating <span className="text-rose-500">*</span>
                               </label>
                               <div className="h-9 flex items-center">
@@ -2832,13 +2832,13 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                             </div>
                           </div>
                           <div>
-                            <label className="block text-base lg:text-xs font-medium text-slate-400 mb-1">
+                            <label className="block text-xs sm:text-sm font-medium text-slate-500 mb-1">
                               Comment <span className="text-rose-500">*</span>
                             </label>
                             <textarea
                               rows={3}
                               {...registerReview("text")}
-                              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm lg:text-xs focus:outline-none focus:border-rose-500"
+                              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-rose-500"
                               placeholder="Write details about food, staff, service..."
                             />
                             {reviewErrors.text && (
@@ -2848,7 +2848,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                           <button
                             type="submit"
                             disabled={submittingReview}
-                            className="inline-flex items-center gap-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl px-4 py-2 text-base lg:text-xs font-bold transition-all shadow-sm disabled:opacity-50"
+                            className="inline-flex items-center gap-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl px-4 py-2 text-sm font-bold transition-all shadow-sm disabled:opacity-50"
                           >
                             {submittingReview && <Loader2 size={14} className="animate-spin" />}
                             Submit Review
@@ -3368,50 +3368,37 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
 
                   <div className="grid items-start gap-6 lg:gap-8 xl:gap-10 lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_360px]">
                     <div className="min-w-0 space-y-5 bg-white rounded-none border-0 px-0 md:rounded-xl md:border md:border-slate-200 md:p-5 p-0">
-                      {/* Guests — dropdown on mobile, chips on tablet/desktop */}
+                      {/* Guests — compact circular pill row on mobile, chips on tablet/desktop */}
                       <div>
-                        <p className="md:hidden text-sm text-slate-500 mb-2">Select number of guests</p>
+                        <div className="md:hidden flex items-center justify-between mb-2.5">
+                          <p className="text-base font-bold text-slate-900">Select number of guests</p>
+                          <span className="text-xs font-semibold text-slate-500">
+                            {Number(guests)} {Number(guests) === 1 ? "guest" : "guests"}
+                          </span>
+                        </div>
                         <p className="hidden md:block text-sm font-semibold text-slate-800 mb-3">Number of guest(s)</p>
 
-                        <div ref={mobileGuestsDropdownRef} className="md:hidden relative">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setReserveWidgetDropdown((prev) => (prev === "guests" ? null : "guests"))
-                            }
-                            className="w-full bg-white border border-slate-200 rounded-xl pl-4 pr-10 py-3 text-sm font-semibold text-[#292929] text-left cursor-pointer"
-                            aria-haspopup="listbox"
-                            aria-expanded={reserveWidgetDropdown === "guests"}
-                          >
-                            {Number(guests)} {Number(guests) === 1 ? "guest" : "guests"}
-                          </button>
-                          <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
-                          {reserveWidgetDropdown === "guests" ? (
-                            <ul
-                              role="listbox"
-                              className="absolute left-0 right-0 top-[calc(100%+4px)] z-50 max-h-56 overflow-y-auto border border-slate-300 bg-white shadow-md rounded-xl"
-                            >
-                              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => {
-                                const selected = Number(guests) === num;
-                                return (
-                                  <li key={num} role="option" aria-selected={selected}>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setGuests(String(num));
-                                        setAvailabilityStatus(null);
-                                        setReserveWidgetDropdown(null);
-                                      }}
-                                      className={`w-full text-left px-4 py-2.5 text-sm font-medium cursor-pointer ${selected ? "bg-slate-900 text-white" : "bg-white text-slate-800 hover:bg-slate-50"
-                                        }`}
-                                    >
-                                      {num} {num === 1 ? "guest" : "guests"}
-                                    </button>
-                                  </li>
-                                );
-                              })}
-                            </ul>
-                          ) : null}
+                        <div className="md:hidden flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-hide items-center">
+                          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => {
+                            const selected = Number(guests) === num;
+                            return (
+                              <button
+                                key={num}
+                                type="button"
+                                onClick={() => {
+                                  setGuests(String(num));
+                                  setAvailabilityStatus(null);
+                                }}
+                                className={`w-10 h-10 shrink-0 rounded-full text-sm font-bold transition-all cursor-pointer flex items-center justify-center ${
+                                  selected
+                                    ? "bg-slate-900 text-white shadow-sm"
+                                    : "bg-white border border-slate-200 text-slate-700 hover:border-slate-300"
+                                }`}
+                              >
+                                {num}
+                              </button>
+                            );
+                          })}
                         </div>
 
                         <div className="hidden md:flex flex-wrap gap-2.5">
@@ -3473,7 +3460,10 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                       </div>
 
                       {/* Meal period accordions + time slots */}
-                      <div className="space-y-3 pt-1">
+                      <div className="space-y-4 pt-2">
+                        <p className="md:hidden text-base font-bold text-slate-900">
+                          Select time slot
+                        </p>
                         <p className="hidden md:block text-sm font-semibold text-slate-800">
                           Select the time of day to see the offers
                         </p>
@@ -3493,7 +3483,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
 
                         {/* Mobile meal chips */}
                         {!isSelectedDayClosed && mealOptions.length > 0 ? (
-                          <div className="md:hidden flex flex-wrap gap-2 mb-1">
+                          <div className="md:hidden flex flex-wrap gap-2 mb-3">
                             {mealOptions.map((meal) => {
                               const selected = openMealId === meal.id;
                               return (

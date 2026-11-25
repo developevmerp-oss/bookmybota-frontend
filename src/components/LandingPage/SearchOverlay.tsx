@@ -363,6 +363,7 @@ export default function SearchOverlay({ open, city, onClose }: SearchOverlayProp
 
         <div className="min-w-0 px-4 sm:px-5 pb-3">
           <div
+            data-scroll-lock-container
             className="flex min-w-0 w-full flex-nowrap items-center gap-2 overflow-x-auto overscroll-x-contain touch-pan-x scrollbar-hide [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             style={{ WebkitOverflowScrolling: "touch" }}
             onWheel={onChipsWheel}

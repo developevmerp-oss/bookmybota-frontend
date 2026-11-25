@@ -51,7 +51,7 @@ export default function MovieShowtimesPage() {
 
   if (!movie || isError || movie.comingSoon) {
     return (
-      <div className="min-h-[50vh] flex flex-col items-center justify-center gap-3 px-5 text-center bg-[#F5F5F5]">
+      <div className="min-h-[50vh] flex flex-col items-center justify-center gap-3 px-5 text-center bg-white">
         <p className="text-base sm:text-lg text-slate-700 font-semibold">
           {movie?.comingSoon ? "Tickets are not open yet" : "Movie not found"}
         </p>
@@ -66,7 +66,7 @@ export default function MovieShowtimesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F5F5F5]">
+    <div className="min-h-screen bg-white">
       <div className="bmb-section-container py-0 lg:py-6">
         <MovieShowtimeSelector
           movieIdOrSlug={idOrSlug}

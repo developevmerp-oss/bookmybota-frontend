@@ -1570,7 +1570,6 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
                       className="relative z-[1] flex aspect-square w-full flex-col items-center justify-between rounded-[1.15rem] px-1.5 py-[0.65rem] text-white"
                       style={{
                         background: DATE_ACTIVE_GRADIENT,
-                        boxShadow: "0 6px 14px rgba(76,29,149,0.25)",
                       }}
                     >
                       <span className="block text-[9px] font-bold tracking-[0.08em] leading-none">
@@ -1799,7 +1798,6 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
                           className="relative z-[1] flex aspect-square w-full flex-col items-center justify-between rounded-[1.15rem] px-1.5 py-[0.65rem] text-white"
                           style={{
                             background: DATE_ACTIVE_GRADIENT,
-                            boxShadow: "0 6px 14px rgba(76,29,149,0.25)",
                           }}
                         >
                           <span className="block text-[9px] sm:text-[10px] font-bold tracking-[0.08em] text-white leading-none">

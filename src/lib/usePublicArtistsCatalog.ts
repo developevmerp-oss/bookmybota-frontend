@@ -225,24 +225,29 @@ export function usePublicArtistsCatalog(opts?: { q?: string; city?: string }) {
                 const image = row.image_url || row.artist_business_image || null;
                 const description = row.description || null;
                 const role = row.role_title || null;
+                const isGuestOrChiefGuest = /^(chief\s*guest|guest)$/i.test(
+                  String(role || "").trim()
+                );
                 const authorized =
                   row.artist_is_authorized !== false && partner_source === "onboarded";
 
-                const existing = byId.get(id);
-                byId.set(id, {
-                  id,
-                  name: existing?.name || name,
-                  description: preferLonger(existing?.description, description),
-                  cover_image_url: existing?.cover_image_url || image || null,
-                  city_name: existing?.city_name || event.city_name || null,
-                  type_name: existing?.type_name || role || "Artist",
-                  role_title: existing?.role_title || role,
-                  partner_source:
-                    existing && isRegisteredDirectoryArtist(existing)
-                      ? existing.partner_source
-                      : partner_source,
-                  is_partner_authorized: authorized,
-                });
+                if (!isGuestOrChiefGuest) {
+                  const existing = byId.get(id);
+                  byId.set(id, {
+                    id,
+                    name: existing?.name || name,
+                    description: preferLonger(existing?.description, description),
+                    cover_image_url: existing?.cover_image_url || image || null,
+                    city_name: existing?.city_name || event.city_name || null,
+                    type_name: existing?.type_name || role || "Artist",
+                    role_title: existing?.role_title || role,
+                    partner_source:
+                      existing && isRegisteredDirectoryArtist(existing)
+                        ? existing.partner_source
+                        : partner_source,
+                    is_partner_authorized: authorized,
+                  });
+                }
 
                 const profile = profiles.get(id);
                 const nextEvents = profile?.events?.some((e) => e.id === event.id)

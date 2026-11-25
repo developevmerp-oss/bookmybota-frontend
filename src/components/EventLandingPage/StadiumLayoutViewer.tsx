@@ -456,7 +456,7 @@ export default function StadiumLayoutViewer({
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string | null>(null);
   // Tier picker: shown when a multi-tier block is clicked — user must pick a tier before seeing seats
   const [showTierPicker, setShowTierPicker] = useState<boolean>(false);
-  const [standingQty, setStandingQty] = useState<number>(1);
+  const [standingQty, setStandingQty] = useState<number>(0);
 
   // Selected seats state
   const [selectedSeats, setSelectedSeats] = useState<TierSeat[]>(initialSelectedSeats);
@@ -616,7 +616,8 @@ export default function StadiumLayoutViewer({
     return selectedBlock.tiers?.find((t) => t.tier_id === activeTierId) || null;
   }, [selectedBlock, activeTierId]);
 
-  // Fetch all seats for the selected block
+  // Fetch all seats for the selected block (skip for standing stands since they use pass selection)
+  const isSelectedStanding = selectedBlock?.stand_type === "standing";
   const {
     data: blockSeatsData,
     isLoading: seatsLoading,
@@ -624,13 +625,14 @@ export default function StadiumLayoutViewer({
     isError: seatsError,
   } = useGetStadiumBlockSeatsQuery(
     { eventId, blockId: selectedBlockId || "" },
-    { skip: !selectedBlockId }
+    { skip: !selectedBlockId || isSelectedStanding }
   );
 
   const rawSeats = blockSeatsData?.seats || [];
-  // Show loading from stand select until seat payload arrives (avoids empty map flash)
+  // Show loading from stand select until seat payload arrives (only for seated stands)
   const seatsPending =
     Boolean(selectedBlockId) &&
+    !isSelectedStanding &&
     !seatsError &&
     (seatsLoading || seatsFetching || !blockSeatsData);
 
@@ -880,15 +882,7 @@ export default function StadiumLayoutViewer({
         if (existingForBlock.length > 0) {
           setStandingQty(existingForBlock.length);
         } else {
-          setStandingQty(
-            Math.max(
-              1,
-              Math.min(
-                maxSelectable < Number.MAX_SAFE_INTEGER ? maxSelectable : 1,
-                block.available || 1
-              )
-            )
-          );
+          setStandingQty(0);
         }
       } else {
         // Resolve specific tier: passed tierId -> category matched tier -> first available tier -> first tier
@@ -907,6 +901,11 @@ export default function StadiumLayoutViewer({
       }
 
       if (!stageRef.current) return;
+
+      // Standing stands use the right-side drawer: keep full stadium layout visible without zooming
+      if (block.stand_type === "standing") {
+        return;
+      }
 
       // Calculate bounds of this block / tier so it fully zooms in to fill the screen
       let bounds: { centerX: number; centerY: number; width: number; height: number };
@@ -4174,8 +4173,8 @@ export default function StadiumLayoutViewer({
               </div>
 
               {/* Drawer Footer Actions */}
-              <div className="p-4 sm:p-5 bg-white border-t border-slate-200 space-y-2 shrink-0">
-                {selectedSeats.length > 0 && (
+              {selectedSeats.length > 0 && (
+                <div className="p-4 sm:p-5 bg-white border-t border-slate-200 space-y-2 shrink-0">
                   <button
                     type="button"
                     onClick={() => {
@@ -4189,23 +4188,8 @@ export default function StadiumLayoutViewer({
                   >
                     <span>✕ Clear All Selected Passes ({selectedSeats.length})</span>
                   </button>
-                )}
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    handleBackToStadium();
-                  }}
-                  className="w-full py-3.5 px-4 rounded-xl bg-[#6900AA] hover:bg-[#57008E] text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-lg shadow-[#6900AA]/20 transition-all active:scale-[0.98] cursor-pointer"
-                >
-                  <Check className="w-4 h-4" />
-                  <span>
-                    {standingQty > 0
-                      ? `Confirm ${standingQty} Standing Pass${standingQty > 1 ? "es" : ""}`
-                      : "Done"}
-                  </span>
-                </button>
-              </div>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -4385,8 +4369,8 @@ export default function StadiumLayoutViewer({
           </div>
         )}
 
-        {/* Seats fetch loading — map view until seat data arrives */}
-        {seatsPending && !showTierPicker && (
+        {/* Seats fetch loading — map view until seat data arrives (only for seated sections) */}
+        {seatsPending && !showTierPicker && !isSelectedStanding && (
           <div className="absolute inset-0 z-50 bg-white/80 backdrop-blur-[2px] pointer-events-none">
             <SeatMapShimmer fill className="border-0 bg-transparent" />
           </div>
@@ -4431,14 +4415,28 @@ export default function StadiumLayoutViewer({
                     </span>
                   </div>
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    {selectedSeats.map((s) => (
-                      <span
-                        key={s.id}
-                        className="text-[10px] font-mono font-bold bg-slate-50 text-slate-700 border border-slate-200 px-2 py-0.5 rounded"
-                      >
-                        {s.row_label}{s.seat_label}
-                      </span>
-                    ))}
+                    {(() => {
+                      const isAllStanding = selectedSeats.every(
+                        (s) =>
+                          /^standing$/i.test(String(s.row_label || "").trim()) ||
+                          /^standing-/i.test(String(s.id || ""))
+                      );
+                      if (isAllStanding) {
+                        return (
+                          <span className="text-[10px] font-mono font-bold bg-purple-50 text-[#6900AA] border border-purple-200 px-2 py-0.5 rounded">
+                            {selectedSeats.length} Standing Pass{selectedSeats.length > 1 ? "es" : ""}
+                          </span>
+                        );
+                      }
+                      return selectedSeats.map((s) => (
+                        <span
+                          key={s.id}
+                          className="text-[10px] font-mono font-bold bg-slate-50 text-slate-700 border border-slate-200 px-2 py-0.5 rounded"
+                        >
+                          {s.row_label}{s.seat_label}
+                        </span>
+                      ));
+                    })()}
                   </div>
                 </div>
               )}

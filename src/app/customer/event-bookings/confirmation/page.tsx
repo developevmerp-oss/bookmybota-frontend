@@ -324,7 +324,7 @@ function ConfirmationContent() {
         venueLine={venue || undefined}
         ticketCountLabel={`${booking.ticket_qty ?? booking.items?.reduce((a, i) => a + Number(i.qty || 0), 0) ?? 0} Ticket(s)`}
         primaryLabel={ticketTypeDisplay}
-        secondaryLabel={seatsLabel || undefined}
+        secondaryLabel={seatsLabel && !seatsLabel.toLowerCase().includes("standing pass") ? seatsLabel : undefined}
         bookingCode={displayCode}
         qrValue={eventBookingQrValue(booking)}
         totalFormatted={formatMoney(booking.grand_total)}

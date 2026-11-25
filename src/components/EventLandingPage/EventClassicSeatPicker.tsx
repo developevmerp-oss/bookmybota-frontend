@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import ClassicSeatMap from "@/components/venue/ClassicSeatMap";
+import { useMapZoom } from "@/components/venue/useMapZoom";
 
 /**
  * Customer seat picker for auditorium / theatre layouts: the same classic grid the movie panel uses.
@@ -21,6 +22,8 @@ export default function EventClassicSeatPicker({
   onSeatsSelected: (seats: any[]) => void;
   className?: string;
 }) {
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const { zoom: userZoom, controls } = useMapZoom(wrapRef);
   const selectedIds = useMemo(() => new Set(selected.map((s) => String(s.id))), [selected]);
   const real = useMemo(() => seats.filter((s) => s && s.row_label != null && s.seat_label != null), [seats]);
 
@@ -36,8 +39,10 @@ export default function EventClassicSeatPicker({
 
   return (
     <div className={`flex h-full min-h-0 flex-col ${className}`}>
-      <div className="min-h-0 flex-1">
+      <div ref={wrapRef} className="relative min-h-0 flex-1 touch-pan-x touch-pan-y [&_*]:touch-pan-x [&_*]:touch-pan-y">
+        {controls}
         <ClassicSeatMap
+          userZoom={userZoom}
           seats={real}
           heightClass="h-full"
           className="!rounded-none !border-0"

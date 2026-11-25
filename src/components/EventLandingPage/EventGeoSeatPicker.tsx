@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { formatMoney } from "@/lib/currencyFormat";
+import { useMapZoom } from "@/components/venue/useMapZoom";
 
 /**
  * Classic customer view for curved / fan / any free-form seating layout.
@@ -173,13 +174,15 @@ export default function EventGeoSeatPicker({
   }, [seats, stage, ticketTypes, deck, decksConfig]);
 
   const boxRef = useRef<HTMLDivElement>(null);
-  const [zoom, setZoom] = useState(1);
+  const [fit, setFit] = useState(1);
+  const { zoom: userZoom, controls } = useMapZoom(boxRef);
+  const zoom = fit * userZoom;
   useEffect(() => {
     const el = boxRef.current;
     if (!el || !model) return;
-    const fit = () => setZoom(Math.min(1, Math.max(0.55, (el.clientWidth - 8) / model.width)));
-    fit();
-    const ro = new ResizeObserver(fit);
+    const doFit = () => setFit(Math.min(1, Math.max(0.55, (el.clientWidth - 8) / model.width)));
+    doFit();
+    const ro = new ResizeObserver(doFit);
     ro.observe(el);
     return () => ro.disconnect();
   }, [model]);
@@ -223,7 +226,7 @@ export default function EventGeoSeatPicker({
           ))}
         </div>
       )}
-      <div ref={boxRef} className="min-h-0 flex-1 overflow-auto">
+      <div className="relative min-h-0 flex-1"><div ref={boxRef} className="h-full overflow-auto">
         <div style={{ width: model.width * zoom, height: model.height * zoom }} className="mx-auto">
           <div style={{ width: model.width, height: model.height, transform: `scale(${zoom})`, transformOrigin: "0 0" }} className="relative">
             <div
@@ -283,6 +286,8 @@ export default function EventGeoSeatPicker({
             </div>
           </div>
         </div>
+      </div>
+      {controls}
       </div>
       <div className="flex flex-wrap items-center justify-center gap-4 border-t border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
         <span className="flex items-center gap-1.5"><i className="size-3.5 rounded-full border-2 border-green-500 bg-white" /> Available</span>

@@ -190,6 +190,17 @@ export default function BlockSeatPicker({
   };
 
   const lastSeat = selected[selected.length - 1] || null;
+  /** Open the section that holds the customer's latest seat, so they can change seats there */
+  const openMyBlock = () => {
+    const id = lastSeat?.block_id ? String(lastSeat.block_id) : String(selected.find((x) => x.block_id)?.block_id || "");
+    if (id) {
+      setCategory(null);
+      setBlockId(id);
+    }
+  };
+  useEffect(() => {
+    if (!lastSeat) setLiveOpen(false);
+  }, [lastSeat]);
   useEffect(() => {
     if (!selected.length) return;
     const t = setTimeout(() => {
@@ -256,14 +267,31 @@ export default function BlockSeatPicker({
   const sheet = (
     <div className="flex h-full min-h-0 flex-col">
       {!block ? (
-        <div className="p-5 text-center text-slate-500">
-          <Armchair className="mx-auto mb-2 size-8 text-slate-300" />
-          <p className="text-base font-bold text-white">Choose a section</p>
-          <p className="mt-1 text-sm">Tap a block on the map. Colours show the price category.</p>
+        <div className="relative p-5 text-center text-slate-500">
           {selected.length > 0 ? (
-            <p className="mt-4 rounded-xl bg-purple-50 px-3 py-2 text-sm font-semibold text-purple-900">
-              {selected.length} seat{selected.length === 1 ? "" : "s"} selected · {money(total)}
-            </p>
+            <button type="button" aria-label="Cancel and pick seats in your block" onClick={openMyBlock} className="absolute right-3 top-3 cursor-pointer rounded-full p-1.5 text-slate-300 hover:bg-white/10 hover:text-white">
+              <X size={18} />
+            </button>
+          ) : null}
+          <Armchair className="mx-auto mb-2 size-8 text-slate-300" />
+          <p className="text-base font-bold text-white">{selected.length > 0 ? "Your seats are ready" : "Choose a section"}</p>
+          <p className="mt-1 text-sm">{selected.length > 0 ? "Book them now, or tap a block on the map to change seats." : "Tap a block on the map. Colours show the price category."}</p>
+          {selected.length > 0 ? (
+            <>
+              <p className="mt-4 rounded-xl bg-purple-50 px-3 py-2 text-sm font-semibold text-purple-900">
+                {selected.length} seat{selected.length === 1 ? "" : "s"} selected · {money(total)}
+              </p>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <button type="button" onClick={openMyBlock} className="cursor-pointer rounded-xl border border-white/30 px-4 py-3 text-sm font-bold text-white hover:bg-white/10">
+                  Change seats
+                </button>
+                {onContinue ? (
+                  <button type="button" onClick={onContinue} className="cursor-pointer rounded-xl bg-[#6900AA] px-4 py-3 text-sm font-bold text-white hover:bg-[#55008a]">
+                    Book these seats
+                  </button>
+                ) : null}
+              </div>
+            </>
           ) : null}
         </div>
       ) : (
@@ -303,7 +331,7 @@ export default function BlockSeatPicker({
                 Your seats here: {selected.filter((x) => String(x.block_id) === block.id).map((x) => `${x.row_label}${x.seat_label}`).join(", ")}
               </p>
             ) : null}
-            <div className={rows.some((r) => r.seats.length > 20) ? "space-y-[3px]" : "space-y-1.5"} data-seat-grid>
+            <div className="overflow-x-auto pb-1"><div style={{ minWidth: `${Math.max(...rows.map((r) => r.seats.length), 1) * 26 + 56}px` }} className={rows.some((r) => r.seats.length > 20) ? "space-y-[3px]" : "space-y-1.5"} data-seat-grid>
               {(() => {
                 const maxCols = Math.max(1, ...rows.map((r) => r.seats.length));
                 // highest row on top, row A (nearest the pitch) at the bottom - works for any number of rows
@@ -322,7 +350,7 @@ export default function BlockSeatPicker({
                             disabled={!free && !isSel}
                             onClick={() => toggle(s)}
                             title={`${block.name} · row ${r.label} · seat ${s.seat_label}`}
-                            className={`flex min-w-0 items-center justify-center ${maxCols > 20 ? "h-[22px] rounded-[3px] text-[9px] leading-none" : "aspect-square rounded-md text-[11px]"} border font-semibold transition-colors ${
+                            className={`flex min-w-0 items-center justify-center ${maxCols > 20 ? "h-[24px] rounded-[4px] text-[10px] leading-none" : "aspect-square rounded-md text-[11px]"} border font-semibold transition-colors ${
                               isSel
                                 ? "cursor-pointer border-orange-400 bg-orange-500 text-white"
                                 : free
@@ -339,6 +367,7 @@ export default function BlockSeatPicker({
                   </div>
                 ));
               })()}
+            </div>
             </div>
             <div className="mt-4 flex flex-wrap items-center justify-center gap-4 text-xs text-slate-500">
               <span className="inline-flex items-center gap-1.5"><span className="size-3.5 rounded border border-white/30 bg-white/10" /> Available</span>
@@ -468,13 +497,13 @@ export default function BlockSeatPicker({
       </div>
 
       {liveOpen && lastSeat ? (
-        <div className="fixed inset-0 z-[200] flex flex-col bg-black">
+        <div className="fixed inset-x-0 top-0 z-[200] flex h-[100dvh] flex-col bg-black">
           <div className="flex items-center justify-between gap-3 border-b border-white/10 bg-[#0b0f17] px-4 py-3 text-white">
             <div className="min-w-0">
               <p className="truncate text-sm font-extrabold sm:text-base">Live stadium view</p>
               <p className="text-[11px] text-slate-400">Drag to look around · switch between your seat, your group and the whole stadium with the buttons</p>
             </div>
-            <button type="button" onClick={() => setLiveOpen(false)} className="shrink-0 cursor-pointer rounded-lg border border-white/30 px-4 py-1.5 text-sm font-bold hover:bg-white/10">Close</button>
+            <button type="button" onClick={() => { setLiveOpen(false); openMyBlock(); }} className="shrink-0 cursor-pointer rounded-lg border border-white/30 px-4 py-1.5 text-sm font-bold hover:bg-white/10">Cancel</button>
           </div>
           <div className="relative min-h-0 flex-1">
             <Stadium3DView booked={seats.filter((x) => String(x.status || "AVAILABLE").toUpperCase() !== "AVAILABLE") as any} selected={selected as any} model={String(cfg.stadium_model || "football")} seats={seats as any} seat={lastSeat as any} className="h-full w-full" />

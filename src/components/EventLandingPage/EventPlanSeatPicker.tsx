@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { formatMoney } from "@/lib/currencyFormat";
+import { useMapZoom } from "@/components/venue/useMapZoom";
 
 /**
  * Customer seat picker that draws an auditorium exactly as the admin laid it out: every seat sits at its saved
@@ -86,16 +87,18 @@ export default function EventPlanSeatPicker({
   }, [list]);
 
   const boxRef = useRef<HTMLDivElement>(null);
-  const [zoom, setZoom] = useState(1);
+  const [fit, setFit] = useState(1);
+  const { zoom: userZoom, controls } = useMapZoom(boxRef);
+  const zoom = fit * userZoom;
   const fy = (y: number) => (plan.flip ? plan.height - y : y);
   const W = plan.width * S;
   const H = plan.height * S;
   useEffect(() => {
     const el = boxRef.current;
     if (!el) return;
-    const fit = () => setZoom(Math.min(1, Math.max(0.5, (el.clientWidth - 8) / W)));
-    fit();
-    const ro = new ResizeObserver(fit);
+    const doFit = () => setFit(Math.min(1, Math.max(0.5, (el.clientWidth - 8) / W)));
+    doFit();
+    const ro = new ResizeObserver(doFit);
     ro.observe(el);
     return () => ro.disconnect();
   }, [W]);
@@ -113,7 +116,7 @@ export default function EventPlanSeatPicker({
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-white">
-      <div ref={boxRef} className="min-h-0 flex-1 overflow-auto bg-slate-50">
+      <div className="relative min-h-0 flex-1"><div ref={boxRef} className="h-full overflow-auto bg-slate-50">
         <div style={{ width: W * zoom, height: H * zoom }} className="mx-auto">
           <div style={{ width: W, height: H, transform: `scale(${zoom})`, transformOrigin: "0 0" }} className="relative">
             <svg className="pointer-events-none absolute inset-0" width={W} height={H}>
@@ -178,6 +181,8 @@ export default function EventPlanSeatPicker({
             )}
           </div>
         </div>
+      </div>
+      {controls}
       </div>
       <div className="flex flex-wrap items-center justify-center gap-4 border-t border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
         <span className="flex items-center gap-1.5"><i className="size-3.5 rounded border-2 border-green-500 bg-white" /> Available</span>

@@ -78,11 +78,14 @@ export default function ClassicSeatMap({
   fitAll = false,
   screenLabel = "All eyes this way please",
   merged = false,
+  userZoom = 1,
   stage = false,
 }: {
   screenLabel?: string;
   /** Auditorium style: all seat blocks side by side on shared rows, keeping aisles but trimming wide empty space */
   merged?: boolean;
+  /** Extra zoom set by the viewer (pinch / buttons), multiplied with the fit-to-box scale */
+  userZoom?: number;
   /** Draw a stage block instead of the cinema screen arc */
   stage?: boolean;
   /** Shrink the whole map to fit the box (previews on cards) instead of scrolling */
@@ -281,8 +284,8 @@ export default function ClassicSeatMap({
   if (mergedLayout) {
     return (
       <div ref={boxRef} className={`${heightClass} ${fitAll ? "overflow-hidden" : "overflow-auto"} rounded-xl border border-slate-200 bg-white ${className}`}>
-        <div style={{ width: contentW * zoom, minHeight: 1 }} className="mx-auto">
-          <div ref={innerRef} style={{ width: contentW, transform: `scale(${zoom})`, transformOrigin: "0 0" }} className="px-4 pb-6 pt-4">
+        <div style={{ width: contentW * zoom * userZoom, minHeight: 1 }} className="mx-auto">
+          <div ref={innerRef} style={{ width: contentW, transform: `scale(${zoom * userZoom})`, transformOrigin: "0 0" }} className="px-4 pb-6 pt-4">
             {stage ? (
               <div className="mx-auto mb-6 flex h-14 items-center justify-center rounded-lg bg-slate-700 text-xs font-bold tracking-[0.35em] text-white shadow-md" style={{ width: Math.min(mergedLayout.width * 0.5, 520) }}>
                 STAGE
@@ -357,8 +360,8 @@ export default function ClassicSeatMap({
 
   return (
     <div ref={boxRef} className={`${heightClass} ${fitAll ? "overflow-hidden" : "overflow-auto"} rounded-xl border border-slate-200 bg-white ${className}`}>
-      <div style={{ width: contentW * zoom, minHeight: 1 }} className="mx-auto">
-        <div ref={innerRef} style={{ width: contentW, transform: `scale(${zoom})`, transformOrigin: "0 0" }} className="px-4 pb-6 pt-4">
+      <div style={{ width: contentW * zoom * userZoom, minHeight: 1 }} className="mx-auto">
+        <div ref={innerRef} style={{ width: contentW, transform: `scale(${zoom * userZoom})`, transformOrigin: "0 0" }} className="px-4 pb-6 pt-4">
           {/* Screen */}
           <div className="mx-auto mb-5 text-center" style={{ width: layout.width * 0.8 }}>
             <svg viewBox="0 0 400 26" className="h-8 w-full" aria-hidden>

@@ -387,6 +387,10 @@ export default function HomeHeader() {
   const hideChromeOnMobileTablet = Boolean(
     pathname === "/movies" ||
     pathname === "/movies/cinemas" ||
+    pathname === "/events" ||
+    pathname === "/dining" ||
+    pathname === "/list-your-show" ||
+    Boolean(pathname?.startsWith("/customer")) ||
     (pathname?.match(/^\/movies\/[^/]+\/?$/) && pathname !== "/movies/cinemas") ||
     pathname?.match(/^\/movies\/[^/]+\/showtimes\/?$/) ||
     pathname?.match(/^\/movies\/cinemas\/[^/]+\/?$/) ||
@@ -416,13 +420,16 @@ export default function HomeHeader() {
     window.addEventListener("storage", syncAuth);
     window.addEventListener("open_customer_login", openLogin);
     const openCity = () => setCityOpen(true);
+    const openSearch = () => setSearchOpen(true);
     window.addEventListener("open_city_select", openCity);
+    window.addEventListener("open_search_overlay", openSearch);
     return () => {
       window.removeEventListener("selected_city_changed", syncCity);
       window.removeEventListener("auth_changed", syncAuth);
       window.removeEventListener("storage", syncAuth);
       window.removeEventListener("open_customer_login", openLogin);
       window.removeEventListener("open_city_select", openCity);
+      window.removeEventListener("open_search_overlay", openSearch);
     };
   }, [pathname]);
 

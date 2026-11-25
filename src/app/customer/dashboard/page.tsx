@@ -496,8 +496,8 @@ export default function CustomerDashboard() {
         </div>
 
         <div
-          className="sticky z-30 bg-white pt-3 sm:pt-4 mb-5 sm:mb-6"
-          style={{ top: headerOffset }}
+          className="sticky top-12 lg:top-[var(--header-offset)] z-30 bg-white pt-3 sm:pt-4 mb-5 sm:mb-6"
+          style={{ "--header-offset": `${headerOffset}px` } as React.CSSProperties}
         >
           <nav
             aria-label="Booking type"

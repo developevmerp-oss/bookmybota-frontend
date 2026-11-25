@@ -19,7 +19,7 @@ import {
   FaChevronLeft,
   FaChevronRight,
 } from "react-icons/fa";
-import { Check, ChevronDown, ChevronRight, ChevronUp, MapPin, Search, SlidersHorizontal, X } from "lucide-react";
+import { ArrowLeft, Check, ChevronDown, ChevronRight, ChevronUp, MapPin, Search, SlidersHorizontal, X } from "lucide-react";
 import SafeCoverImage, { EventImageFallback, ArtistImageFallback, ARTIST_IMAGE_FALLBACK_CLASS } from "@/components/Shared/SafeCoverImage";
 import {
   api,
@@ -773,6 +773,25 @@ export default function PublicEventsPage() {
   const allEventsRef = useRef<HTMLElement>(null);
   const allEventsRailRef = useRef<HTMLDivElement>(null);
   const filtersStickySentinelRef = useRef<HTMLDivElement>(null);
+  const bmsHeaderRef = useRef<HTMLDivElement>(null);
+  const [bmsHeaderHeight, setBmsHeaderHeight] = useState(64);
+
+  useLayoutEffect(() => {
+    const el = bmsHeaderRef.current;
+    if (!el) return;
+    const measure = () => {
+      const h = Math.round(el.getBoundingClientRect().height);
+      if (h > 0) setBmsHeaderHeight((prev) => (prev === h ? prev : h));
+    };
+    measure();
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(measure) : null;
+    ro?.observe(el);
+    window.addEventListener("resize", measure, { passive: true });
+    return () => {
+      ro?.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, []);
   const categoryFromFilterRef = useRef(false);
   // One category in URL → dedicated browse from first paint (avoids home showcase flash)
   const [dedicatedCategoryPage, setDedicatedCategoryPage] = useState(
@@ -2705,6 +2724,66 @@ export default function PublicEventsPage() {
 
   return (
     <div className="bg-white">
+      {/* ── Mobile / tablet: BMS frosted chrome (matches Movies Now Showing) ── */}
+      <div
+        ref={bmsHeaderRef}
+        className="bmb-movies-frost-chrome lg:hidden fixed top-0 inset-x-0 z-40"
+        style={{ paddingTop: "max(0px, env(safe-area-inset-top, 0px))" }}
+      >
+        <div
+          className="bmb-movies-frost-chrome__glass"
+          aria-hidden
+          style={{
+            background: "rgba(255,255,255,0.55)",
+            WebkitBackdropFilter: "blur(18px) saturate(180%)",
+            backdropFilter: "blur(18px) saturate(180%)",
+          }}
+        />
+        <div className="bmb-movies-frost-chrome__fade" aria-hidden />
+        <div className="bmb-movies-frost-chrome__content">
+          <div className="flex items-center gap-1 px-2 sm:px-3 pt-2 pb-2 min-w-0">
+            <button
+              type="button"
+              onClick={() => router.push("/")}
+              aria-label="Back to home"
+              className="flex size-10 shrink-0 items-center justify-center text-[#111111] cursor-pointer"
+            >
+              <ArrowLeft size={22} strokeWidth={2.25} />
+            </button>
+            <div className="min-w-0 flex-1">
+              <h1 className="text-[16px] sm:text-[17px] font-bold text-[#111111] leading-tight truncate drop-shadow-[0_0_6px_rgba(255,255,255,0.9)]">
+                {activeCategoryKey ? browseHeading : "Events"}
+              </h1>
+              <button
+                type="button"
+                onClick={() => window.dispatchEvent(new Event("open_city_select"))}
+                className="mt-0.5 inline-flex max-w-full items-center gap-1 text-[12px] sm:text-[13px] font-medium text-[#6B7280] hover:text-[#6900AA] cursor-pointer"
+              >
+                <span className="truncate">
+                  {city && city !== "All Cities" ? city : "Select City"} |{" "}
+                  {catalogPending
+                    ? "…"
+                    : `${totalEventCount} Event${totalEventCount === 1 ? "" : "s"}`}
+                </span>
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={openSearchPopup}
+              aria-label="Search events"
+              className="flex size-10 shrink-0 items-center justify-center text-[#111111] cursor-pointer"
+            >
+              <Search size={20} strokeWidth={2} />
+            </button>
+          </div>
+        </div>
+      </div>
+      <div
+        className="lg:hidden shrink-0 pointer-events-none"
+        style={{ height: Math.max(bmsHeaderHeight, 48) }}
+        aria-hidden
+      />
+
       {/* Top promo — same marketing + city logic / banner UI as dining & landing */}
       <ListingPromoSlider
         category={listingPromoCategory}

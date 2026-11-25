@@ -150,7 +150,19 @@ export async function buildTicketCardPdf(options: TicketCardPdfOptions): Promise
     ? (await coverCropImageForPdf(posterRaw, posterW, posterH)) || posterRaw
     : null;
 
-  const topH = pad + posterH + pad;
+  // Estimate Header Details Height to ensure topH dynamically encloses all text
+  const textMaxW = cardW - pad * 2 - posterW - 12;
+  const estimatedTitleLines = Math.max(1, Math.ceil(doc.getTextWidth(options.title || "Booking") / textMaxW));
+  let estimatedHeaderContentH = 4.5 + estimatedTitleLines * 4.2;
+  if (options.categoryLabel) estimatedHeaderContentH += 4.2;
+  if (options.whenLine) estimatedHeaderContentH += 4.2;
+  if (options.venueLine) {
+    const venueEstLines = Math.max(1, Math.ceil(doc.getTextWidth(options.venueLine) / textMaxW));
+    estimatedHeaderContentH += venueEstLines * 3.3 + 1;
+  }
+  if (options.offerLabel) estimatedHeaderContentH += 5.5;
+
+  const topH = Math.max(pad + posterH + pad, pad + estimatedHeaderContentH + pad);
 
   const primaryText = String(options.primaryLabel || "RESERVATION").trim() || "RESERVATION";
   const primaryLen = primaryText.length;
@@ -169,7 +181,7 @@ export async function buildTicketCardPdf(options: TicketCardPdfOptions): Promise
   else middleH += 2;
   middleH += 4.5 + 4.5; // booking ID + spacing
   if (options.cancellationNote) middleH += 7 + 4.5; // banner + spacing
-  middleH += 4.5 + 3.8 + 5; // contact support rows
+  middleH += 4.5 + 3.8 + 2; // contact support row (with telephone icon) + spacing
 
   let bottomH = 5.5;
   const hasAmount = Boolean(options.totalFormatted || options.amountRows?.length);
@@ -214,22 +226,31 @@ export async function buildTicketCardPdf(options: TicketCardPdfOptions): Promise
   }
 
   const textLeft = cardX + pad + posterW + 3.5;
-  const textMaxW = cardW - pad * 2 - posterW - 12;
 
   // Title
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10.5);
   doc.setTextColor(17, 17, 17);
-  doc.text(options.title || "Booking", textLeft, curY + 4.5, { maxWidth: textMaxW });
+  const titleLines = doc.splitTextToSize(options.title || "Booking", textMaxW);
+  doc.text(titleLines, textLeft, curY + 4.5);
+  let detailY = curY + 4.5 + titleLines.length * 4.2;
 
-  // Date & Time
-  let detailY = curY + 10.5;
+  // Category / formatMeta (e.g. "English, 2D") matching on-screen UI
+  if (options.categoryLabel) {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7.2);
+    doc.setTextColor(119, 119, 119);
+    doc.text(options.categoryLabel, textLeft, detailY, { maxWidth: textMaxW });
+    detailY += 4.2;
+  }
+
+  // Date & Time (e.g. "Wed, 25 Nov | 8:00 AM")
   if (options.whenLine) {
     doc.setFont("helvetica", "normal");
     doc.setFontSize(7.2);
     doc.setTextColor(102, 102, 102);
     doc.text(options.whenLine, textLeft, detailY, { maxWidth: textMaxW });
-    detailY += 4.5;
+    detailY += 4.2;
   }
 
   // Venue & Address
@@ -237,18 +258,21 @@ export async function buildTicketCardPdf(options: TicketCardPdfOptions): Promise
     doc.setFont("helvetica", "normal");
     doc.setFontSize(6.8);
     doc.setTextColor(119, 119, 119);
-    doc.text(options.venueLine, textLeft, detailY, { maxWidth: textMaxW });
-    detailY += 4.5;
+    const venueLines = doc.splitTextToSize(options.venueLine, textMaxW);
+    doc.text(venueLines, textLeft, detailY);
+    detailY += venueLines.length * 3.3 + 1;
   }
 
   // Offer badge if any
   if (options.offerLabel) {
+    detailY += 1.5;
+    const badgeW = Math.min(36, doc.getTextWidth(options.offerLabel) + 4);
     doc.setFillColor(17, 17, 17);
-    doc.roundedRect(textLeft, detailY - 3, 28, 4, 1, 1, "F");
+    doc.roundedRect(textLeft, detailY - 3, badgeW, 4.2, 1, 1, "F");
     doc.setTextColor(255, 255, 255);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(5.8);
-    doc.text(options.offerLabel, textLeft + 2, detailY - 0.4, { maxWidth: 26 });
+    doc.text(options.offerLabel, textLeft + 2, detailY - 0.2, { maxWidth: badgeW - 4 });
   }
 
   // Vertical Tag on top right edge (e.g. "Dine-in", "M-Ticket", "E-Ticket")
@@ -348,18 +372,12 @@ export async function buildTicketCardPdf(options: TicketCardPdfOptions): Promise
     curY += bannerH;
   }
 
-  // Contact support row
+  // Contact support row (matching on-screen UI with phone glyph + "Contact support")
   curY += 4.5;
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7.2);
   doc.setTextColor(51, 51, 51);
   doc.text("Contact support", centerX, curY, { align: "center" });
-
-  curY += 3.8;
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(6.2);
-  doc.setTextColor(136, 136, 136);
-  doc.text("support@bookmybota.com", centerX, curY, { align: "center" });
 
   curY += 5;
 

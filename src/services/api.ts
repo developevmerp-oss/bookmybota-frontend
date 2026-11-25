@@ -785,6 +785,7 @@ export interface MovieBookingDetail {
   beverage_qty?: number;
   convenience_fee_total: number;
   discount_amount: number;
+  gift_card_amount?: number | string;
   grand_total: number;
   ticket_qty: number;
   commission_percent?: number | string;

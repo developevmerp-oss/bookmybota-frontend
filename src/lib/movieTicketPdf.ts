@@ -1,4 +1,4 @@
-import { formatDateCustomer, formatTime12h } from "@/lib/dateFormat";
+import { formatTime12h, getVenueDateTimeParts } from "@/lib/dateFormat";
 import { formatMoney } from "@/lib/currencyFormat";
 import {
   buildTicketCardPdf,
@@ -28,8 +28,9 @@ export type MovieTicketPdfBooking = {
   grand_total?: number | string;
   beverage_total?: number | string;
   convenience_fee_total?: number | string;
-  discount_amount?: number | string;
-  promo_code?: string;
+  discount_amount?: number | string | null;
+  gift_card_amount?: number | string | null;
+  promo_code?: string | null;
   seats?: Array<{
     seat_identifier?: string;
     tier_name?: string | null;
@@ -44,12 +45,17 @@ export type MovieTicketPdfBooking = {
   }>;
 };
 
-function formatLongDate(value?: string) {
-  if (!value) return "—";
-  const normalized = String(value).includes("T") ? value : String(value).replace(" ", "T");
-  const label = formatDateCustomer(normalized);
-  const time = formatTime12h(normalized);
-  return `${label} · ${time}`;
+/** Formats showtime matching screen UI, e.g. "Wed, 25 Nov | 8:00 AM" */
+function formatShowtimeMetaLine(startsAt?: string): string {
+  if (!startsAt) return "—";
+  const parts = getVenueDateTimeParts(startsAt);
+  if (!parts) return formatTime12h(startsAt);
+  const month = new Date(Date.UTC(parts.y, parts.m - 1, parts.d, 12)).toLocaleDateString("en-GB", {
+    month: "short",
+    timeZone: "UTC",
+  });
+  const day = String(parts.d).padStart(2, "0");
+  return `${parts.weekdayLong.slice(0, 3)}, ${day} ${month} | ${formatTime12h(startsAt)}`;
 }
 
 export async function buildMovieTicketPdf(booking: MovieTicketPdfBooking): Promise<Blob> {
@@ -76,7 +82,7 @@ export async function buildMovieTicketPdf(booking: MovieTicketPdfBooking): Promi
     .filter(Boolean)
     .join(", ");
 
-  const formatMeta = [booking.showtime_format, booking.showtime_language]
+  const formatMeta = [booking.showtime_language, booking.showtime_format]
     .filter(Boolean)
     .join(", ");
 
@@ -124,7 +130,15 @@ export async function buildMovieTicketPdf(booking: MovieTicketPdfBooking): Promi
   if (Number(booking.discount_amount) > 0) {
     amountRows.push({
       label: `Discount${booking.promo_code ? ` (${booking.promo_code})` : ""}`,
-      value: `− ${formatMoney(Number(booking.discount_amount) || 0)}`,
+      value: `- ${formatMoney(Number(booking.discount_amount) || 0)}`,
+      strong: true,
+    });
+  }
+
+  if (Number(booking.gift_card_amount) > 0) {
+    amountRows.push({
+      label: "Gift Card",
+      value: `- ${formatMoney(Number(booking.gift_card_amount) || 0)}`,
       strong: true,
     });
   }
@@ -134,8 +148,9 @@ export async function buildMovieTicketPdf(booking: MovieTicketPdfBooking): Promi
     title: booking.movie_title || "Movie",
     posterUrl: booking.movie_poster || booking.cinema_image || null,
     tag: "M-Ticket",
-    whenLine: formatLongDate(booking.showtime_starts_at),
-    venueLine: venueLine || formatMeta,
+    categoryLabel: formatMeta || undefined,
+    whenLine: formatShowtimeMetaLine(booking.showtime_starts_at),
+    venueLine: venueLine || undefined,
     offerLabel: booking.promo_code ? `Offer: ${booking.promo_code}` : undefined,
     ticketCountLabel: `${ticketCount} Ticket${ticketCount === 1 ? "" : "(s)"}`,
     primaryLabel: booking.screen_name || "SCREEN",

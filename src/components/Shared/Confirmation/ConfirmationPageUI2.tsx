@@ -346,9 +346,17 @@ export default function ConfirmationPageUI2({ bookingId }: { bookingId: string }
               </div>
               {Number(booking.discount_amount) > 0 ? (
                 <div className="flex justify-between gap-4 text-[0.875rem] text-[#57008E]">
-                  <span>Discount</span>
+                  <span>Discount{booking.promo_code ? ` (${booking.promo_code})` : ""}</span>
                   <span className="font-semibold tabular-nums">
-                    −{formatMoney(Number(booking.discount_amount) || 0)}
+                    -{formatMoney(Number(booking.discount_amount) || 0)}
+                  </span>
+                </div>
+              ) : null}
+              {Number(booking.gift_card_amount) > 0 ? (
+                <div className="flex justify-between gap-4 text-[0.875rem] text-[#57008E]">
+                  <span>Gift Card</span>
+                  <span className="font-semibold tabular-nums">
+                    -{formatMoney(Number(booking.gift_card_amount) || 0)}
                   </span>
                 </div>
               ) : null}

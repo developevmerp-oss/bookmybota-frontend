@@ -266,9 +266,11 @@ export default function EventGeoSeatPicker({
                     top: y,
                     width: model.seatPx,
                     height: model.seatPx,
-                    background: picked ? "#6900AA" : free ? "#ffffff" : "#e5e7eb",
+                    // selected = same soft violet + glow as the movie seat picker (#7B61FF)
+                    background: picked ? "#7B61FF" : free ? "#ffffff" : "#e5e7eb",
                     color: picked ? "#fff" : free ? "#334155" : "#cbd5e1",
-                    border: `${picked ? 2 : 1.5}px solid ${picked ? "#4c0080" : free ? "#22c55e" : "#e5e7eb"}`,
+                    border: `${picked ? 1 : 1.5}px solid ${picked ? "#7B61FF" : free ? "#22c55e" : "#e5e7eb"}`,
+                    boxShadow: picked ? "0 0 0 3px rgba(123,97,255,0.22), 0 0 12px 3px rgba(123,97,255,0.4)" : undefined,
                     cursor: free || picked ? "pointer" : "not-allowed",
                     ...(dim ? { opacity: picked ? 0.9 : 0.3, filter: "blur(1.6px)", pointerEvents: "none" as const } : {}),
                   }}
@@ -291,7 +293,7 @@ export default function EventGeoSeatPicker({
       </div>
       <div className="flex flex-wrap items-center justify-center gap-4 border-t border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
         <span className="flex items-center gap-1.5"><i className="size-3.5 rounded-full border-2 border-green-500 bg-white" /> Available</span>
-        <span className="flex items-center gap-1.5"><i className="size-3.5 rounded-full bg-[#6900AA]" /> Selected</span>
+        <span className="flex items-center gap-1.5"><i className="size-3.5 rounded-full bg-[#7B61FF] shadow-[0_0_0_2px_rgba(123,97,255,0.22)]" /> Selected</span>
         <span className="flex items-center gap-1.5"><i className="size-3.5 rounded-full bg-slate-200" /> Sold / held</span>
       </div>
     </div>

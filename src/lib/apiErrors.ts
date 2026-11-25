@@ -59,3 +59,14 @@ export function extractApiSuccessMessage(data: unknown, fallback: string): strin
   }
   return fallback;
 }
+
+/**
+ * True when the server says the seats a customer picked were taken by someone else (or are no longer available).
+ * The booking pages then show the full-page "seats unavailable" screen instead of a small popup.
+ */
+export function isSeatConflictError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const msg = extractApiError(error, '');
+  if (!/seat/i.test(msg)) return false;
+  return /(no longer available|not available|unavailable|already (booked|held|taken|reserved)|booked by another|held by another|currently held|blocked by)/i.test(msg);
+}

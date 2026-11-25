@@ -1,9 +1,10 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
 import { OrbitControls, useGLTF } from "@react-three/drei";
 import * as THREE from "three";
+import { Minus, Plus } from "lucide-react";
 import Stadium3DView, { type Seat3D } from "@/components/EventLandingPage/Stadium3DView";
 
 /**
@@ -36,9 +37,82 @@ function loadSeats(model: string): Promise<ModelSeat[]> {
 
 const COLORS = ["#ef4444", "#facc15", "#22c55e", "#f8fafc", "#2563eb", "#f97316"];
 
+const glbUrl = (model: string) => `${model === "narendra-modi" ? "/models/narendra-modi.glb" : "/models/stadium.glb"}?v=${MODEL_VERSION}`;
+
+/**
+ * Starts downloading everything the live stadium view needs (the code, the seat positions and the 3D model) in the
+ * background, so the first time the customer opens it, it is already there and appears complete.
+ */
+export function preloadStadium(modelKey = "football") {
+  loadSeats(modelKey).catch(() => {});
+  useGLTF.preload(glbUrl(modelKey));
+}
+
 function Model({ model }: { model: string }) {
-  const gltf = useGLTF(`${model === "narendra-modi" ? "/models/narendra-modi.glb" : "/models/stadium.glb"}?v=${MODEL_VERSION}`);
+  const gltf = useGLTF(glbUrl(model));
   return <primitive object={gltf.scene} />;
+}
+
+/** Rendered inside <Suspense> after the model: it only mounts once the 3D model has finished loading */
+function Ready({ onReady }: { onReady: () => void }) {
+  useEffect(() => {
+    onReady();
+  }, [onReady]);
+  return null;
+}
+
+type ZoomApi = { by: (factor: number) => void };
+
+/**
+ * Zoom for the 3D view. Mouse wheel, trackpad pinch (ctrl + wheel) and two-finger pinch zoom ONLY the 3D picture
+ * (by narrowing / widening the camera lens); they are kept away from the browser, so the header and footer around
+ * the view do not zoom. The + / - buttons use the same `by` function.
+ */
+function ZoomRig({ api }: { api: MutableRefObject<ZoomApi | null> }) {
+  const { camera, gl } = useThree();
+  useEffect(() => {
+    const cam = camera as THREE.PerspectiveCamera;
+    const el = gl.domElement;
+    const MIN_FOV = 22;
+    const MAX_FOV = 85;
+    const by = (f: number) => {
+      cam.fov = Math.min(MAX_FOV, Math.max(MIN_FOV, cam.fov * f));
+      cam.updateProjectionMatrix();
+    };
+    api.current = { by };
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      by(Math.exp(e.deltaY * (e.ctrlKey ? 0.012 : 0.0012)));
+    };
+    let last = 0;
+    const dist = (t: TouchList) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+    const onStart = (e: TouchEvent) => {
+      if (e.touches.length === 2) last = dist(e.touches);
+    };
+    const onMove = (e: TouchEvent) => {
+      if (e.touches.length === 2 && last > 0) {
+        e.preventDefault();
+        const d = dist(e.touches);
+        by(last / d);
+        last = d;
+      }
+    };
+    const onEnd = () => {
+      last = 0;
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    el.addEventListener("touchstart", onStart, { passive: true });
+    el.addEventListener("touchmove", onMove, { passive: false });
+    el.addEventListener("touchend", onEnd);
+    return () => {
+      el.removeEventListener("wheel", onWheel);
+      el.removeEventListener("touchstart", onStart);
+      el.removeEventListener("touchmove", onMove);
+      el.removeEventListener("touchend", onEnd);
+      api.current = null;
+    };
+  }, [camera, gl, api]);
+  return null;
 }
 
 function Crowd({ seats, skipId }: { seats: ModelSeat[]; skipId: string | null }) {
@@ -66,11 +140,11 @@ function Crowd({ seats, skipId }: { seats: ModelSeat[]; skipId: string | null })
   }, [people]);
   return (
     <group>
-      <instancedMesh ref={bodies} args={[undefined, undefined, people.length]}>
+      <instancedMesh frustumCulled={false} ref={bodies} args={[undefined, undefined, people.length]}>
         <boxGeometry args={[0.5, 0.65, 0.4]} />
         <meshStandardMaterial roughness={0.9} />
       </instancedMesh>
-      <instancedMesh ref={heads} args={[undefined, undefined, people.length]}>
+      <instancedMesh frustumCulled={false} ref={heads} args={[undefined, undefined, people.length]}>
         <sphereGeometry args={[0.2, 8, 6]} />
         <meshStandardMaterial roughness={0.9} />
       </instancedMesh>
@@ -78,6 +152,11 @@ function Crowd({ seats, skipId }: { seats: ModelSeat[]; skipId: string | null })
   );
 }
 
+/**
+ * NOTE: every instancedMesh below has frustumCulled={false}. Chair positions are written in an effect AFTER the first
+ * frame; three.js computes an instanced mesh's culling sphere once, from the first frame (all chairs still at the
+ * origin), so chairs vanished depending on where the camera looked - most often on the first open.
+ */
 /** Chair-shaped markers (cushion + backrest) in one colour, laid over the model's chairs, facing the pitch */
 function ColoredChairs({ seats, color, scale = 1.25, lit = false, glow = false, wide = 1 }: { seats: ModelSeat[]; color: string; scale?: number; lit?: boolean; glow?: boolean; wide?: number }) {
   const cushion = useRef<THREE.InstancedMesh>(null);
@@ -119,11 +198,11 @@ function ColoredChairs({ seats, color, scale = 1.25, lit = false, glow = false, 
   if (items.length === 0) return null;
   return (
     <group>
-      <instancedMesh key={items.length} ref={cushion} args={[undefined, undefined, items.length]}>
+      <instancedMesh frustumCulled={false} key={items.length} ref={cushion} args={[undefined, undefined, items.length]}>
         <boxGeometry args={[0.46, 0.13, 0.46]} />
         {lit ? <meshStandardMaterial color={color} roughness={0.5} emissive={glow ? color : "#000000"} emissiveIntensity={glow ? 0.55 : 0} /> : <meshBasicMaterial color={color} polygonOffset polygonOffsetFactor={-4} polygonOffsetUnits={-4} />}
       </instancedMesh>
-      <instancedMesh key={`b${items.length}`} ref={back} args={[undefined, undefined, items.length]}>
+      <instancedMesh frustumCulled={false} key={`b${items.length}`} ref={back} args={[undefined, undefined, items.length]}>
         <boxGeometry args={[0.46, 0.5, 0.12]} />
         {lit ? <meshStandardMaterial color={color} roughness={0.5} emissive={glow ? color : "#000000"} emissiveIntensity={glow ? 0.55 : 0} /> : <meshBasicMaterial color={color} polygonOffset polygonOffsetFactor={-4} polygonOffsetUnits={-4} />}
       </instancedMesh>
@@ -155,6 +234,7 @@ function Rig({ pose }: { pose: Pose }) {
     const p = camera as THREE.PerspectiveCamera;
     p.near = 0.1;
     p.far = 1200;
+    p.fov = 62; // a new view starts at the normal zoom
     p.updateProjectionMatrix();
     if (pose) {
       const from = new THREE.Vector3(...pose.pos);
@@ -282,10 +362,19 @@ export default function StadiumModelView({ seats, seat, className = "", model: m
       return true;
     });
   }, [model, mine, gone]);
-  const mode: "seat" | "group" | "stadium" = chosen ?? (mine.length > 1 ? "group" : "seat");
+  // Always opens on "From my seat" (what the customer will see from their chair); the other two views are one tap away
+  const mode: "seat" | "group" | "stadium" = chosen ?? "seat";
   const overview = mode === "stadium";
   const cam = mode === "seat" && seat ? mapping.get(seat.id) || null : null;
-  const pose: Pose = mode === "stadium" ? null : mode === "group" ? groupPose(mine) : cam ? { pos: cam.camera, look: cam.lookAt } : null;
+  // memoised so the camera is only moved when the view really changes, not on every re-render
+  const pose: Pose = useMemo(
+    () => (mode === "stadium" ? null : mode === "group" ? groupPose(mine) : cam ? { pos: cam.camera, look: cam.lookAt } : null),
+    [mode, mine, cam]
+  );
+
+  const zoomApi = useRef<ZoomApi | null>(null);
+  const [sceneReady, setSceneReady] = useState(false);
+  const markReady = useCallback(() => setSceneReady(true), []);
 
   if (failed || (model && seat && mode === "seat" && !cam)) return <Stadium3DView seats={seats} seat={seat} className={className} />;
   if (!model) return <div className={`flex items-center justify-center bg-[#0b1224] text-sm text-slate-400 ${className}`}>Loading stadium…</div>;
@@ -302,14 +391,28 @@ export default function StadiumModelView({ seats, seat, className = "", model: m
           <ColoredChairs seats={freeChairs} color="#1d4ed8" scale={1} lit wide={wide} />
           <Taken seats={gone} wide={wide} />
           <Picked seats={mine} wide={wide} tall={overview} skipId={mode === "seat" ? cam?.id || null : null} />
+          <Ready onReady={markReady} />
         </Suspense>
         <Rig pose={pose} />
+        <ZoomRig api={zoomApi} />
       </Canvas>
-      <div className="pointer-events-none absolute right-3 top-3 rounded-full bg-black/60 px-3 py-1.5 text-xs font-semibold text-white">Drag to look around</div>
-      <div className="absolute bottom-3 left-3 flex max-w-[calc(100%-1.5rem)] flex-wrap gap-1.5">
+      {/* Covers the empty sky until the 3D model and every chair are in place, so the view never shows half loaded */}
+      {!sceneReady ? (
+        <div className="absolute inset-0 z-20 flex items-center justify-center bg-[#0b1224] text-sm text-slate-300">Loading stadium…</div>
+      ) : null}
+      <div className="pointer-events-none absolute right-3 top-3 rounded-full bg-black/60 px-3 py-1.5 text-xs font-semibold text-white">Drag to look around · scroll or pinch to zoom</div>
+      <div className="absolute bottom-3 right-3 z-10 flex flex-col overflow-hidden rounded-xl border border-white/20 bg-black/70 shadow-lg">
+        <button type="button" aria-label="Zoom in" onClick={() => zoomApi.current?.by(1 / 1.2)} className="flex size-9 cursor-pointer items-center justify-center text-white hover:bg-white/15">
+          <Plus className="size-4" />
+        </button>
+        <button type="button" aria-label="Zoom out" onClick={() => zoomApi.current?.by(1.2)} className="flex size-9 cursor-pointer items-center justify-center border-t border-white/20 text-white hover:bg-white/15">
+          <Minus className="size-4" />
+        </button>
+      </div>
+      <div className="absolute bottom-3 left-3 flex max-w-[calc(100%-5rem)] flex-wrap gap-1.5">
         {([
           ["seat", "From my seat"],
-          ...(mine.length > 1 ? [["group", `My ${mine.length} seats`]] : []),
+          ...(mine.length >= 1 ? [["group", mine.length > 1 ? `My ${mine.length} seats` : "My seat"]] : []),
           ["stadium", "Whole stadium"],
         ] as Array<["seat" | "group" | "stadium", string]>).map(([id, label]) => (
           <button

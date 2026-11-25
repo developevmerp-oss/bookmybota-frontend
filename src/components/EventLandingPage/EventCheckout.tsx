@@ -63,7 +63,8 @@ import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
 import { formatDateCustomer, formatTime12h, getVenueDateTimeParts, venueDateStr } from "@/lib/dateFormat";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
-import { extractApiError } from "@/lib/apiErrors";
+import { extractApiError, isSeatConflictError } from "@/lib/apiErrors";
+import SeatsUnavailablePage from "@/components/Shared/SeatsUnavailablePage";
 import { formatMoney } from "@/lib/currencyFormat";
 import { parseEventLanguages } from "@/lib/eventValidation";
 import { sanitizePhoneInput } from "@/lib/validation";
@@ -299,6 +300,8 @@ export default function EventCheckout({
   const [bookedSuccessId, setBookedSuccessId] = useState<string | null>(null);
   const [holding, setHolding] = useState(false);
   const [selectedSeats, setSelectedSeats] = useState<any[]>([]);
+  // true when someone else took the chosen seats at the same moment: shows the full-page "seats unavailable" screen
+  const [seatConflict, setSeatConflict] = useState(false);
   const [desiredSeatQty, setDesiredSeatQty] = useState<number | null>(null);
   const [seatCountPick, setSeatCountPick] = useState<number | null>(null);
   const [seatQtyModalOpen, setSeatQtyModalOpen] = useState(false);
@@ -1010,6 +1013,25 @@ export default function EventCheckout({
     }
   };
 
+  /** From the "seats unavailable" page: free any hold, clear the seats and show the same seat layout again */
+  const handleSeatConflictBack = async () => {
+    setSeatConflict(false);
+    userCancelledHoldRef.current = true;
+    await releaseActiveHold();
+    clearHoldSessionToken();
+    setSessionToken(undefined);
+    clearSeatHoldState();
+    setSelectedSeats([]);
+    autoOpenedMapRef.current = true; // the map is reopened right here, not by the auto-open effect
+    try {
+      refetchLayout();
+    } catch {
+      // ignore
+    }
+    setStep(2);
+    setIsMapFullscreen(true);
+  };
+
   const resetToSeatsAfterTimeout = async () => {
     userCancelledHoldRef.current = true;
     await releaseActiveHold();
@@ -1296,7 +1318,11 @@ export default function EventCheckout({
         }
       }
     } catch (err) {
-      toast.error(extractApiError(err, "Booking failed. Please try again."));
+      if (isSeatConflictError(err)) {
+        setSeatConflict(true);
+      } else {
+        toast.error(extractApiError(err, "Booking failed. Please try again."));
+      }
     } finally {
       setSubmitting(false);
     }
@@ -1931,7 +1957,17 @@ export default function EventCheckout({
         setStep(4);
         toast.success(res.message || "Seats held for 10 minutes.");
       } catch (err) {
-        toast.error(extractApiError(err, "Could not hold seats. Please try again."));
+        if (isSeatConflictError(err)) {
+          setSelectedSeats([]);
+          setSeatConflict(true);
+          try {
+            refetchLayout();
+          } catch {
+            // ignore
+          }
+        } else {
+          toast.error(extractApiError(err, "Could not hold seats. Please try again."));
+        }
       } finally {
         setHolding(false);
       }
@@ -3465,6 +3501,8 @@ export default function EventCheckout({
                 </p>
               </div>
               <div className="flex items-center gap-2 shrink-0">
+                {/* Map / Grid view switch hidden on purpose: customers always see the designed layout (map).
+                    The grid fallback code is kept below but is no longer reachable from the UI.
                 {!isStadiumLayout && (
                   <div className="flex items-center gap-0.5 p-0.5 bg-slate-100 rounded-md border border-slate-200">
                     <button
@@ -3491,6 +3529,7 @@ export default function EventCheckout({
                     </button>
                   </div>
                 )}
+                */}
                 <p className="text-[0.8125rem] md:max-lg:text-[1rem] lg:text-[0.8125rem] font-extrabold text-[#6900AA] tabular-nums">
                   {selectedSeats.length}/{effectiveDesiredSeatQty ?? "—"}
                 </p>
@@ -4508,11 +4547,21 @@ export default function EventCheckout({
     </>
   );
 
+  // Full-page "seats unavailable" screen: shown by both the full-page booking route and the side-panel checkout
+  const seatConflictPage = seatConflict ? (
+    <SeatsUnavailablePage
+      title={event.name}
+      subtitle={selectedShowtime?.venue_name || undefined}
+      onBack={() => void handleSeatConflictBack()}
+    />
+  ) : null;
+
   if (isPage) {
     return (
       <>
         {panel}
         {checkoutModals}
+        {seatConflictPage}
         {!isOrganizer && (
           <CustomerAuthModal
             open={authModalOpen}
@@ -4539,6 +4588,7 @@ export default function EventCheckout({
         {panel}
       </div>
       {checkoutModals}
+      {seatConflictPage}
       {!isOrganizer && (
         <CustomerAuthModal
           open={authModalOpen}

@@ -424,7 +424,7 @@ export default function ConfirmationPageUI1({
       if (prev) prev.qty += 1;
       else grouped.set(key, { label, qty: 1, unit });
     }
-    const rows: { label: string; labelDetail?: string; value: string }[] =
+    const rows: { label: string; labelDetail?: string; value: string; strong?: boolean }[] =
       grouped.size > 0
         ? [...grouped.values()].map((g) => ({
             label: `${g.label} × ${g.qty}`,
@@ -452,7 +452,15 @@ export default function ConfirmationPageUI1({
     if (Number(booking.discount_amount) > 0) {
       rows.push({
         label: `Discount${booking.promo_code ? ` (${booking.promo_code})` : ""}`,
-        value: `− ${formatMoney(Number(booking.discount_amount) || 0)}`,
+        value: `- ${formatMoney(Number(booking.discount_amount) || 0)}`,
+        strong: true,
+      });
+    }
+    if (Number(booking.gift_card_amount) > 0) {
+      rows.push({
+        label: "Gift Card",
+        value: `- ${formatMoney(Number(booking.gift_card_amount) || 0)}`,
+        strong: true,
       });
     }
     return rows;

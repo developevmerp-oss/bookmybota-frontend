@@ -273,6 +273,7 @@ function ConfirmationContent() {
 
   const feeTotal = Number(booking.convenience_fee_total) || 0;
   const discountTotal = Number(booking.discount_amount) || 0;
+  const giftCardTotal = Number(booking.gift_card_amount) || 0;
   const amountRows = [
     ...groupedItems.map((item) => ({
       label: `${item.ticket_type} × ${item.qty}`,
@@ -285,8 +286,17 @@ function ConfirmationContent() {
     ...(discountTotal > 0
       ? [
           {
-            label: "Discount",
-            value: `− ${formatMoney(discountTotal)}`,
+            label: `Discount${booking.promo_code ? ` (${booking.promo_code})` : ""}`,
+            value: `- ${formatMoney(discountTotal)}`,
+            strong: true as const,
+          },
+        ]
+      : []),
+    ...(giftCardTotal > 0
+      ? [
+          {
+            label: "Gift Card",
+            value: `- ${formatMoney(giftCardTotal)}`,
             strong: true as const,
           },
         ]

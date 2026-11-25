@@ -44,7 +44,9 @@ export type EventTicketPdfBooking = {
   created_at?: string;
   grand_total?: number | string;
   convenience_fee_total?: number | string;
-  discount_amount?: number | string;
+  discount_amount?: number | string | null;
+  gift_card_amount?: number | string | null;
+  promo_code?: string | null;
   qr_code?: string;
   qr_payload?: string;
   ticket_mode?: string;
@@ -576,7 +578,7 @@ function drawTicketContent(
     doc.setTextColor(...BRAND);
     doc.text("Promo discount", contentX, y);
     doc.setFont("helvetica", "bold");
-    doc.text(`−${formatMoney(booking.discount_amount)}`, contentX + contentW, y, { align: "right" });
+    doc.text(`-${formatMoney(booking.discount_amount)}`, contentX + contentW, y, { align: "right" });
     doc.setFont("helvetica", "normal");
     y += 7;
   }
@@ -667,8 +669,16 @@ export async function buildEventTicketPdf(
 
   if (Number(booking.discount_amount) > 0) {
     amountRows.push({
-      label: "Discount",
-      value: `− ${formatMoney(booking.discount_amount)}`,
+      label: `Discount${booking.promo_code ? ` (${booking.promo_code})` : ""}`,
+      value: `- ${formatMoney(booking.discount_amount)}`,
+      strong: true,
+    });
+  }
+
+  if (Number(booking.gift_card_amount) > 0) {
+    amountRows.push({
+      label: "Gift Card",
+      value: `- ${formatMoney(booking.gift_card_amount)}`,
       strong: true,
     });
   }
@@ -679,7 +689,7 @@ export async function buildEventTicketPdf(
         formatTime12h(booking.starts_at),
       ]
         .filter(Boolean)
-        .join(" · ")
+        .join(" | ")
     : undefined;
 
   const venueLine = [booking.venue_name, booking.venue_address]
@@ -699,6 +709,7 @@ export async function buildEventTicketPdf(
     tag: ticketModeLabel(mode) || "E-Ticket",
     whenLine,
     venueLine: venueLine || undefined,
+    offerLabel: booking.promo_code ? `Offer: ${booking.promo_code}` : undefined,
     ticketCountLabel: `${totalTickets} Ticket${totalTickets === 1 ? "" : "(s)"}`,
     primaryLabel: ticketTypes || "EVENT PASS",
     secondaryLabel: seatsLabel || undefined,

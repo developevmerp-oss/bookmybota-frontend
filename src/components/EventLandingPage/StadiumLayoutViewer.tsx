@@ -13,6 +13,9 @@ import {
   ChevronRight,
   Info,
   LayoutGrid,
+  Minus,
+  Plus,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { SeatMapShimmer } from "@/components/Shared/Shimmer";
@@ -2937,6 +2940,12 @@ export default function StadiumLayoutViewer({
               const isSoldOut = block.available === 0 && block.total > 0;
               const minPrice = getBlockMinPrice(block);
               const isStanding = block.stand_type === "standing";
+              const blockSelectedSeats = selectedSeats.filter(
+                (s) =>
+                  s.section_name === block.name ||
+                  s.id.startsWith(`standing-${block.block_id}-`)
+              );
+              const hasPicks = blockSelectedSeats.length > 0;
 
               const cx = block.x + block.width / 2;
               const cy = block.y + block.height / 2;
@@ -3549,7 +3558,7 @@ export default function StadiumLayoutViewer({
                                       cornerRadius={pillH / 2}
                                       fill="#FFFFFF"
                                       opacity={0.96}
-                                      stroke={isHovered ? "#6900AA" : "rgba(15,23,42,0.12)"}
+                                      stroke={hasPicks || isHovered ? "#6900AA" : "rgba(15,23,42,0.12)"}
                                       strokeWidth={isHovered ? 1.5 : 1}
                                       shadowColor="#0f172a"
                                       shadowBlur={isHovered ? 8 : 4}
@@ -3560,7 +3569,7 @@ export default function StadiumLayoutViewer({
                                       x={-pillW / 2 + 10}
                                       y={0}
                                       radius={3}
-                                      fill={isSoldOut ? "#EF4444" : "#10B981"}
+                                      fill={hasPicks ? "#6900AA" : isSoldOut ? "#EF4444" : "#10B981"}
                                     />
                                     {/* Price text */}
                                     <Text
@@ -3930,275 +3939,327 @@ export default function StadiumLayoutViewer({
           )}
         </Stage>
 
-        {/* ── Standing Pass Selector Overlay (shown when a standing block is clicked) ── */}
-        {selectedBlock && selectedBlock.stand_type === "standing" && (
-          <div
-            className="absolute inset-0 z-30 flex flex-col bg-[#F8FAFC]/97 backdrop-blur-md"
-            style={{ animation: "fadeIn 0.22s ease-out forwards" }}
-          >
-            <div className="flex items-center justify-between gap-3 px-4 py-3 bg-white border-b border-slate-200 shrink-0 shadow-sm">
-              <button
-                onClick={handleBackToStadium}
-                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#6900AA] hover:bg-[#7a00c6] text-white text-xs font-bold transition-all active:scale-95"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                <span>Stadium Map</span>
-              </button>
-              <div className="flex flex-col items-center">
-                <span className="text-sm font-extrabold text-slate-900">{selectedBlock.name}</span>
-                <span className="text-[11px] text-purple-700 font-semibold mt-0.5">General Admission · Standing Area</span>
-              </div>
-              <div className="w-24" />
-            </div>
+        
+      <style>{`
+        @keyframes stadiumDrawerSlide {
+          from {
+            transform: translateX(100%);
+            opacity: 0.9;
+          }
+          to {
+            transform: translateX(0);
+            opacity: 1;
+          }
+        }
+      `}</style>
 
-            <div className="flex-1 overflow-auto flex items-center justify-center p-4 sm:p-8">
-              <div className="w-full max-w-md bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-xl space-y-6">
-                <div className="flex items-center gap-4">
+        {/* ── Standing Pass Selector Drawer (Right side drawer when a standing block is clicked) ── */}
+        {selectedBlock && selectedBlock.stand_type === "standing" && (
+          <div className="absolute inset-0 z-40 flex justify-end">
+            {/* Backdrop over layout */}
+            <div
+              className="absolute inset-0 bg-slate-900/30 backdrop-blur-[2px] transition-opacity duration-200"
+              onClick={handleBackToStadium}
+            />
+
+            {/* Right Side Drawer Panel */}
+            <div
+              className="relative w-full sm:w-[420px] md:w-[460px] h-full bg-[#F8FAFC] shadow-2xl flex flex-col z-10 border-l border-slate-200"
+              style={{ animation: "stadiumDrawerSlide 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards" }}
+            >
+              {/* Drawer Header */}
+              <div className="flex items-center justify-between gap-3 px-5 py-4 bg-white border-b border-slate-200 shrink-0">
+                <div className="flex items-center gap-3 min-w-0">
                   <div
-                    className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl text-white shadow-md"
+                    className="w-10 h-10 rounded-xl flex items-center justify-center text-lg text-white shadow-sm shrink-0"
                     style={{ backgroundColor: selectedBlock.color || "#6900AA" }}
                   >
                     🧍
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-base font-extrabold text-slate-900 truncate">
-                        {selectedBlock.name}
-                      </h3>
-                      <span className="text-[10px] font-bold bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full border border-purple-200">
-                        STANDING PASS
-                      </span>
-                    </div>
-                    {(() => {
-                      const matchedTicketId = selectedBlock.ticket_type_id || selectedBlock.tiers[0]?.ticket_type_id || "";
-                      const tt = ticketTypes.find((t) => t.id === matchedTicketId);
-                      const unitPrice = tt ? Number(tt.price) : 0;
-                      return (
-                        <p className="text-sm font-extrabold text-emerald-600 mt-0.5">
-                          ETB {unitPrice.toLocaleString()}{" "}
-                          <span className="text-xs text-slate-400 font-normal">/ pass</span>
-                        </p>
-                      );
-                    })()}
+                  <div className="min-w-0">
+                    <h3 className="text-base font-extrabold text-slate-900 truncate">
+                      {selectedBlock.name}
+                    </h3>
+                    <p className="text-[11px] text-purple-700 font-semibold truncate">
+                      General Admission · Standing Pass
+                    </p>
                   </div>
                 </div>
 
-                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-500 font-medium">Availability</span>
-                    <span className="font-bold text-slate-800">
-                      {selectedBlock.available > 0
-                        ? `${selectedBlock.available.toLocaleString()} passes left`
-                        : "Sold out"}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-500 font-medium">Seating</span>
-                    <span className="font-bold text-purple-700">General Admission (No reserved seats)</span>
-                  </div>
-                </div>
+                <button
+                  type="button"
+                  onClick={handleBackToStadium}
+                  className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center transition-colors shrink-0 cursor-pointer"
+                  title="Close"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
 
-                {/* Quantity Selector */}
+              {/* Drawer Content */}
+              <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-4">
+                {/* Hint banner */}
+                <p className="text-[0.8125rem] text-slate-500">
+                  Choose one ticket type. Selecting another type clears your current selection.
+                </p>
+
                 {(() => {
-                  const existingForBlock = selectedSeats.filter(
-                    (s) =>
-                      s.section_name === selectedBlock.name ||
-                      s.id.startsWith(`standing-${selectedBlock.block_id}-`)
+                  const matchedTicketId =
+                    selectedBlock.ticket_type_id || selectedBlock.tiers[0]?.ticket_type_id || "";
+                  const tt = ticketTypes.find((t) => t.id === matchedTicketId);
+                  const unitPrice = tt ? Number(tt.price) : 0;
+                  const available = selectedBlock.available || 0;
+                  const total = selectedBlock.total || 0;
+                  const soldOut = available <= 0;
+                  const maxPerOrder = Math.max(
+                    1,
+                    Math.min(
+                      maxSelectable < Number.MAX_SAFE_INTEGER ? maxSelectable : 10,
+                      available || 1
+                    )
                   );
-                  const existingForBlockCount = existingForBlock.length;
+
+                  const isFewLeft = available > 0 && total > 0 && available / total < 0.25;
 
                   return (
-                    <>
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
-                            Select Number of Passes
-                          </label>
-                          {existingForBlockCount > 0 && (
-                            <span className="text-[11px] font-bold text-[#6900AA] bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200">
-                              {existingForBlockCount} currently selected
+                    <div
+                      className={`rounded-[0.75rem] px-4 py-3.5 flex items-center justify-between gap-3 bg-white shadow-[0_0.125rem_0.75rem_rgba(15,23,42,0.06)] border transition-all ${
+                        standingQty > 0
+                          ? "border-[#6900AA] ring-1 ring-[#6900AA]/20"
+                          : soldOut
+                            ? "border-slate-100 opacity-60"
+                            : "border-slate-200"
+                      }`}
+                    >
+                      <div className="min-w-0">
+                        <p className="font-bold text-[1.0625rem] sm:text-[1.125rem] text-slate-900 uppercase tracking-wide truncate">
+                          {selectedBlock.name}
+                        </p>
+                        <p className="mt-1.5 text-[1.0625rem] sm:text-[1.125rem] font-extrabold text-slate-900">
+                          ETB {unitPrice.toLocaleString()}
+                          {isFewLeft && !soldOut && (
+                            <span className="ml-2.5 text-[0.9375rem] font-semibold text-[#E85D04] normal-case">
+                              Fast Filling
                             </span>
                           )}
-                        </div>
-                        <div className="flex items-center justify-between gap-4 p-3 bg-slate-100 rounded-2xl border border-slate-200">
-                          <button
-                            type="button"
-                            disabled={standingQty <= 0}
-                            onClick={() => setStandingQty((q) => Math.max(0, q - 1))}
-                            className="w-10 h-10 rounded-xl bg-white border border-slate-300 hover:border-slate-400 text-slate-800 font-extrabold text-lg flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-sm cursor-pointer"
-                            title={standingQty === 1 ? "Reduce to 0 to clear" : "Decrease passes"}
-                          >
-                            −
-                          </button>
-                          <div className="text-center">
-                            <span
-                              className={`text-xl font-extrabold font-mono ${standingQty === 0 ? "text-slate-400" : "text-slate-900"
-                                }`}
-                            >
-                              {standingQty}
+                          {soldOut && (
+                            <span className="ml-2.5 text-[0.9375rem] font-semibold text-[#E11D48] normal-case">
+                              Sold out
                             </span>
-                            <span className="text-[11px] text-slate-500 block">
-                              {standingQty === 0 ? "passes (clear)" : `pass${standingQty > 1 ? "es" : ""}`}
-                            </span>
-                          </div>
-                          <button
-                            type="button"
-                            disabled={
-                              standingQty >=
-                              Math.min(
-                                maxSelectable < Number.MAX_SAFE_INTEGER ? maxSelectable : 10,
-                                selectedBlock.available || 1
-                              )
-                            }
-                            onClick={() =>
-                              setStandingQty((q) =>
-                                Math.min(
-                                  maxSelectable < Number.MAX_SAFE_INTEGER ? maxSelectable : 10,
-                                  selectedBlock.available || 1,
-                                  q + 1
-                                )
-                              )
-                            }
-                            className="w-10 h-10 rounded-xl bg-white border border-slate-300 hover:border-slate-400 text-slate-800 font-extrabold text-lg flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-sm cursor-pointer"
-                          >
-                            +
-                          </button>
-                        </div>
+                          )}
+                        </p>
+                        {!soldOut && (
+                          <p className="mt-1 text-[0.75rem] font-medium text-slate-500 normal-case">
+                            Max {maxPerOrder} per order
+                          </p>
+                        )}
                       </div>
 
-                      {/* Action Buttons: Confirm or Clear */}
-                      <div className="space-y-2.5 pt-1">
-                        {standingQty === 0 ? (
+                      <div className="shrink-0">
+                        {soldOut ? null : standingQty === 0 ? (
                           <button
                             type="button"
                             onClick={() => {
-                              const remaining = selectedSeats.filter(
-                                (s) =>
-                                  !(
-                                    s.section_name === selectedBlock.name ||
-                                    s.id.startsWith(`standing-${selectedBlock.block_id}-`)
-                                  )
-                              );
-                              setSelectedSeats(remaining);
-                              onSeatsSelected(remaining);
-                              toast.info(`Cleared standing passes for ${selectedBlock.name}`);
-                              handleBackToStadium();
-                            }}
-                            className="w-full py-3 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-lg transition-all active:scale-[0.98] cursor-pointer"
-                          >
-                            <span>Clear All Passes for {selectedBlock.name}</span>
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            disabled={selectedBlock.available === 0}
-                            onClick={() => {
-                              const matchedTicketId =
-                                selectedBlock.ticket_type_id || selectedBlock.tiers[0]?.ticket_type_id || "";
-                              const tt = ticketTypes.find((t) => t.id === matchedTicketId);
-                              const unitPrice = tt ? Number(tt.price) : 0;
-
-                              const otherSeats = selectedSeats.filter(
-                                (s) =>
-                                  !(
-                                    s.section_name === selectedBlock.name ||
-                                    s.id.startsWith(`standing-${selectedBlock.block_id}-`)
-                                  )
-                              );
-
-                              const virtualSeats: TierSeat[] = Array.from(
-                                { length: standingQty },
-                                (_, idx) => ({
-                                  id: `standing-${selectedBlock.block_id}-${Date.now()}-${idx + 1}`,
+                              const newQty = 1;
+                              setStandingQty(newQty);
+                              const virtualSeats: TierSeat[] = [
+                                {
+                                  id: `standing-${selectedBlock.block_id}-${Date.now()}-1`,
                                   row_label: "Standing",
-                                  seat_label: `Pass #${idx + 1}`,
+                                  seat_label: "Pass #1",
                                   coordinate_x: selectedBlock.x + selectedBlock.width / 2,
                                   coordinate_y: selectedBlock.y + selectedBlock.height / 2,
                                   status: "AVAILABLE",
                                   ticket_type_id: matchedTicketId,
                                   section_name: selectedBlock.name,
                                   price: unitPrice,
-                                })
-                              );
-
-                              const combined = [...otherSeats, ...virtualSeats];
-                              setSelectedSeats(combined);
-                              onSeatsSelected(combined);
-                              toast.success(
-                                `${standingQty} Standing pass${standingQty > 1 ? "es" : ""} selected for ${selectedBlock.name}!`
-                              );
-                              handleBackToStadium();
+                                },
+                              ];
+                              setSelectedSeats(virtualSeats);
+                              onSeatsSelected(virtualSeats);
+                              toast.success(`1 pass selected for ${selectedBlock.name}!`);
                             }}
-                            className="w-full py-3 px-4 rounded-xl bg-[#6900AA] hover:bg-[#57008E] text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-lg transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                            className="min-w-[4.75rem] px-3.5 py-2 rounded-[0.375rem] border-2 border-[#6900AA] text-[#6900AA] text-[1rem] font-bold cursor-pointer hover:bg-[#F7E9FF] transition-colors"
                           >
-                            <Check className="w-4 h-4" />
-                            <span>Confirm {standingQty} Standing Pass{standingQty > 1 ? "es" : ""}</span>
+                            Add
                           </button>
-                        )}
-
-                        {/* Dedicated 1-Click Clear Button if tickets currently selected */}
-                        {(existingForBlockCount > 0 || selectedSeats.length > 0) && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const remaining = selectedSeats.filter(
-                                (s) =>
-                                  !(
-                                    s.section_name === selectedBlock.name ||
-                                    s.id.startsWith(`standing-${selectedBlock.block_id}-`)
-                                  )
-                              );
-                              setSelectedSeats(remaining);
-                              onSeatsSelected(remaining);
-                              setStandingQty(0);
-                              toast.info(
-                                existingForBlockCount > 0
-                                  ? `Cleared ${existingForBlockCount} passes for ${selectedBlock.name}`
-                                  : "Cleared selected passes"
-                              );
-                              handleBackToStadium();
-                            }}
-                            className="w-full py-2.5 px-3 rounded-xl border border-rose-200 bg-rose-50/90 hover:bg-rose-100 text-rose-700 font-bold text-xs flex items-center justify-center gap-1.5 transition-all active:scale-[0.98] cursor-pointer"
-                          >
-                            <span>✕ Clear All Selected Passes ({existingForBlockCount > 0 ? existingForBlockCount : selectedSeats.length})</span>
-                          </button>
+                        ) : (
+                          <div className="flex items-center gap-0 rounded-[0.375rem] border-2 border-[#6900AA] overflow-hidden bg-white shadow-sm">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newQty = standingQty - 1;
+                                setStandingQty(newQty);
+                                if (newQty === 0) {
+                                  setSelectedSeats([]);
+                                  onSeatsSelected([]);
+                                  toast.info(`Cleared passes for ${selectedBlock.name}`);
+                                } else {
+                                  const virtualSeats: TierSeat[] = Array.from(
+                                    { length: newQty },
+                                    (_, idx) => ({
+                                      id: `standing-${selectedBlock.block_id}-${Date.now()}-${idx + 1}`,
+                                      row_label: "Standing",
+                                      seat_label: `Pass #${idx + 1}`,
+                                      coordinate_x: selectedBlock.x + selectedBlock.width / 2,
+                                      coordinate_y: selectedBlock.y + selectedBlock.height / 2,
+                                      status: "AVAILABLE",
+                                      ticket_type_id: matchedTicketId,
+                                      section_name: selectedBlock.name,
+                                      price: unitPrice,
+                                    })
+                                  );
+                                  setSelectedSeats(virtualSeats);
+                                  onSeatsSelected(virtualSeats);
+                                }
+                              }}
+                              className="w-9 h-9 flex items-center justify-center text-[#6900AA] cursor-pointer hover:bg-[#F7E9FF] transition-colors"
+                            >
+                              <Minus size={15} />
+                            </button>
+                            <span className="w-8 text-center font-bold text-[1.0625rem] text-slate-900 select-none">
+                              {standingQty}
+                            </span>
+                            <button
+                              type="button"
+                              disabled={standingQty >= maxPerOrder}
+                              onClick={() => {
+                                const newQty = standingQty + 1;
+                                setStandingQty(newQty);
+                                const virtualSeats: TierSeat[] = Array.from(
+                                  { length: newQty },
+                                  (_, idx) => ({
+                                    id: `standing-${selectedBlock.block_id}-${Date.now()}-${idx + 1}`,
+                                    row_label: "Standing",
+                                    seat_label: `Pass #${idx + 1}`,
+                                    coordinate_x: selectedBlock.x + selectedBlock.width / 2,
+                                    coordinate_y: selectedBlock.y + selectedBlock.height / 2,
+                                    status: "AVAILABLE",
+                                    ticket_type_id: matchedTicketId,
+                                    section_name: selectedBlock.name,
+                                    price: unitPrice,
+                                  })
+                                );
+                                setSelectedSeats(virtualSeats);
+                                onSeatsSelected(virtualSeats);
+                              }}
+                              className="w-9 h-9 flex items-center justify-center text-[#6900AA] cursor-pointer hover:bg-[#F7E9FF] disabled:opacity-40 transition-colors"
+                            >
+                              <Plus size={15} />
+                            </button>
+                          </div>
                         )}
                       </div>
-                    </>
+                    </div>
                   );
                 })()}
+
+                {/* Summary bar if passes selected */}
+                {standingQty > 0 && (
+                  <div className="flex items-center justify-between px-4 py-3 bg-purple-50/70 border border-purple-200/60 rounded-xl text-xs">
+                    <span className="text-purple-900 font-medium">Estimated Total</span>
+                    {(() => {
+                      const matchedTicketId =
+                        selectedBlock.ticket_type_id || selectedBlock.tiers[0]?.ticket_type_id || "";
+                      const tt = ticketTypes.find((t) => t.id === matchedTicketId);
+                      const unitPrice = tt ? Number(tt.price) : 0;
+                      return (
+                        <span className="font-extrabold text-[#6900AA] text-sm">
+                          ETB {(unitPrice * standingQty).toLocaleString()}
+                        </span>
+                      );
+                    })()}
+                  </div>
+                )}
+              </div>
+
+              {/* Drawer Footer Actions */}
+              <div className="p-4 sm:p-5 bg-white border-t border-slate-200 space-y-2 shrink-0">
+                {selectedSeats.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedSeats([]);
+                      onSeatsSelected([]);
+                      setStandingQty(0);
+                      toast.info("Cleared all selected passes");
+                      handleBackToStadium();
+                    }}
+                    className="w-full py-2.5 px-3 rounded-xl border border-rose-200 bg-rose-50/80 hover:bg-rose-100 text-rose-700 font-bold text-xs flex items-center justify-center gap-1.5 transition-all active:scale-[0.98] cursor-pointer"
+                  >
+                    <span>✕ Clear All Selected Passes ({selectedSeats.length})</span>
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleBackToStadium();
+                  }}
+                  className="w-full py-3.5 px-4 rounded-xl bg-[#6900AA] hover:bg-[#57008E] text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-lg shadow-[#6900AA]/20 transition-all active:scale-[0.98] cursor-pointer"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>
+                    {standingQty > 0
+                      ? `Confirm ${standingQty} Standing Pass${standingQty > 1 ? "es" : ""}`
+                      : "Done"}
+                  </span>
+                </button>
               </div>
             </div>
           </div>
         )}
 
-        {/* ── Tier Picker Overlay (Level 2: shown when a multi-tier block is clicked) ── */}
+        {/* ── Tier Picker Drawer (Right side drawer when a multi-tier block is clicked) ── */}
         {selectedBlock && showTierPicker && (
-          <div
-            className="absolute inset-0 z-30 flex flex-col bg-[#F8FAFC]/97 backdrop-blur-md"
-            style={{ animation: "fadeIn 0.22s ease-out forwards" }}
-          >
-            <div className="flex items-center justify-between gap-3 px-4 py-3 bg-white border-b border-slate-200 shrink-0">
-              <button
-                onClick={handleBackToStadium}
-                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#6900AA] hover:bg-[#7a00c6] text-white text-xs font-bold transition-all active:scale-95"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                <span>Stadium</span>
-              </button>
-              <div className="flex flex-col items-center">
-                <span className="text-sm font-bold text-slate-900">{selectedBlock.name}</span>
-                <span className="text-[11px] text-slate-500 mt-0.5">Select a tier to view seats</span>
-              </div>
-              <div className="w-24" />
-            </div>
+          <div className="absolute inset-0 z-40 flex justify-end">
+            {/* Backdrop over layout */}
+            <div
+              className="absolute inset-0 bg-slate-900/30 backdrop-blur-[2px] transition-opacity duration-200"
+              onClick={handleBackToStadium}
+            />
 
-            <div className="flex-1 overflow-auto flex items-center justify-center p-4 sm:p-8">
-              <div className="w-full max-w-2xl space-y-4">
-                <p className="text-center text-xs font-semibold uppercase tracking-widest text-slate-400 mb-2">
-                  {selectedBlock.tiers.length} tier{selectedBlock.tiers.length !== 1 ? "s" : ""} available — pick one
+            {/* Right Side Drawer Panel */}
+            <div
+              className="relative w-full sm:w-[420px] md:w-[460px] h-full bg-white shadow-2xl flex flex-col z-10 border-l border-slate-200"
+              style={{ animation: "stadiumDrawerSlide 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards" }}
+            >
+              {/* Drawer Header */}
+              <div className="flex items-center justify-between gap-3 px-5 py-4 bg-white border-b border-slate-200 shrink-0">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div
+                    className="w-10 h-10 rounded-xl flex items-center justify-center text-lg text-white shadow-sm shrink-0"
+                    style={{ backgroundColor: (selectedBlock as any).color || "#6900AA" }}
+                  >
+                    🏟️
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="text-base font-extrabold text-slate-900 truncate">
+                      {selectedBlock.name}
+                    </h3>
+                    <p className="text-[11px] text-slate-500 font-medium truncate">
+                      Select a tier to view seats
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleBackToStadium}
+                  className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center transition-colors shrink-0 cursor-pointer"
+                  title="Close"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Drawer Content */}
+              <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-4">
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                  {selectedBlock.tiers.length} tier{selectedBlock.tiers.length !== 1 ? "s" : ""} available
                 </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+
+                <div className="space-y-3">
                   {selectedBlock.tiers.map((tier) => {
                     const tt = ticketTypes.find((t) => t.id === tier.ticket_type_id);
                     const price = tt ? Number(tt.price) : null;
@@ -4218,18 +4279,19 @@ export default function StadiumLayoutViewer({
                         key={tier.tier_id}
                         disabled={isSoldOut}
                         onClick={() => handleTierSelect(tier.tier_id)}
-                        className={`group relative flex flex-col gap-3 text-left rounded-2xl border p-4 transition-all duration-200 ${isSoldOut
-                          ? "border-slate-200 bg-slate-50 opacity-50 cursor-not-allowed"
-                          : "border-slate-200 bg-white hover:border-[#6900AA] hover:shadow-lg hover:shadow-[#6900AA]/10 active:scale-[0.98] cursor-pointer"
-                          }`}
+                        className={`group w-full relative flex flex-col gap-3 text-left rounded-2xl border p-4 transition-all duration-200 ${
+                          isSoldOut
+                            ? "border-slate-200 bg-slate-50 opacity-50 cursor-not-allowed"
+                            : "border-slate-200 bg-white hover:border-[#6900AA] hover:shadow-lg hover:shadow-[#6900AA]/10 active:scale-[0.98] cursor-pointer"
+                        }`}
                       >
                         <div className="flex items-center gap-3">
                           <div
-                            className="w-4 h-12 rounded-md shrink-0 ring-1 ring-slate-200"
+                            className="w-3.5 h-10 rounded-md shrink-0 ring-1 ring-slate-200"
                             style={{ background: tier.color || (selectedBlock as any).color || "#3b82f6" }}
                           />
-                          <div className="flex flex-col">
-                            <span className="text-sm font-bold text-slate-900 group-hover:text-[#6900AA] transition-colors">
+                          <div className="flex flex-col min-w-0">
+                            <span className="text-sm font-bold text-slate-900 group-hover:text-[#6900AA] transition-colors truncate">
                               {tier.name}
                             </span>
                             {price !== null && (
@@ -4243,24 +4305,20 @@ export default function StadiumLayoutViewer({
                           </span>
                         </div>
 
-                        <div className="flex items-center gap-4 text-xs text-slate-500 pl-7">
+                        <div className="flex items-center justify-between text-xs text-slate-500 pl-6.5 pt-1 border-t border-slate-100">
                           <span className="flex items-center gap-1">
                             <Users className="w-3 h-3" />
                             {tier.total.toLocaleString()} seats
                           </span>
-                          {tier.available > 0 && (
-                            <span className="text-emerald-600 font-semibold">
-                              {tier.available.toLocaleString()} left
+                          {!isSoldOut ? (
+                            <span className="flex items-center gap-1 font-semibold text-[#6900AA]">
+                              View Seats
+                              <ChevronRight className="w-3.5 h-3.5" />
                             </span>
+                          ) : (
+                            <span className="text-red-500 font-medium">Unavailable</span>
                           )}
                         </div>
-
-                        {!isSoldOut && (
-                          <div className="flex items-center gap-1 text-xs font-semibold text-[#6900AA] pl-7 mt-0.5">
-                            <span>View Seats</span>
-                            <ChevronRight className="w-3.5 h-3.5" />
-                          </div>
-                        )}
                       </button>
                     );
                   })}

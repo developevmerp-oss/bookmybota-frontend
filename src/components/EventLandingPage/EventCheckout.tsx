@@ -2910,13 +2910,22 @@ export default function EventCheckout({
                       {ticketQty} ticket{ticketQty === 1 ? "" : "s"}
                     </p>
                     <p className="mt-0.5 text-sm text-slate-600">
-                      {[
-                        selectedLines.map((l) => l.ticket_type).filter(Boolean).join(", "),
-                        selectedSeats
+                      {(() => {
+                        const types = selectedLines.map((l) => l.ticket_type).filter(Boolean).join(", ");
+                        const isAllStanding = selectedSeats.length > 0 && selectedSeats.every(
+                          (s) =>
+                            /^standing$/i.test(String(s.row_label || s.row || "").trim()) ||
+                            /^standing-/i.test(String(s.id || ""))
+                        );
+                        if (isAllStanding) {
+                          return types || "Standing Pass";
+                        }
+                        const seatCodes = selectedSeats
                           .map((s) => `${s.row_label || s.row || ""}${s.seat_label || s.number || ""}`.trim())
                           .filter(Boolean)
-                          .join(", "),
-                      ].filter(Boolean).join("  •  ")}
+                          .join(", ");
+                        return [types, seatCodes].filter(Boolean).join("  •  ");
+                      })()}
                     </p>
                   </div>
                   <p className="shrink-0 text-sm font-bold text-slate-900">{formatMoney(ticketAmount)}</p>
@@ -3764,14 +3773,26 @@ export default function EventCheckout({
                 </div>
                 {selectedSeats.length > 0 && (
                   <p className="text-[11px] md:max-lg:text-[13px] lg:text-[11px] text-slate-400 truncate mt-0.5 hidden sm:block">
-                    {selectedSeats
-                      .map((s: any) => {
-                        const row = String(s.row_label || s.row || "").trim();
-                        const num = String(s.seat_label || s.number || "").trim();
-                        return row && num ? `${row} ${num}` : `${row}${num}`;
-                      })
-                      .filter(Boolean)
-                      .join(" · ")}
+                    {(() => {
+                      const isAllStanding = selectedSeats.every(
+                        (s: any) =>
+                          /^standing$/i.test(String(s.row_label || s.row || "").trim()) ||
+                          /^standing-/i.test(String(s.id || ""))
+                      );
+                      if (isAllStanding) {
+                        const count = selectedSeats.length;
+                        const section = selectedSeats[0]?.section_name || selectedSeats[0]?.sectionName || "Standing";
+                        return `${count} Standing Pass${count === 1 ? "" : "es"} (${section})`;
+                      }
+                      return selectedSeats
+                        .map((s: any) => {
+                          const row = String(s.row_label || s.row || "").trim();
+                          const num = String(s.seat_label || s.number || "").trim();
+                          return row && num ? `${row} ${num}` : `${row}${num}`;
+                        })
+                        .filter(Boolean)
+                        .join(" · ");
+                    })()}
                   </p>
                 )}
                 <p className="text-[1.125rem] sm:text-[1.375rem] md:max-lg:text-[1.5rem] lg:text-[1.375rem] font-extrabold text-slate-900 leading-tight mt-0.5">

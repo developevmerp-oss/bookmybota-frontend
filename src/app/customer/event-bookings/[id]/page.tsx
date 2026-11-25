@@ -277,7 +277,7 @@ export default function EventBookingDetailPage({
               <Ticket size={16} className="text-[#6900AA] mb-1" />
               <p className="text-sm font-bold text-slate-900">{ticketCount} Tickets</p>
               <p className="text-xs text-slate-400">
-                {seatsLabel ? `${ticketTypeLabel} · ${seatsLabel}` : ticketTypeLabel}
+                {seatsLabel && !seatsLabel.toLowerCase().includes("standing pass") ? `${ticketTypeLabel} · ${seatsLabel}` : ticketTypeLabel}
               </p>
             </div>
           </div>

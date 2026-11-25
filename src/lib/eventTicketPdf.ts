@@ -712,7 +712,7 @@ export async function buildEventTicketPdf(
     offerLabel: booking.promo_code ? `Offer: ${booking.promo_code}` : undefined,
     ticketCountLabel: `${totalTickets} Ticket${totalTickets === 1 ? "" : "(s)"}`,
     primaryLabel: ticketTypes || "EVENT PASS",
-    secondaryLabel: seatsLabel || undefined,
+    secondaryLabel: seatsLabel && !seatsLabel.toLowerCase().includes("standing pass") ? seatsLabel : undefined,
     bookingCode: displayCode,
     qrValue: qrRaw,
     showQr: true,

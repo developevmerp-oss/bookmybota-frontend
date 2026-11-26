@@ -4064,17 +4064,24 @@ export const api = createApi({
         date: string;
         slots: string[];
         by_meal: { breakfast: string[]; lunch: string[]; dinner: string[] };
+        slot_max_guests?: Record<string, number>;
         slot_interval_minutes?: number;
       },
-      { business_id: string; date: string; guests: string | number }
+      { business_id: string; date: string; guests?: string | number }
     >({
-      query: ({ business_id, date, guests }) =>
-        `/bookings/available-slots?business_id=${encodeURIComponent(business_id)}&date=${encodeURIComponent(date)}&guests=${encodeURIComponent(String(guests))}`,
+      query: ({ business_id, date, guests }) => {
+        const guestsQs =
+          guests !== undefined && String(guests).trim() !== ''
+            ? `&guests=${encodeURIComponent(String(guests))}`
+            : '';
+        return `/bookings/available-slots?business_id=${encodeURIComponent(business_id)}&date=${encodeURIComponent(date)}${guestsQs}`;
+      },
       transformResponse: (res: {
         data?: {
           date: string;
           slots: string[];
           by_meal: { breakfast: string[]; lunch: string[]; dinner: string[] };
+          slot_max_guests?: Record<string, number>;
           slot_interval_minutes?: number;
         };
       }) =>
@@ -4082,7 +4089,10 @@ export const api = createApi({
           date: "",
           slots: [],
           by_meal: { breakfast: [], lunch: [], dinner: [] },
+          slot_max_guests: {},
         },
+      providesTags: ['Bookings'],
+      keepUnusedDataFor: 300,
     }),
 
     createBooking: builder.mutation<
@@ -4888,12 +4898,16 @@ export const api = createApi({
 
     getPublicGiftCardDesigns: builder.query<
       GiftCardDesign[],
-      { category?: string } | void
+      { category?: string; q?: string } | void
     >({
       query: (arg) => {
-        const category = arg && typeof arg === 'object' ? arg.category : undefined;
-        const qs = category ? `?category=${encodeURIComponent(category)}` : '';
-        return `/gift-cards/designs${qs}`;
+        const sp = new URLSearchParams();
+        if (arg && typeof arg === 'object') {
+          if (arg.category) sp.set('category', arg.category);
+          if (arg.q?.trim()) sp.set('q', arg.q.trim());
+        }
+        const qs = sp.toString();
+        return `/gift-cards/designs${qs ? `?${qs}` : ''}`;
       },
       transformResponse: (res: { data: GiftCardDesign[] }) => res.data || [],
       providesTags: ['GiftCardDesigns'],
@@ -7305,13 +7319,21 @@ export const api = createApi({
 
     releaseEventSeatHold: builder.mutation<
       { message: string },
-      { holdId: string; session_token?: string }
+      { holdId: string; session_token?: string; eventId?: string }
     >({
       query: ({ holdId, session_token }) => ({
         url: `/events/holds/${holdId}`,
         method: 'DELETE',
         body: session_token ? { session_token } : {},
       }),
+      invalidatesTags: (_r, _e, arg) =>
+        arg.eventId
+          ? [
+              { type: 'EventLayouts', id: arg.eventId },
+              { type: 'EventLayouts', id: `public-${arg.eventId}` },
+              { type: 'EventLayouts', id: `stadium-${arg.eventId}` },
+            ]
+          : ['EventLayouts'],
     }),
 
     createEventBooking: builder.mutation<
@@ -8374,13 +8396,17 @@ export const api = createApi({
 
     releaseMovieSeatHold: builder.mutation<
       { message: string },
-      { holdId: string; session_token?: string }
+      { holdId: string; session_token?: string; showtimeId?: string }
     >({
       query: ({ holdId, session_token }) => ({
         url: `/movies/holds/${holdId}`,
         method: 'DELETE',
         body: session_token ? { session_token } : {},
       }),
+      invalidatesTags: (_r, _e, arg) =>
+        arg.showtimeId
+          ? [{ type: 'MovieShowtimes', id: `layout-${arg.showtimeId}` }]
+          : ['MovieShowtimes'],
     }),
 
     createMovieBooking: builder.mutation<

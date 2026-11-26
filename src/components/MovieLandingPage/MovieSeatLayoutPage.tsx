@@ -474,10 +474,13 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
     isError,
     error: layoutError,
     refetch,
-  } = useGetMovieShowtimeLayoutQuery({
-    showtimeId,
-    session_token: sessionToken,
-  });
+  } = useGetMovieShowtimeLayoutQuery(
+    {
+      showtimeId,
+      session_token: sessionToken,
+    },
+    { refetchOnMountOrArgChange: true }
+  );
   const layoutErrorMessage = extractApiError(
     layoutError,
     "We couldn’t load the seat layout for this showtime. It might have finished or been updated."
@@ -1645,11 +1648,13 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
 
   const confirmCancelTransaction = async () => {
     userCancelledHoldRef.current = true;
+    const effectiveHoldId = holdId || layoutData?.own_hold?.id || null;
     try {
-      if (holdId) {
+      if (effectiveHoldId) {
         await releaseHold({
-          holdId,
+          holdId: effectiveHoldId,
           session_token: sessionToken || readHoldSessionToken(),
+          showtimeId,
         }).unwrap();
       }
     } catch {
@@ -1680,6 +1685,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
       return;
     }
     setStep("seats");
+    void refetch();
   };
 
   const requestLeaveConfirmStep = (action: "back" | "exit") => {
@@ -1689,11 +1695,13 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
 
   const resetToSeatsAfterTimeout = async () => {
     userCancelledHoldRef.current = true;
+    const effectiveHoldId = holdId || layoutData?.own_hold?.id || null;
     try {
-      if (holdId) {
+      if (effectiveHoldId) {
         await releaseHold({
-          holdId,
+          holdId: effectiveHoldId,
           session_token: sessionToken || readHoldSessionToken(),
+          showtimeId,
         }).unwrap();
       }
     } catch {
@@ -1838,6 +1846,13 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
       window.history.pushState({ bmbMovieStep: step }, "");
     }
   }, [step]);
+
+  useEffect(() => {
+    if (step === "seats") {
+      void refetch();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refetch fresh seat statuses when returning to seat map
+  }, [step, sessionToken]);
 
   useEffect(() => {
     const handlePopState = () => {

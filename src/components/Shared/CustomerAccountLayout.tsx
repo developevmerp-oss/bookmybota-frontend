@@ -60,11 +60,7 @@ export default function CustomerAccountLayout({
   const isProfileOverview = pathname === "/customer/profile";
 
   const handleBack = () => {
-    if (typeof window !== "undefined" && window.history.length > 1) {
-      router.back();
-    } else {
-      router.push("/customer/profile");
-    }
+    router.push("/customer/profile");
   };
 
   const currentNav = NAV.find(

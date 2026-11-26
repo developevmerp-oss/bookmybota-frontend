@@ -107,7 +107,7 @@ export function MovieNotifyCard({
         <div
           className={`flex flex-col min-w-0 ${
             listing
-              ? "gap-0.5 px-1.5 sm:px-2 pt-1.5 pb-2"
+              ? "gap-0.5 lg:gap-1 px-1.5 sm:px-2 lg:px-3 pt-1.5 lg:pt-2.5 pb-2 lg:pb-3"
               : dense
                 ? "gap-0.5 px-2.5 pt-2 pb-2.5"
                 : "gap-0.5 sm:gap-1 px-2.5 sm:px-3.5 pt-2.5 sm:pt-3 pb-3 sm:pb-3.5"
@@ -115,13 +115,13 @@ export function MovieNotifyCard({
         >
           <div
             className={`flex items-start justify-between min-w-0 ${
-              listing || dense ? "gap-1" : "gap-1.5 sm:gap-2"
+              listing || dense ? "gap-1 lg:gap-1.5" : "gap-1.5 sm:gap-2"
             }`}
           >
             <h3
               className={`min-w-0 flex-1 font-bold text-[#1C1C1C] break-words leading-snug line-clamp-2 ${
                 listing
-                  ? "text-[12px] sm:text-[13px] tracking-normal"
+                  ? "text-[12px] sm:text-[13px] lg:text-[15px] xl:text-base tracking-normal lg:tracking-wide"
                   : dense
                     ? "text-[0.8125rem] sm:text-[0.875rem] lg:text-[0.9375rem] tracking-wide"
                     : "text-[0.875rem] sm:text-base md:text-lg tracking-wide"
@@ -132,19 +132,19 @@ export function MovieNotifyCard({
             {showRating ? (
               <span
                 className={`shrink-0 inline-flex items-center pt-0.5 ${
-                  listing || dense ? "gap-0.5" : "gap-1"
+                  listing || dense ? "gap-0.5 lg:gap-1" : "gap-1"
                 }`}
                 aria-label={`Rated ${rating.toFixed(1)}`}
               >
                 <Star
                   size={listing ? 10 : dense ? 11 : 13}
-                  className="fill-[#F5C518] text-[#F5C518]"
+                  className={`fill-[#F5C518] text-[#F5C518] ${listing ? "lg:w-3.5 lg:h-3.5" : ""}`}
                   strokeWidth={0}
                 />
                 <span
                   className={`font-bold tabular-nums text-[#1C1C1C] leading-none ${
                     listing
-                      ? "text-[10px] sm:text-[11px]"
+                      ? "text-[10px] sm:text-[11px] lg:text-xs xl:text-sm"
                       : dense
                         ? "text-[11px] sm:text-xs"
                         : "text-xs sm:text-sm"
@@ -160,7 +160,7 @@ export function MovieNotifyCard({
             <p
               className={`min-w-0 text-gray-600 truncate leading-snug ${
                 listing
-                  ? "text-[10px] sm:text-[11px] tracking-normal"
+                  ? "text-[10px] sm:text-[11px] lg:text-xs xl:text-[13px] tracking-normal"
                   : dense
                     ? "text-[11px] sm:text-xs tracking-wide"
                     : "text-xs sm:text-sm tracking-wide"

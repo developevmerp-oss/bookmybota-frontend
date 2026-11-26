@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useForm, Controller } from "react-hook-form";
@@ -151,6 +151,7 @@ export default function CustomerProfilePage() {
     formState: { errors },
   } = useForm<CustomerProfileValues>({
     resolver: yupResolver(customerProfileSchema) as any,
+    shouldUnregister: false,
     defaultValues: {
       name: "",
       phone: "",
@@ -190,17 +191,21 @@ export default function CustomerProfilePage() {
   });
   const [updateProfile, { isLoading: isSaving }] = useUpdateCustomerProfileMutation();
 
+  const hydratedValues = useMemo<CustomerProfileValues>(
+    () => ({
+      name: profile?.name || user?.name || "",
+      phone: profile?.phone || user?.phone || "",
+      email: profile?.email || user?.email || "",
+      address: profile?.address || "",
+      city: profile?.city || "",
+      state: profile?.state || "",
+    }),
+    [profile, user?.name, user?.phone, user?.email]
+  );
+
   useEffect(() => {
-    if (!profile) return;
-    reset({
-      name: profile.name || "",
-      phone: profile.phone || "",
-      email: profile.email || user?.email || "",
-      address: profile.address || "",
-      city: profile.city || "",
-      state: profile.state || "",
-    });
-  }, [profile, user?.email, reset]);
+    reset(hydratedValues);
+  }, [hydratedValues, mobileScreen, isEditing, reset]);
 
   const onValid = async (values: CustomerProfileValues) => {
     if (!customerId) return;

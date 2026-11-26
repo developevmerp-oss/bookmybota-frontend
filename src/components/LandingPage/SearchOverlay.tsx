@@ -112,6 +112,22 @@ function toEventItem(e: PublicEvent): TrendItem {
   };
 }
 
+/** "All" shows a bit of everything: events, movies, dining, artists and venues take turns */
+function interleave(items: TrendItem[], limit: number): TrendItem[] {
+  const group = (k: TrendKind) => (k === "live" || k === "category" ? "event" : k);
+  const buckets = new Map<string, TrendItem[]>();
+  items.forEach((it) => {
+    const g = group(it.kind);
+    buckets.set(g, [...(buckets.get(g) || []), it]);
+  });
+  const lists = Array.from(buckets.values());
+  const out: TrendItem[] = [];
+  for (let i = 0; out.length < limit && lists.some((l) => i < l.length); i++) {
+    for (const l of lists) if (i < l.length && out.length < limit) out.push(l[i]);
+  }
+  return out;
+}
+
 export default function SearchOverlay({ open, city, onClose }: SearchOverlayProps) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -203,6 +219,18 @@ export default function SearchOverlay({ open, city, onClose }: SearchOverlayProp
         }
         return items;
       }
+      if (category === "all") {
+        for (const it of trending.slice(0, 4)) push(it);
+        for (const m of movies.slice(0, 4)) {
+          const title = (m.title || "").trim();
+          if (!title) continue;
+          push({ id: `movie-${m.id}`, label: title, href: movieHref(m), kind: "movie", image: resolveMediaUrl(m.poster_url || m.banner_url || ""), categoryBlob: `movie ${(m.genres || []).join(" ")}` });
+        }
+        for (const d of dining.slice(0, 4)) push({ id: d.id, label: d.name, href: restaurantHref(d), kind: "dining", image: resolveMediaUrl(d.cover_image_url || ""), categoryBlob: "dining restaurant" });
+        for (const a of artists.slice(0, 3)) push({ id: `artist-${a.id}`, label: a.type_name ? `${a.name} · ${a.type_name}` : a.name, href: artistHref(a), kind: "artist", image: resolveMediaUrl(a.cover_image_url || "") });
+        for (const v of venues.slice(0, 3)) push({ id: `venue-${v.id}`, label: v.type_name ? `${v.name} · ${v.type_name}` : v.name, href: venueHref(v), kind: "venue", image: resolveMediaUrl(v.cover_image_url || "") });
+        return interleave(items, 12);
+      }
       return trending.filter((item) =>
         matchesCategory(item.kind, category, item.label, item.categoryBlob)
       );
@@ -273,7 +301,7 @@ export default function SearchOverlay({ open, city, onClose }: SearchOverlayProp
         });
       }
     }
-    return items.slice(0, 12);
+    return category === "all" ? interleave(items, 12) : items.slice(0, 12);
   }, [query, trending, pool, categories, dining, movies, artists, venues, category]);
 
   const go = (href: string) => {

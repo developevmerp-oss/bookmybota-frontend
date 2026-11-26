@@ -43,6 +43,11 @@ export default function AdminEventLayoutPage() {
         </div>
 
         {eventId && (
+          <Link href={`/admin/events/${eventId}/sport-layout`} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-[#6900AA] text-white shrink-0">
+            New sport map layout
+          </Link>
+        )}
+        {eventId && (
           <Link
             href={`/events/${eventId}`}
             target="_blank"

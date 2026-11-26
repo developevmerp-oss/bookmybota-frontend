@@ -3488,10 +3488,10 @@ export default function EventCheckout({
               <button
                 type="button"
                 onClick={() => {
-                  setIsMapFullscreen(false);
                   if (isSingleVenue) {
                     onClose();
                   } else {
+                    setIsMapFullscreen(false);
                     setStep(1);
                   }
                 }}

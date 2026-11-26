@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 
 /**
  * Read-only "classic" seat map for the admin panels: the same look as the customer's classic view.
@@ -80,6 +80,7 @@ export default function ClassicSeatMap({
   merged = false,
   userZoom = 1,
   stage = false,
+  scrollBoxRef,
 }: {
   screenLabel?: string;
   /** Auditorium style: all seat blocks side by side on shared rows, keeping aisles but trimming wide empty space */
@@ -88,6 +89,8 @@ export default function ClassicSeatMap({
   userZoom?: number;
   /** Draw a stage block instead of the cinema screen arc */
   stage?: boolean;
+  /** Optional external ref to the scrollable container (for pinch/drag zoom hooks) */
+  scrollBoxRef?: RefObject<HTMLDivElement | null>;
   /** Shrink the whole map to fit the box (previews on cards) instead of scrolling */
   fitAll?: boolean;
   seats?: unknown;
@@ -262,7 +265,8 @@ export default function ClassicSeatMap({
     return { rows: tidy, cols: cols.map((c, i) => ({ left: colLeft[i], inner: Math.round((c.max - c.min) * scale) + SEAT })), width };
   }, [list, merged]);
 
-  const boxRef = useRef<HTMLDivElement>(null);
+  const localBoxRef = useRef<HTMLDivElement>(null);
+  const boxRef = scrollBoxRef ?? localBoxRef;
   const [zoom, setZoom] = useState(1);
   const innerRef = useRef<HTMLDivElement>(null);
   const contentW = mergedLayout ? mergedLayout.width + 32 : layout ? layout.width + (LABEL_COL + LABEL_GAP) * 2 + 32 : 0;
@@ -270,16 +274,26 @@ export default function ClassicSeatMap({
     const el = boxRef.current;
     if (!el || !contentW) return;
     const fit = () => {
-      const byWidth = (el.clientWidth - 8) / contentW;
+      const byWidth = (el.clientWidth - 16) / contentW;
       const contentH = innerRef.current?.scrollHeight || 0;
       const byHeight = fitAll && contentH ? (el.clientHeight - 8) / contentH : Infinity;
-      setZoom(Math.min(1, Math.max(fitAll ? 0.05 : merged ? 0.55 : 0.22, Math.min(byWidth, byHeight))));
+      setZoom(Math.min(1, Math.max(fitAll ? 0.05 : 0.25, Math.min(byWidth, byHeight))));
     };
     fit();
     const ro = new ResizeObserver(fit);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [contentW, fitAll, layout, mergedLayout, merged]);
+  }, [boxRef, contentW, fitAll, layout, mergedLayout, merged]);
+
+  useEffect(() => {
+    const el = boxRef.current;
+    if (!el) return;
+    const id = requestAnimationFrame(() => {
+      el.scrollLeft = Math.max(0, (el.scrollWidth - el.clientWidth) / 2);
+      el.scrollTop = 0;
+    });
+    return () => cancelAnimationFrame(id);
+  }, [boxRef, zoom, contentW]);
 
   if (mergedLayout) {
     return (
@@ -287,8 +301,11 @@ export default function ClassicSeatMap({
         <div style={{ width: contentW * zoom * userZoom, minHeight: 1 }} className="mx-auto">
           <div ref={innerRef} style={{ width: contentW, transform: `scale(${zoom * userZoom})`, transformOrigin: "0 0" }} className="px-4 pb-6 pt-4">
             {stage ? (
-              <div className="mx-auto mb-6 flex h-14 items-center justify-center rounded-lg bg-slate-700 text-xs font-bold tracking-[0.35em] text-white shadow-md" style={{ width: Math.min(mergedLayout.width * 0.5, 520) }}>
-                STAGE
+              <div className="mx-auto mb-6 text-center" style={{ width: Math.min(mergedLayout.width * 0.5, 520) }}>
+                <p className="mb-1.5 text-[11px] font-medium tracking-wide text-slate-400">All eyes this way please</p>
+                <div className="flex h-14 items-center justify-center rounded-xl border border-slate-600/40 bg-gradient-to-b from-slate-700 to-slate-800 text-xs font-bold tracking-[0.35em] text-white shadow-md">
+                  STAGE
+                </div>
               </div>
             ) : (
               <div className="mx-auto mb-5 text-center" style={{ width: mergedLayout.width * 0.6 }}>

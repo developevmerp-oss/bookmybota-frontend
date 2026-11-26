@@ -184,18 +184,27 @@ export default function EventGeoSeatPicker({
       const vw = el.clientWidth;
       const vh = el.clientHeight;
       if (vw < 40 || vh < 40) return;
-      const nextFit = Math.min(1, (vw - 24) / model.width, (vh - 24) / model.height);
-      setFit(Math.max(0.15, Math.round(nextFit * 1000) / 1000));
-      requestAnimationFrame(() => {
-        el.scrollLeft = Math.max(0, (el.scrollWidth - el.clientWidth) / 2);
-        el.scrollTop = Math.max(0, (el.scrollHeight - el.clientHeight) / 2);
-      });
+      // On mobile, frame the stage + center seats cleanly (matching EventPlanSeatPicker)
+      // while allowing two-finger pinch/slide to zoom in, zoom out, or pan to outer wings.
+      const focusW = vw < 640 ? Math.min(model.width, Math.max(model.stageW * 1.85, 720)) : model.width;
+      const nextFit = Math.min(1, (vw - 24) / focusW, vw < 640 ? 1 : (vh - 24) / model.height);
+      setFit(Math.max(0.2, Math.round(nextFit * 1000) / 1000));
     };
     doFit();
     const ro = new ResizeObserver(doFit);
     ro.observe(el);
     return () => ro.disconnect();
   }, [model]);
+
+  useEffect(() => {
+    const el = boxRef.current;
+    if (!el || !model) return;
+    const id = requestAnimationFrame(() => {
+      el.scrollLeft = Math.max(0, (el.scrollWidth - el.clientWidth) / 2);
+      el.scrollTop = 0;
+    });
+    return () => cancelAnimationFrame(id);
+  }, [fit, model]);
 
   const activeDeckIdx = model?.activeDeck ?? 0;
   useEffect(() => {
@@ -241,6 +250,12 @@ export default function EventGeoSeatPicker({
           <div style={{ width: model.width * zoom, height: model.height * zoom }} className="shrink-0">
             <div style={{ width: model.width, height: model.height, transform: `scale(${zoom})`, transformOrigin: "0 0" }} className="relative">
             <div
+              className="pointer-events-none absolute -translate-x-1/2 whitespace-nowrap text-[11px] tracking-wide text-slate-500"
+              style={{ left: model.centerX, top: Math.max(8, model.stageTop - 22) }}
+            >
+              All eyes this way please
+            </div>
+            <div
               className="absolute flex h-16 items-center justify-center rounded-lg bg-slate-700 text-sm font-bold tracking-[0.4em] text-white shadow-md"
               style={{ left: model.centerX - model.stageW / 2, top: model.stageTop, width: model.stageW }}
             >
@@ -264,29 +279,31 @@ export default function EventGeoSeatPicker({
               const picked = selectedIds.has(String(s.id));
               const dim = dk !== model.activeDeck;
               const free = String(s.status || "").toUpperCase() === "AVAILABLE";
+              const rawNo = String(s.seat_label).replace(/^0+(?=\d)/, "");
+              const paddedNo = /^\d+$/.test(rawNo) ? rawNo.padStart(2, "0") : rawNo;
               return (
                 <button
                   key={String(s.id)}
                   type="button"
-                  title={`${s.section_name} · ${model.shown.get(String(s.id)) ?? s.row_label}${String(s.seat_label).replace(/^0+(?=\d)/, "")}`}
+                  title={`${s.section_name} · ${model.shown.get(String(s.id)) ?? s.row_label}${rawNo}`}
                   onClick={() => toggle(s)}
                   disabled={(!free && !picked) || dk !== model.activeDeck}
-                  className="absolute flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full text-[10px] font-semibold"
+                  className="absolute flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[7px] text-[10px] font-semibold transition-[border-color,transform,background-color] duration-150"
                   style={{
                     left: x,
                     top: y,
                     width: model.seatPx,
                     height: model.seatPx,
-                    // selected = same soft violet + glow as the movie seat picker (#7B61FF)
-                    background: picked ? "#7B61FF" : free ? "#ffffff" : "#e5e7eb",
-                    color: picked ? "#fff" : free ? "#334155" : "#cbd5e1",
-                    border: `${picked ? 1 : 1.5}px solid ${picked ? "#7B61FF" : free ? "#22c55e" : "#e5e7eb"}`,
+                    // Movie Classic View palette: #7B61FF selected, #4B5563 available, #E0E0E0 booked
+                    background: picked ? "#7B61FF" : "#ffffff",
+                    color: picked ? "#ffffff" : free ? "#1E293B" : "#C4C4C4",
+                    border: `1px solid ${picked ? "#7B61FF" : free ? "#4B5563" : "#E0E0E0"}`,
                     boxShadow: picked ? "0 0 0 3px rgba(123,97,255,0.22), 0 0 12px 3px rgba(123,97,255,0.4)" : undefined,
                     cursor: free || picked ? "pointer" : "not-allowed",
                     ...(dim ? { opacity: picked ? 0.9 : 0.3, filter: "blur(1.6px)", pointerEvents: "none" as const } : {}),
                   }}
                 >
-                  {String(s.seat_label).replace(/^0+(?=\d)/, "")}
+                  {!free && !picked ? <span aria-hidden>×</span> : paddedNo}
                 </button>
               );
             })}
@@ -304,9 +321,9 @@ export default function EventGeoSeatPicker({
       {controls}
       </div>
       <div className="flex flex-wrap items-center justify-center gap-4 border-t border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
-        <span className="flex items-center gap-1.5"><i className="size-3.5 rounded-full border-2 border-green-500 bg-white" /> Available</span>
-        <span className="flex items-center gap-1.5"><i className="size-3.5 rounded-full bg-[#7B61FF] shadow-[0_0_0_2px_rgba(123,97,255,0.22)]" /> Selected</span>
-        <span className="flex items-center gap-1.5"><i className="size-3.5 rounded-full bg-slate-200" /> Sold / held</span>
+        <span className="flex items-center gap-1.5"><i className="size-3.5 rounded-[4px] border border-[#4B5563] bg-white" /> Available</span>
+        <span className="flex items-center gap-1.5"><i className="size-3.5 rounded-[4px] border border-[#7B61FF] bg-[#7B61FF] shadow-[0_0_0_2px_rgba(123,97,255,0.22)]" /> Selected</span>
+        <span className="flex items-center gap-1.5"><i className="flex size-3.5 items-center justify-center rounded-[4px] border border-[#E0E0E0] bg-white text-[10px] leading-none font-medium text-[#C4C4C4] not-italic">×</i> Sold / held</span>
       </div>
     </div>
   );

@@ -2003,3 +2003,11 @@ html.admin-theme .admin-dashboard-layout table .portal-table-muted {
   color: #111111;
 }
 
+input[type="search"]::-webkit-search-cancel-button,
+input[type="search"]::-webkit-search-decoration,
+input[type="search"]::-webkit-search-results-button,
+input[type="search"]::-webkit-search-results-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+}
+

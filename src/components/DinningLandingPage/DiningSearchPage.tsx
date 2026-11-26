@@ -295,7 +295,7 @@ function SearchContent() {
           />
           {/* Subtle overlay */}
           <div className="absolute inset-0 bg-gradient-to-r from-black/45 via-black/10 to-transparent" />
-          
+
           {/* Left Overlay Info Box (Zomato bottom-left aligned) */}
           <div className="absolute bottom-0 left-0 z-10 bg-black/20 backdrop-blur-md border-t border-r border-white/10 rounded-tr-3xl p-6 md:p-7 w-full md:w-[560px] shadow-2xl flex flex-col justify-center animate-fadeIn">
             <div>
@@ -337,10 +337,10 @@ function SearchContent() {
           )}
         </div>
       </div>
-      
+
       {/* ── 2. Results and Filters ─────────────────────────────────────────── */}
       <div className="bmb-section-container">
-        
+
         {/* Header stats & quick clear chips */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 mb-2">
           <div>
@@ -360,63 +360,63 @@ function SearchContent() {
           </div>
 
           {hasQuickFilters ? (
-          <div className="flex flex-wrap items-center gap-2">
-            {collectionParam && (
-              <div className="flex items-center gap-1.5 bg-rose-50 border border-rose-100 text-rose-600 px-3.5 py-1.5 rounded-full text-xs font-bold shadow-sm">
-                <span>Collection: {activeCollection?.title || collectionParam}</span>
-                <button
-                  onClick={() => handleClearFilter("collection")}
-                  className="hover:bg-rose-100 p-0.5 rounded-full transition-colors flex items-center justify-center"
-                >
-                  <X size={12} className="text-rose-600" />
-                </button>
-              </div>
-            )}
+            <div className="flex flex-wrap items-center gap-2">
+              {collectionParam && (
+                <div className="flex items-center gap-1.5 bg-rose-50 border border-rose-100 text-rose-600 px-3.5 py-1.5 rounded-full text-xs font-bold shadow-sm">
+                  <span>Collection: {activeCollection?.title || collectionParam}</span>
+                  <button
+                    onClick={() => handleClearFilter("collection")}
+                    className="hover:bg-rose-100 p-0.5 rounded-full transition-colors flex items-center justify-center"
+                  >
+                    <X size={12} className="text-rose-600" />
+                  </button>
+                </div>
+              )}
 
-            {moodParam && (
-              <div className="flex items-center gap-1.5 bg-amber-50 border border-amber-100 text-amber-700 px-3.5 py-1.5 rounded-full text-xs font-bold shadow-sm">
-                <span>Mood: {activeMood?.title || moodParam}</span>
-                <button
-                  onClick={() => handleClearFilter("mood")}
-                  className="hover:bg-amber-100 p-0.5 rounded-full transition-colors flex items-center justify-center"
-                >
-                  <X size={12} className="text-amber-700" />
-                </button>
-              </div>
-            )}
+              {moodParam && (
+                <div className="flex items-center gap-1.5 bg-amber-50 border border-amber-100 text-amber-700 px-3.5 py-1.5 rounded-full text-xs font-bold shadow-sm">
+                  <span>Mood: {activeMood?.title || moodParam}</span>
+                  <button
+                    onClick={() => handleClearFilter("mood")}
+                    className="hover:bg-amber-100 p-0.5 rounded-full transition-colors flex items-center justify-center"
+                  >
+                    <X size={12} className="text-amber-700" />
+                  </button>
+                </div>
+              )}
 
-            {queryParam && (
-              <div className="flex items-center gap-1.5 bg-sky-50 border border-sky-100 text-sky-600 px-3.5 py-1.5 rounded-full text-xs font-bold shadow-sm">
-                <span>Search: "{queryParam}"</span>
-                <button
-                  onClick={() => handleClearFilter("search")}
-                  className="hover:bg-sky-100 p-0.5 rounded-full transition-colors flex items-center justify-center"
-                >
-                  <X size={12} className="text-sky-600" />
-                </button>
-              </div>
-            )}
+              {queryParam && (
+                <div className="flex items-center gap-1.5 bg-sky-50 border border-sky-100 text-sky-600 px-3.5 py-1.5 rounded-full text-xs font-bold shadow-sm">
+                  <span>Search: "{queryParam}"</span>
+                  <button
+                    onClick={() => handleClearFilter("search")}
+                    className="hover:bg-sky-100 p-0.5 rounded-full transition-colors flex items-center justify-center"
+                  >
+                    <X size={12} className="text-sky-600" />
+                  </button>
+                </div>
+              )}
 
-            {cityParam && (
-              <div className="flex items-center gap-1.5 bg-slate-100 border border-slate-200 text-slate-650 px-3.5 py-1.5 rounded-full text-xs font-bold shadow-sm">
-                <span>City: {cityParam}</span>
-                <button
-                  onClick={() => handleClearFilter("city")}
-                  className="hover:bg-slate-200 p-0.5 rounded-full transition-colors flex items-center justify-center"
-                >
-                  <X size={12} className="text-slate-600" />
-                </button>
-              </div>
-            )}
+              {cityParam && (
+                <div className="flex items-center gap-1.5 bg-slate-100 border border-slate-200 text-slate-650 px-3.5 py-1.5 rounded-full text-xs font-bold shadow-sm">
+                  <span>City: {cityParam}</span>
+                  <button
+                    onClick={() => handleClearFilter("city")}
+                    className="hover:bg-slate-200 p-0.5 rounded-full transition-colors flex items-center justify-center"
+                  >
+                    <X size={12} className="text-slate-600" />
+                  </button>
+                </div>
+              )}
 
-            <button
-              type="button"
-              onClick={clearListingFilters}
-              className="text-xs text-rose-600 hover:text-rose-700 font-bold px-2 py-1.5 transition-colors cursor-pointer"
-            >
-              Clear All
-            </button>
-          </div>
+              <button
+                type="button"
+                onClick={clearListingFilters}
+                className="text-xs text-rose-600 hover:text-rose-700 font-bold px-2 py-1.5 transition-colors cursor-pointer"
+              >
+                Clear All
+              </button>
+            </div>
           ) : null}
         </div>
 

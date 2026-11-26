@@ -143,6 +143,7 @@ export default function RootLayoutClient({
     pathname === "/artists" ||
     pathname === "/collections" ||
     pathname === "/search" ||
+    pathname === "/gift-cards" ||
     isCustomerAccountPage;
   const showLayoutFooter =
     showPublicHeader &&

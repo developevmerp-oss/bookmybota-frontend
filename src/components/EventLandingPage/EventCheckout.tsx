@@ -419,13 +419,13 @@ export default function EventCheckout({
     isLoading: layoutLoading,
     isFetching: layoutFetching,
     refetch: refetchEventLayout,
-  } = useGetEventLayoutQuery(layoutArg, { skip: !isOrganizer });
+  } = useGetEventLayoutQuery(layoutArg, { skip: !isOrganizer, refetchOnMountOrArgChange: true });
   const {
     data: publicLayoutData,
     isLoading: publicLayoutLoading,
     isFetching: publicLayoutFetching,
     refetch: refetchPublicLayout,
-  } = useGetPublicEventLayoutQuery(layoutArg, { skip: isOrganizer });
+  } = useGetPublicEventLayoutQuery(layoutArg, { skip: isOrganizer, refetchOnMountOrArgChange: true });
 
   const refetchLayout = () => {
     if (isOrganizer) {
@@ -1003,16 +1003,30 @@ export default function EventCheckout({
   };
 
   const releaseActiveHold = async () => {
-    if (!holdId) return;
+    const effectiveHoldId =
+      holdId ||
+      (activeLayoutData as any)?.data?.own_hold?.id ||
+      (activeLayoutData as any)?.own_hold?.id ||
+      null;
+    if (!effectiveHoldId) return;
     try {
       await releaseEventSeatHold({
-        holdId,
+        holdId: effectiveHoldId,
         session_token: sessionToken || readHoldSessionToken(),
+        eventId: event.id,
       }).unwrap();
     } catch {
       // best-effort release
     }
   };
+
+  useEffect(() => {
+    if (!open) return;
+    if (step === 2 || isMapFullscreen) {
+      void (isOrganizer ? refetchEventLayout() : refetchPublicLayout());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refetch fresh seat statuses when returning to layout/map
+  }, [open, step, isMapFullscreen, sessionToken]);
 
   /** From the "seats unavailable" page: free any hold, clear the seats and show the same seat layout again */
   const handleSeatConflictBack = async () => {

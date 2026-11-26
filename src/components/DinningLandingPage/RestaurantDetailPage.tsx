@@ -57,7 +57,7 @@ import ShareSheet from '@/components/Shared/ShareSheet';
 import { lockBodyScroll } from '@/lib/lockBodyScroll';
 import { useSelectedCity } from '@/lib/useSelectedCity';
 import PaymentSuccessView from '@/components/Shared/PaymentSuccessView';
-import { RestaurantDetailShimmer } from '@/components/Shared/Shimmer';
+import { DiningSlotGridShimmer, RestaurantDetailShimmer } from '@/components/Shared/Shimmer';
 import ShinyBlackButton from '@/components/Shared/ShinyBlackButton';
 import { useStickyCtaAboveFooter } from '@/lib/useStickyCtaAboveFooter';
 import { getPhoneValidationError, isValidPhone, sanitizePhoneInput } from '@/lib/validation';
@@ -1476,7 +1476,6 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
     {
       business_id: bizId,
       date: selectedDateKey,
-      guests: Number(guests) || 2,
     },
     { skip: !bizId || !profile?.id || !selectedDateKey || isSelectedDayClosed }
   );
@@ -1492,13 +1491,18 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
     slotInterval
   );
 
-  // Only block slot picking on the first load — keep grid visible during background refetch
+  // Only show full-grid shimmer on the initial load; keep grid visible when switching dates
   const slotsInitialLoading = availableSlotsLoading && !availableSlotsData;
 
+  const guestPartySize = Number(guests) || 2;
   const availableSlotSet = useMemo(() => {
     const list = availableSlotsData?.slots || [];
+    const maxMap = availableSlotsData?.slot_max_guests;
+    if (maxMap && Object.keys(maxMap).length > 0) {
+      return new Set(list.filter((hm) => (maxMap[hm] ?? 0) >= guestPartySize));
+    }
     return new Set(list);
-  }, [availableSlotsData?.slots]);
+  }, [availableSlotsData?.slots, availableSlotsData?.slot_max_guests, guestPartySize]);
 
   const availableByMeal = availableSlotsData?.by_meal;
 
@@ -2013,12 +2017,11 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
 
       <div
         className={`bmb-section-container ${isBookTableFlow
-            ? "max-lg:px-0 max-lg:pt-0 max-lg:pb-0 py-0 lg:pt-0 lg:pb-16"
-            : `max-md:px-0 max-md:pt-0 pt-7 md:pb-16 ${
-                !hideBookingSidebar
-                  ? "max-md:pb-[calc(5.75rem+env(safe-area-inset-bottom))]"
-                  : "max-md:pb-4"
-              }`
+          ? "max-lg:px-0 max-lg:pt-0 max-lg:pb-0 py-0 lg:pt-0 lg:pb-16"
+          : `max-md:px-0 max-md:pt-0 pt-7 md:pb-16 ${!hideBookingSidebar
+            ? "max-md:pb-[calc(5.75rem+env(safe-area-inset-bottom))]"
+            : "max-md:pb-4"
+          }`
           }`}
       >
         {/* ── Header: title + icon actions + rating (hidden on book flow + success) ── */}
@@ -2088,11 +2091,11 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
         {/* ── Gallery + sticky table reservation ── */}
         <div
           className={`${isBookTableFlow
+            ? ""
+            : `grid items-start gap-x-5 gap-y-2 sm:gap-x-6 lg:gap-x-7 2xl:gap-x-12 ${hideBookingSidebar
               ? ""
-              : `grid items-start gap-x-5 gap-y-2 sm:gap-x-6 lg:gap-x-7 2xl:gap-x-12 ${hideBookingSidebar
-                ? ""
-                : "md:grid-cols-[minmax(0,1fr)_280px] lg:grid-cols-[minmax(0,1fr)_320px] 2xl:grid-cols-[minmax(0,1fr)_360px]"
-              }`
+              : "md:grid-cols-[minmax(0,1fr)_280px] lg:grid-cols-[minmax(0,1fr)_320px] 2xl:grid-cols-[minmax(0,1fr)_360px]"
+            }`
             }`}
         >
           <div
@@ -2106,7 +2109,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                 <div
                   ref={heroScrollRef}
                   className="flex h-full w-full overflow-x-auto overflow-y-hidden snap-x snap-mandatory scrollbar-hide [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden overscroll-x-contain"
-                  onScroll={syncHeroPhotoFromScroll}  
+                  onScroll={syncHeroPhotoFromScroll}
                   onPointerDown={onHeroPointerDown}
                   onPointerMove={onHeroPointerMove}
                   onPointerUp={onHeroPointerUp}
@@ -2344,30 +2347,30 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
               ) : null}
 
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-              {infoCostText ? (
-                <p className="inline-flex items-center gap-1 text-[13px] sm:text-sm font-medium text-slate-700">
-                  <EqualApproximately size={14} strokeWidth={2} className="shrink-0 text-slate-600" aria-hidden />
-                  <span>{infoCostText}</span>
-                </p>
-              ) : null}
-
-              <button
-                type="button"
-                onClick={() => setVenueInfoModal("hours")}
-                className="inline-flex items-center gap-1.5 cursor-pointer text-[13px] sm:text-sm shrink-0"
-                aria-label="Show opening hours"
-              >
-                <span className={`font-semibold ${isOpenNow ? "text-emerald-600" : "text-[#C2410C]"}`}>
-                  {openStatusLabel}
-                </span>
-                {openStatusDetail ? (
-                  <>
-                    <span className={isOpenNow ? "text-emerald-600" : "text-[#C2410C]"} aria-hidden>•</span>
-                    <span className="font-medium text-slate-600">{openStatusDetail}</span>
-                  </>
+                {infoCostText ? (
+                  <p className="inline-flex items-center gap-1 text-[13px] sm:text-sm font-medium text-slate-700">
+                    <EqualApproximately size={14} strokeWidth={2} className="shrink-0 text-slate-600" aria-hidden />
+                    <span>{infoCostText}</span>
+                  </p>
                 ) : null}
-                <ChevronDown size={15} className="text-slate-700" strokeWidth={2.25} />
-              </button>
+
+                <button
+                  type="button"
+                  onClick={() => setVenueInfoModal("hours")}
+                  className="inline-flex items-center gap-1.5 cursor-pointer text-[13px] sm:text-sm shrink-0"
+                  aria-label="Show opening hours"
+                >
+                  <span className={`font-semibold ${isOpenNow ? "text-emerald-600" : "text-[#C2410C]"}`}>
+                    {openStatusLabel}
+                  </span>
+                  {openStatusDetail ? (
+                    <>
+                      <span className={isOpenNow ? "text-emerald-600" : "text-[#C2410C]"} aria-hidden>•</span>
+                      <span className="font-medium text-slate-600">{openStatusDetail}</span>
+                    </>
+                  ) : null}
+                  <ChevronDown size={15} className="text-slate-700" strokeWidth={2.25} />
+                </button>
               </div>
 
               <div className="flex flex-wrap gap-2.5 pt-0.5">
@@ -2476,8 +2479,8 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                                       setReserveWidgetDropdown(null);
                                     }}
                                     className={`w-full text-left px-3 py-2 text-sm font-medium cursor-pointer ${selected
-                                        ? "bg-[#2563EB] text-white"
-                                        : "bg-white text-[#292929] hover:bg-slate-50"
+                                      ? "bg-[#2563EB] text-white"
+                                      : "bg-white text-[#292929] hover:bg-slate-50"
                                       }`}
                                   >
                                     {label}
@@ -2526,8 +2529,8 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                                       setReserveWidgetDropdown(null);
                                     }}
                                     className={`w-full text-left px-3 py-2 text-sm font-medium cursor-pointer ${selected
-                                        ? "bg-[#2563EB] text-white"
-                                        : "bg-white text-[#292929] hover:bg-slate-50"
+                                      ? "bg-[#2563EB] text-white"
+                                      : "bg-white text-[#292929] hover:bg-slate-50"
                                       }`}
                                   >
                                     {num} {num === 1 ? "Guest" : "Guests"}
@@ -2625,8 +2628,8 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                                 type="button"
                                 onClick={() => handleQuickBook(offer)}
                                 className={`relative overflow-hidden rounded-xl text-left transition-all cursor-pointer h-full min-h-[120px] p-3.5 sm:p-4 ${isFeatured
-                                    ? "bg-[#2563eb] text-white hover:bg-[#1d4ed8] shadow-sm"
-                                    : "bg-white text-zinc-900 border border-[#d7e6ff] hover:border-[#93c5fd]"
+                                  ? "bg-[#2563eb] text-white hover:bg-[#1d4ed8] shadow-sm"
+                                  : "bg-white text-zinc-900 border border-[#d7e6ff] hover:border-[#93c5fd]"
                                   }`}
                               >
                                 {scheduled && (
@@ -3105,8 +3108,8 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                   type="button"
                   onClick={() => setCurrentPhotoIdx(idx)}
                   className={`w-16 h-12 rounded-lg overflow-hidden shrink-0 transition-all border-2 cursor-pointer ${currentPhotoIdx === idx
-                      ? "border-white scale-105 opacity-100"
-                      : "border-transparent opacity-50 hover:opacity-80"
+                    ? "border-white scale-105 opacity-100"
+                    : "border-transparent opacity-50 hover:opacity-80"
                     }`}
                 >
                   <img src={url} alt={`thumb ${idx}`} className="w-full h-full object-cover" />
@@ -3120,11 +3123,10 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
       {/* ── 8. Book a Table flow (inline in Book a Table tab via portal) ── */}
       {activeTab === "Book a Table" && bookTableSlot && createPortal(
         <div
-          className={`w-full bg-white flex flex-col md:pb-16 ${
-            drawerStep === 1 || drawerStep === 3
-              ? "max-md:min-h-[100dvh] max-md:pb-[4.75rem]"
-              : ""
-          }`}
+          className={`w-full bg-white flex flex-col md:pb-16 ${drawerStep === 1 || drawerStep === 3
+            ? "max-md:min-h-[100dvh] max-md:pb-[4.75rem]"
+            : ""
+            }`}
           style={
             isBookTableFlow && isLgViewport
               ? { paddingTop: (restaurantStickyHeight || 96) + 12 }
@@ -3215,20 +3217,27 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                   })
                   : [];
 
-              // Keep full meal grids visible; mark each slot available/unavailable.
-              // Avoid flashing "Unavailable" while background fetching by showing smooth checking state
+              // Only show available slots; show shimmer skeleton only on initial load.
+              const isSlotsFetching = slotsInitialLoading;
               const withAvailability = (raw: string[], mealKey: 'breakfast' | 'lunch' | 'dinner') => {
+                if (isSlotsFetching) {
+                  return raw.map((slot) => ({ slot, available: false, isPending: true }));
+                }
                 const apiMeal = availableByMeal?.[mealKey];
+                const maxMap = availableSlotsData?.slot_max_guests;
+                const hasMaxMap = Boolean(maxMap && Object.keys(maxMap).length > 0);
                 const apiReady = Boolean(availableSlotsData);
-                const isPending = availableSlotsLoading || availableSlotsFetching;
-                return raw.map((slot) => {
-                  let available = false;
-                  if (apiReady) {
-                    if (apiMeal) available = apiMeal.includes(slot);
-                    else available = availableSlotSet.has(slot);
-                  }
-                  return { slot, available, isPending };
-                });
+                return raw
+                  .map((slot) => {
+                    let available = false;
+                    if (apiReady) {
+                      if (hasMaxMap) available = (maxMap![slot] ?? 0) >= guestPartySize;
+                      else if (apiMeal) available = apiMeal.includes(slot);
+                      else available = availableSlotSet.has(slot);
+                    }
+                    return { slot, available, isPending: false };
+                  })
+                  .filter((item) => item.available);
               };
 
               const mealOptions = (
@@ -3274,46 +3283,14 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                 isPending?: boolean
               ) => {
                 const isSelected = selectedTime === slot && available;
-                const promoText = isPending ? 'Checking…' : available ? offerChipLabel : 'Unavailable';
+                const promoText = available ? offerChipLabel : '';
                 const base =
                   variant === 'mobile'
                     ? 'min-h-[56px] px-2 py-2.5 rounded-xl border text-center transition-all flex flex-col items-center justify-center'
                     : 'min-h-[52px] px-2 py-2 rounded-xl border text-center transition-all flex flex-col items-center justify-center';
 
-                if (isPending) {
-                  return (
-                    <div
-                      key={slot}
-                      className={`${base} border-slate-200 bg-slate-50/70 text-slate-400 select-none animate-pulse`}
-                    >
-                      <span className="text-sm font-semibold leading-none text-slate-600">
-                        {formatSlotLabel(slot)}
-                      </span>
-                      <span className="text-[0.625rem] font-medium text-slate-400 mt-1.5 leading-none">
-                        Checking…
-                      </span>
-                    </div>
-                  );
-                }
-
-                if (!available) {
-                  return (
-                    <button
-                      key={slot}
-                      type="button"
-                      disabled
-                      aria-disabled="true"
-                      title="This time is not available"
-                      className={`${base} border-slate-100 bg-slate-50 text-slate-400 cursor-not-allowed opacity-70`}
-                    >
-                      <span className="text-sm font-semibold leading-none line-through decoration-slate-300">
-                        {formatSlotLabel(slot)}
-                      </span>
-                      <span className="text-[0.625rem] font-bold text-slate-400 mt-1.5 leading-none">
-                        {promoText}
-                      </span>
-                    </button>
-                  );
+                if (isPending || !available) {
+                  return null;
                 }
                 return (
                   <button
@@ -3324,10 +3301,10 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                       handleTimeSelect(slot);
                     }}
                     className={`${base} cursor-pointer ${isSelected
-                        ? variant === 'mobile'
-                          ? 'border-slate-900 bg-slate-900 text-white'
-                          : 'border border-[#6900AA] bg-[#f7e9ff] text-slate-900'
-                        : 'border border-slate-200 bg-white text-slate-800 hover:border-slate-300'
+                      ? variant === 'mobile'
+                        ? 'border-slate-900 bg-slate-900 text-white'
+                        : 'border border-[#6900AA] bg-[#f7e9ff] text-slate-900'
+                      : 'border border-slate-200 bg-white text-slate-800 hover:border-slate-300'
                       }`}
                   >
                     <span
@@ -3338,10 +3315,10 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                     {promoText ? (
                       <span
                         className={`text-[0.625rem] font-bold mt-1.5 leading-none ${isSelected && variant === 'mobile'
-                            ? 'text-white/80'
-                            : variant === 'mobile'
-                              ? 'text-[#6900AA]'
-                              : 'text-[#2563EB]'
+                          ? 'text-white/80'
+                          : variant === 'mobile'
+                            ? 'text-[#6900AA]'
+                            : 'text-[#2563EB]'
                           }`}
                       >
                         {promoText}
@@ -3389,11 +3366,10 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                                   setGuests(String(num));
                                   setAvailabilityStatus(null);
                                 }}
-                                className={`w-10 h-10 shrink-0 rounded-full text-sm font-bold transition-all cursor-pointer flex items-center justify-center ${
-                                  selected
-                                    ? "bg-slate-900 text-white shadow-sm"
-                                    : "bg-white border border-slate-200 text-slate-700 hover:border-slate-300"
-                                }`}
+                                className={`w-10 h-10 shrink-0 rounded-full text-sm font-bold transition-all cursor-pointer flex items-center justify-center ${selected
+                                  ? "bg-slate-900 text-white shadow-sm"
+                                  : "bg-white border border-slate-200 text-slate-700 hover:border-slate-300"
+                                  }`}
                               >
                                 {num}
                               </button>
@@ -3413,8 +3389,8 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                                   setAvailabilityStatus(null);
                                 }}
                                 className={`w-11 h-11 sm:w-12 sm:h-12 rounded-xl text-sm font-semibold transition-all cursor-pointer flex items-center justify-center ${selected
-                                    ? 'border border-[#6900AA] text-[#6900AA] bg-[#f7e9ff]'
-                                    : 'border border-slate-200 text-slate-700 bg-white hover:border-slate-300'
+                                  ? 'border border-[#6900AA] text-[#6900AA] bg-[#f7e9ff]'
+                                  : 'border border-slate-200 text-slate-700 bg-white hover:border-slate-300'
                                   }`}
                               >
                                 {num}
@@ -3443,8 +3419,8 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                                 type="button"
                                 onClick={() => handleDateSelect(idx)}
                                 className={`min-w-[72px] sm:min-w-[88px] md:min-w-[96px] shrink-0 rounded-xl px-2.5 py-2.5 text-center transition-all cursor-pointer ${selected
-                                    ? 'md:border md:border-[#6900AA] md:bg-[#f7e9ff] bg-slate-900 text-white border-transparent'
-                                    : 'md:border md:border-slate-200 md:bg-white md:hover:border-slate-300 border-transparent bg-transparent'
+                                  ? 'md:border md:border-[#6900AA] md:bg-[#f7e9ff] bg-slate-900 text-white border-transparent'
+                                  : 'md:border md:border-slate-200 md:bg-white md:hover:border-slate-300 border-transparent bg-transparent'
                                   }`}
                               >
                                 <p className={`text-sm font-semibold leading-tight ${selected ? 'md:text-[#6900AA] text-white' : 'text-slate-700'}`}>
@@ -3461,21 +3437,24 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
 
                       {/* Meal period accordions + time slots */}
                       <div className="space-y-4 pt-2">
-                        <p className="md:hidden text-base font-bold text-slate-900">
-                          Select time slot
-                        </p>
-                        <p className="hidden md:block text-sm font-semibold text-slate-800">
-                          Select the time of day to see the offers
-                        </p>
+                        <div className="md:hidden flex items-center justify-between gap-2">
+                          <p className="text-base font-bold text-slate-900">
+                            Select time slot
+                          </p>
+                          {availableSlotsFetching && !slotsInitialLoading ? (
+                            <Loader2 size={14} className="animate-spin text-slate-400 shrink-0" />
+                          ) : null}
+                        </div>
+                        <div className="hidden md:flex items-center justify-between gap-2">
+                          <p className="text-sm font-semibold text-slate-800">
+                            Select the time of day to see the offers
+                          </p>
+                          {availableSlotsFetching && !slotsInitialLoading ? (
+                            <Loader2 size={14} className="animate-spin text-slate-400 shrink-0" />
+                          ) : null}
+                        </div>
 
-                        {slotsInitialLoading ? (
-                          <div className="flex items-center gap-2 text-sm text-slate-500 py-3">
-                            <Loader2 size={16} className="animate-spin shrink-0" />
-                            Checking available times…
-                          </div>
-                        ) : null}
-
-                        {!slotsInitialLoading && !isSelectedDayClosed && mealOptions.length === 0 ? (
+                        {!isSlotsFetching && !isSelectedDayClosed && mealOptions.length === 0 ? (
                           <p className="text-xs text-slate-400 font-medium py-2">
                             No time slots for this date.
                           </p>
@@ -3496,8 +3475,8 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                                     setAvailabilityStatus(null);
                                   }}
                                   className={`rounded-full px-4 py-2 text-sm font-semibold border cursor-pointer ${selected
-                                      ? "bg-slate-100 border-slate-300 text-slate-900"
-                                      : "bg-white border-slate-200 text-slate-700"
+                                    ? "bg-slate-100 border-slate-300 text-slate-900"
+                                    : "bg-white border-slate-200 text-slate-700"
                                     }`}
                                 >
                                   {meal.label}
@@ -3525,10 +3504,13 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                                 {(() => {
                                   const meal = mealOptions.find((m) => m.id === openMealId);
                                   if (!meal) return null;
+                                  if (isSlotsFetching) {
+                                    return <DiningSlotGridShimmer variant="mobile" count={6} />;
+                                  }
                                   if (meal.slots.length === 0) {
                                     return (
                                       <p className="text-xs text-slate-400 font-medium py-3 text-center">
-                                        No slots in this period.
+                                        No slots available for this period.
                                       </p>
                                     );
                                   }
@@ -3582,9 +3564,11 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
 
                                     {isOpen && (
                                       <div className="px-4 pb-4">
-                                        {meal.slots.length === 0 ? (
+                                        {isSlotsFetching ? (
+                                          <DiningSlotGridShimmer variant="desktop" count={6} />
+                                        ) : meal.slots.length === 0 ? (
                                           <p className="text-xs text-slate-400 font-medium py-3 text-center">
-                                            No slots in this period.
+                                            No slots available for this period.
                                           </p>
                                         ) : (
                                           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
@@ -3644,8 +3628,8 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                                       setNoOfferSelected(false);
                                     }}
                                     className={`relative w-[220px] sm:w-[240px] text-left rounded-xl border bg-white px-4 py-3.5 pt-4 transition-all cursor-pointer overflow-visible ${isActive
-                                        ? "border-[#6900AA] shadow-sm"
-                                        : "border-slate-200 hover:border-slate-300"
+                                      ? "border-[#6900AA] shadow-sm"
+                                      : "border-slate-200 hover:border-slate-300"
                                       }`}
                                   >
                                     <span
@@ -3683,8 +3667,8 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                                   setNoOfferSelected(true);
                                 }}
                                 className={`relative w-[220px] sm:w-[240px] text-left rounded-xl border bg-white px-4 py-3.5 pt-4 transition-all cursor-pointer overflow-visible ${noOfferSelected
-                                    ? "border-[#6900AA] shadow-sm"
-                                    : "border-slate-200 hover:border-slate-300"
+                                  ? "border-[#6900AA] shadow-sm"
+                                  : "border-slate-200 hover:border-slate-300"
                                   }`}
                               >
                                 <span className="absolute top-2 left-2 z-10 w-7 h-7 rounded-full bg-[#6900AA] flex items-center justify-center text-white text-xs font-bold shadow-sm">
@@ -4108,8 +4092,8 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                                           setArrivalDropdownOpen(false);
                                         }}
                                         className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors cursor-pointer ${selected
-                                            ? 'bg-primary text-white font-semibold'
-                                            : 'text-zinc-700 font-medium hover:bg-primary/5'
+                                          ? 'bg-primary text-white font-semibold'
+                                          : 'text-zinc-700 font-medium hover:bg-primary/5'
                                           }`}
                                       >
                                         {opt.label}
@@ -4137,8 +4121,8 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                         disabled={isSubmittingBooking || isCreatingBooking}
                         ariaBusy={isSubmittingBooking || isCreatingBooking || undefined}
                         className={`w-full max-w-sm sm:max-w-md py-3.5 rounded-xl text-white text-sm shadow-sm ${isSubmittingBooking || isCreatingBooking
-                            ? "bg-zinc-700"
-                            : "bg-[#111111]"
+                          ? "bg-zinc-700"
+                          : "bg-[#111111]"
                           }`}
                       >
                         {isSubmittingBooking || isCreatingBooking ? (
@@ -4420,35 +4404,35 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
               <div className="mt-4 space-y-3 md:space-y-4 md:max-w-sm lg:max-w-md">
                 {(hasDiningPolicyContent(profile.booking_terms) ||
                   hasDiningPolicyContent(profile.cancellation_policy)) && (
-                <div className="flex flex-wrap items-center gap-2 pt-1">
-                  {hasDiningPolicyContent(profile.booking_terms) ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setBookingPolicyFocus("terms");
-                      setBookingPolicyOpen(true);
-                    }}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-black/80 bg-white px-2.5 py-1.5 text-xs font-semibold text-black hover:bg-slate-50 transition-colors cursor-pointer"
-                  >
-                    <span>Terms &amp; Conditions</span>
-                    <ChevronRight size={13} strokeWidth={2.25} className="text-black shrink-0" />
-                  </button>
-                  ) : null}
-                  {hasDiningPolicyContent(profile.cancellation_policy) ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setBookingPolicyFocus("cancellation");
-                      setBookingPolicyOpen(true);
-                    }}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-black/80 bg-white px-2.5 py-1.5 text-xs font-semibold text-black hover:bg-slate-50 transition-colors cursor-pointer"
-                  >
-                    <span>Cancellation Policy</span>
-                    <ChevronRight size={13} strokeWidth={2.25} className="text-black shrink-0" />
-                  </button>
-                  ) : null}
-                </div>
-                )}
+                    <div className="flex flex-wrap items-center gap-2 pt-1">
+                      {hasDiningPolicyContent(profile.booking_terms) ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setBookingPolicyFocus("terms");
+                            setBookingPolicyOpen(true);
+                          }}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-black/80 bg-white px-2.5 py-1.5 text-xs font-semibold text-black hover:bg-slate-50 transition-colors cursor-pointer"
+                        >
+                          <span>Terms &amp; Conditions</span>
+                          <ChevronRight size={13} strokeWidth={2.25} className="text-black shrink-0" />
+                        </button>
+                      ) : null}
+                      {hasDiningPolicyContent(profile.cancellation_policy) ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setBookingPolicyFocus("cancellation");
+                            setBookingPolicyOpen(true);
+                          }}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-black/80 bg-white px-2.5 py-1.5 text-xs font-semibold text-black hover:bg-slate-50 transition-colors cursor-pointer"
+                        >
+                          <span>Cancellation Policy</span>
+                          <ChevronRight size={13} strokeWidth={2.25} className="text-black shrink-0" />
+                        </button>
+                      ) : null}
+                    </div>
+                  )}
 
                 {/* Desktop terms checkbox — temporarily hidden
                 <label className="hidden lg:flex items-start gap-2.5 cursor-pointer select-none">
@@ -4496,11 +4480,11 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                   }
                   onClick={() => void proceedToBooking()}
                   className={`hidden md:inline-flex w-full items-center justify-center px-6 sm:px-8 py-3.5 rounded-xl text-base ${selectedTime &&
-                      selectedSlotIsAvailable &&
-                      !slotsInitialLoading &&
-                      !proceedChecking
-                      ? "bg-[#111111] text-white"
-                      : "bg-[#cfcfcf] text-white"
+                    selectedSlotIsAvailable &&
+                    !slotsInitialLoading &&
+                    !proceedChecking
+                    ? "bg-[#111111] text-white"
+                    : "bg-[#cfcfcf] text-white"
                     }`}
                 >
                   {proceedChecking ? (
@@ -4533,11 +4517,11 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
             }
             onClick={() => void proceedToBooking()}
             className={`w-full inline-flex items-center justify-center px-6 py-3.5 rounded-xl text-base ${selectedTime &&
-                selectedSlotIsAvailable &&
-                !slotsInitialLoading &&
-                !proceedChecking
-                ? "bg-[#111111] text-white"
-                : "bg-[#cfcfcf] text-white"
+              selectedSlotIsAvailable &&
+              !slotsInitialLoading &&
+              !proceedChecking
+              ? "bg-[#111111] text-white"
+              : "bg-[#cfcfcf] text-white"
               }`}
           >
             {proceedChecking ? (
@@ -4553,11 +4537,11 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
       ) : null}
 
       {isBookTableFlow &&
-      drawerStep === 3 &&
-      availabilityStatus !== "unavailable" &&
-      !bookingPolicyOpen &&
-      !isLightboxOpen &&
-      !stickyCtaHidden ? (
+        drawerStep === 3 &&
+        availabilityStatus !== "unavailable" &&
+        !bookingPolicyOpen &&
+        !isLightboxOpen &&
+        !stickyCtaHidden ? (
         <div
           className="md:hidden fixed inset-x-0 z-40 border-t border-slate-200 bg-white px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
           style={{ bottom: stickyCtaBottom }}
@@ -4567,9 +4551,8 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
             form="dining-confirm-booking-form"
             disabled={isSubmittingBooking || isCreatingBooking}
             ariaBusy={isSubmittingBooking || isCreatingBooking || undefined}
-            className={`w-full inline-flex items-center justify-center px-6 py-3.5 rounded-xl text-base ${
-              isSubmittingBooking || isCreatingBooking ? "bg-zinc-700 text-white" : "bg-[#111111] text-white"
-            }`}
+            className={`w-full inline-flex items-center justify-center px-6 py-3.5 rounded-xl text-base ${isSubmittingBooking || isCreatingBooking ? "bg-zinc-700 text-white" : "bg-[#111111] text-white"
+              }`}
           >
             {isSubmittingBooking || isCreatingBooking ? (
               <>
@@ -4585,10 +4568,10 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
 
       {/* Mobile sticky Book a table CTA (overview) */}
       {!hideBookingSidebar &&
-      activeTab !== "Book a Table" &&
-      !isLightboxOpen &&
-      !stickyCtaHidden &&
-      !venueInfoModal ? (
+        activeTab !== "Book a Table" &&
+        !isLightboxOpen &&
+        !stickyCtaHidden &&
+        !venueInfoModal ? (
         <div
           className="md:hidden fixed inset-x-0 z-40 border-t border-slate-200 bg-white px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
           style={{ bottom: stickyCtaBottom }}
@@ -4672,8 +4655,8 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                 <div
                   id="restaurant-tabs"
                   className={`overflow-hidden transition-[max-height,opacity] duration-300 ease-out ${showSectionTabs
-                      ? "max-h-16 opacity-100"
-                      : "max-h-0 opacity-0 pointer-events-none"
+                    ? "max-h-16 opacity-100"
+                    : "max-h-0 opacity-0 pointer-events-none"
                     }`}
                 >
                   <div className="flex gap-6 overflow-x-auto scrollbar-hide pt-0.5 pb-0.5">
@@ -4683,8 +4666,8 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                         type="button"
                         onClick={() => scrollToDetailSection(tab.sectionId, tab.id)}
                         className={`py-2.5 text-sm sm:text-base lg:text-sm font-semibold tracking-wide border-b-2 transition-all whitespace-nowrap cursor-pointer ${activeTab === tab.id
-                            ? "border-slate-900 text-slate-900 font-bold"
-                            : "border-transparent text-slate-400 hover:text-slate-900"
+                          ? "border-slate-900 text-slate-900 font-bold"
+                          : "border-transparent text-slate-400 hover:text-slate-900"
                           }`}
                       >
                         {tab.id}
@@ -4713,11 +4696,10 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
           <div
             ref={mobileTabsRef}
             id="dining-mobile-section-tabs"
-            className={`md:hidden fixed top-0 left-0 right-0 z-[60] bg-white border-b border-slate-200 transition-all duration-300 ease-out ${
-              showMobileStickyChrome && !isLightboxOpen
-                ? "translate-y-0 opacity-100"
-                : "-translate-y-full opacity-0 pointer-events-none"
-            }`}
+            className={`md:hidden fixed top-0 left-0 right-0 z-[60] bg-white border-b border-slate-200 transition-all duration-300 ease-out ${showMobileStickyChrome && !isLightboxOpen
+              ? "translate-y-0 opacity-100"
+              : "-translate-y-full opacity-0 pointer-events-none"
+              }`}
             aria-hidden={!showMobileStickyChrome || isLightboxOpen}
           >
             <div className="flex items-center gap-2 px-2.5 sm:px-3 h-12">
@@ -4743,11 +4725,10 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
             </div>
 
             <div
-              className={`overflow-hidden transition-[max-height,opacity] duration-300 ease-out ${
-                showMobileSectionTabs
-                  ? "max-h-14 opacity-100"
-                  : "max-h-0 opacity-0 pointer-events-none"
-              }`}
+              className={`overflow-hidden transition-[max-height,opacity] duration-300 ease-out ${showMobileSectionTabs
+                ? "max-h-14 opacity-100"
+                : "max-h-0 opacity-0 pointer-events-none"
+                }`}
             >
               <div className="px-5 flex gap-5 overflow-x-auto scrollbar-hide border-t border-slate-100">
                 {DETAIL_SECTION_TABS.map((tab) => (
@@ -4755,11 +4736,10 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                     key={`mobile-tab-${tab.id}`}
                     type="button"
                     onClick={() => scrollToDetailSection(tab.sectionId, tab.id)}
-                    className={`py-2.5 text-sm font-semibold tracking-wide border-b-2 transition-all whitespace-nowrap cursor-pointer ${
-                      activeTab === tab.id
-                        ? "border-slate-900 text-slate-900 font-bold"
-                        : "border-transparent text-slate-400"
-                    }`}
+                    className={`py-2.5 text-sm font-semibold tracking-wide border-b-2 transition-all whitespace-nowrap cursor-pointer ${activeTab === tab.id
+                      ? "border-slate-900 text-slate-900 font-bold"
+                      : "border-transparent text-slate-400"
+                      }`}
                   >
                     {tab.id}
                   </button>

@@ -188,7 +188,7 @@ function CollectionsContent() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {collections.map((collection) => {
-              const placesCount = collection.places_count !== undefined 
+              const placesCount = collection.places_count !== undefined
                 ? `${collection.places_count} Place${collection.places_count !== 1 ? 's' : ''}`
                 : collection.subtitle || "0 Places";
 
@@ -209,7 +209,7 @@ function CollectionsContent() {
                   />
                   {/* Neutral dark scrim — keeps title readable without colored tints */}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-transparent" />
-                  
+
                   {/* Content container */}
                   <div className="absolute inset-0 flex flex-col justify-end p-5 select-none">
                     <span className="inline-block self-start text-[9px] font-black uppercase bg-white/20 backdrop-blur-sm text-white px-2 py-0.5 rounded-md mb-2 tracking-wider">

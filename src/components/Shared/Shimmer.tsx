@@ -20,6 +20,33 @@ function Wrap({ children }: { children: ReactNode }) {
   return <SkeletonTheme {...theme}>{children}</SkeletonTheme>;
 }
 
+export function DiningSlotGridShimmer({
+  variant = "mobile",
+  count = 6,
+}: {
+  variant?: "mobile" | "desktop";
+  count?: number;
+}) {
+  const height = variant === "mobile" ? 56 : 52;
+  return (
+    <Wrap>
+      <div
+        className={
+          variant === "mobile"
+            ? "grid grid-cols-2 gap-2.5"
+            : "grid grid-cols-2 sm:grid-cols-3 gap-2.5"
+        }
+        aria-busy="true"
+        aria-label="Loading available time slots"
+      >
+        {Array.from({ length: count }).map((_, idx) => (
+          <Skeleton key={idx} height={height} borderRadius={12} />
+        ))}
+      </div>
+    </Wrap>
+  );
+}
+
 export function EventDetailShimmer() {
   return (
     <Wrap>

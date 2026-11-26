@@ -8,7 +8,6 @@ import {
   ChevronRight,
   Gift,
   HelpCircle,
-  Lock,
   LogOut,
   Heart,
   Tag,
@@ -20,7 +19,6 @@ import { logoutCustomer } from "@/lib/authSession";
 
 const NAV = [
   { href: "/customer/profile", icon: User, label: "My Profile" },
-  { href: "/customer/change-password", icon: Lock, label: "Change Password" },
   { href: "/customer/dashboard", icon: Calendar, label: "My Orders / Reservations" },
   { href: "/customer/favourite", icon: Heart, label: "My Favourite" },
   { href: "/customer/gift-cards", icon: Gift, label: "My Gift Cards" },

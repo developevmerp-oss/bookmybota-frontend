@@ -1,14 +1,23 @@
 "use client";
 
-import ChangePasswordForm from "@/components/Shared/ChangePasswordForm";
-import CustomerAccountLayout from "@/components/Shared/CustomerAccountLayout";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import {
+  CustomerAccountShellShimmer,
+  CustomerProfileShimmer,
+} from "@/components/Shared/Shimmer";
 
+/** Customers authenticate with Phone + OTP — redirect legacy change-password route to My Profile. */
 export default function CustomerChangePasswordPage() {
+  const router = useRouter();
+
+  useEffect(() => {
+    router.replace("/customer/profile");
+  }, [router]);
+
   return (
-    <CustomerAccountLayout>
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-6 max-w-lg">
-        <ChangePasswordForm variant="light" hideHeaderBelowLg />
-      </div>
-    </CustomerAccountLayout>
+    <CustomerAccountShellShimmer>
+      <CustomerProfileShimmer />
+    </CustomerAccountShellShimmer>
   );
 }

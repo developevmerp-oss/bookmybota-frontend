@@ -131,6 +131,7 @@ const VenueLayoutViewer = dynamic(
 );
 
 const BlockSeatPicker = dynamic(() => import("@/components/EventLandingPage/BlockSeatPicker"), { ssr: false });
+const SportZoomSeatPicker = dynamic(() => import("@/components/EventLandingPage/SportZoomSeatPicker"), { ssr: false });
 const EventClassicSeatPicker = dynamic(() => import("@/components/EventLandingPage/EventClassicSeatPicker"), { ssr: false });
 const EventPlanSeatPicker = dynamic(() => import("@/components/EventLandingPage/EventPlanSeatPicker"), { ssr: false });
 const EventGeoSeatPicker = dynamic(() => import("@/components/EventLandingPage/EventGeoSeatPicker"), { ssr: false });
@@ -451,6 +452,7 @@ export default function EventCheckout({
 
   // Stadiums and halls drawn as blocks get the section picker (map, then seats, then a view from the seat)
   const isBlockLayout = seatingConfig?.layout_mode === "universal_blocks";
+  const isSportZoom = seatingConfig?.layout_mode === "sport_zoom";
 
   const [createEventBooking] = useCreateEventBookingMutation();
   const [createEventSeatHold] = useCreateEventSeatHoldMutation();
@@ -1794,6 +1796,12 @@ export default function EventCheckout({
   const handleMapSeatsSelected = (seats: any[]) => {
     if (!desiredSeatQty) {
       applySelectedSeats(seats);
+      return;
+    }
+
+    // the sport map already picks seats side by side in one row, so take its choice as it is
+    if (isSportZoom) {
+      applySelectedSeats(seats.slice(0, desiredSeatQty));
       return;
     }
 
@@ -3576,7 +3584,15 @@ export default function EventCheckout({
           <div className="flex-1 min-h-0 overflow-hidden flex flex-col bg-white">
             {seatViewMode === "canvas" || isStadiumLayout ? (
               <div className="flex-1 min-h-0 h-full w-full">
-                {isBlockLayout ? (
+                {isSportZoom ? (
+                  <SportZoomSeatPicker
+                    layoutData={activeLayoutData}
+                    ticketTypes={ticketTypes}
+                    onSeatsSelected={handleMapSeatsSelected}
+                    initialSelectedSeats={selectedSeats}
+                    maxSelectable={desiredSeatQty ?? undefined}
+                  />
+                ) : isBlockLayout ? (
                   <BlockSeatPicker
                     onContinue={() => {
                       if (effectiveDesiredSeatQty && selectedSeats.length === effectiveDesiredSeatQty) {

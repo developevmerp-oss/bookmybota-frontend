@@ -88,6 +88,7 @@ export default function EventPlanSeatPicker({
 
   const boxRef = useRef<HTMLDivElement>(null);
   const [fit, setFit] = useState(1);
+  const hasCenteredRef = useRef(false);
   const { zoom: userZoom, controls } = useMapZoom(boxRef);
   const zoom = fit * userZoom;
   const fy = (y: number) => (plan.flip ? plan.height - y : y);
@@ -104,8 +105,13 @@ export default function EventPlanSeatPicker({
       maxW = Math.max(maxW, r.x * S + 20);
       maxH = Math.max(maxH, fy(r.y) * S + 20);
     }
+    if (plan.stage) {
+      const sy = plan.flip ? fy(plan.stage.y + plan.stage.h) : plan.stage.y;
+      maxW = Math.max(maxW, (plan.stage.x + plan.stage.w) * S + 20);
+      maxH = Math.max(maxH, (sy + plan.stage.h) * S + 20);
+    }
     return { actualW: maxW, actualH: maxH };
-  }, [W, H, list, rowTags, plan.flip, plan.height]);
+  }, [W, H, list, rowTags, plan.flip, plan.height, plan.stage]);
 
   useEffect(() => {
     const el = boxRef.current;
@@ -114,19 +120,34 @@ export default function EventPlanSeatPicker({
       const vw = el.clientWidth;
       const vh = el.clientHeight;
       if (vw < 40 || vh < 40) return;
-      const pad = vw >= 640 ? 48 : 32;
-      const nextFit = Math.min(1, (vw - pad) / actualW, (vh - pad) / actualH);
-      setFit(Math.max(0.15, Math.round(nextFit * 1000) / 1000));
-      requestAnimationFrame(() => {
-        el.scrollLeft = Math.max(0, (el.scrollWidth - el.clientWidth) / 2);
-        el.scrollTop = Math.max(0, (el.scrollHeight - el.clientHeight) / 2);
-      });
+      const pad = vw >= 640 ? 48 : 24;
+      // On mobile, frame the stage + center stalls cleanly (like Movie Classic View)
+      // while allowing pinch/slide to reach outer wings or zoom in/out.
+      const focusW = vw < 640 && plan.stage
+        ? Math.min(actualW, Math.max(plan.stage.w * S * 1.65, 720))
+        : actualW;
+      const nextFit = Math.min(1, (vw - pad) / focusW, vw < 640 ? 1 : (vh - pad) / actualH);
+      setFit(Math.max(0.2, Math.round(nextFit * 1000) / 1000));
     };
     doFit();
     const ro = new ResizeObserver(doFit);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [actualW, actualH]);
+  }, [actualW, actualH, plan.stage]);
+
+  // Center horizontally & show the stage cleanly at the top once fit is applied
+  useEffect(() => {
+    const el = boxRef.current;
+    if (!el) return;
+    const id = requestAnimationFrame(() => {
+      el.scrollLeft = Math.max(0, (el.scrollWidth - el.clientWidth) / 2);
+      if (!hasCenteredRef.current) {
+        el.scrollTop = 0;
+        hasCenteredRef.current = true;
+      }
+    });
+    return () => cancelAnimationFrame(id);
+  }, [fit, actualW, actualH]);
 
   const toggle = (seat: Seat) => {
     const id = String(seat.id);
@@ -141,7 +162,7 @@ export default function EventPlanSeatPicker({
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-white">
-      <div className="relative min-h-0 flex-1"><div ref={boxRef} className="h-full overflow-auto bg-slate-50">
+      <div className="relative min-h-0 flex-1"><div ref={boxRef} className="h-full overflow-auto bg-white">
         <div className="min-h-full min-w-full w-max flex items-center justify-center p-2 sm:p-4">
           <div style={{ width: actualW * zoom, height: actualH * zoom }} className="shrink-0">
             <div style={{ width: actualW, height: actualH, transform: `scale(${zoom})`, transformOrigin: "0 0" }} className="relative">
@@ -176,37 +197,56 @@ export default function EventPlanSeatPicker({
             {list.map((s) => {
               const picked = selectedIds.has(String(s.id));
               const free = String(s.status || "").toUpperCase() === "AVAILABLE";
+              const rawNo = String(s.seat_label).replace(/^0+(?=\d)/, "");
+              const paddedNo = /^\d+$/.test(rawNo) ? rawNo.padStart(2, "0") : rawNo;
               return (
                 <button
                   key={String(s.id)}
                   type="button"
-                  title={`${tierOf(String(s.section_name))} · ${s.row_label}${s.seat_label}`}
+                  title={`${tierOf(String(s.section_name))} · ${s.row_label}${rawNo}`}
                   onClick={() => toggle(s)}
                   disabled={!free && !picked}
-                  className="absolute flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-md text-[11px] font-semibold"
+                  className="absolute flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[7px] text-[10px] font-semibold transition-[border-color,transform,background-color] duration-150"
                   style={{
                     left: Number(s.coordinate_x) * S,
                     top: fy(Number(s.coordinate_y)) * S,
                     width: SEAT,
                     height: SEAT,
-                    // selected = same soft violet + glow as the movie seat picker (#7B61FF)
-                    background: picked ? "#7B61FF" : free ? "#ffffff" : "#e5e7eb",
-                    color: picked ? "#fff" : free ? "#334155" : "#cbd5e1",
-                    border: `${picked ? 1 : 1.5}px solid ${picked ? "#7B61FF" : free ? "#22c55e" : "#e5e7eb"}`,
+                    // Movie Classic View palette: #7B61FF selected, #4B5563 available, #E0E0E0 booked
+                    background: picked ? "#7B61FF" : "#ffffff",
+                    color: picked ? "#ffffff" : free ? "#1E293B" : "#C4C4C4",
+                    border: `1px solid ${picked ? "#7B61FF" : free ? "#4B5563" : "#E0E0E0"}`,
                     boxShadow: picked ? "0 0 0 3px rgba(123,97,255,0.22), 0 0 12px 3px rgba(123,97,255,0.4)" : undefined,
                     cursor: free || picked ? "pointer" : "not-allowed",
                   }}
                 >
-                  {String(s.seat_label).replace(/^0+(?=\d)/, "")}
+                  {!free && !picked ? <span aria-hidden>×</span> : paddedNo}
                 </button>
               );
             })}
 
-            {plan.stage && (
-              <div className="absolute flex items-center justify-center rounded-md bg-slate-700 text-lg font-extrabold tracking-[0.4em] text-white shadow-md" style={{ left: plan.stage.x * S, top: (plan.flip ? fy(plan.stage.y + plan.stage.h) : plan.stage.y) * S, width: plan.stage.w * S, height: plan.stage.h * S }}>
-                {plan.stage.label || "STAGE"}
-              </div>
-            )}
+            {plan.stage && (() => {
+              const stageTop = (plan.flip ? fy(plan.stage.y + plan.stage.h) : plan.stage.y) * S;
+              const stageLeft = plan.stage.x * S;
+              const stageW = plan.stage.w * S;
+              const stageH = plan.stage.h * S;
+              return (
+                <>
+                  <div
+                    className="pointer-events-none absolute -translate-x-1/2 whitespace-nowrap text-[11px] font-medium tracking-wide text-slate-400"
+                    style={{ left: stageLeft + stageW / 2, top: Math.max(2, stageTop - 18) }}
+                  >
+                    All eyes this way please
+                  </div>
+                  <div
+                    className="absolute flex items-center justify-center rounded-xl bg-gradient-to-b from-slate-700 to-slate-800 border border-slate-600/40 text-lg font-extrabold tracking-[0.4em] text-white shadow-md"
+                    style={{ left: stageLeft, top: stageTop, width: stageW, height: stageH }}
+                  >
+                    {plan.stage.label || "STAGE"}
+                  </div>
+                </>
+              );
+            })()}
           </div>
           </div>
         </div>
@@ -214,9 +254,9 @@ export default function EventPlanSeatPicker({
       {controls}
       </div>
       <div className="flex flex-wrap items-center justify-center gap-4 border-t border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
-        <span className="flex items-center gap-1.5"><i className="size-3.5 rounded border-2 border-green-500 bg-white" /> Available</span>
-        <span className="flex items-center gap-1.5"><i className="size-3.5 rounded bg-[#7B61FF] shadow-[0_0_0_2px_rgba(123,97,255,0.22)]" /> Selected</span>
-        <span className="flex items-center gap-1.5"><i className="size-3.5 rounded bg-slate-200" /> Sold / held</span>
+        <span className="flex items-center gap-1.5"><i className="size-3.5 rounded-[4px] border border-[#4B5563] bg-white" /> Available</span>
+        <span className="flex items-center gap-1.5"><i className="size-3.5 rounded-[4px] border border-[#7B61FF] bg-[#7B61FF] shadow-[0_0_0_2px_rgba(123,97,255,0.22)]" /> Selected</span>
+        <span className="flex items-center gap-1.5"><i className="flex size-3.5 items-center justify-center rounded-[4px] border border-[#E0E0E0] bg-white text-[10px] leading-none font-medium text-[#C4C4C4] not-italic">×</i> Sold / held</span>
       </div>
     </div>
   );

@@ -49,6 +49,22 @@ export default function GiftCardsBrowsePage() {
   }, []);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (window.history.state?.bmbGiftCards !== true) {
+      window.history.pushState({ bmbGiftCards: true }, "");
+    }
+    const onPopState = () => {
+      if (searchPopupOpen) {
+        setSearchPopupOpen(false);
+        return;
+      }
+      router.replace("/customer/profile");
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [router, searchPopupOpen]);
+
+  useEffect(() => {
     if (!searchPopupOpen) return;
     const t = window.setTimeout(() => searchInputRef.current?.focus(), 20);
     const onKey = (e: KeyboardEvent) => {

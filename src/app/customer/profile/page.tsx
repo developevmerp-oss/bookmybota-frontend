@@ -142,6 +142,32 @@ export default function CustomerProfilePage() {
   const [mobileScreen, setMobileScreen] = useState<"overview" | "details" | "edit">("overview");
   const [isEditing, setIsEditing] = useState(false);
 
+  // Sync hardware/browser Back button:
+  // - From mobile sub-screens ("details" / "edit"), return to "overview"
+  // - From overview (/customer/profile), redirect to the landing page (/)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (mobileScreen !== "overview") {
+      if (window.history.state?.bmbProfileScreen !== mobileScreen) {
+        window.history.pushState({ bmbProfileScreen: mobileScreen }, "");
+      }
+    } else if (
+      window.history.state?.bmbProfileOverview !== true &&
+      !window.history.state?.bmbProfileScreen
+    ) {
+      window.history.pushState({ bmbProfileOverview: true }, "");
+    }
+    const onPopState = () => {
+      if (mobileScreen !== "overview") {
+        setMobileScreen("overview");
+        return;
+      }
+      router.replace("/");
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [mobileScreen, router]);
+
   const {
     register,
     handleSubmit,
@@ -635,7 +661,13 @@ export default function CustomerProfilePage() {
             <div className="flex items-center gap-3 px-1">
               <button
                 type="button"
-                onClick={() => setMobileScreen("details")}
+                onClick={() => {
+                  if (typeof window !== "undefined" && window.history.state?.bmbProfileScreen) {
+                    window.history.back();
+                  } else {
+                    setMobileScreen("overview");
+                  }
+                }}
                 className="p-1 -ml-1 text-black cursor-pointer"
                 aria-label="Back to personal details"
               >

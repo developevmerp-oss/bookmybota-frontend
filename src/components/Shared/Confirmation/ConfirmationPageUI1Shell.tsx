@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   Download,
@@ -261,6 +262,7 @@ function ModalShell({
  * No rating column unless `showAside` + `aside` are provided — otherwise ticket is centered.
  */
 export default function ConfirmationPageUI1Shell(props: ConfirmationPageUI1ShellProps) {
+  const router = useRouter();
   const {
     showAside = false,
     aside,
@@ -292,6 +294,21 @@ export default function ConfirmationPageUI1Shell(props: ConfirmationPageUI1Shell
     showQr = true,
     directDetails = true,
   } = props;
+
+  // Hardware/browser Back button redirects to exploreHref (falling back to backHref);
+  // the in-app "<- Your Ticket" button stays on backHref unchanged.
+  const hardwareBackHref = exploreHref || backHref;
+  useEffect(() => {
+    if (typeof window === "undefined" || !hardwareBackHref) return;
+    if (window.history.state?.bmbConfirmBack !== hardwareBackHref) {
+      window.history.pushState({ bmbConfirmBack: hardwareBackHref }, "");
+    }
+    const onPopState = () => {
+      router.replace(hardwareBackHref);
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [hardwareBackHref, router]);
 
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);

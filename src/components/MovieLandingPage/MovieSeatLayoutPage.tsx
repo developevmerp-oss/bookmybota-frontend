@@ -1862,8 +1862,21 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
   }, [step, sessionToken]);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+    const guardTag =
+      step === "review"
+        ? "review"
+        : step === "beverages"
+          ? "beverages"
+          : holdId
+            ? "seats-hold"
+            : null;
+    if (guardTag && window.history.state?.bmbMovieStep !== guardTag) {
+      window.history.pushState({ bmbMovieStep: guardTag }, "");
+    }
     const handlePopState = () => {
-      if (step === "review") {
+      if (step === "review" || (step === "seats" && holdId)) {
+        window.history.pushState({ bmbMovieStep: step === "review" ? "review" : "seats-hold" }, "");
         requestLeaveConfirmStep("back");
       } else if (step === "beverages") {
         setStep("seats");
@@ -1871,7 +1884,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
     };
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
-  }, [step]);
+  }, [step, holdId]);
 
   const onConfirmBooking = async (values: MovieCheckoutFormValues) => {
     if (!holdId) {

@@ -245,13 +245,6 @@ function CustomerDropdown({
               My Profile
             </Link>
             <Link
-              href="/customer/change-password"
-              onClick={handleItemClick("/customer/change-password")}
-              className="block px-4 py-2.5 type-nav-md font-medium text-[#111111] hover:bg-[#F7E9FF] transition-colors"
-            >
-              Change Password
-            </Link>
-            <Link
               href="/customer/dashboard"
               onClick={handleItemClick("/customer/dashboard")}
               className="block px-4 py-2.5 type-nav-md font-medium text-[#111111] hover:bg-[#F7E9FF] transition-colors"

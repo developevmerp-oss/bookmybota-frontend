@@ -36,6 +36,25 @@ export function cropAspectLabel(aspect?: number): string | null {
   return `Vertical · 1:${(1 / aspect).toFixed(2)}`;
 }
 
+/** Recommended pixel dimensions corresponding to the target aspect ratio. */
+export function cropRecommendedSizeLabel(aspect?: number, override?: string): string {
+  if (override?.trim()) return override.trim();
+  if (!aspect || aspect <= 0) return "Up to 1920 px (Free Aspect Ratio)";
+  const near = (a: number, b: number) => Math.abs(a - b) < 0.02;
+  if (near(aspect, 16 / 9)) return "1920 × 1080 px";
+  if (near(aspect, 2 / 3)) return "800 × 1200 px";
+  if (near(aspect, 3 / 4)) return "900 × 1200 px";
+  if (near(aspect, 4 / 3)) return "1200 × 900 px";
+  if (near(aspect, 1)) return "1080 × 1080 px";
+  if (near(aspect, 16 / 10)) return "1600 × 1000 px";
+  if (near(aspect, 3)) return "1920 × 640 px";
+  if (near(aspect, 2)) return "1200 × 600 px";
+  if (near(aspect, 21 / 9)) return "1920 × 823 px";
+  if (near(aspect, 2.5)) return "1920 × 768 px";
+  if (aspect > 1) return `1920 × ${Math.round(1920 / aspect)} px`;
+  return `${Math.round(1200 * aspect)} × 1200 px`;
+}
+
 /**
  * Preview box class that matches the crop aspect (avoids object-cover re-cropping).
  */
@@ -120,12 +139,14 @@ async function cropImageToBlob(
 export function ImageCropModal({
   src,
   aspect,
+  recommendedSize,
   onCancel,
   onConfirm,
   onPickAnother,
 }: {
   src: string;
   aspect?: number;
+  recommendedSize?: string;
   onCancel: () => void;
   onConfirm: (blob: Blob) => void;
   onPickAnother?: () => void;
@@ -138,6 +159,7 @@ export function ImageCropModal({
 
   const lockedAspect = aspect && aspect > 0 ? aspect : undefined;
   const label = cropAspectLabel(lockedAspect);
+  const sizeLabel = cropRecommendedSizeLabel(lockedAspect, recommendedSize);
 
   const onImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
     const { width, height } = e.currentTarget;
@@ -183,7 +205,10 @@ export function ImageCropModal({
         <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b border-[#E5E5E5]">
           <div>
             <p className="font-semibold text-slate-800">Crop image</p>
-            {label ? <p className="text-xs text-slate-500 mt-0.5">{label}</p> : null}
+            <p className="text-xs text-slate-500 mt-0.5">
+              {label ? `Aspect Ratio: ${label} · ` : "Aspect Ratio: Free · "}
+              Recommended Size: {sizeLabel}
+            </p>
           </div>
           <button type="button" onClick={onCancel} className="p-1 text-slate-500 hover:text-slate-800">
             <X size={18} />
@@ -252,6 +277,7 @@ export function ImageCropModal({
 
 type PickerProps = {
   aspect?: number;
+  recommendedSize?: string;
   disabled?: boolean;
   className?: string;
   children: ReactNode;
@@ -260,6 +286,7 @@ type PickerProps = {
 
 export default function ImageCropPicker({
   aspect,
+  recommendedSize,
   disabled,
   className,
   children,
@@ -280,9 +307,18 @@ export default function ImageCropPicker({
     setSrc(null);
   }, [src]);
 
+  const ratioHint = cropAspectLabel(aspect);
+  const sizeHint = cropRecommendedSizeLabel(aspect, recommendedSize);
+
   return (
     <>
-      <button type="button" disabled={disabled} className={className} onClick={() => inputRef.current?.click()}>
+      <button
+        type="button"
+        disabled={disabled}
+        className={className}
+        title={`Aspect Ratio: ${ratioHint || "Free"} · Recommended Size: ${sizeHint}`}
+        onClick={() => inputRef.current?.click()}
+      >
         {children}
       </button>
       <input ref={inputRef} type="file" accept="image/*" className="hidden" disabled={disabled} onChange={onPick} />
@@ -290,6 +326,7 @@ export default function ImageCropPicker({
         <ImageCropModal
           src={src}
           aspect={aspect}
+          recommendedSize={recommendedSize}
           onCancel={close}
           onPickAnother={() => inputRef.current?.click()}
           onConfirm={async (blob) => {
@@ -306,6 +343,7 @@ export default function ImageCropPicker({
 type FieldProps = {
   value?: string;
   aspect?: number;
+  recommendedSize?: string;
   disabled?: boolean;
   previewClassName?: string;
   emptyClassName?: string;
@@ -318,6 +356,7 @@ type FieldProps = {
 export function CroppedImageField({
   value,
   aspect,
+  recommendedSize,
   disabled,
   previewClassName,
   emptyClassName,
@@ -355,15 +394,35 @@ export function CroppedImageField({
     emptyClassName ||
     `flex flex-col items-center justify-center border border-dashed border-slate-300 hover:border-rose-400 ${cropPreviewClass(aspect, "border-dashed")}`;
 
+  const ratioHint = cropAspectLabel(aspect);
+  const sizeHint = cropRecommendedSizeLabel(aspect, recommendedSize);
+
   if (!value) {
     return (
       <ImageCropPicker
         aspect={aspect}
+        recommendedSize={recommendedSize}
         disabled={disabled}
         className={resolvedEmptyClass}
         onCroppedFile={onCroppedFile}
       >
-        {emptyContent || <span className="text-xs">{emptyLabel}</span>}
+        {emptyContent ? (
+          <div className="flex flex-col items-center gap-1 text-center">
+            {emptyContent}
+            <span className="text-[10px] text-slate-400">
+              {ratioHint ? `${ratioHint} · ` : "Free Ratio · "}
+              {sizeHint}
+            </span>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center gap-0.5 px-2 text-center">
+            <span className="text-xs font-medium">{emptyLabel}</span>
+            <span className="text-[10px] text-slate-400">
+              {ratioHint ? `${ratioHint} · ` : "Free Ratio · "}
+              {sizeHint}
+            </span>
+          </div>
+        )}
       </ImageCropPicker>
     );
   }
@@ -392,11 +451,16 @@ export function CroppedImageField({
           </div>
         )}
       </div>
+      <p className="mt-1 text-[10px] text-slate-400">
+        {ratioHint ? `Aspect Ratio: ${ratioHint} · ` : "Aspect Ratio: Free · "}
+        Recommended: {sizeHint}
+      </p>
       <input ref={inputRef} type="file" accept="image/*" className="hidden" disabled={disabled} onChange={onPick} />
       {src && (
         <ImageCropModal
           src={src}
           aspect={aspect}
+          recommendedSize={recommendedSize}
           onCancel={close}
           onPickAnother={openFile}
           onConfirm={finish}

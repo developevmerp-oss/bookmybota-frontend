@@ -303,6 +303,21 @@ function ConfirmationContent() {
       : []),
   ];
 
+  const catSlug = String(
+    (booking as { category_slug?: string | null }).category_slug || ""
+  ).trim();
+  const catName = String(booking.category_name || "").trim();
+  const eventExploreHref = catSlug
+    ? `/events?category=${encodeURIComponent(catSlug)}`
+    : catName
+      ? `/events?category=${encodeURIComponent(
+          catName
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/^-+|-+$/g, "")
+        )}`
+      : "/events";
+
   // UI1 = BMS ticket + optional rating aside when event ended. UI2 = classic EventTicketCard layout below.
   if (CONFIRMATION_UI_VERSION === 1) {
     return (
@@ -338,7 +353,7 @@ function ConfirmationContent() {
         cancellationNote={ticketModeConfirmationMessage(ticketMode)}
         onDownloadPdf={downloadTickets}
         downloading={downloading}
-        exploreHref="/events"
+        exploreHref={eventExploreHref}
         supportHref="/customer/help"
         showQr={true}
         directDetails={true}

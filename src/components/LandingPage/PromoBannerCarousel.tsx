@@ -346,10 +346,10 @@ export default function PromoBannerCarousel({ city }: PromoBannerCarouselProps) 
   } = useHomeCatalog(city);
   const hasCity = hasCityFilter(city);
   const { data: cityMoviesData } = useGetPublicMoviesQuery({
-    limit: 50,
+    limit: 12,
     ...(hasCity ? { city } : {}),
   });
-  const { data: allMoviesData } = useGetPublicMoviesQuery({ limit: 50 }, { skip: !hasCity });
+  const { data: allMoviesData } = useGetPublicMoviesQuery({ limit: 12 }, { skip: !hasCity });
   const movieItems = preferCityOrAll(
     cityMoviesData?.items ?? [],
     allMoviesData?.items ?? [],

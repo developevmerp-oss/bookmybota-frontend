@@ -5257,6 +5257,43 @@ export const api = createApi({
       invalidatesTags: ['AdminDiningGiftCardSettlements', 'DiningGiftCardRedemptions', 'MyGiftCards'],
     }),
 
+    getAdminBookingLogs: builder.query<
+      {
+        items: Array<{
+          type: 'dining' | 'event' | 'movie';
+          id: string;
+          created_at: string;
+          customer_name: string;
+          customer_phone: string | null;
+          customer_email: string | null;
+          item: string;
+          partner: string | null;
+          detail: string | null;
+          qty: number | null;
+          amount: number | null;
+          status: string;
+          source: string | null;
+        }>;
+        meta: import('@/lib/pagination').PaginationMeta;
+        summary: { total: number; amount: number };
+      },
+      { page?: number; limit?: number; q?: string; type?: string; from?: string; to?: string } | void
+    >({
+      query: (params) => {
+        const sp = new URLSearchParams();
+        Object.entries(params || {}).forEach(([k, v]) => {
+          if (v !== undefined && v !== '') sp.set(k, String(v));
+        });
+        const qs = sp.toString();
+        return `/admin/booking-logs${qs ? `?${qs}` : ''}`;
+      },
+      transformResponse: (res: any) => ({
+        items: res.data || [],
+        meta: res.meta || { page: 1, limit: 25, total: 0, total_pages: 0 },
+        summary: res.summary || { total: 0, amount: 0 },
+      }),
+    }),
+
     getAdminEventGiftCardRedemptions: builder.query<
       {
         items: EventGiftCardRedemptionRow[];
@@ -9231,6 +9268,7 @@ export const {
   useGetAdminDiningGiftCardRedemptionsQuery,
   usePatchAdminDiningGiftCardSettlementMutation,
   useGetAdminEventGiftCardRedemptionsQuery,
+  useGetAdminBookingLogsQuery,
   useGetAdminMovieGiftCardRedemptionsQuery,
   useGetMarketingCampaignsQuery,
   useGetMarketingPaymentSummaryQuery,

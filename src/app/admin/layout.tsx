@@ -35,6 +35,7 @@ import {
   Layers,
   LayoutGrid,
   Compass,
+  ScrollText,
 } from "lucide-react";
 import AuthGate from "@/components/Shared/AuthGate";
 import SessionGuard from "@/components/Shared/SessionGuard";
@@ -107,6 +108,7 @@ const navigation: NavItem[] = [
   { type: "link", name: "Platform Offers", href: "/admin/platform-offers", icon: Tag },
   { type: "link", name: "Gift Cards", href: "/admin/gift-cards", icon: Gift },
   { type: "link", name: "Gift Card Ledger", href: "/admin/gift-card-settlements", icon: Wallet },
+  { type: "link", name: "Booking Logs", href: "/admin/booking-logs", icon: ScrollText },
   { type: "link", name: "Customers", href: "/admin/customers", icon: Users },
   { type: "link", name: "Profile", href: "/admin/profile", icon: UserRound },
 ];

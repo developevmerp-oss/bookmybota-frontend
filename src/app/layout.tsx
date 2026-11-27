@@ -63,6 +63,18 @@ export const metadata: Metadata = {
   },
 };
 
+const API_ORIGIN = (() => {
+  const raw =
+    process.env.NEXT_PUBLIC_API_BASE_URL?.trim() ||
+    process.env.NEXT_PUBLIC_API_URL?.trim();
+  if (!raw) return null;
+  try {
+    return new URL(raw.replace(/\/api\/?$/i, "")).origin;
+  } catch {
+    return null;
+  }
+})();
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -75,6 +87,14 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <head>
+        {API_ORIGIN ? (
+          <>
+            <link rel="preconnect" href={API_ORIGIN} crossOrigin="anonymous" />
+            <link rel="dns-prefetch" href={API_ORIGIN} />
+          </>
+        ) : null}
+        <link rel="preconnect" href="https://res.cloudinary.com" crossOrigin="anonymous" />
+        <link rel="dns-prefetch" href="https://res.cloudinary.com" />
         <link rel="icon" href={`/favicon.ico?v=${FAVICON_V}`} sizes="any" />
         <link
           rel="icon"

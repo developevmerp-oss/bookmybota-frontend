@@ -402,6 +402,7 @@ export default function MovieDetailPage() {
   const heroEndRef = useRef<HTMLDivElement>(null);
   const [showStickyBar, setShowStickyBar] = useState(false);
   const [langFormatOpen, setLangFormatOpen] = useState(false);
+  const pendingBookClickRef = useRef(false);
 
   const { data: apiMovie, isLoading, isError } = useGetPublicMovieQuery(idOrSlug, {
     skip: !idOrSlug,
@@ -418,7 +419,7 @@ export default function MovieDetailPage() {
     isLoading: showtimesLoading,
     isSuccess: showtimesSuccess,
     isError: showtimesError,
-  } = useGetPublicMovieShowtimesQuery({ idOrSlug }, { skip: !idOrSlug });
+  } = useGetPublicMovieShowtimesQuery({ idOrSlug, summary: 1 }, { skip: !idOrSlug });
 
   const movie = useMemo<MovieDetailData | null>(() => {
     if (!apiMovie) return null;
@@ -443,13 +444,27 @@ export default function MovieDetailPage() {
 
   const langFormatGroups = useMemo(() => {
     if (!movie) return [];
+    const fromBackendPairs = (() => {
+      const pairs = showtimesData?.available_language_formats;
+      if (!Array.isArray(pairs)) return null;
+      const byLang = new Map<string, string[]>();
+      for (const p of pairs) {
+        const lang = String(p.language || "").trim();
+        const fmt = String(p.format || "").trim();
+        if (!lang || !fmt) continue;
+        const list = byLang.get(lang) || [];
+        if (!list.some((f) => f.toLowerCase() === fmt.toLowerCase())) list.push(fmt);
+        byLang.set(lang, list);
+      }
+      return Array.from(byLang.entries()).map(([language, formats]) => ({ language, formats }));
+    })();
     return buildLanguageFormatGroups(
-      groupsFromShowtimes(showtimesData?.cinemas),
+      fromBackendPairs ?? groupsFromShowtimes(showtimesData?.cinemas),
       movie.languages,
       movie.formats || [],
       { showtimesReady }
     );
-  }, [movie, showtimesData?.cinemas, showtimesReady]);
+  }, [movie, showtimesData?.available_language_formats, showtimesData?.cinemas, showtimesReady]);
 
   const formatBadges = useMemo(() => {
     const fromGroups = allFormatsFromGroups(langFormatGroups);
@@ -478,6 +493,31 @@ export default function MovieDetailPage() {
     return () => observer.disconnect();
   }, [headerOffset, movie?.id]);
 
+  const bookHref = movie?.bookHref || `/movies/${movie?.slug || movie?.id || idOrSlug}/showtimes`;
+
+  const proceedAfterShowtimesReady = () => {
+    if (needsLangFormatPicker) {
+      setLangFormatOpen(true);
+      return;
+    }
+    const only = langFormatGroups[0];
+    if (only?.language && only.language !== "All" && only.formats.length === 1) {
+      const params = new URLSearchParams();
+      params.set("language", only.language);
+      params.set("format", only.formats[0]);
+      router.push(`${bookHref}?${params.toString()}`);
+      return;
+    }
+    router.push(bookHref);
+  };
+
+  useEffect(() => {
+    if (!pendingBookClickRef.current || !showtimesReady || !movie) return;
+    pendingBookClickRef.current = false;
+    proceedAfterShowtimesReady();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showtimesReady, needsLangFormatPicker, movie]);
+
   if (isLoading) {
     return <MovieDetailShimmer />;
   }
@@ -493,28 +533,12 @@ export default function MovieDetailPage() {
     );
   }
 
-  const bookHref = movie.bookHref || `/movies/${movie.slug || movie.id}/showtimes`;
-
   const handleBookTickets = () => {
-    // Wait for showtimes so we only open the picker for real multi options
     if (!showtimesReady && !showtimesError) {
-      router.push(bookHref);
+      pendingBookClickRef.current = true;
       return;
     }
-    // Multiple languages / formats → BMS picker; otherwise go straight to showtimes
-    if (needsLangFormatPicker) {
-      setLangFormatOpen(true);
-      return;
-    }
-    const only = langFormatGroups[0];
-    if (only?.language && only.language !== "All" && only.formats.length === 1) {
-      const params = new URLSearchParams();
-      params.set("language", only.language);
-      params.set("format", only.formats[0]);
-      router.push(`${bookHref}?${params.toString()}`);
-      return;
-    }
-    router.push(bookHref);
+    proceedAfterShowtimesReady();
   };
 
   return (

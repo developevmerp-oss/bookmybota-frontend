@@ -36,6 +36,10 @@ import {
   type PublicMovieShowtimeItem,
 } from "@/services/api";
 import CinemaWishlistButton from "@/components/MovieLandingPage/CinemaWishlistButton";
+import MovieLanguageFormatModal, {
+  buildLanguageFormatGroups,
+  groupsFromShowtimes,
+} from "@/components/MovieLandingPage/MovieLanguageFormatModal";
 import {
   parseCsvParam,
   sameStringList,
@@ -1122,11 +1126,15 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
   const [timeFilters, setTimeFilters] = useState<string[]>(() =>
     parseCsvParam(searchParams.get("time"))
   );
+  const [otherFilters, setOtherFilters] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState<SortKey>(() => {
     const s = searchParams.get("sort");
     return s === "popularity" || s === "distance" || s === "relevance" ? s : "relevance";
   });
-  const [openFilter, setOpenFilter] = useState<"language" | "price" | "time" | "sort" | null>(null);
+  const [openFilter, setOpenFilter] = useState<
+    "language" | "price" | "format" | "other" | "time" | "sort" | null
+  >(null);
+  const [langFormatModalOpen, setLangFormatModalOpen] = useState(false);
   const [mobileSheet, setMobileSheet] = useState<"filters" | "sort" | null>(null);
   const [draftPriceFilters, setDraftPriceFilters] = useState<string[]>([]);
   const [draftTimeFilters, setDraftTimeFilters] = useState<string[]>([]);
@@ -1335,13 +1343,19 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
 
   const filteredCinemas = useMemo(() => {
     let rows = cinemas;
+    if (otherFilters.includes("fnb")) {
+      rows = rows.filter((c) => Boolean(c.has_fnb));
+    }
+    if (otherFilters.includes("m_ticket")) {
+      rows = rows.filter((c) => c.m_ticket !== false);
+    }
     if (sortBy === "popularity") {
       rows = [...rows].sort((a, b) => b.showtimes.length - a.showtimes.length);
     } else if (sortBy === "distance") {
       rows = [...rows].sort((a, b) => a.name.localeCompare(b.name));
     }
     return rows;
-  }, [cinemas, sortBy]);
+  }, [cinemas, otherFilters, sortBy]);
 
   const [lateEntryModal, setLateEntryModal] = useState<{
     showtime: PublicMovieShowtimeItem;
@@ -1378,6 +1392,14 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
 
   /** BMS flow: open seat map first — “How many seats?” modal shows on that page. */
   const goToSeatMap = (showtime: PublicMovieShowtimeItem) => {
+    try {
+      sessionStorage.setItem(
+        "bmb_movie_showtimes_return_url",
+        window.location.pathname + window.location.search
+      );
+    } catch {
+      /* ignore */
+    }
     router.push(`/movies/book/${showtime.id}`);
   };
 
@@ -1402,6 +1424,34 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
 
   const backHref = `/movies/${movie.slug || movie.id}`;
   const languageLabel = languageFilters.length === 1 ? languageFilters[0] : null;
+  const formatLabelForFirst = formatFilters.length === 1 ? formatFilters[0] : null;
+  const langFormatButtonLabel =
+    languageLabel && formatLabelForFirst
+      ? `${languageLabel} - ${formatLabelForFirst}`
+      : languageLabel || formatLabelForFirst || "Language & Format";
+
+  const langFormatGroups = useMemo(() => {
+    const fromBackendPairs = (() => {
+      const pairs = data?.available_language_formats;
+      if (!Array.isArray(pairs)) return null;
+      const byLang = new Map<string, string[]>();
+      for (const p of pairs) {
+        const lang = String(p.language || "").trim();
+        const fmt = String(p.format || "").trim();
+        if (!lang || !fmt) continue;
+        const list = byLang.get(lang) || [];
+        if (!list.some((f) => f.toLowerCase() === fmt.toLowerCase())) list.push(fmt);
+        byLang.set(lang, list);
+      }
+      return Array.from(byLang.entries()).map(([language, formats]) => ({ language, formats }));
+    })();
+    return buildLanguageFormatGroups(
+      fromBackendPairs ?? groupsFromShowtimes(data?.cinemas),
+      movie.languages,
+      movie.formats || [],
+      { showtimesReady: isSuccess }
+    );
+  }, [data?.available_language_formats, data?.cinemas, movie.languages, movie.formats, isSuccess]);
   // Header title follows URL language/format filters when set
   const titleLanguage =
     languageFilters.length > 0 ? languageFilters.join(", ") : null;
@@ -1852,17 +1902,40 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
                     : "max-w-[100%] opacity-100 translate-x-0"
                 }`}
               >
-                <BmsFilterDropdown
-                  label={languageLabel || "Language"}
-                  values={languageFilters}
-                  options={languageOptions}
-                  open={openFilter === "language"}
-                  onOpenChange={(next) => setOpenFilter(next ? "language" : null)}
-                  underline={Boolean(languageLabel || languageFilters.length)}
-                  onChange={setLanguageFilters}
-                  emptyText="No languages for this date"
-                  icon={<Globe size={15} />}
-                />
+                {(() => {
+                  const langFmtActive = Boolean(
+                    langFormatModalOpen ||
+                      languageLabel ||
+                      formatLabelForFirst ||
+                      languageFilters.length ||
+                      formatFilters.length
+                  );
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOpenFilter(null);
+                        setLangFormatModalOpen(true);
+                      }}
+                      className={`h-9 sm:h-10 px-2.5 sm:px-3.5 inline-flex items-center gap-1.5 sm:gap-2 rounded-xl border text-[12px] sm:text-[13px] font-medium cursor-pointer focus:outline-none transition-colors whitespace-nowrap shrink-0 ${
+                        langFmtActive
+                          ? "border-slate-400 bg-slate-100 text-slate-900 font-semibold"
+                          : "border-slate-200 text-slate-700 bg-white hover:border-slate-300"
+                      }`}
+                    >
+                      <span className="shrink-0 text-current opacity-80">
+                        <Globe size={15} />
+                      </span>
+                      <span className="truncate max-w-[7rem] sm:max-w-[10rem]">{langFormatButtonLabel}</span>
+                      <ChevronDown
+                        size={14}
+                        className={`shrink-0 transition-transform ${langFormatModalOpen ? "rotate-180" : ""} ${
+                          langFmtActive ? "text-slate-900" : "text-slate-400"
+                        }`}
+                      />
+                    </button>
+                  );
+                })()}
                 <BmsFilterDropdown
                   label="Price Range"
                   values={priceFilters}
@@ -1871,6 +1944,18 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
                   onOpenChange={(next) => setOpenFilter(next ? "price" : null)}
                   onChange={setPriceFilters}
                   icon={<Ticket size={15} />}
+                />
+                <BmsFilterDropdown
+                  label="Other Filters"
+                  values={otherFilters}
+                  options={[
+                    { value: "fnb", label: "Food & Beverage" },
+                    { value: "m_ticket", label: "M-Ticket" },
+                  ]}
+                  open={openFilter === "other"}
+                  onOpenChange={(next) => setOpenFilter(next ? "other" : null)}
+                  onChange={setOtherFilters}
+                  icon={<SlidersHorizontal size={15} />}
                 />
                 <BmsFilterDropdown
                   label="Preferred Time"
@@ -1957,6 +2042,16 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
                 Show All Cities
               </button>
             ) : null}
+          </div>
+          <div className="flex items-center gap-4 text-[11px] font-semibold tracking-wide text-[#6B7280] uppercase">
+            <span className="inline-flex items-center gap-1.5">
+              <span className="size-2 rounded-full bg-[#22C55E]" aria-hidden />
+              AVAILABLE
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="size-2 rounded-full bg-[#F59E0B]" aria-hidden />
+              FAST FILLING
+            </span>
           </div>
         </div>
       </div>
@@ -2392,6 +2487,20 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
           })}
         </ul>
       </MobileBottomSheet>
+
+      <MovieLanguageFormatModal
+        open={langFormatModalOpen}
+        onClose={() => setLangFormatModalOpen(false)}
+        movieTitle={movie.title}
+        showtimesPath={pathname}
+        groups={langFormatGroups}
+        selectedLanguages={languageFilters}
+        selectedFormats={formatFilters}
+        onSelect={(lang, fmt) => {
+          setLanguageFilters(lang && lang !== "All" ? [lang] : []);
+          setFormatFilters(fmt ? [fmt] : []);
+        }}
+      />
     </div>
   );
 }

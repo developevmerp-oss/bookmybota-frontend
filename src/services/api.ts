@@ -637,6 +637,7 @@ export interface PublicMovieShowtimesResponse {
     slug: string;
   };
   available_dates: string[];
+  available_language_formats?: Array<{ language: string; format: string }>;
   cinemas: PublicMovieCinemaGroup[];
 }
 
@@ -8346,6 +8347,8 @@ export const api = createApi({
         time?: string;
         /** Cinema name / address search */
         q?: string;
+        /** Return only available_dates and available_language_formats (skip showtime rows & seat availability) */
+        summary?: number | boolean | string;
       }
     >({
       query: ({ idOrSlug, ...params }) => ({

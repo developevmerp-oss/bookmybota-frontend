@@ -529,27 +529,34 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
     ? showtimeDateKey(layoutData.showtime.starts_at)
     : "";
 
-  /** Seat-page back → this movie's showtimes with matching date / language / format. */
+  /** Seat-page back → restore the exact showtimes URL (with user's chosen filters), or fallback to same date. */
   const showtimesBackHref = useMemo(() => {
     const movieKey = layoutData?.movie?.slug || layoutData?.movie?.id;
     if (!movieKey) return "/movies";
+    try {
+      const saved = sessionStorage.getItem("bmb_movie_showtimes_return_url");
+      if (
+        saved &&
+        (saved.startsWith(`/movies/${movieKey}/showtimes`) ||
+          (layoutData?.movie?.id && saved.startsWith(`/movies/${layoutData.movie.id}/showtimes`)) ||
+          (layoutData?.movie?.slug && saved.startsWith(`/movies/${layoutData.movie.slug}/showtimes`)))
+      ) {
+        return saved;
+      }
+    } catch {
+      /* ignore */
+    }
     const params = new URLSearchParams();
     const dateKey = layoutData?.showtime?.starts_at
       ? showtimeDateKey(layoutData.showtime.starts_at)
       : "";
-    const language = String(layoutData?.showtime?.language || "").trim();
-    const format = String(layoutData?.showtime?.format || "").trim();
     if (dateKey) params.set("date", dateKey);
-    if (language) params.set("language", language);
-    if (format) params.set("format", format);
     const qs = params.toString();
     return qs ? `/movies/${movieKey}/showtimes?${qs}` : `/movies/${movieKey}/showtimes`;
   }, [
     layoutData?.movie?.slug,
     layoutData?.movie?.id,
     layoutData?.showtime?.starts_at,
-    layoutData?.showtime?.language,
-    layoutData?.showtime?.format,
   ]);
 
   const { data: publicShowtimesData } = useGetPublicMovieShowtimesQuery(

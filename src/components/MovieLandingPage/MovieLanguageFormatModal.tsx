@@ -18,6 +18,11 @@ type Props = {
   showtimesPath: string;
   /** Languages with their available formats (from movie masters / showtimes). */
   groups: LanguageFormatGroup[];
+  /** Optional active filters to highlight the currently selected pill(s). */
+  selectedLanguages?: string[];
+  selectedFormats?: string[];
+  /** Optional in-page filter handler (used on showtimes filter bar instead of navigating). */
+  onSelect?: (language?: string, format?: string) => void;
 };
 
 function normalizeKey(value: string): string {
@@ -148,6 +153,9 @@ export default function MovieLanguageFormatModal({
   movieTitle,
   showtimesPath,
   groups,
+  selectedLanguages = [],
+  selectedFormats = [],
+  onSelect,
 }: Props) {
   const router = useRouter();
 
@@ -167,6 +175,10 @@ export default function MovieLanguageFormatModal({
 
   const go = (language?: string, format?: string) => {
     onClose();
+    if (onSelect) {
+      onSelect(language, format);
+      return;
+    }
     router.push(showtimesHref(showtimesPath, { language, format }));
   };
 
@@ -205,34 +217,56 @@ export default function MovieLanguageFormatModal({
         </div>
 
         <div className="pb-5">
-          {groups.map((group) => (
-            <div key={group.language}>
-              <div className="bg-[#F3F4F6] px-5 py-2.5 text-[12px] font-bold uppercase tracking-wide text-[#6B7280]">
-                {group.language}
+          {groups.map((group) => {
+            const normLangs = selectedLanguages.map(normalizeKey);
+            const normFmts = selectedFormats.map(normalizeKey);
+            const langMatches =
+              normLangs.length === 0 ||
+              normLangs.includes(normalizeKey(group.language)) ||
+              group.language === "All";
+            const selectAllActive =
+              normFmts.length === 0 &&
+              (normLangs.length === 0 || normLangs.includes(normalizeKey(group.language)));
+            return (
+              <div key={group.language}>
+                <div className="bg-[#F3F4F6] px-5 py-2.5 text-[12px] font-bold uppercase tracking-wide text-[#6B7280]">
+                  {group.language}
+                </div>
+                <div className="flex flex-wrap gap-2.5 px-5 py-3.5">
+                  {group.formats.map((fmt) => {
+                    const isActive = langMatches && normFmts.includes(normalizeKey(fmt));
+                    return (
+                      <button
+                        key={`${group.language}-${fmt}`}
+                        type="button"
+                        onClick={() => go(group.language, fmt)}
+                        className={`inline-flex items-center rounded-full border px-4 py-2 text-sm font-semibold cursor-pointer transition-colors ${
+                          isActive
+                            ? "border-[#6900AA] bg-[#6900AA] text-white"
+                            : "border-[#6900AA] bg-white text-[#6900AA] hover:bg-[#F7E9FF]"
+                        }`}
+                      >
+                        {fmt}
+                      </button>
+                    );
+                  })}
+                  {group.formats.length > 1 ? (
+                    <button
+                      type="button"
+                      onClick={() => go(group.language)}
+                      className={`inline-flex items-center rounded-full border px-4 py-2 text-sm font-semibold cursor-pointer transition-colors ${
+                        selectAllActive
+                          ? "border-[#6900AA] bg-[#6900AA] text-white"
+                          : "border-[#6900AA] bg-white text-[#6900AA] hover:bg-[#F7E9FF]"
+                      }`}
+                    >
+                      Select all
+                    </button>
+                  ) : null}
+                </div>
               </div>
-              <div className="flex flex-wrap gap-2.5 px-5 py-3.5">
-                {group.formats.map((fmt) => (
-                  <button
-                    key={`${group.language}-${fmt}`}
-                    type="button"
-                    onClick={() => go(group.language, fmt)}
-                    className="inline-flex items-center rounded-full border border-[#6900AA] bg-white px-4 py-2 text-sm font-semibold text-[#6900AA] hover:bg-[#F7E9FF] cursor-pointer transition-colors"
-                  >
-                    {fmt}
-                  </button>
-                ))}
-                {group.formats.length > 1 ? (
-                  <button
-                    type="button"
-                    onClick={() => go(group.language)}
-                    className="inline-flex items-center rounded-full border border-[#6900AA] bg-white px-4 py-2 text-sm font-semibold text-[#6900AA] hover:bg-[#F7E9FF] cursor-pointer transition-colors"
-                  >
-                    Select all
-                  </button>
-                ) : null}
-              </div>
-            </div>
-          ))}
+            );
+          })}
           {groups.length === 0 ? (
             <p className="px-5 py-8 text-sm text-slate-500 text-center">
               No language or format options available.

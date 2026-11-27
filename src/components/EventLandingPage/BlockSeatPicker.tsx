@@ -412,9 +412,9 @@ export default function BlockSeatPicker({
               </p>
               <p className="text-xs text-slate-500">{seatView.tier}</p>
             </div>
-            <button type="button" onClick={() => setLiveOpen(true)} className="shrink-0 cursor-pointer rounded-lg bg-[#6900AA] px-4 py-2 text-xs font-bold text-white hover:bg-[#55008a]">
+            {(cfg as any).live_3d ? <button type="button" onClick={() => setLiveOpen(true)} className="shrink-0 cursor-pointer rounded-lg bg-[#6900AA] px-4 py-2 text-xs font-bold text-white hover:bg-[#55008a]">
               Live stadium view
-            </button>
+            </button> : null}
           </div>
           <div className="mt-2 grid grid-cols-3 gap-2 text-center">
             <div className="rounded-lg bg-white/5 px-2 py-2">

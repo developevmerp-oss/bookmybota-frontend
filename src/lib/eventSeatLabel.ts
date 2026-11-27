@@ -1,3 +1,9 @@
+/** "Lower 9" / "Upper 9" / "104" -> "Block 9" / "Block 104" (the ticket type already says Lower or Upper stand) */
+export function ticketBlockName(section: string): string {
+  const m = /^(?:lower|upper)s+(d+)$/i.exec(section.trim()) || /^(d+)$/.exec(section.trim());
+  return m ? `Block ${m[1]}` : section;
+}
+
 /** Format a single event seat as checkout does, e.g. Row A + Seat 12 → "A12", or clean standing pass format. */
 export function formatEventSeatCode(item: {
   row_label?: string | null;
@@ -49,13 +55,29 @@ export function eventBookingSeatsLabel(
     return `${count} Standing Pass${count === 1 ? "" : "es"}`;
   }
 
-  const seen = new Set<string>();
-  const codes: string[] = [];
+  // group by block / section so the ticket says where the seats are: "Lower 9 · Row K: K7, K8, K9"
+  const groups = new Map<string, Array<(typeof items)[number]>>();
   for (const item of items) {
-    const code = formatEventSeatCode(item);
-    if (!code || seen.has(code)) continue;
-    seen.add(code);
-    codes.push(code);
+    const key = ticketBlockName(String(item.section_name || "").trim());
+    groups.set(key, [...(groups.get(key) || []), item]);
   }
-  return codes.join(", ");
+  const parts: string[] = [];
+  groups.forEach((list, section) => {
+    if (list.every((i) => /^ga$/i.test(String(i.row_label || "").trim()))) {
+      parts.push(`${section || "Standing"} · ${list.length} standing ticket${list.length === 1 ? "" : "s"}`);
+      return;
+    }
+    const seen = new Set<string>();
+    const codes: string[] = [];
+    for (const item of list) {
+      const code = formatEventSeatCode(item);
+      if (!code || seen.has(code)) continue;
+      seen.add(code);
+      codes.push(code);
+    }
+    const rows = [...new Set(list.map((i) => String(i.row_label || "").trim()).filter(Boolean))];
+    const where = rows.length === 1 && section ? `${section} · Row ${rows[0]}` : section;
+    parts.push(where ? `${where}: ${codes.join(", ")}` : codes.join(", "));
+  });
+  return parts.join(" | ");
 }

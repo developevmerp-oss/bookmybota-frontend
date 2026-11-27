@@ -9,6 +9,10 @@ const Stadium3DView = dynamic(() => import("@/components/EventLandingPage/Stadiu
   ssr: false,
   loading: () => <div className="flex h-full items-center justify-center bg-[#0b1224] text-sm text-slate-400">Loading 3D view…</div>,
 });
+const Arena3DView = dynamic(() => import("@/components/EventLandingPage/ArenaModelView"), {
+  ssr: false,
+  loading: () => <div className="flex h-full items-center justify-center bg-[#0b1224] text-sm text-slate-400">Loading 3D view…</div>,
+});
 
 /**
  * Customer seat picker for the "sport_zoom" layout: one flat stadium map (light theme, one colour for every stand).
@@ -550,6 +554,10 @@ export default function SportZoomSeatPicker({
   const activeBlockId = active && active.type === "block" ? active.id : null;
   const viewBox = `${vb.x} ${vb.y} ${vb.w} ${vb.h}`;
 
+  const tintOf = (catId?: string) => {
+    const c = (cfg as any).tint ? catById.get(catId || "")?.color : null;
+    return c && /^#[0-9a-f]{6}$/i.test(c) ? ((cfg as any).tint === "solid" ? c : `${c}38`) : C.block;
+  };
   const renderBlock = (orig: SportObject) => {
     const picked = activeId === orig.id;
     const o = picked ? shown.get(orig.id) || orig : orig; // the opened stand is drawn deeper when it has very many rows
@@ -572,12 +580,17 @@ export default function SportZoomSeatPicker({
     // name sits in the middle of the stand and is sized to fit inside it
     const mid = o.arc ? arcPoint(o.arc, (o.arc.r0 + o.arc.r1) / 2, (o.arc.a0 + o.arc.a1) / 2) : { x: o.x, y: o.y };
     const avail = o.arc ? ((o.arc.r1 - o.arc.r0) * (Math.abs((o.arc.a0 + o.arc.a1) / 2) < 35 ? 0.9 : 1.5)) : o.w * 0.9;
-    const titleSize = Math.max(9, Math.min(22, avail / (Math.max(4, o.name.length) * 0.58), Math.min(o.w, o.h) * 0.3));
+    // long names ("Dress Circle 8") go on two lines and are sized to the room the block really has
+    const nm = /^(.*S)s+(d+)$/.exec(o.name);
+    const lines = o.arc && nm && nm[1].includes(" ") ? [nm[1], nm[2]] : [o.name];
+    const longest = Math.max(...lines.map((l) => l.length), 3);
+    const room = o.arc ? Math.min(o.w, o.h * 1.8) * 0.78 : o.w * 0.9;
+    const titleSize = Math.max(8, Math.min(22, (o.arc ? room : avail) / (longest * 0.58), Math.min(o.w, o.h) * 0.3, (o.h * 0.8) / (lines.length * 1.15)));
     return (
       <g key={o.id} opacity={dim ? 0.3 : 1} transform={picked ? `translate(${o.x} ${o.y}) scale(${pop}) translate(${-o.x} ${-o.y})` : undefined}>
         <polygon
           points={blockOutline(o)}
-          fill={sold ? C.sold : picked ? "#ffffff" : C.block}
+          fill={sold ? C.sold : picked ? "#ffffff" : tintOf(o.category_id)}
           fillOpacity={1}
           stroke={picked ? C.accent : sold ? C.soldLine : C.blockLine}
           strokeWidth={picked ? 1.2 : 1.6}
@@ -588,7 +601,9 @@ export default function SportZoomSeatPicker({
         />
         {!showSeats ? (
           <g pointerEvents="none" textAnchor="middle" fill={sold ? "#64748b" : C.blockText}>
-            <text x={mid.x} y={mid.y} dominantBaseline="central" fontSize={titleSize} fontWeight={800}>{o.name}</text>
+            <text x={mid.x} y={mid.y - ((lines.length - 1) * titleSize * 0.55)} dominantBaseline="central" fontSize={titleSize} fontWeight={800}>
+              {lines.map((l, i) => (<tspan key={i} x={mid.x} dy={i === 0 ? 0 : titleSize * 1.1}>{l}</tspan>))}
+            </text>
             {sold ? <text x={mid.x} y={mid.y + titleSize * 0.95} fontSize={titleSize * 0.6} opacity={0.85}>Sold out</text> : null}
           </g>
         ) : (
@@ -662,7 +677,7 @@ export default function SportZoomSeatPicker({
             const left = freeInCategory(c.id);
             return (
               <button key={c.id} type="button" onClick={() => setCategory(category === c.id ? null : c.id)} className={chipCls(category === c.id, left === 0)}>
-                {c.name} <span className={category === c.id ? "text-white/80" : "text-slate-500"}>{left === 0 ? "Sold out" : money(c.price)}</span>
+                <i className="mr-1.5 inline-block size-2.5 rounded-full align-middle" style={{ background: (cfg as any).tint ? c.color : "transparent" }} />{c.name} <span className={category === c.id ? "text-white/80" : "text-slate-500"}>{left === 0 ? "Sold out" : money(c.price)}</span>
               </button>
             );
           })}
@@ -672,7 +687,7 @@ export default function SportZoomSeatPicker({
         <div
           ref={boxRef}
           className="relative min-h-0 flex-1 touch-none select-none overflow-hidden"
-          style={{ touchAction: "none", background: C.bg }}
+          style={{ touchAction: "none", background: (cfg as any).bg || C.bg }}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
@@ -690,27 +705,27 @@ export default function SportZoomSeatPicker({
                 <text x={o.x} y={o.y} textAnchor="middle" dominantBaseline="central" fontSize={Math.min(o.h * 0.11, 26)} fontWeight={800} fill={C.pitchLine} opacity={0.7}>{o.name}</text>
               </g>
             ))}
-            {objects.filter((o) => o.type === "stage").map((o) => (
-              <g key={o.id} pointerEvents="none">
-                <polygon points={rectOutline(o)} fill="#cbd5e1" stroke="#64748b" strokeWidth={2} />
-                <text x={o.x} y={o.y} textAnchor="middle" dominantBaseline="central" fontSize={22} fontWeight={800} fill="#334155" letterSpacing={4}>{o.name}</text>
-              </g>
-            ))}
             {objects.filter((o) => o.type === "standing").map((o) => {
               const free = freeByBlock.get(o.id) || 0;
               const picked = zoneSelected(o.id).length;
               const dim = category !== null && o.category_id !== category;
-              const fs = Math.max(13, Math.min(o.h * 0.3, 26));
+              const fs = (o as any).label_size ?? Math.max(13, Math.min(o.h * 0.3, 26));
               return (
                 <g key={o.id} opacity={dim ? 0.3 : 1}>
-                  <polygon points={rectOutline(o)} fill={free === 0 ? C.sold : C.block} stroke={activeId === o.id || picked ? C.accent : C.blockLine} strokeWidth={activeId === o.id || picked ? 3 : 1.6} strokeDasharray="8 5" data-hit="standing" data-id={o.id} style={{ cursor: "pointer" }} />
+                  <polygon points={rectOutline(o)} fill={free === 0 ? C.sold : tintOf(o.category_id)} stroke={activeId === o.id || picked ? C.accent : (cfg as any).no_dash ? "none" : C.blockLine} strokeWidth={activeId === o.id || picked ? 3 : 1.6} strokeDasharray={(cfg as any).no_dash ? undefined : "8 5"} data-hit="standing" data-id={o.id} style={{ cursor: "pointer" }} />
                   <g pointerEvents="none" textAnchor="middle" fill={free === 0 ? "#64748b" : C.blockText}>
-                    <text x={o.x} y={o.y - 2} fontSize={fs} fontWeight={800}>{o.name}</text>
-                    <text x={o.x} y={o.y + fs * 0.95} fontSize={fs * 0.66} opacity={0.85}>{free === 0 ? "Sold out" : "Standing"}{picked ? ` · ${picked} yours` : ""}</text>
+                    <text x={(o as any).label_x ?? o.x} y={((o as any).label_y ?? o.y) - 2} fontSize={fs} fontWeight={800}>{o.name}</text>
+                    <text x={(o as any).label_x ?? o.x} y={((o as any).label_y ?? o.y) + fs * 0.95} fontSize={fs * 0.66} opacity={0.85}>{free === 0 ? "Sold out" : "Standing"}{picked ? ` · ${picked} yours` : ""}</text>
                   </g>
                 </g>
               );
             })}
+            {objects.filter((o) => o.type === "stage").map((o) => (
+              <g key={o.id} pointerEvents="none">
+                <polygon points={rectOutline(o)} fill={(cfg as any).stage_color || "#cbd5e1"} stroke={(cfg as any).stage_color ? "#2e3a8c" : "#64748b"} strokeWidth={2} />
+                <text x={(o as any).label_x ?? o.x} y={(o as any).label_y ?? o.y} textAnchor="middle" dominantBaseline="central" fontSize={Math.max(11, Math.min(22, o.w * 0.15))} fontWeight={800} fill={(cfg as any).stage_text || "#334155"} letterSpacing={o.w < 140 ? 1 : 4}>{o.name}</text>
+              </g>
+            ))}
             {objects.filter((o) => o.type === "block" && o.id !== activeId).map(renderBlock)}
             {objects.filter((o) => o.type === "block" && o.id === activeId).map(renderBlock)}
           </svg>
@@ -762,7 +777,7 @@ export default function SportZoomSeatPicker({
           </div>
         )}
 
-        {selected.length > 0 ? (
+        {selected.length > 0 && (cfg as any).live_3d ? (
           <div className="px-4 pt-3">
             <button type="button" onClick={() => setLiveOpen(true)} className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-[#6900AA] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#55008a]">
               <Box className="size-4" /> Live stadium view
@@ -803,7 +818,11 @@ export default function SportZoomSeatPicker({
             <button type="button" onClick={() => setLiveOpen(false)} className="shrink-0 cursor-pointer rounded-lg border border-white/30 px-4 py-1.5 text-sm font-bold hover:bg-white/10">Close</button>
           </div>
           <div className="relative min-h-0 flex-1">
-            <Stadium3DView booked={seats.filter((x) => !isFree(x)) as any} selected={selected as any} model={String((cfg as any).stadium_model || "football")} seats={seats as any} seat={lastSeat as any} className="h-full w-full" />
+            {String((cfg as any).stadium_model || "") === "procedural" ? (
+              <Arena3DView booked={seats.filter((x) => !isFree(x)) as any} selected={selected as any} seats={seats as any} seat={lastSeat as any} layout={cfg as any} className="h-full w-full" />
+            ) : (
+            <Stadium3DView booked={seats.filter((x) => !isFree(x)) as any} selected={selected as any} model={String((cfg as any).stadium_model || "football")} layout={cfg as any} seats={seats as any} seat={lastSeat as any} className="h-full w-full" />
+            )}
           </div>
           <div className="flex items-center justify-between gap-3 border-t border-white/10 bg-[#0b0f17] px-4 py-3 text-white">
             <div className="min-w-0">

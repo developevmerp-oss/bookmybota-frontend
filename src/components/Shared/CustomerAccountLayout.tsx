@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -56,10 +57,30 @@ export default function CustomerAccountLayout({
   };
 
   const isProfileOverview = pathname === "/customer/profile";
+  const isTopLevelCustomerSubpage =
+    pathname === "/customer/dashboard" ||
+    pathname === "/customer/favourite" ||
+    pathname === "/customer/gift-cards" ||
+    pathname === "/customer/help" ||
+    pathname === "/customer/offers";
 
   const handleBack = () => {
     router.push("/customer/profile");
   };
+
+  // Match hardware/browser Back button on top-level /customer/* subpages with the in-app Back button (/customer/profile).
+  // Nested detail pages (/customer/bookings/[id], /customer/gift-cards/[id], etc.) are handled by ConfirmationPageUI1Shell.
+  useEffect(() => {
+    if (typeof window === "undefined" || !isTopLevelCustomerSubpage || hideMobileHeader) return;
+    if (window.history.state?.bmbCustomerSubpage !== pathname) {
+      window.history.pushState({ bmbCustomerSubpage: pathname }, "");
+    }
+    const onPopState = () => {
+      router.replace("/customer/profile");
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [isTopLevelCustomerSubpage, hideMobileHeader, pathname, router]);
 
   const currentNav = NAV.find(
     (n) =>

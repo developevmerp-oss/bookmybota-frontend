@@ -6,9 +6,9 @@ import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { artistHref } from "@/lib/businessPublicPath";
 import { scrollRailBy, useHorizontalScrollEdges } from "@/lib/useHorizontalScrollEdges";
 import {
-  usePublicArtistsCatalog,
-  type DirectoryArtist,
-} from "@/lib/usePublicArtistsCatalog";
+  useGetPublicArtistDirectoryQuery,
+  type PublicRegisteredPartner,
+} from "@/services/api";
 import SafeCoverImage, {
   ARTIST_IMAGE_FALLBACK_CLASS,
   ArtistImageFallback,
@@ -26,7 +26,9 @@ type RailArtistCard = {
   href: string;
 };
 
-function mapApiArtist(artist: DirectoryArtist): RailArtistCard {
+function mapApiArtist(
+  artist: PublicRegisteredPartner & { role_title?: string | null }
+): RailArtistCard {
   return {
     id: artist.id,
     name: artist.name,
@@ -82,13 +84,17 @@ function ArtistCard({ artist }: { artist: RailArtistCard }) {
 
 export default function TopArtistsRail() {
   const scrollerRef = useRef<HTMLDivElement>(null);
-  const { artists, isLoading } = usePublicArtistsCatalog();
+  const { data: directoryPage, isLoading } = useGetPublicArtistDirectoryQuery({
+    page: 1,
+    limit: 20,
+  });
+  const artists = directoryPage?.items ?? [];
   const items = useMemo(() => {
     const mapped = artists
       .filter(
         (a) =>
           !/^(chief\s*guest|guest)$/i.test(
-            String(a.role_title || a.type_name || "").trim()
+            String((a as { role_title?: string | null }).role_title || a.type_name || "").trim()
           )
       )
       .map(mapApiArtist);

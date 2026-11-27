@@ -717,6 +717,21 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
   // Sticky section tabs (Overview / Menu / Photos / Reviews) — District-like staged sticky nav
   const [activeTab, setActiveTab] = useState<string>("Overview");
   const [drawerStep, setDrawerStep] = useState(1); // 1: Selections, 2: Login/OTP/Register, 3: Summary, 4: Success
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (drawerStep === 3) {
+      if (window.history.state?.bmbDiningStep !== 3) {
+        window.history.pushState({ bmbDiningStep: 3 }, "");
+      }
+    }
+    const onPopState = () => {
+      if (drawerStep === 3) {
+        setDrawerStep(1);
+      }
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [drawerStep]);
   const [siteHeaderHeight, setSiteHeaderHeight] = useState(0);
   const [sidebarStickyTop, setSidebarStickyTop] = useState(140);
   const [titlePast, setTitlePast] = useState(false);

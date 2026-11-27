@@ -48,9 +48,56 @@ export function preloadStadium(modelKey = "football") {
   useGLTF.preload(glbUrl(modelKey));
 }
 
-function Model({ model }: { model: string }) {
+type LayoutObj = { id: string; type: string; x: number; y: number; w: number; h: number; outline?: number[]; category_id?: string };
+type LayoutCfg = { objects?: LayoutObj[]; categories?: Array<{ id: string; color?: string }> } | undefined;
+
+function Model({ model, custom }: { model: string; custom: boolean }) {
   const gltf = useGLTF(glbUrl(model));
+  // a concert on the pitch: no goal posts
+  useMemo(() => {
+    gltf.scene.traverse((o) => {
+      if (/^goals/i.test(o.name)) o.visible = !custom;
+    });
+  }, [gltf, custom]);
   return <primitive object={gltf.scene} />;
+}
+
+/** Stage, fan pit and standing floor of a concert laid out on the pitch (2D map -> pitch of the 3D model) */
+function GroundOverlay({ model, layout }: { model: string; layout: NonNullable<LayoutCfg> }) {
+  const gltf = useGLTF(glbUrl(model));
+  const parts = useMemo(() => {
+    const pitch = gltf.scene.getObjectByName("Pitch_0") || gltf.scene.getObjectByName("Pitch");
+    if (!pitch) return [];
+    const box = new THREE.Box3().setFromObject(pitch);
+    const size = box.getSize(new THREE.Vector3());
+    const c = box.getCenter(new THREE.Vector3());
+    const alongX = size.x >= size.z;
+    const sx = (alongX ? size.x : size.z) / 500;
+    const sz = (alongX ? size.z : size.x) / 220;
+    const to3 = (x: number, y: number): [number, number] => {
+      const a = (x - 800) * sx, b = (y - 600) * sz;
+      return alongX ? [c.x + a, c.z + b] : [c.x + b, c.z + a];
+    };
+    return (layout.objects || [])
+      .filter((o) => o.type === "stage" || o.type === "standing")
+      .map((o, idx) => {
+        const pts: Array<[number, number]> = [];
+        if (o.outline && o.outline.length >= 6) for (let i = 0; i + 1 < o.outline.length; i += 2) pts.push([o.x + o.outline[i] * o.w, o.y + o.outline[i + 1] * o.h]);
+        else pts.push([o.x - o.w / 2, o.y - o.h / 2], [o.x + o.w / 2, o.y - o.h / 2], [o.x + o.w / 2, o.y + o.h / 2], [o.x - o.w / 2, o.y + o.h / 2]);
+        const shape = new THREE.Shape(pts.map(([x, y]) => { const [px, pz] = to3(x, y); return new THREE.Vector2(px, -pz); }));
+        const color = o.type === "stage" ? "#3b2a63" : layout.categories?.find((k) => k.id === o.category_id)?.color || "#7B61FF";
+        return { id: o.id, stage: o.type === "stage", geo: new THREE.ExtrudeGeometry(shape, { depth: o.type === "stage" ? 1.0 : 0.08, bevelEnabled: false }), color, y: box.max.y + 0.02 + idx * 0.06 };
+      });
+  }, [gltf, layout]);
+  return (
+    <group>
+      {parts.map((p) => (
+        <mesh key={p.id} geometry={p.geo} rotation-x={-Math.PI / 2} position={[0, p.y, 0]}>
+          <meshStandardMaterial color={p.color} transparent={!p.stage} opacity={p.stage ? 1 : 0.7} emissive={p.stage ? "#7c3aed" : p.color} emissiveIntensity={p.stage ? 0.35 : 0.25} />
+        </mesh>
+      ))}
+    </group>
+  );
 }
 
 /** Rendered inside <Suspense> after the model: it only mounts once the 3D model has finished loading */
@@ -274,7 +321,7 @@ function groupPose(group: ModelSeat[]): Pose {
   return { pos: [pos.x, pos.y, pos.z], look: [c.x, c.y + 0.5, c.z] };
 }
 
-export default function StadiumModelView({ seats, seat, className = "", model: modelKey = "football", selected = [], booked = [] }: { seats: Seat3D[]; seat: Seat3D | null; className?: string; model?: string; selected?: Seat3D[]; booked?: Seat3D[] }) {
+export default function StadiumModelView({ seats, seat, className = "", model: modelKey = "football", selected = [], booked = [], layout }: { seats: Seat3D[]; seat: Seat3D | null; className?: string; model?: string; selected?: Seat3D[]; booked?: Seat3D[]; layout?: LayoutCfg }) {
   const [model, setModel] = useState<ModelSeat[] | null>(null);
   const [failed, setFailed] = useState(false);
 
@@ -387,7 +434,8 @@ export default function StadiumModelView({ seats, seat, className = "", model: m
         <hemisphereLight args={["#cfe0ff", "#2b3a2f", 1.15]} />
         <directionalLight position={[80, 140, 60]} intensity={2.2} />
         <Suspense fallback={null}>
-          <Model model={modelKey} />
+          <Model model={modelKey} custom={!!layout?.objects?.some((o) => o.type === "stage")} />
+          {layout?.objects?.some((o) => o.type === "stage") ? <GroundOverlay model={modelKey} layout={layout} /> : null}
           <ColoredChairs seats={freeChairs} color="#1d4ed8" scale={1} lit wide={wide} />
           <Taken seats={gone} wide={wide} />
           <Picked seats={mine} wide={wide} tall={overview} skipId={mode === "seat" ? cam?.id || null : null} />

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { eventBookingSeatsLabel } from "@/lib/eventSeatLabel";
 import Link from "next/link";
 import { Controller, useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
@@ -501,7 +502,10 @@ export default function EventCheckout({
       const allSeats: any[] =
         (activeLayoutData as any)?.data?.seats || (activeLayoutData as any)?.seats || [];
       const heldSet = new Set(heldSeatIds);
-      const matched = allSeats.filter((s: any) => heldSet.has(String(s.id)));
+      const matched = allSeats.filter(
+        (s: any) => heldSet.has(String(s.id)) && String(s.status || "AVAILABLE").toUpperCase() === "AVAILABLE"
+      );
+      if (matched.length === 0 && allSeats.length > 0) return; // seats already booked: never show them as selected
 
       setSelectedSeats((curr) => {
         if (curr && curr.length > 0) return curr;
@@ -2979,10 +2983,10 @@ export default function EventCheckout({
                         if (isAllStanding) {
                           return types || "Standing Pass";
                         }
-                        const seatCodes = selectedSeats
-                          .map((s) => `${s.row_label || s.row || ""}${s.seat_label || s.number || ""}`.trim())
-                          .filter(Boolean)
-                          .join(", ");
+                        // block + row + seats, e.g. "Lower 9 · Row K: K7, K8"
+                        const seatCodes = eventBookingSeatsLabel(
+                          selectedSeats.map((s) => ({ row_label: s.row_label || s.row, seat_label: s.seat_label || s.number, section_name: s.section_name }))
+                        );
                         return [types, seatCodes].filter(Boolean).join("  •  ");
                       })()}
                     </p>
